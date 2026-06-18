@@ -1,0 +1,58 @@
+'use server'
+
+import { eq } from 'drizzle-orm'
+import { redirect } from 'next/navigation'
+import { db, schema } from '@/db'
+import { ownerExists } from '@/lib/auth/bootstrap'
+import { hashPassword } from '@/lib/auth/password'
+import { createSession } from '@/lib/auth/session'
+
+export type SetupState = { error: string } | null
+
+function field(formData: FormData, key: string): string {
+  const value = formData.get(key)
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+// First-run owner creation. Guarded against a race: if an owner appears between
+// the page check and submit, we bail to /login rather than create a second user.
+export async function createOwner(_prev: SetupState, formData: FormData): Promise<SetupState> {
+  if (await ownerExists()) redirect('/login')
+
+  const name = field(formData, 'name')
+  const email = field(formData, 'email').toLowerCase()
+  const password = String(formData.get('password') ?? '')
+
+  if (!name) return { error: 'Name is required.' }
+  if (!email || !email.includes('@')) return { error: 'A valid email is required.' }
+  if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
+
+  const passwordHash = await hashPassword(password)
+
+  const [user] = await db
+    .insert(schema.users)
+    .values({ name, email, passwordHash, role: 'owner' })
+    .onConflictDoNothing({ target: schema.users.email })
+    .returning({ id: schema.users.id })
+
+  if (!user) {
+    // Email already taken — the owner (or a prior attempt) exists.
+    const [existing] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1)
+    if (existing) redirect('/login')
+    return { error: 'Could not create the owner account.' }
+  }
+
+  await db.insert(schema.auditLog).values({
+    actorId: user.id,
+    action: 'setup',
+    targetType: 'user',
+    targetId: user.id,
+  })
+
+  await createSession(user.id)
+  redirect('/')
+}

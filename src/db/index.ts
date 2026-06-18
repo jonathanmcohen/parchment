@@ -9,7 +9,21 @@ const globalForDb = globalThis as unknown as { __pool?: Pool }
 
 const pool = globalForDb.__pool ?? new Pool({ connectionString: env.databaseUrl, max: 10 })
 
+// A dropped idle connection (DB restart, container shutdown in tests) must not
+// crash the process — node-postgres throws on an unhandled pool 'error'.
+pool.on('error', (e) => {
+  if (env.nodeEnv !== 'production') console.error('[db] idle client error:', e.message)
+})
+
 if (env.nodeEnv !== 'production') globalForDb.__pool = pool
 
 export const db = drizzle(pool, { schema })
 export { schema }
+
+// Closes the shared pool (test teardown; not used in the running app).
+export async function closeDb(): Promise<void> {
+  if (globalForDb.__pool) {
+    await globalForDb.__pool.end()
+    delete globalForDb.__pool
+  }
+}

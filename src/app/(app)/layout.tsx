@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { requireUser } from '@/lib/auth/guard'
+import { SignOutButton } from '@/lib/auth/sign-out-button'
 
 const nav = [
   { href: '/files', label: 'Files' },
@@ -8,7 +10,10 @@ const nav = [
   { href: '/settings', label: 'Settings' },
 ]
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Gate the whole app group: unauthenticated visitors are sent to /login.
+  const user = await requireUser()
+
   return (
     <div className="flex min-h-screen">
       <aside className="flex w-56 shrink-0 flex-col gap-1 border-[var(--border)] border-r bg-[var(--paper)] p-4">
@@ -24,6 +29,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {item.label}
           </Link>
         ))}
+        <div className="mt-auto flex flex-col gap-1 border-[var(--border)] border-t pt-4">
+          <span className="px-2 text-[var(--muted)] text-xs">{user.name}</span>
+          <SignOutButton />
+        </div>
       </aside>
       <main className="flex-1 p-8">{children}</main>
     </div>

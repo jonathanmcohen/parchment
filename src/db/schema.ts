@@ -87,6 +87,39 @@ export const auditLog = pgTable(
   (t) => [index('audit_log_created_idx').on(t.createdAt)],
 )
 
+// ─── Sessions (A2) — opaque cookie tokens; only the sha256 hash is stored ───
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('sessions_user_idx').on(t.userId)],
+)
+
+// ─── Personal access tokens (A2) — Bearer auth for the API ───
+// Plaintext token is shown once at creation; only the sha256 hash is persisted.
+export const pats = pgTable(
+  'pats',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    tokenPrefix: text('token_prefix').notNull(), // 'pat_' + first 6 chars, for display
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('pats_owner_idx').on(t.ownerId)],
+)
+
 // ─── Collab state (Yjs document snapshots, written by parchment-collab) ───
 export const collabState = pgTable('collab_state', {
   name: text('name').primaryKey(),

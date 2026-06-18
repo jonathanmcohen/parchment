@@ -32,10 +32,10 @@
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
 | A1 | Scaffold repo, biome, tsconfig, drizzle, **single-container** image (PG18+pgvector+Hocuspocus+Next, s6-overlay) | DONE | ✓ | ✓ | typecheck/lint/build 0; **Vitest+Testcontainers** migration test 3/3; **axe-core 6/6** zero-violations; single-container **browser-verified live** (:3001). a11y contrast bug found+fixed (RED→GREEN) |
-| A2 | Auth — PAT + local owner account; OAuth 2.1 + SSO route stubs (v0.2) | TODO | ☐ | ☐ | |
-| A3 | Settings shell — Account / Workspace / Admin / Developer / Notifications / Security | TODO | ☐ | ☐ | mirror Cairn groupings |
-| A4 | Audit log (create/delete/share/export/login) | TODO | ☐ | ☐ | |
-| A5 | Health page (DB / disk / search index / collab status pills) | TODO | ☐ | ☐ | |
+| A2 | Auth — PAT + local owner account; OAuth 2.1 + SSO route stubs (v0.2) | DONE | ✓ | ✓ | argon2id + session cookie + Bearer-PAT; /setup + /login; OAuth/SSO 501 stubs; `(app)` gated by requireUser. auth.test green; **browser-verified** owner-creation → session → audit row; axe /login + /setup-form clean |
+| A3 | Settings shell — Account / Workspace / Admin / Developer / Notifications / Security | DONE | ✓ | ✓ | 6-group nested-layout shell + active sub-nav; axe 6/6 (fixed inverted active-link contrast, RED→GREEN); browser-verified |
+| A4 | Audit log (create/delete/share/export/login) | DONE | ✓ | ✓ | append-only logAudit (never throws) + filterable viewer; Testcontainers test 3/3; **browser-verified** (setup event renders); axe clean |
+| A5 | Health page (DB / disk / search index / collab status pills) | DONE | ✓ | ✓ | real probes (db/collab/search-index/disk), resilient; pills page + /api/health; **browser-verified** (db up, collab/disk down shown); axe clean |
 
 ## Plan B — Editor core / TIER 1 (14)
 
@@ -197,7 +197,7 @@
 
 | Plan | Items | DONE | GAP | Open |
 |---|---|---|---|---|
-| A Foundations | 5 | 1 | 0 | 4 |
+| A Foundations | 5 | 5 | 0 | 0 |
 | B Editor core | 14 | 0 | 0 | 14 |
 | C Code block | 7 | 0 | 0 | 7 |
 | D Collab | 5 | 0 | 0 | 5 |
@@ -209,6 +209,6 @@
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **1** | **0** | **103** |
+| **Total** | **104** | **5** | **0** | **99** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

@@ -1,0 +1,29 @@
+export default function DeveloperSettingsPage() {
+  return (
+    <section className="max-w-2xl">
+      <h1 className="font-semibold text-2xl tracking-tight">Developer</h1>
+      <p className="mt-2 text-[var(--muted)]">
+        Programmatic access to your workspace for scripts and integrations.
+      </p>
+
+      <section aria-labelledby="developer-tokens" className="mt-8">
+        <h2 id="developer-tokens" className="font-medium text-lg">
+          Personal access tokens
+        </h2>
+        <p className="mt-1 text-[var(--muted)] text-sm">
+          Tokens authenticate API requests on your behalf. They are created and revoked from token
+          management (Plan A2).
+        </p>
+      </section>
+
+      <section aria-labelledby="developer-webhooks" className="mt-8">
+        <h2 id="developer-webhooks" className="font-medium text-lg">
+          Webhooks
+        </h2>
+        <p className="mt-1 text-[var(--muted)] text-sm">
+          Send HTTP callbacks to your own services when documents change (Plan J7).
+        </p>
+      </section>
+    </section>
+  )
+}

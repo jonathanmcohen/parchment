@@ -5,6 +5,8 @@
   --foreground: #1a1a17;
   --muted: #6b6b63;
   --accent: #7c5cff;
+  /* Accent shade guaranteed to pass WCAG AA with white text (both themes). */
+  --accent-contrast: #6d28d9;
   --paper: #ffffff;
   --border: #e3e1da;
 }
@@ -25,6 +27,7 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
   --color-paper: var(--paper);
   --color-border: var(--border);
 }

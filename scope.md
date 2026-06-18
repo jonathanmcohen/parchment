@@ -31,7 +31,7 @@
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
-| A1 | Scaffold repo, biome, tsconfig, drizzle, **single-container** image (PG18+pgvector+Hocuspocus+Next, s6-overlay) | GREEN | ☐ | ☐ | built+ran+**browser-verified live** (home/files/health, container :3001); typecheck/lint/build all 0; migration→5 tables. `DONE` pending Vitest/Testcontainers test + axe-core report (needs K4 harness) |
+| A1 | Scaffold repo, biome, tsconfig, drizzle, **single-container** image (PG18+pgvector+Hocuspocus+Next, s6-overlay) | DONE | ✓ | ✓ | typecheck/lint/build 0; **Vitest+Testcontainers** migration test 3/3; **axe-core 6/6** zero-violations; single-container **browser-verified live** (:3001). a11y contrast bug found+fixed (RED→GREEN) |
 | A2 | Auth — PAT + local owner account; OAuth 2.1 + SSO route stubs (v0.2) | TODO | ☐ | ☐ | |
 | A3 | Settings shell — Account / Workspace / Admin / Developer / Notifications / Security | TODO | ☐ | ☐ | mirror Cairn groupings |
 | A4 | Audit log (create/delete/share/export/login) | TODO | ☐ | ☐ | |
@@ -175,7 +175,7 @@
 | K1 | ARIA structure, semantic HTML, alt text required on insert | TODO | ☐ | ☐ | ties B5 |
 | K2 | High-contrast theme + OpenDyslexic toggle | TODO | ☐ | ☐ | |
 | K3 | Keyboard-only nav — every menu, focus ring, skip-to-content | TODO | ☐ | ☐ | |
-| K4 | axe-core harness — every top-level page a Playwright a11y target | TODO | ☐ | ☐ | release gate |
+| K4 | axe-core harness — every top-level page a Playwright a11y target | WIP | ☐ | ☐ | harness live (Playwright + @axe-core), 6 routes green; extends as routes are added |
 | K5 | i18n via next-intl + RTL (Arabic/Hebrew) | TODO | ☐ | ☐ | |
 | K6 | Spell check — browser-native + per-workspace custom dict | TODO | ☐ | ☐ | |
 | K7 | Grammar check — LanguageTool (host URL + key UI) | TODO | ☐ | ☐ | |
@@ -197,7 +197,7 @@
 
 | Plan | Items | DONE | GAP | Open |
 |---|---|---|---|---|
-| A Foundations | 5 | 0 | 0 | 5 |
+| A Foundations | 5 | 1 | 0 | 4 |
 | B Editor core | 14 | 0 | 0 | 14 |
 | C Code block | 7 | 0 | 0 | 7 |
 | D Collab | 5 | 0 | 0 | 5 |
@@ -209,6 +209,6 @@
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **0** | **0** | **104** |
+| **Total** | **104** | **1** | **0** | **103** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

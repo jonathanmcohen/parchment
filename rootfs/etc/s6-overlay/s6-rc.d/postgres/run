@@ -1,0 +1,13 @@
+#!/command/with-contenv sh
+set -e
+mkdir -p "$PGDATA"
+chown postgres:postgres "$PGDATA"
+if [ ! -s "$PGDATA/PG_VERSION" ]; then
+  echo "[parchment] initializing postgres cluster"
+  s6-setuidgid postgres initdb -D "$PGDATA" -U parchment -E UTF8 \
+    --auth-local=trust --auth-host=trust >/dev/null
+  echo "listen_addresses = 'localhost'" >> "$PGDATA/postgresql.conf"
+  echo "host all all 127.0.0.1/32 trust" >> "$PGDATA/pg_hba.conf"
+  echo "host all all ::1/128 trust" >> "$PGDATA/pg_hba.conf"
+fi
+exec s6-setuidgid postgres postgres -D "$PGDATA"

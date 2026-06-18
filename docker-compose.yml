@@ -1,0 +1,38 @@
+# DEV ONLY. Production is the single all-in-one image (see Dockerfile).
+#
+#  - `db`  : Postgres 18 + pgvector for local `pnpm dev` (host port 5433).
+#  - `app` : builds + runs the full single-container image (its own bundled
+#            Postgres; ignores `db`). Use to smoke-test the production image.
+
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: parchment
+      POSTGRES_PASSWORD: parchment
+      POSTGRES_DB: parchment
+    ports:
+      - '5433:5432'
+    volumes:
+      - parchment_dev_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U parchment']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    image: ghcr.io/jonathanmcohen/parchment:dev
+    ports:
+      - '3000:3000'
+      - '1234:1234'
+    volumes:
+      - parchment_pg:/var/lib/postgresql
+      - parchment_data:/data
+    profiles: ['full']
+
+volumes:
+  parchment_dev_pg:
+  parchment_pg:
+  parchment_data:

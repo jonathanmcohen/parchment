@@ -1,0 +1,22 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# next
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+
+# runtime data
+/data/
+parchment-data/
+
+# os / editor
+.DS_Store
+*.log

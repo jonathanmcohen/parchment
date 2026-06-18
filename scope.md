@@ -31,7 +31,7 @@
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
-| A1 | Scaffold repo, biome, tsconfig, drizzle, **single-container** image (PG18+pgvector+Hocuspocus+Next, s6-overlay) | WIP | ☐ | ☐ | started; compose is dev-only |
+| A1 | Scaffold repo, biome, tsconfig, drizzle, **single-container** image (PG18+pgvector+Hocuspocus+Next, s6-overlay) | GREEN | ☐ | ☐ | built+ran+**browser-verified live** (home/files/health, container :3001); typecheck/lint/build all 0; migration→5 tables. `DONE` pending Vitest/Testcontainers test + axe-core report (needs K4 harness) |
 | A2 | Auth — PAT + local owner account; OAuth 2.1 + SSO route stubs (v0.2) | TODO | ☐ | ☐ | |
 | A3 | Settings shell — Account / Workspace / Admin / Developer / Notifications / Security | TODO | ☐ | ☐ | mirror Cairn groupings |
 | A4 | Audit log (create/delete/share/export/login) | TODO | ☐ | ☐ | |

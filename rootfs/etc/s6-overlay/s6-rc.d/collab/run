@@ -1,0 +1,3 @@
+#!/command/with-contenv sh
+cd /app
+exec ./node_modules/.bin/tsx collab/server.ts

@@ -12,7 +12,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = (await req.json()) as { name?: unknown; parentId?: unknown }
 
   if (typeof body.name === 'string') {
-    await renameFolder(id, body.name)
+    await renameFolder(user.id, id, body.name)
   }
 
   if ('parentId' in body) {

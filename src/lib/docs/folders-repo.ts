@@ -23,11 +23,13 @@ export async function listFolders(ownerId: string): Promise<Folder[]> {
   return db.select().from(schema.folders).where(eq(schema.folders.ownerId, ownerId))
 }
 
-export async function renameFolder(id: string, name: string): Promise<void> {
+export async function renameFolder(ownerId: string, id: string, name: string): Promise<void> {
+  const trimmed = name.trim()
+  if (trimmed.length === 0) throw new Error('empty name')
   await db
     .update(schema.folders)
-    .set({ name, updatedAt: new Date() })
-    .where(eq(schema.folders.id, id))
+    .set({ name: trimmed, updatedAt: new Date() })
+    .where(and(eq(schema.folders.id, id), eq(schema.folders.ownerId, ownerId)))
 }
 
 /**

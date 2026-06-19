@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { CommandPaletteMount } from '@/components/CommandPaletteMount'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
 
@@ -16,6 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
+      <CommandPaletteMount />
       <aside className="flex w-56 shrink-0 flex-col gap-1 border-[var(--border)] border-r bg-[var(--paper)] p-4">
         <Link href="/" className="mb-4 px-2 font-semibold text-lg tracking-tight">
           Parchment

@@ -1253,12 +1253,23 @@ body {
   margin: 0.6em 0;
 }
 .parchment-prose pre {
-  background: var(--paper);
+  /* C3/C4: Shiki token colours are applied via inline styles on individual spans.
+     Use a light neutral background that complements all 6 bundled themes.
+     github-light / solarized-light stay on white; github-dark / dracula / nord /
+     solarized-dark need the dark mode override below. */
+  background: #f6f8fa;
   border: 1px solid var(--border);
   border-radius: 0.4rem;
   padding: 0.75em 1em;
   overflow-x: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Prevent the default inherit from washing out Shiki inline token colours. */
+  color: inherit;
+}
+@media (prefers-color-scheme: dark) {
+  .parchment-prose pre {
+    background: #1e2030;
+  }
 }
 .parchment-prose p.is-editor-empty:first-child::before {
   content: "Start writing…";

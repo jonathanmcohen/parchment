@@ -1,5 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import { blockExtensions } from '@/lib/editor/block-extensions'
+import { CodeBlockShiki } from '@/lib/editor/extensions/code-block-shiki'
 import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
@@ -25,6 +26,10 @@ export const baseExtensions = [
       protocols: ['http', 'https', 'mailto'],
       HTMLAttributes: { rel: 'noopener noreferrer nofollow' },
     },
+    // C3/C4: Disable StarterKit's built-in codeBlock so our Shiki-powered
+    // CodeBlockShiki extension (added below) is the sole codeBlock node.
+    // Without this, ProseMirror would warn about a duplicate node type.
+    codeBlock: false,
   }),
   ...inlineExtensions,
   ...blockExtensions,
@@ -45,4 +50,6 @@ export const baseExtensions = [
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the
   // onOpenImage callback that controls the image dialog.
+  // C3/C4: Shiki-powered code block (replaces StarterKit's built-in codeBlock).
+  CodeBlockShiki,
 ]

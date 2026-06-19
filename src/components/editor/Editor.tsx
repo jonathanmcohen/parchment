@@ -18,6 +18,7 @@ import { LinkPopover } from '@/components/editor/LinkPopover'
 import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
+import { ReadingPresence } from '@/components/editor/ReadingPresence'
 import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
@@ -27,6 +28,7 @@ import { type Counts, countText } from '@/lib/editor/counts'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import { DEFAULT_PAGE_SETUP, type PageSetup } from '@/lib/editor/paginate'
+import { type Reader, throttle } from '@/lib/editor/reading-presence'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { authorColor } from '@/lib/editor/track-changes'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
@@ -273,6 +275,10 @@ export function Editor({
   // D2: suggestions panel toggle
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
 
+  // D5: reading presence readers list + canvas wrapper ref
+  const [readers, setReaders] = useState<Reader[]>([])
+  const canvasWrapRef = useRef<HTMLDivElement>(null)
+
   const save = useCallback(
     (json: Record<string, unknown>) => {
       const markdown = serializeMarkdown(json)
@@ -464,6 +470,40 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-section', handler)
   }, [editor])
 
+  // D5: publish own awareness presence + reading position
+  useEffect(() => {
+    if (!editor || !provider) return
+
+    // Publish user field so unfocused readers still appear in awareness
+    provider.setAwarenessField('user', { name: currentUserName, color: cursorColor })
+
+    const publishReading = throttle(() => {
+      try {
+        const vh = window.innerHeight
+        const editorLeft = editor.view.dom.getBoundingClientRect().left
+        const hit = editor.view.posAtCoords({ left: editorLeft + 40, top: vh / 2 })
+        if (hit) {
+          provider.setAwarenessField('reading', { pos: hit.pos, updatedAt: Date.now() })
+        }
+      } catch {
+        // editor may be transiently invalid
+      }
+    }, 200)
+
+    // Initial publish
+    publishReading()
+
+    const onScroll = () => publishReading()
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true })
+    editor.on('update', publishReading)
+
+    return () => {
+      window.removeEventListener('scroll', onScroll, { capture: true })
+      editor.off('update', publishReading)
+      publishReading.cancel()
+    }
+  }, [editor, provider, currentUserName, cursorColor])
+
   return (
     <div className="mx-auto max-w-5xl">
       {/* Inline formatting toolbar (B2) */}
@@ -492,13 +532,22 @@ export function Editor({
         {editor && <OutlinePane editor={editor} />}
 
         {/* B9: find + replace panel — positioned relative to this wrapper */}
-        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+        <div ref={canvasWrapRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
           <PageCanvas pageSetup={pageSetup} onPageCountChange={setPageCount} editor={editor}>
             <EditorContent editor={editor} />
           </PageCanvas>
 
           {editor && findOpen && (
             <FindReplace editor={editor} initialMode={findMode} onClose={closeFind} />
+          )}
+
+          {editor && provider && (
+            <ReadingPresence
+              editor={editor}
+              provider={provider}
+              containerRef={canvasWrapRef}
+              onReadersChange={setReaders}
+            />
           )}
         </div>
 
@@ -515,7 +564,12 @@ export function Editor({
       {/* Selection bubble menu (B2) */}
       {editor && <BubbleMenu editor={editor} />}
 
-      <StatusBar pageCount={pageCount} full={full} selection={selection} />
+      <StatusBar
+        pageCount={pageCount}
+        full={full}
+        selection={selection}
+        readers={readers.map((r) => r.user)}
+      />
 
       {/* B5: Image insert dialog */}
       {editor && imageDialogOpen && (

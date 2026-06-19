@@ -2,6 +2,7 @@
 
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
+import { TableControls } from '@/components/editor/TableControls'
 
 type Props = {
   editor: Editor
@@ -111,6 +112,8 @@ export function Toolbar({ editor }: Props) {
       firstLineIndent: Boolean(ed.getAttributes('paragraph').firstLineIndent),
       // Code block language
       codeLanguage: ed.getAttributes('codeBlock').language as string | undefined,
+      // Table
+      table: ed.isActive('table'),
     }),
   })
 
@@ -505,6 +508,30 @@ export function Toolbar({ editor }: Props) {
               ))}
             </select>
           </label>
+        </>
+      )}
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── Insert table (B4) ────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Insert table"
+        aria-pressed={s.table}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() =>
+          editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+        }
+      >
+        ⊞
+      </button>
+
+      {/* ── Table context controls (visible when cursor is in a table) ── */}
+      {s.table && (
+        <>
+          <span className="parchment-toolbar-sep" aria-hidden="true" />
+          <TableControls editor={editor} />
         </>
       )}
     </div>

@@ -44,7 +44,7 @@
 | B1 | Page-bounded canvas, `@page` + paged.js, Letter default, A4 toggle, per-section margin+orientation | DONE | ✓ | ✓ | page-width paper + computed break markers + live "Page X · N words" + A4/Letter toggle (816↔794px); paginate unit 15/15; axe clean; browser-verified (3-page overflow, markers, toggle). paged.js print=H2, per-section margins=B14 |
 | B2 | Inline formatting bar (B/I/U/S/sub/super/code/highlight/color/font/size/line-height/letter-spacing) | DONE | ✓ | ✓ | fixed top toolbar + selection bubble menu; reactive aria-pressed (useEditorState); onMouseDown keeps selection. marks unit 10/10 (jsdom); axe clean; browser-verified |
 | B3 | Block formatting (H1–H6, para, quote, code w/ auto-detect, lists, outlines, align, indent) | DONE | ✓ | ✓ | block-type select (P/H1–6/quote/code), bullet/numbered/task lists, L/C/R/justify align, first-line indent, code-block manual language picker (auto-detect+Shiki=C). blocks unit 13/13; axe clean; browser-verified. Removed dup Underline (StarterKit owns it) |
-| B4 | Tables — insert/resize/merge/header/shade/sort, `=SUM/AVG/AVERAGE/COUNT`, ranges `A1:A10` | TODO | ☐ | ☐ | |
+| B4 | Tables — insert/resize/merge/header/shade/sort, `=SUM/AVG/AVERAGE/COUNT`, ranges `A1:A10` | DONE | ✓ | ✓ | Tiptap Table (resizable) + controls (add/del row-col, merge/split, header toggle, sort, delete); alt-row shade; formula cells via `recomputeFormulas` (Σ btn) using tested `evalFormula`/`expandRange`. Targets the **selected** table (findSelectedTable, unit-proven). 102 unit tests; axe clean; browser-verified (insert, =SUM=30) |
 | B5 | Images — paste/drag/upload, position modes, resize, crop, **alt text required**, lock aspect | TODO | ☐ | ☐ | a11y gate |
 | B6 | Links — auto-detect, named, link-to-heading, link-to-doc (fuzzy picker) | TODO | ☐ | ☐ | |
 | B7 | Auto TOC — `/toc`, refresh, optional page numbers + leader dots | TODO | ☐ | ☐ | |
@@ -198,7 +198,7 @@
 | Plan | Items | DONE | GAP | Open |
 |---|---|---|---|---|
 | A Foundations | 5 | 5 | 0 | 0 |
-| B Editor core | 14 | 3 | 0 | 11 |
+| B Editor core | 14 | 4 | 0 | 10 |
 | C Code block | 7 | 0 | 0 | 7 |
 | D Collab | 5 | 0 | 0 | 5 |
 | E File manager | 11 | 0 | 0 | 11 |
@@ -209,6 +209,6 @@
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **8** | **0** | **96** |
+| **Total** | **104** | **9** | **0** | **95** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

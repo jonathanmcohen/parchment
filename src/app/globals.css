@@ -309,6 +309,84 @@ body {
   color: var(--muted);
 }
 
+/* ── Tables (B4) ─────────────────────────────────────────────────── */
+
+/* Wrapper injected by @tiptap/extension-table for overflow scroll */
+.tableWrapper {
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.parchment-prose table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.92em;
+}
+
+.parchment-prose table th,
+.parchment-prose table td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  vertical-align: top;
+  min-width: 40px;
+  position: relative;
+}
+
+/* Header row */
+.parchment-prose table th {
+  background: var(--border);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* Alternating row shading — even data rows get a subtle tint */
+.parchment-prose table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--border) 30%, transparent);
+}
+
+/* Selected cell highlight (ProseMirror adds .selectedCell) */
+.parchment-prose table .selectedCell {
+  outline: 2px solid var(--accent-contrast);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--accent-contrast) 12%, transparent);
+}
+
+/* Column resize handle injected by the resizable Table extension */
+.parchment-prose table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent);
+  cursor: col-resize;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+
+.parchment-prose table .column-resize-handle:hover,
+.parchment-prose table th:hover .column-resize-handle,
+.parchment-prose table td:hover .column-resize-handle {
+  opacity: 1;
+}
+
+/* Resize cursor class added by the extension to <body> during drag */
+.resize-cursor {
+  cursor: col-resize;
+}
+
+/* Table controls toolbar band — fieldset used for semantics, reset its native box */
+.parchment-table-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
 /* Editor content (B0 baseline; page canvas styling lands in B1). */
 .parchment-prose {
   min-height: 60vh;

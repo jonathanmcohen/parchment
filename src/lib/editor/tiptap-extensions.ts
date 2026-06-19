@@ -1,5 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import { blockExtensions } from '@/lib/editor/block-extensions'
+import { tableExtensions } from '@/lib/editor/extensions/table'
 import { inlineExtensions } from '@/lib/editor/inline-extensions'
 
 // Base node/mark set. History is disabled because Collaboration (Yjs) provides
@@ -12,4 +13,5 @@ export const baseExtensions = [
   }),
   ...inlineExtensions,
   ...blockExtensions,
+  ...tableExtensions,
 ]

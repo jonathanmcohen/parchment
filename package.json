@@ -46,6 +46,7 @@
     "@tiptap/react": "3.27.1",
     "@tiptap/starter-kit": "3.27.1",
     "@tiptap/suggestion": "3.27.1",
+    "diff": "9.0.0",
     "dotenv": "17.4.2",
     "drizzle-orm": "0.45.2",
     "highlight.js": "11.11.1",

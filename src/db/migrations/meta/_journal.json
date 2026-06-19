@@ -22,6 +22,13 @@
       "when": 1781887189957,
       "tag": "0002_salty_preak",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781888104835,
+      "tag": "0003_massive_quasar",
+      "breakpoints": true
     }
   ]
 }

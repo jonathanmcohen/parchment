@@ -74,7 +74,7 @@
 |---|---|---|---|---|---|
 | D1 | Comment threads — anchor, replies, resolve, @-mention, filter open/resolved/mine | DONE | ✓ | ✓ | `comments` table (migration 0002) + comments-repo + API (`/api/docs/[id]/comments`); `comment` mark anchors selection (click→`parchment:focus-comment`); CommentsSidebar (threads/replies/resolve/3-way filter), `parseMentions` (client-safe shared module — split repo to fix pg-in-client). comments unit+integration; axe clean; browser-verified (add→anchored+@alice, reply, resolve→mark removed+under Resolved) |
 | D2 | Suggesting mode — tracked insert/delete/format, accept/reject, accept-all, side-by-side, author colors | TODO | ☐ | ☐ | |
-| D3 | Version history — autosave 30s + named snapshots, visual + unified-md diff, restore | TODO | ☐ | ☐ | |
+| D3 | Version history — autosave 30s + named snapshots, visual + unified-md diff, restore | DONE | ✓ | ✓ | `doc_versions` (migration 0003) + versions-repo + API (list/snapshot/restore); 30s autosave snapshot (only if markdown changed) + named snapshots; `diffMarkdown`/`unifiedPatch` (jsdiff) A/B compare; restore is reversible (pre-restore snapshot). version-diff unit 10 + versions integration 7; axe clean; browser-verified (v1/v2 + auto snapshot, diff old+new, restore→reverted) |
 | D4 | Real-time multi-cursor + presence (Yjs/Hocuspocus) | TODO | ☐ | ☐ | |
 | D5 | Collaborative reading position | TODO | ☐ | ☐ | |
 
@@ -200,7 +200,7 @@
 | A Foundations | 5 | 5 | 0 | 0 |
 | B Editor core | 14 | 14 | 0 | 0 |
 | C Code block | 7 | 7 | 0 | 0 |
-| D Collab | 5 | 1 | 0 | 4 |
+| D Collab | 5 | 2 | 0 | 3 |
 | E File manager | 11 | 0 | 0 | 11 |
 | F Disk mirror | 6 | 0 | 0 | 6 |
 | G Tiers 2–8 | 17 | 0 | 0 | 17 |
@@ -209,6 +209,6 @@
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **27** | **0** | **77** |
+| **Total** | **104** | **28** | **0** | **76** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

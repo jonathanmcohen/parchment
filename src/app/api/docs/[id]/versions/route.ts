@@ -1,0 +1,48 @@
+import { type NextRequest, NextResponse } from 'next/server'
+import { authenticateRequest } from '@/lib/auth/guard'
+import { getDocument } from '@/lib/docs/repo'
+import { createVersion, listVersions } from '@/lib/docs/versions-repo'
+
+export const dynamic = 'force-dynamic'
+
+// GET /api/docs/[id]/versions — list version summaries (newest first)
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const user = await authenticateRequest(req)
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  const { id } = await ctx.params
+  const doc = await getDocument(id)
+  if (!doc || doc.ownerId !== user.id)
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+
+  const versions = await listVersions(id)
+  return NextResponse.json(versions)
+}
+
+// POST /api/docs/[id]/versions — snapshot the current doc state as a version
+// Body: { kind: 'auto' | 'named', label?: string }
+// The route reads the CURRENT doc content+markdown and creates the snapshot,
+// so the client just fires the trigger; the server captures the state.
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const user = await authenticateRequest(req)
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  const { id } = await ctx.params
+  const doc = await getDocument(id)
+  if (!doc || doc.ownerId !== user.id)
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+
+  const body = (await req.json()) as { kind?: string; label?: string }
+  const kind = body.kind === 'named' ? 'named' : 'auto'
+  const label = kind === 'named' ? (body.label ?? null) : null
+
+  const result = await createVersion(id, {
+    kind,
+    label,
+    content: doc.content,
+    markdown: doc.markdown,
+    authorId: user.id,
+  })
+
+  return NextResponse.json(result, { status: 201 })
+}

@@ -15,6 +15,8 @@ type Props = {
   onOpenPageSetup: () => void
   onToggleComments: () => void
   commentsSidebarOpen: boolean
+  onToggleVersionHistory: () => void
+  versionHistoryOpen: boolean
 }
 
 const FONT_FAMILIES = [
@@ -111,6 +113,8 @@ export function Toolbar({
   onOpenPageSetup,
   onToggleComments,
   commentsSidebarOpen,
+  onToggleVersionHistory,
+  versionHistoryOpen,
 }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
@@ -701,6 +705,18 @@ export function Toolbar({
         onClick={onToggleComments}
       >
         💬
+      </button>
+
+      {/* ── D3: Toggle version history panel ─────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Version history"
+        aria-pressed={versionHistoryOpen}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={onToggleVersionHistory}
+      >
+        🕐
       </button>
     </div>
   )

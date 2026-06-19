@@ -48,7 +48,7 @@
 | B5 | Images — paste/drag/upload, position modes, resize, crop, **alt text required**, lock aspect | DONE | ✓ | ✓ | upload→asset route→serve (verified 200 image/png), URL insert, paste/drop, 5 position modes, corner resize + lock-aspect, **alt REQUIRED on insert** (browser-verified: empty alt blocked w/ role=alert). image-node unit 14; axe clean. **GAP: crop = stub-with-TODO** (resize ships; full canvas crop deferred — tracked) |
 | B6 | Links — auto-detect, named, link-to-heading, link-to-doc (fuzzy picker) | DONE | ✓ | ✓ | StarterKit Link configured in-place (autolink+linkOnPaste, rel=noopener), 3-mode LinkPopover (URL/heading/doc); heading anchor ids (HeadingId global attr — **fixed: was not rendering id**); `/api/docs/search` fuzzy picker. 144 unit+integration tests; axe clean; browser-verified (named link href+rel, h2 id=slug, search 200) |
 | B7 | Auto TOC — `/toc`, refresh, optional page numbers + leader dots | DONE | ✓ | ✓ | `toc` NodeView reading `collectHeadings`; auto-refreshes on editor updates + manual Refresh; nested anchor links to `#id`; page-numbers toggle → leader dots + page (headingPage from B1 paginate). 156 tests; axe clean; browser-verified (entry→#introduction-section, dots on toggle). Toolbar insert btn (slash insert=B12) |
-| B8 | Footnotes + endnotes — `[^1]`, numbered, click-jump, footer/end per-section | TODO | ☐ | ☐ | |
+| B8 | Footnotes + endnotes — `[^1]`, numbered, click-jump, footer/end per-section | DONE | ✓ | ✓ | `[^…]` input rule + toolbar btn → superscript ref + end-of-doc item; auto-numbered (appendTransaction); bidirectional click-jump (ref `#fn-def-id` ↔ definition back-link ↩ `#fnref-id`); markdown `[^N]`/`[^N]:`. 169 tests; axe clean; browser-verified (2 refs numbered, anchors both ways). **Note: footer placement = print-time (H2); on-screen both render end-of-doc** |
 | B9 | Find + replace — case/word/regex, replace all, scope, ⌘F / ⌘⇧H | TODO | ☐ | ☐ | |
 | B10 | Word + char count — live, selection-scoped, reading time | TODO | ☐ | ☐ | |
 | B11 | Outline pane — collapsible rail, jump, drag-reorder subtree | TODO | ☐ | ☐ | |
@@ -198,7 +198,7 @@
 | Plan | Items | DONE | GAP | Open |
 |---|---|---|---|---|
 | A Foundations | 5 | 5 | 0 | 0 |
-| B Editor core | 14 | 7 | 0 | 7 |
+| B Editor core | 14 | 8 | 0 | 6 |
 | C Code block | 7 | 0 | 0 | 7 |
 | D Collab | 5 | 0 | 0 | 5 |
 | E File manager | 11 | 0 | 0 | 11 |
@@ -209,6 +209,6 @@
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **12** | **0** | **92** |
+| **Total** | **104** | **13** | **0** | **91** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

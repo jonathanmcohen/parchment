@@ -3,6 +3,7 @@
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
 import { TableControls } from '@/components/editor/TableControls'
+import { detectLanguage, getActiveCodeBlockText } from '@/lib/editor/shiki/auto-detect'
 
 type Props = {
   editor: Editor
@@ -50,7 +51,11 @@ const BLOCK_TYPES = [
   { label: 'Code block', value: 'codeBlock' },
 ]
 
+/** Sentinel value for the "Auto-detect" option — not persisted to the node attribute. */
+const AUTO_DETECT_VALUE = '__auto__'
+
 const CODE_LANGUAGES = [
+  { label: 'Auto-detect', value: AUTO_DETECT_VALUE },
   { label: 'Plaintext', value: '' },
   { label: 'JavaScript', value: 'javascript' },
   { label: 'TypeScript', value: 'typescript' },
@@ -508,13 +513,17 @@ export function Toolbar({
               id="toolbar-code-language"
               aria-label="Code block language"
               value={s.codeLanguage ?? ''}
-              onChange={(e) =>
-                editor
-                  .chain()
-                  .focus()
-                  .updateAttributes('codeBlock', { language: e.target.value })
-                  .run()
-              }
+              onChange={(e) => {
+                const chosen = e.target.value
+                if (chosen === AUTO_DETECT_VALUE) {
+                  // Read active code block text and detect its language.
+                  const text = getActiveCodeBlockText(editor) ?? ''
+                  const { language } = detectLanguage(text)
+                  editor.chain().focus().updateAttributes('codeBlock', { language }).run()
+                } else {
+                  editor.chain().focus().updateAttributes('codeBlock', { language: chosen }).run()
+                }
+              }}
               className="parchment-toolbar-select"
             >
               {CODE_LANGUAGES.map((lang) => (

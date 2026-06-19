@@ -201,6 +201,20 @@ export const smartFolders = pgTable(
   (t) => [index('smart_folders_owner_idx').on(t.ownerId)],
 )
 
+// ─── Settings (E11) — generic owner key-value store ──────────────────────────
+export const settings = pgTable(
+  'settings',
+  {
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    key: text('key').notNull(),
+    value: jsonb('value').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.ownerId, t.key] })],
+)
+
 // ─── Tags (E4) — color-coded labels, many-to-many with documents ─────────────
 export const tags = pgTable(
   'tags',

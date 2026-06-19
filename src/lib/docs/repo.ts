@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, ilike, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
 
@@ -235,6 +235,38 @@ export async function restoreDocument(ownerId: string, id: string): Promise<void
     .update(schema.documents)
     .set({ trashedAt: null, updatedAt: new Date() })
     .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
+}
+
+/**
+ * E11: Permanently delete trashed docs older than `retentionDays` for this owner.
+ * No-op if retentionDays <= 0. Only touches docs where trashedAt is not null.
+ * Returns the count purged.
+ */
+export async function purgeExpiredTrash(ownerId: string, retentionDays: number): Promise<number> {
+  if (retentionDays <= 0) return 0
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
+  const result = await db
+    .delete(schema.documents)
+    .where(
+      and(
+        eq(schema.documents.ownerId, ownerId),
+        isNotNull(schema.documents.trashedAt),
+        lt(schema.documents.trashedAt, cutoff),
+      ),
+    )
+  return result.rowCount ?? 0
+}
+
+/**
+ * E11: Permanently delete ALL trashed docs for this owner.
+ * Only touches docs where trashedAt is not null.
+ * Returns the count deleted.
+ */
+export async function emptyTrash(ownerId: string): Promise<number> {
+  const result = await db
+    .delete(schema.documents)
+    .where(and(eq(schema.documents.ownerId, ownerId), isNotNull(schema.documents.trashedAt)))
+  return result.rowCount ?? 0
 }
 
 /** Move a doc to a folder (null = root). Owner-scoped by id. */

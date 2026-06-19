@@ -1,6 +1,13 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
-import { listDocumentsInFolder, listRecents, listStarred, listTrashed } from '@/lib/docs/repo'
+import {
+  listDocumentsInFolder,
+  listRecents,
+  listStarred,
+  listTrashed,
+  purgeExpiredTrash,
+} from '@/lib/docs/repo'
+import { getTrashRetentionDays } from '@/lib/docs/settings-repo'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,6 +56,9 @@ export async function GET(req: NextRequest) {
   }
 
   if (view === 'trash') {
+    // E11: lazy purge — expire old trashed docs before listing
+    const retentionDays = await getTrashRetentionDays(user.id)
+    await purgeExpiredTrash(user.id, retentionDays)
     const docs = await listTrashed(user.id)
     return NextResponse.json(
       docs.map((d) => ({

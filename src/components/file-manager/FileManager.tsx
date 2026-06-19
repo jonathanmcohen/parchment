@@ -1555,6 +1555,171 @@ function AllViewDocRow({
   )
 }
 
+// ─── Trash toolbar (E11) ─────────────────────────────────────────────────────
+
+interface TrashToolbarProps {
+  docCount: number
+  onAfterEmpty: () => void
+}
+
+function TrashToolbar({ docCount, onAfterEmpty }: TrashToolbarProps) {
+  const [retentionDays, setRetentionDaysState] = useState<number>(30)
+  const [showDialog, setShowDialog] = useState(false)
+  const [confirmPhrase, setConfirmPhrase] = useState('')
+  const [emptying, setEmptying] = useState(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+
+  // Load retention setting on mount
+  useEffect(() => {
+    fetch('/api/settings/trash-retention')
+      .then((r) => r.json() as Promise<{ days: number }>)
+      .then((data) => setRetentionDaysState(data.days))
+      .catch(() => {
+        // leave default
+      })
+  }, [])
+
+  const handleRetentionChange = async (val: number) => {
+    const clamped = Math.max(0, Math.round(val))
+    setRetentionDaysState(clamped)
+    try {
+      await fetch('/api/settings/trash-retention', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ days: clamped }),
+      })
+    } catch {
+      // leave state
+    }
+  }
+
+  // Close dialog on Escape
+  useEffect(() => {
+    if (!showDialog) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowDialog(false)
+        setConfirmPhrase('')
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [showDialog])
+
+  const handleEmptyConfirm = async () => {
+    setEmptying(true)
+    try {
+      const res = await fetch('/api/trash/empty', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirm: confirmPhrase }),
+      })
+      if (res.ok) {
+        setShowDialog(false)
+        setConfirmPhrase('')
+        onAfterEmpty()
+      }
+    } catch {
+      // leave state
+    } finally {
+      setEmptying(false)
+    }
+  }
+
+  const canConfirm = confirmPhrase.trim().toLowerCase() === 'empty trash'
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-4 mb-4 p-3 rounded-md border border-[var(--border)] bg-[var(--paper)]">
+        {/* Retention control */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <label
+            htmlFor="trash-retention-days"
+            className="text-sm text-[var(--foreground)] shrink-0"
+          >
+            Permanently delete trashed items after
+          </label>
+          <input
+            id="trash-retention-days"
+            type="number"
+            min="0"
+            value={retentionDays}
+            onChange={(e) => setRetentionDaysState(Number(e.target.value))}
+            onBlur={(e) => handleRetentionChange(Number(e.target.value))}
+            className="w-20 px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+          />
+          <span className="text-sm text-[var(--muted)] shrink-0">days (0 = keep forever)</span>
+        </div>
+
+        {/* Empty Trash button */}
+        <button
+          type="button"
+          onClick={() => setShowDialog(true)}
+          className="ml-auto px-3 py-1.5 text-sm rounded border border-red-400 text-red-600 hover:bg-red-50 font-medium shrink-0"
+        >
+          Empty Trash
+        </button>
+      </div>
+
+      {/* Empty-Trash confirmation dialog */}
+      {showDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Empty Trash"
+            className="bg-[var(--paper)] border border-[var(--border)] rounded-lg shadow-2xl p-6 w-full max-w-md flex flex-col gap-4"
+          >
+            <h2 className="text-base font-semibold text-[var(--foreground)]">Empty Trash</h2>
+            <p className="text-sm text-[var(--foreground)]">
+              Permanently delete all <strong>{docCount}</strong> {docCount === 1 ? 'item' : 'items'}{' '}
+              in Trash. This cannot be undone.
+            </p>
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="empty-trash-confirm"
+                className="text-sm font-medium text-[var(--foreground)]"
+              >
+                Type &lsquo;empty trash&rsquo; to confirm
+              </label>
+              <input
+                id="empty-trash-confirm"
+                type="text"
+                value={confirmPhrase}
+                onChange={(e) => setConfirmPhrase(e.target.value)}
+                placeholder="empty trash"
+                autoComplete="off"
+                className="px-2 py-1.5 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDialog(false)
+                  setConfirmPhrase('')
+                }}
+                className="px-3 py-1.5 text-sm rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleEmptyConfirm}
+                disabled={!canConfirm || emptying}
+                className="px-3 py-1.5 text-sm rounded bg-red-600 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-red-700"
+              >
+                {emptying ? 'Deleting…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function FileManager({ initialFolders, initialDocs }: Props) {
@@ -2339,6 +2504,9 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
 
       {(view === 'recents' || view === 'starred' || view === 'trash') && (
         <main className="flex-1 min-w-0">
+          {view === 'trash' && (
+            <TrashToolbar docCount={flatDocs.length} onAfterEmpty={() => fetchFlatDocs('trash')} />
+          )}
           {flatDocs.length === 0 ? (
             <p className="text-[var(--muted)]">
               {view === 'trash' ? 'Trash is empty.' : 'Nothing here yet.'}

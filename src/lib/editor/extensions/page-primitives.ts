@@ -1,4 +1,6 @@
 import { Node } from '@tiptap/core'
+import { ReactNodeViewRenderer } from '@tiptap/react'
+import { SectionBreakView } from '@/components/editor/SectionBreakView'
 import type {
   PageNumberFormat,
   PageNumberPosition,
@@ -115,6 +117,10 @@ export const SectionBreakExtension = Node.create({
       'div',
       { 'data-section-break': '', class: 'parchment-section-break-node', ...HTMLAttributes },
     ]
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(SectionBreakView)
   },
 
   addCommands() {

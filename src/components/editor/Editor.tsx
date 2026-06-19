@@ -479,9 +479,15 @@ export function Editor({
 
     const publishReading = throttle(() => {
       try {
-        const vh = window.innerHeight
-        const editorLeft = editor.view.dom.getBoundingClientRect().left
-        const hit = editor.view.posAtCoords({ left: editorLeft + 40, top: vh / 2 })
+        // Probe the doc position at the centre of the editor's *visible* band
+        // (clamped to the viewport), not the raw window centre — the editor is
+        // offset below the toolbar/title, and short docs don't reach mid-window.
+        const rect = editor.view.dom.getBoundingClientRect()
+        const visTop = Math.max(rect.top, 0)
+        const visBottom = Math.min(rect.bottom, window.innerHeight)
+        const midY = (visTop + visBottom) / 2
+        const x = rect.left + Math.min(40, rect.width / 2)
+        const hit = editor.view.posAtCoords({ left: x, top: midY })
         if (hit) {
           provider.setAwarenessField('reading', { pos: hit.pos, updatedAt: Date.now() })
         }

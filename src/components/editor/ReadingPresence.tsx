@@ -102,9 +102,11 @@ export function ReadingPresence({ editor, provider, containerRef, onReadersChang
 
         const handleClick = () => {
           try {
-            const domResult = editor.view.domAtPos(reader.pos)
-            const node = domResult.node as HTMLElement
-            node.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+            const { node } = editor.view.domAtPos(reader.pos)
+            // domAtPos may return a text node (no scrollIntoView) — resolve to
+            // its parent element so the jump actually scrolls.
+            const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement)
+            el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
           } catch {
             // position transiently invalid — do nothing
           }

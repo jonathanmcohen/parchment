@@ -1,5 +1,6 @@
 import { and, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
+import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
 // it touches `db` (pg) and is only imported by server routes/components in app code.
@@ -36,6 +37,20 @@ export async function saveDocument(
       updatedAt: new Date(),
     })
     .where(eq(schema.documents.id, id))
+
+  // Best-effort embedding generation — never blocks or fails the save.
+  if (isSemanticEnabled()) {
+    const title = data.title ?? ''
+    const text = `${title}\n${data.markdown}`
+    try {
+      const v = await embed(text)
+      if (v) {
+        await db.update(schema.documents).set({ embedding: v }).where(eq(schema.documents.id, id))
+      }
+    } catch {
+      // ignore — embedding is best-effort
+    }
+  }
 }
 
 export async function getDocument(id: string): Promise<Doc | null> {

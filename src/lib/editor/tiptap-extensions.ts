@@ -3,6 +3,7 @@ import { blockExtensions } from '@/lib/editor/block-extensions'
 import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
+import { PageBreakExtension, SectionBreakExtension } from '@/lib/editor/extensions/page-primitives'
 import { tableExtensions } from '@/lib/editor/extensions/table'
 import { TocExtension } from '@/lib/editor/extensions/toc'
 import { inlineExtensions } from '@/lib/editor/inline-extensions'
@@ -37,6 +38,9 @@ export const baseExtensions = [
   FootnoteRef,
   FootnoteItem,
   FootnotesBlock,
+  // B13: manual page breaks + section breaks.
+  PageBreakExtension,
+  SectionBreakExtension,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

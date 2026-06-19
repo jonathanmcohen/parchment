@@ -113,6 +113,19 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'ADVANCED',
     keywords: ['footnote', 'endnote', 'reference', 'note', 'fn'],
   },
+  // B13: page break + section break
+  {
+    id: 'pageBreak',
+    title: 'Page break',
+    category: 'ADVANCED',
+    keywords: ['page', 'break', 'pagebreak', 'newpage'],
+  },
+  {
+    id: 'sectionBreak',
+    title: 'Section break',
+    category: 'ADVANCED',
+    keywords: ['section', 'break', 'sectionbreak', 'chapter'],
+  },
 ]
 
 /**

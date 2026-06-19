@@ -1,6 +1,7 @@
 'use client'
 
 import type { Editor } from '@tiptap/core'
+import { useEditorState } from '@tiptap/react'
 
 type Props = {
   editor: Editor
@@ -31,69 +32,80 @@ const LETTER_SPACINGS = [
   { label: 'Widest (0.2em)', value: '0.2em' },
 ]
 
+function parseSize(raw: string | undefined): { value: number; unit: 'pt' | 'px' } {
+  if (!raw) return { value: 12, unit: 'pt' }
+  if (raw.endsWith('px')) return { value: Number.parseInt(raw, 10), unit: 'px' }
+  return { value: Number.parseInt(raw, 10), unit: 'pt' }
+}
+
+// Prevent the toolbar from stealing the editor selection on click.
+const keepSelection = (e: React.MouseEvent) => e.preventDefault()
+
 export function Toolbar({ editor }: Props) {
-  // Font size state — read from active marks
-  const currentFontSize = editor.getAttributes('textStyle').fontSize as string | undefined
+  // Reactive state — re-renders the toolbar when the selection/marks change so
+  // aria-pressed and the control values track the editor.
+  const s = useEditorState({
+    editor,
+    selector: ({ editor }) => ({
+      bold: editor.isActive('bold'),
+      italic: editor.isActive('italic'),
+      underline: editor.isActive('underline'),
+      strike: editor.isActive('strike'),
+      subscript: editor.isActive('subscript'),
+      superscript: editor.isActive('superscript'),
+      code: editor.isActive('code'),
+      highlight: editor.isActive('highlight'),
+      color: editor.getAttributes('textStyle').color as string | undefined,
+      fontFamily: editor.getAttributes('textStyle').fontFamily as string | undefined,
+      fontSize: editor.getAttributes('textStyle').fontSize as string | undefined,
+      lineHeight: editor.getAttributes('textStyle').lineHeight as string | undefined,
+      letterSpacing: editor.getAttributes('textStyle').letterSpacing as string | undefined,
+    }),
+  })
 
-  // Parse current size into number + unit
-  const parseSize = (raw: string | undefined): { value: number; unit: 'pt' | 'px' } => {
-    if (!raw) return { value: 12, unit: 'pt' }
-    if (raw.endsWith('px')) return { value: parseInt(raw, 10), unit: 'px' }
-    return { value: parseInt(raw, 10), unit: 'pt' }
-  }
-
-  const { value: sizeValue, unit: sizeUnit } = parseSize(currentFontSize)
-
+  const { value: sizeValue, unit: sizeUnit } = parseSize(s.fontSize)
   const applySize = (value: number, unit: 'pt' | 'px') => {
     editor.chain().focus().setFontSize(`${value}${unit}`).run()
   }
 
-  const currentFontFamily = editor.getAttributes('textStyle').fontFamily as string | undefined
-  const currentLineHeight = editor.getAttributes('textStyle').lineHeight as string | undefined
-  const currentLetterSpacing = editor.getAttributes('textStyle').letterSpacing as string | undefined
-  const currentColor = editor.getAttributes('textStyle').color as string | undefined
-
   return (
     <div className="parchment-toolbar" role="toolbar" aria-label="Formatting">
-      {/* Bold */}
       <button
         type="button"
         aria-label="Bold"
-        aria-pressed={editor.isActive('bold')}
+        aria-pressed={s.bold}
         className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleBold().run()}
       >
         <strong>B</strong>
       </button>
-
-      {/* Italic */}
       <button
         type="button"
         aria-label="Italic"
-        aria-pressed={editor.isActive('italic')}
+        aria-pressed={s.italic}
         className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       >
         <em>I</em>
       </button>
-
-      {/* Underline */}
       <button
         type="button"
         aria-label="Underline"
-        aria-pressed={editor.isActive('underline')}
+        aria-pressed={s.underline}
         className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
       >
         <span style={{ textDecoration: 'underline' }}>U</span>
       </button>
-
-      {/* Strike */}
       <button
         type="button"
         aria-label="Strikethrough"
-        aria-pressed={editor.isActive('strike')}
+        aria-pressed={s.strike}
         className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       >
         <span style={{ textDecoration: 'line-through' }}>S</span>
@@ -101,45 +113,42 @@ export function Toolbar({ editor }: Props) {
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* Subscript */}
       <button
         type="button"
         aria-label="Subscript"
-        aria-pressed={editor.isActive('subscript')}
+        aria-pressed={s.subscript}
         className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleSubscript().run()}
       >
         X<sub>2</sub>
       </button>
-
-      {/* Superscript */}
       <button
         type="button"
         aria-label="Superscript"
-        aria-pressed={editor.isActive('superscript')}
+        aria-pressed={s.superscript}
         className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleSuperscript().run()}
       >
         X<sup>2</sup>
       </button>
-
-      {/* Inline code */}
       <button
         type="button"
         aria-label="Inline code"
-        aria-pressed={editor.isActive('code')}
+        aria-pressed={s.code}
         className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
         {'</>'}
       </button>
-
-      {/* Highlight */}
       <button
         type="button"
         aria-label="Highlight"
-        aria-pressed={editor.isActive('highlight')}
+        aria-pressed={s.highlight}
         className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleHighlight().run()}
       >
         <span style={{ background: '#fef08a', padding: '0 2px' }}>H</span>
@@ -147,37 +156,31 @@ export function Toolbar({ editor }: Props) {
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* Text color */}
       <label className="parchment-toolbar-label" htmlFor="toolbar-color">
         Color
         <input
           id="toolbar-color"
           type="color"
           aria-label="Text color"
-          value={currentColor ?? '#000000'}
-          onChange={(e) => {
-            editor.chain().focus().setColor(e.target.value).run()
-          }}
+          value={s.color ?? '#000000'}
+          onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
           className="parchment-color-input"
         />
       </label>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* Font family */}
       <label className="parchment-toolbar-label" htmlFor="toolbar-font-family">
         Font
         <select
           id="toolbar-font-family"
           aria-label="Font family"
-          value={currentFontFamily ?? ''}
-          onChange={(e) => {
-            if (e.target.value === '') {
-              editor.chain().focus().unsetFontFamily().run()
-            } else {
-              editor.chain().focus().setFontFamily(e.target.value).run()
-            }
-          }}
+          value={s.fontFamily ?? ''}
+          onChange={(e) =>
+            e.target.value === ''
+              ? editor.chain().focus().unsetFontFamily().run()
+              : editor.chain().focus().setFontFamily(e.target.value).run()
+          }
           className="parchment-toolbar-select"
         >
           {FONT_FAMILIES.map((f) => (
@@ -190,7 +193,6 @@ export function Toolbar({ editor }: Props) {
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* Font size */}
       <label className="parchment-toolbar-label" htmlFor="toolbar-font-size">
         Size
         <input
@@ -201,7 +203,7 @@ export function Toolbar({ editor }: Props) {
           max={999}
           value={sizeValue}
           onChange={(e) => {
-            const v = parseInt(e.target.value, 10)
+            const v = Number.parseInt(e.target.value, 10)
             if (!Number.isNaN(v) && v > 0) applySize(v, sizeUnit)
           }}
           className="parchment-size-input"
@@ -210,10 +212,8 @@ export function Toolbar({ editor }: Props) {
           type="button"
           aria-label={`Font size unit: ${sizeUnit}, click to toggle`}
           className="parchment-unit-btn"
-          onClick={() => {
-            const nextUnit = sizeUnit === 'pt' ? 'px' : 'pt'
-            applySize(sizeValue, nextUnit)
-          }}
+          onMouseDown={keepSelection}
+          onClick={() => applySize(sizeValue, sizeUnit === 'pt' ? 'px' : 'pt')}
         >
           {sizeUnit}
         </button>
@@ -221,20 +221,17 @@ export function Toolbar({ editor }: Props) {
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* Line height */}
       <label className="parchment-toolbar-label" htmlFor="toolbar-line-height">
         Line
         <select
           id="toolbar-line-height"
           aria-label="Line height"
-          value={currentLineHeight ?? ''}
-          onChange={(e) => {
-            if (e.target.value === '') {
-              editor.chain().focus().unsetLineHeight().run()
-            } else {
-              editor.chain().focus().setLineHeight(e.target.value).run()
-            }
-          }}
+          value={s.lineHeight ?? ''}
+          onChange={(e) =>
+            e.target.value === ''
+              ? editor.chain().focus().unsetLineHeight().run()
+              : editor.chain().focus().setLineHeight(e.target.value).run()
+          }
           className="parchment-toolbar-select"
         >
           <option value="">Default</option>
@@ -248,20 +245,17 @@ export function Toolbar({ editor }: Props) {
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* Letter spacing */}
       <label className="parchment-toolbar-label" htmlFor="toolbar-letter-spacing">
         Spacing
         <select
           id="toolbar-letter-spacing"
           aria-label="Letter spacing"
-          value={currentLetterSpacing ?? ''}
-          onChange={(e) => {
-            if (e.target.value === '') {
-              editor.chain().focus().unsetLetterSpacing().run()
-            } else {
-              editor.chain().focus().setLetterSpacing(e.target.value).run()
-            }
-          }}
+          value={s.letterSpacing ?? ''}
+          onChange={(e) =>
+            e.target.value === ''
+              ? editor.chain().focus().unsetLetterSpacing().run()
+              : editor.chain().focus().setLetterSpacing(e.target.value).run()
+          }
           className="parchment-toolbar-select"
         >
           <option value="">Default</option>

@@ -42,7 +42,7 @@
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
 | B1 | Page-bounded canvas, `@page` + paged.js, Letter default, A4 toggle, per-section margin+orientation | DONE | ✓ | ✓ | page-width paper + computed break markers + live "Page X · N words" + A4/Letter toggle (816↔794px); paginate unit 15/15; axe clean; browser-verified (3-page overflow, markers, toggle). paged.js print=H2, per-section margins=B14 |
-| B2 | Inline formatting bar (B/I/U/S/sub/super/code/highlight/color/font/size/line-height/letter-spacing) | TODO | ☐ | ☐ | |
+| B2 | Inline formatting bar (B/I/U/S/sub/super/code/highlight/color/font/size/line-height/letter-spacing) | DONE | ✓ | ✓ | fixed top toolbar + selection bubble menu; reactive aria-pressed (useEditorState); onMouseDown keeps selection. marks unit 10/10 (jsdom); axe clean; browser-verified |
 | B3 | Block formatting (H1–H6, para, quote, code w/ auto-detect, lists, outlines, align, indent) | TODO | ☐ | ☐ | |
 | B4 | Tables — insert/resize/merge/header/shade/sort, `=SUM/AVG/AVERAGE/COUNT`, ranges `A1:A10` | TODO | ☐ | ☐ | |
 | B5 | Images — paste/drag/upload, position modes, resize, crop, **alt text required**, lock aspect | TODO | ☐ | ☐ | a11y gate |
@@ -198,7 +198,7 @@
 | Plan | Items | DONE | GAP | Open |
 |---|---|---|---|---|
 | A Foundations | 5 | 5 | 0 | 0 |
-| B Editor core | 14 | 1 | 0 | 13 |
+| B Editor core | 14 | 2 | 0 | 12 |
 | C Code block | 7 | 0 | 0 | 7 |
 | D Collab | 5 | 0 | 0 | 5 |
 | E File manager | 11 | 0 | 0 | 11 |
@@ -209,6 +209,6 @@
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **6** | **0** | **98** |
+| **Total** | **104** | **7** | **0** | **97** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

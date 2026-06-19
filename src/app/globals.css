@@ -274,37 +274,37 @@ body {
 
 /* ── Task list (B3) ──────────────────────────────────────────────────── */
 
-.parchment-prose ul[data-type='taskList'] {
+.parchment-prose ul[data-type="taskList"] {
   list-style: none;
   padding-left: 0;
   margin: 0.5em 0;
 }
 
-.parchment-prose ul[data-type='taskList'] li {
+.parchment-prose ul[data-type="taskList"] li {
   display: flex;
   align-items: flex-start;
   gap: 0.5em;
   margin: 0.2em 0;
 }
 
-.parchment-prose ul[data-type='taskList'] li > label {
+.parchment-prose ul[data-type="taskList"] li > label {
   flex-shrink: 0;
   margin-top: 0.1em;
   user-select: none;
 }
 
-.parchment-prose ul[data-type='taskList'] li > label input[type='checkbox'] {
+.parchment-prose ul[data-type="taskList"] li > label input[type="checkbox"] {
   cursor: pointer;
   width: 1em;
   height: 1em;
   accent-color: var(--accent-contrast);
 }
 
-.parchment-prose ul[data-type='taskList'] li > div {
+.parchment-prose ul[data-type="taskList"] li > div {
   flex: 1;
 }
 
-.parchment-prose ul[data-type='taskList'] li[data-checked='true'] > div {
+.parchment-prose ul[data-type="taskList"] li[data-checked="true"] > div {
   text-decoration: line-through;
   color: var(--muted);
 }

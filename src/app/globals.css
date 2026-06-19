@@ -176,7 +176,7 @@ body {
 }
 
 .parchment-page-break-node::after {
-  content: 'Page break';
+  content: "Page break";
   position: absolute;
   left: 50%;
   top: -0.6em;
@@ -201,7 +201,7 @@ body {
 }
 
 .parchment-section-break-node::after {
-  content: 'Section break';
+  content: "Section break";
   position: absolute;
   left: 50%;
   top: -0.6em;

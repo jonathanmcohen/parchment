@@ -82,7 +82,7 @@
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
-| E1 | Folders + nested, drag-drop reparent | TODO | ☐ | ☐ | |
+| E1 | Folders + nested, drag-drop reparent | DONE | ✓ | ✓ | `folders-repo` (create/list/rename/move/delete — all owner-scoped; `moveFolder` cycle-guarded, `deleteFolder` transactionally reparents child folders+docs to grandparent) + `listDocumentsInFolder`/`moveDocument` in repo. Pure `folder-tree.ts` (`buildTree`/`folderPath`/`wouldCreateCycle`, orphan+cycle-safe) — 16 unit + 7 integration (testcontainers). API: `/api/folders` (GET/POST), `/api/folders/[id]` (PATCH rename/move→409 on cycle, DELETE), `/api/docs/[id]/move`, `/api/docs?folder=`. `/files` now a client `FileManager`: nested folder tree, breadcrumb nav, native HTML5 drag-drop reparent (doc→folder, folder→folder, →root). axe clean. Browser-verified prod build: create+nest folders, navigate, drag doc into folder (root 23→22, present in folder), folder→child blocked (409 alert), folder→root valid. |
 | E2 | Recents / Starred / Shared (stub) / Trash views | TODO | ☐ | ☐ | |
 | E3 | Smart folders — live saved searches | TODO | ☐ | ☐ | |
 | E4 | Tags — color-coded, picker, filter, bulk tag | TODO | ☐ | ☐ | |

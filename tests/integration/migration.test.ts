@@ -51,6 +51,7 @@ describe('A1 — migration + schema', () => {
     expect(rows.map((r) => r.tablename)).toEqual([
       'audit_log',
       'collab_state',
+      'comments',
       'documents',
       'folders',
       'pats',

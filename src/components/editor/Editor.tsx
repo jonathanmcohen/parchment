@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
+import { CommentsSidebar } from '@/components/editor/CommentsSidebar'
 import { CropDialog } from '@/components/editor/CropDialog'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
@@ -92,6 +93,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
   // B13: section-break edit dialog — holds the doc position of the node to edit.
   const [sectionDialogPos, setSectionDialogPos] = useState<number | null>(null)
+
+  // D1: comments sidebar toggle
+  const [commentsSidebarOpen, setCommentsSidebarOpen] = useState(false)
 
   const save = useCallback(
     (json: Record<string, unknown>) => {
@@ -260,12 +264,14 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
           onOpenLink={openLinkPopover}
           onCropImage={openCropForSelection}
           onOpenPageSetup={() => setPageSetupOpen(true)}
+          onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
+          commentsSidebarOpen={commentsSidebarOpen}
         />
       )}
 
       <h1 className="mb-4 font-semibold text-2xl tracking-tight">{initialTitle}</h1>
 
-      {/* B11: outline rail + canvas in a flex row */}
+      {/* B11: outline rail + canvas in a flex row; D1: comments sidebar on the right */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0 }}>
         {/* B11: outline pane (left rail) */}
         {editor && <OutlinePane editor={editor} />}
@@ -280,6 +286,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
             <FindReplace editor={editor} initialMode={findMode} onClose={closeFind} />
           )}
         </div>
+
+        {/* D1: comments sidebar (right rail) */}
+        {editor && commentsSidebarOpen && <CommentsSidebar docId={docId} editor={editor} />}
       </div>
 
       {/* Selection bubble menu (B2) */}

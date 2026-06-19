@@ -1,7 +1,9 @@
 import { sql } from 'drizzle-orm'
 import {
+  boolean,
   customType,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -126,6 +128,30 @@ export const collabState = pgTable('collab_state', {
   state: text('state'), // bytea in SQL; see migration. Stored as binary Yjs update.
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// ─── Comments (D1) — threaded, anchored to a ProseMirror selection range ───
+// The root comment has threadId == id. Replies share the root's threadId.
+// anchorFrom/anchorTo store the ProseMirror positions of the highlighted range
+// (only set on root comments; null for replies). `resolved` lives on the root
+// comment and applies to the whole thread.
+export const comments = pgTable(
+  'comments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    threadId: uuid('thread_id').notNull(),
+    authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
+    body: text('body').notNull(),
+    mentions: jsonb('mentions').notNull().default([]),
+    anchorFrom: integer('anchor_from'),
+    anchorTo: integer('anchor_to'),
+    resolved: boolean('resolved').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('comments_doc_idx').on(t.docId), index('comments_thread_idx').on(t.threadId)],
+)
 
 // Hint for the migration generator: ensure extensions exist.
 export const _extensions = sql`create extension if not exists vector;`

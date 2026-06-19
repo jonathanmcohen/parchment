@@ -18,6 +18,7 @@ import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
 import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
+import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { type Counts, countText } from '@/lib/editor/counts'
@@ -100,6 +101,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
   // D3: version history panel toggle
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
+
+  // D2: suggestions panel toggle
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
 
   const save = useCallback(
     (json: Record<string, unknown>) => {
@@ -293,6 +297,8 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
           commentsSidebarOpen={commentsSidebarOpen}
           onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
           versionHistoryOpen={versionHistoryOpen}
+          onToggleSuggestions={() => setSuggestionsOpen((v) => !v)}
+          suggestionsOpen={suggestionsOpen}
         />
       )}
 
@@ -319,6 +325,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
         {/* D3: version history panel (right rail) */}
         {editor && versionHistoryOpen && <VersionHistory docId={docId} editor={editor} />}
+
+        {/* D2: suggestions panel (right rail) */}
+        {editor && suggestionsOpen && <SuggestionsPanel editor={editor} />}
       </div>
 
       {/* Selection bubble menu (B2) */}

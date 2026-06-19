@@ -17,6 +17,8 @@ type Props = {
   commentsSidebarOpen: boolean
   onToggleVersionHistory: () => void
   versionHistoryOpen: boolean
+  onToggleSuggestions: () => void
+  suggestionsOpen: boolean
 }
 
 const FONT_FAMILIES = [
@@ -115,6 +117,8 @@ export function Toolbar({
   commentsSidebarOpen,
   onToggleVersionHistory,
   versionHistoryOpen,
+  onToggleSuggestions,
+  suggestionsOpen,
 }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
@@ -164,6 +168,8 @@ export function Toolbar({
       link: ed.isActive('link'),
       // Image (selected node) — gates the crop button
       image: ed.isActive('image'),
+      // D2: suggesting mode active
+      suggesting: ed.storage.suggesting?.enabled === true,
     }),
   })
 
@@ -717,6 +723,28 @@ export function Toolbar({
         onClick={onToggleVersionHistory}
       >
         🕐
+      </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── D2: Suggesting mode toggle ────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Suggesting mode"
+        aria-pressed={suggestionsOpen}
+        className={`parchment-toolbar-btn${s.suggesting ? ' parchment-toolbar-btn--suggesting' : ''}`}
+        onMouseDown={keepSelection}
+        onClick={() => {
+          editor.chain().focus().toggleSuggesting().run()
+          onToggleSuggestions()
+        }}
+      >
+        <span aria-hidden="true">✎?</span>
+        {s.suggesting && (
+          <span className="parchment-suggesting-indicator" aria-hidden="true">
+            ON
+          </span>
+        )}
       </button>
     </div>
   )

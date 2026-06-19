@@ -52,7 +52,7 @@
 | B9 | Find + replace — case/word/regex, replace all, scope, ⌘F / ⌘⇧H | DONE | ✓ | ✓ | pure `findMatches`/`applyReplacements` (case/word/regex, invalid-regex→error not throw) mapped to PM decorations; panel w/ counter, next/prev, replace+replace-all, doc/selection scope; ⌘F/⌘⇧H keymap. 188 tests; axe clean; browser-verified (3 matches "1 of 3", replace-all→THE×3, invalid regex role=alert) |
 | B10 | Word + char count — live, selection-scoped, reading time | DONE | ✓ | ✓ | pure `countText`/`readingTimeMinutes`; StatusBar live doc counts + reading time (238wpm), switches to selection counts when text selected (useEditorState). 197 tests; axe clean; browser-verified ("5 words·23 chars·1 min read"; sel "2 words·7 chars") |
 | B11 | Outline pane — collapsible rail, jump, drag-reorder subtree | DONE | ✓ | ✓ | left rail reads `collectHeadings` (live), collapsible pane + per-heading subtree collapse, click/Enter jump to `#id`, drag-reorder moves whole section (heading + descendants) via `moveSection`/`moveHeadingSection` (collect-then-adjust PM positions). 216 tests (19 reorder, subtree integrity); axe clean; browser-verified (lists heading, jump). |
-| B12 | Slash menu — `/`, categories BASIC/TEXT/LISTS/MEDIA/EMBED/ADVANCED, category rail | TODO | ☐ | ☐ | |
+| B12 | Slash menu — `/`, categories BASIC/TEXT/LISTS/MEDIA/EMBED/ADVANCED, category rail | DONE | ✓ | ✓ | `@tiptap/suggestion` `/` trigger → ReactRenderer popup; left category rail (All/BASIC/TEXT/LISTS/MEDIA/EMBED/ADVANCED); `filterSlashItems` live filter; arrow/Enter/Esc keyboard; insert removes `/query` then runs command (Image→opens dialog). 234 tests; axe clean; browser-verified (/head→H1/2/3, Enter inserts H1 + clears query) |
 | B13 | Page primitives — page numbers, running headers/footers per-section, `/pagebreak`, section breaks | TODO | ☐ | ☐ | |
 | B14 | Margins + page setup dialog — in/cm, custom margins, orientation, Letter/A4/Legal/Tabloid/Custom | TODO | ☐ | ☐ | |
 
@@ -198,7 +198,7 @@
 | Plan | Items | DONE | GAP | Open |
 |---|---|---|---|---|
 | A Foundations | 5 | 5 | 0 | 0 |
-| B Editor core | 14 | 11 | 0 | 3 |
+| B Editor core | 14 | 12 | 0 | 2 |
 | C Code block | 7 | 0 | 0 | 7 |
 | D Collab | 5 | 0 | 0 | 5 |
 | E File manager | 11 | 0 | 0 | 11 |
@@ -209,6 +209,6 @@
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **16** | **0** | **88** |
+| **Total** | **104** | **17** | **0** | **87** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

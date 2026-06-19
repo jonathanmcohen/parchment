@@ -1455,7 +1455,9 @@ body {
   color: var(--muted);
   cursor: pointer;
   letter-spacing: 0.03em;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .parchment-slash-rail-btn:hover {
@@ -1463,7 +1465,7 @@ body {
   color: var(--foreground);
 }
 
-.parchment-slash-rail-btn[aria-pressed='true'] {
+.parchment-slash-rail-btn[aria-pressed="true"] {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
   font-weight: 600;

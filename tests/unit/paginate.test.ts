@@ -32,8 +32,8 @@ describe('measurePageBreaks', () => {
     expect(measurePageBreaks(2000, 1056)).toEqual([1056])
   })
 
-  it('two breaks when content spans three pages', () => {
-    expect(measurePageBreaks(3200, 1056)).toEqual([1056, 2112])
+  it('three breaks when content overflows three pages into a fourth', () => {
+    expect(measurePageBreaks(3200, 1056)).toEqual([1056, 2112, 3168])
   })
 
   it('no breaks when content fits within one page', () => {
@@ -54,8 +54,8 @@ describe('pageCount', () => {
     expect(pageCount(2000, 1056)).toBe(2)
   })
 
-  it('returns 3 when content spans three pages', () => {
-    expect(pageCount(3200, 1056)).toBe(3)
+  it('returns 4 when content overflows three pages into a fourth', () => {
+    expect(pageCount(3200, 1056)).toBe(4)
   })
 
   it('returns 1 for zero height content', () => {

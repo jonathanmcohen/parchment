@@ -29,7 +29,7 @@ export function pageDims(
  * The first page starts at 0 — breaks are where the *next* page starts.
  * Returns `pageCount - 1` evenly-spaced offsets at multiples of pageHeightPx.
  * `measurePageBreaks(2000, 1056)` → `[1056]`
- * `measurePageBreaks(3200, 1056)` → `[1056, 2112]`
+ * `measurePageBreaks(3200, 1056)` → `[1056, 2112, 3168]`
  * `measurePageBreaks(1000, 1056)` → `[]`
  */
 export function measurePageBreaks(contentHeightPx: number, pageHeightPx: number): number[] {
@@ -42,10 +42,10 @@ export function measurePageBreaks(contentHeightPx: number, pageHeightPx: number)
 }
 
 /**
- * Total page count; always at least 1.
- * Uses rounding so that negligible overflow (< half a page) does not inflate
- * the count — consistent with the canonical spec examples.
+ * Total page count; always at least 1. Any content past a page boundary lands
+ * on the next page, so this is a ceiling: content of height 3200 with 1056-px
+ * pages occupies 4 pages (3·1056 = 3168 < 3200).
  */
 export function pageCount(contentHeightPx: number, pageHeightPx: number): number {
-  return Math.max(1, Math.round(contentHeightPx / pageHeightPx))
+  return Math.max(1, Math.ceil(contentHeightPx / pageHeightPx))
 }

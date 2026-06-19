@@ -153,5 +153,27 @@ export const comments = pgTable(
   (t) => [index('comments_doc_idx').on(t.docId), index('comments_thread_idx').on(t.threadId)],
 )
 
+// ─── Document version history (D3) ──────────────────────────────────────────
+// `kind` = 'auto' (30-second autosave) | 'named' (user-labelled snapshot).
+// `content` = ProseMirror JSON at the time of the snapshot.
+// `markdown` = serialized markdown (for diffing).
+// `label` = null for autosaves; non-null for named snapshots.
+export const docVersions = pgTable(
+  'doc_versions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    label: text('label'), // null for autosaves
+    kind: text('kind').notNull().default('auto'), // 'auto' | 'named'
+    content: jsonb('content'), // ProseMirror JSON snapshot
+    markdown: text('markdown').notNull().default(''),
+    authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('doc_versions_doc_created_idx').on(t.docId, t.createdAt)],
+)
+
 // Hint for the migration generator: ensure extensions exist.
 export const _extensions = sql`create extension if not exists vector;`

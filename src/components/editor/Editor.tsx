@@ -19,6 +19,7 @@ import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
 import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { Toolbar } from '@/components/editor/Toolbar'
+import { VersionHistory } from '@/components/editor/VersionHistory'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
@@ -96,6 +97,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
   // D1: comments sidebar toggle
   const [commentsSidebarOpen, setCommentsSidebarOpen] = useState(false)
+
+  // D3: version history panel toggle
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
 
   const save = useCallback(
     (json: Record<string, unknown>) => {
@@ -183,6 +187,27 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
     },
   })
 
+  // D3: autosave snapshot — tracks the last-snapshotted markdown to avoid spamming.
+  // Only fires a version snapshot when the content has changed since last snapshot.
+  // Declared after useEditor so `editor` is in scope.
+  const lastSnapshotMd = useRef<string | null>(null)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!editor) return
+      const json = editor.getJSON() as Record<string, unknown>
+      const md = serializeMarkdown(json)
+      // Skip if content hasn't changed since last snapshot
+      if (md === lastSnapshotMd.current) return
+      lastSnapshotMd.current = md
+      void fetch(`/api/docs/${docId}/versions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'auto' }),
+      })
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [docId, editor])
+
   // B10: derive full-document and selection counts reactively via useEditorState.
   // The selector runs on every transaction so counts stay in sync with edits and
   // selection changes without extra state variables.
@@ -266,6 +291,8 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
           onOpenPageSetup={() => setPageSetupOpen(true)}
           onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
           commentsSidebarOpen={commentsSidebarOpen}
+          onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
+          versionHistoryOpen={versionHistoryOpen}
         />
       )}
 
@@ -289,6 +316,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
         {/* D1: comments sidebar (right rail) */}
         {editor && commentsSidebarOpen && <CommentsSidebar docId={docId} editor={editor} />}
+
+        {/* D3: version history panel (right rail) */}
+        {editor && versionHistoryOpen && <VersionHistory docId={docId} editor={editor} />}
       </div>
 
       {/* Selection bubble menu (B2) */}

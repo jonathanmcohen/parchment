@@ -2173,7 +2173,9 @@ body {
   cursor: pointer;
   background: transparent;
   color: inherit;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 .parchment-suggestions-action-btn:disabled {
   opacity: 0.45;

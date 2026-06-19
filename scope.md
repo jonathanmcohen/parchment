@@ -98,7 +98,7 @@
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
-| F1 | Every doc → real `.md` under `~/parchment/files/<folder>/<file>.md`, configurable root | TODO | ☐ | ☐ | |
+| F1 | Every doc → real `.md` under `~/parchment/files/<folder>/<file>.md`, configurable root | DONE | ✓ | ✓ | **Write-side mirror** (F2=chokidar reverse). `documents.disk_path` col (migration 0010). Pure `disk/paths.ts` (`sanitizeSegment`, `docRelPath` nests folder chain, `disambiguate` ` (2)` on collision, case-insensitive) — 15 unit. `disk/mirror.ts` (`filesRoot()` reads `PARCHMENT_FILES_ROOT` at call time; `syncDocToDisk` builds path→disambiguate vs other docs' disk_path→mkdir-p→write markdown→relocate old + prune empty dirs→update disk_path; `removeDocFromDisk`) — queries `@/db` directly (no repo import → no cycle); **all fs ops best-effort, never throw**. Hooked into save/move/rename/restore/duplicate (sync) + trash (remove) in repo.ts. 474 unit + 7 integration (real mkdtemp dir). Root configurable via `PARCHMENT_FILES_ROOT` (container `/data/files`). Browser-verified prod build (root `/tmp/parchment-dev/files`): rename→`DiskMirrorTest.md` written w/ markdown; rename→relocates (old gone); folder-move→`MirrorFolder/DiskMirrorRenamed.md`; disk_path tracks. **GAP: reverse sync (disk→doc) + conflict = F2; per-doc git = F4.** |
 | F2 | chokidar watcher — external edits sync back, conflict detect | TODO | ☐ | ☐ | |
 | F3 | Markdown canonical form — lossless, extension blocks as fenced `parchment:*` | TODO | ☐ | ☐ | |
 | F4 | Per-doc git via isomorphic-git — autocommit, log, cherry-pick, branch, merge | TODO | ☐ | ☐ | |

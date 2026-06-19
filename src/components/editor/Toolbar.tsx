@@ -10,6 +10,7 @@ type Props = {
   onInsertImage: (prefillSrc?: string) => void
   onOpenLink: () => void
   onCropImage: () => void
+  onOpenPageSetup: () => void
 }
 
 const FONT_FAMILIES = [
@@ -73,7 +74,14 @@ function parseSize(raw: string | undefined): { value: number; unit: 'pt' | 'px' 
 // Prevent the toolbar from stealing the editor selection on click.
 const keepSelection = (e: React.MouseEvent) => e.preventDefault()
 
-export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink, onCropImage }: Props) {
+export function Toolbar({
+  editor,
+  docId: _docId,
+  onInsertImage,
+  onOpenLink,
+  onCropImage,
+  onOpenPageSetup,
+}: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
   const s = useEditorState({
@@ -621,6 +629,22 @@ export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink, onCr
         onClick={() => editor.chain().focus().insertSectionBreak().run()}
       >
         §
+      </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── Page setup (B14) ─────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Page setup"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={(e) => {
+          e.preventDefault()
+          onOpenPageSetup()
+        }}
+      >
+        ☰⊞
       </button>
 
       {/* ── Table context controls (visible when cursor is in a table) ── */}

@@ -14,12 +14,13 @@ import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
+import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
-import type { PageSize } from '@/lib/editor/paginate'
+import { DEFAULT_PAGE_SETUP, type PageSetup } from '@/lib/editor/paginate'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
 
@@ -48,7 +49,8 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [size, setSize] = useState<PageSize>('Letter')
+  const [pageSetup, setPageSetup] = useState<PageSetup>(DEFAULT_PAGE_SETUP)
+  const [pageSetupOpen, setPageSetupOpen] = useState(false)
   const [pageCount, setPageCount] = useState(1)
 
   // B5: image dialog state — null = closed; string = prefill src for paste/drop flow
@@ -241,23 +243,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
           onInsertImage={openImageDialog}
           onOpenLink={openLinkPopover}
           onCropImage={openCropForSelection}
+          onOpenPageSetup={() => setPageSetupOpen(true)}
         />
       )}
-
-      {/* Page size toggle */}
-      <div className="mb-4 flex items-center gap-2">
-        {(['Letter', 'A4'] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            aria-pressed={size === s}
-            onClick={() => setSize(s)}
-            className="parchment-size-btn"
-          >
-            {s}
-          </button>
-        ))}
-      </div>
 
       <h1 className="mb-4 font-semibold text-2xl tracking-tight">{initialTitle}</h1>
 
@@ -268,7 +256,7 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
         {/* B9: find + replace panel — positioned relative to this wrapper */}
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-          <PageCanvas size={size} onPageCountChange={setPageCount} editor={editor}>
+          <PageCanvas pageSetup={pageSetup} onPageCountChange={setPageCount} editor={editor}>
             <EditorContent editor={editor} />
           </PageCanvas>
 
@@ -304,6 +292,15 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
           alt={cropState.alt}
           onCropped={applyCrop}
           onClose={() => setCropState(null)}
+        />
+      )}
+
+      {/* B14: Page setup dialog */}
+      {pageSetupOpen && (
+        <PageSetupDialog
+          initial={pageSetup}
+          onApply={setPageSetup}
+          onClose={() => setPageSetupOpen(false)}
         />
       )}
     </div>

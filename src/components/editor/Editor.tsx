@@ -6,8 +6,10 @@ import { EditorContent, useEditor } from '@tiptap/react'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
+import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { StatusBar } from '@/components/editor/StatusBar'
+import { Toolbar } from '@/components/editor/Toolbar'
 import type { PageSize } from '@/lib/editor/paginate'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
@@ -70,6 +72,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
   return (
     <div className="mx-auto max-w-5xl">
+      {/* Inline formatting toolbar (B2) */}
+      {editor && <Toolbar editor={editor} />}
+
       {/* Page size toggle */}
       <div className="mb-4 flex items-center gap-2">
         {(['Letter', 'A4'] as const).map((s) => (
@@ -90,6 +95,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
       <PageCanvas size={size} onPageCountChange={setPageCount}>
         <EditorContent editor={editor} />
       </PageCanvas>
+
+      {/* Selection bubble menu (B2) */}
+      {editor && <BubbleMenu editor={editor} />}
 
       <StatusBar pageCount={pageCount} wordCount={wordCount} />
     </div>

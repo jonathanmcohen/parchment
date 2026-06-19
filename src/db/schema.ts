@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -198,6 +199,34 @@ export const smartFolders = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('smart_folders_owner_idx').on(t.ownerId)],
+)
+
+// ─── Tags (E4) — color-coded labels, many-to-many with documents ─────────────
+export const tags = pgTable(
+  'tags',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    color: text('color').notNull().default('slate'), // a tag-colors palette name
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('tags_owner_idx').on(t.ownerId)],
+)
+
+export const documentTags = pgTable(
+  'document_tags',
+  {
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.docId, t.tagId] }), index('document_tags_tag_idx').on(t.tagId)],
 )
 
 // Hint for the migration generator: ensure extensions exist.

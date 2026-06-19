@@ -3,6 +3,7 @@ import { blockExtensions } from '@/lib/editor/block-extensions'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
 import { tableExtensions } from '@/lib/editor/extensions/table'
+import { TocExtension } from '@/lib/editor/extensions/toc'
 import { inlineExtensions } from '@/lib/editor/inline-extensions'
 
 // Base node/mark set. History is disabled because Collaboration (Yjs) provides
@@ -29,4 +30,6 @@ export const baseExtensions = [
   imageExtensions,
   // B6: stable heading ids for anchor links, TOC (B7), outline (B11).
   HeadingId,
+  // B7: auto table of contents block.
+  TocExtension,
 ]

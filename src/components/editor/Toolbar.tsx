@@ -557,6 +557,19 @@ export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink }: Pr
         🔗
       </button>
 
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── Insert table of contents (B7) ────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Insert table of contents"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().insertToc().run()}
+      >
+        ☰
+      </button>
+
       {/* ── Table context controls (visible when cursor is in a table) ── */}
       {s.table && (
         <>

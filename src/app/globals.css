@@ -686,6 +686,140 @@ body {
   color: var(--foreground);
 }
 
+/* ── Table of Contents block (B7) ───────────────────────────────────── */
+
+.parchment-toc {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin: 1em 0;
+  background: color-mix(in srgb, var(--background) 80%, var(--paper));
+  user-select: none;
+}
+
+.parchment-toc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.parchment-toc-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.parchment-toc-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.parchment-toc-btn {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  height: 24px;
+  background: var(--paper);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+
+.parchment-toc-btn:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+.parchment-toc-btn[aria-pressed="true"] {
+  background: var(--accent-contrast);
+  color: #fff;
+  border-color: var(--accent-contrast);
+}
+
+.parchment-toc-empty {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0;
+  font-style: italic;
+}
+
+.parchment-toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.parchment-toc-entry {
+  line-height: 1.5;
+}
+
+/* Simple link mode (no page numbers) */
+.parchment-toc-link {
+  font-size: 0.88rem;
+  color: var(--foreground);
+  text-decoration: none;
+  transition: color 0.1s;
+}
+
+.parchment-toc-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.parchment-toc-link:focus-visible {
+  outline: 2px solid var(--accent-contrast);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Page-number row — flex with leader dots */
+.parchment-toc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  width: 100%;
+}
+
+.parchment-toc-row .parchment-toc-link {
+  flex-shrink: 0;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Leader dots — a flex-grow spacer with a dotted bottom border */
+.parchment-toc-dots {
+  flex: 1;
+  border-bottom: 1px dotted var(--muted);
+  margin-bottom: 3px;
+  min-width: 16px;
+  opacity: 0.5;
+}
+
+.parchment-toc-page {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  min-width: 1.8em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.parchment-toc-page--unknown {
+  opacity: 0.5;
+}
+
 /* Editor content (B0 baseline; page canvas styling lands in B1). */
 .parchment-prose {
   min-height: 60vh;

@@ -6,6 +6,7 @@ import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensio
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
 import { PageBreakExtension, SectionBreakExtension } from '@/lib/editor/extensions/page-primitives'
+import { Suggesting } from '@/lib/editor/extensions/suggesting'
 import { tableExtensions } from '@/lib/editor/extensions/table'
 import { TocExtension } from '@/lib/editor/extensions/toc'
 import { inlineExtensions } from '@/lib/editor/inline-extensions'
@@ -49,6 +50,8 @@ export const baseExtensions = [
   SectionBreakExtension,
   // D1: comment thread anchoring mark.
   CommentMark,
+  // D2: suggesting mode — tracked insertions/deletions.
+  Suggesting,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

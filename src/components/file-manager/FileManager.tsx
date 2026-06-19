@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { docMenuItems } from '@/lib/docs/context-actions'
 import type { SortDir, SortKey } from '@/lib/docs/doc-sort'
 import { sortDocs } from '@/lib/docs/doc-sort'
 import type { FolderNode, TreeNode } from '@/lib/docs/folder-tree'
@@ -635,6 +636,173 @@ function SortViewToolbar({
   )
 }
 
+// ─── Context menu ─────────────────────────────────────────────────────────────
+
+interface ContextMenuState {
+  doc: DocDTO
+  x: number
+  y: number
+}
+
+interface ContextMenuProps {
+  state: ContextMenuState
+  onClose: () => void
+  onRefresh: () => void
+  /** Switch to All view and navigate to the doc's folder. */
+  navigateTo: (folderId: string | null) => void
+  onSetView: (v: 'all') => void
+}
+
+function ContextMenu({ state, onClose, onRefresh, navigateTo, onSetView }: ContextMenuProps) {
+  const { doc, x, y } = state
+  const ref = useRef<HTMLDivElement>(null)
+  const items = docMenuItems({ starred: doc.starred ?? false })
+
+  // Close on outside click or Escape
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [onClose])
+
+  const handleAction = async (key: string) => {
+    onClose()
+    switch (key) {
+      case 'open':
+        window.location.href = `/d/${doc.id}`
+        break
+      case 'rename': {
+        const next = window.prompt('Rename', doc.title)
+        if (next !== null && next.trim() !== '' && next.trim() !== doc.title) {
+          try {
+            const res = await fetch(`/api/docs/${doc.id}/rename`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ title: next.trim() }),
+            })
+            if (res.ok) onRefresh()
+          } catch {
+            // leave state unchanged
+          }
+        }
+        break
+      }
+      case 'duplicate': {
+        try {
+          const res = await fetch(`/api/docs/${doc.id}/duplicate`, { method: 'POST' })
+          if (res.ok) onRefresh()
+        } catch {
+          // leave state unchanged
+        }
+        break
+      }
+      case 'star': {
+        try {
+          const res = await fetch(`/api/docs/${doc.id}/star`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ starred: !doc.starred }),
+          })
+          if (res.ok) onRefresh()
+        } catch {
+          // leave state unchanged
+        }
+        break
+      }
+      case 'export-md': {
+        try {
+          const res = await fetch(`/api/docs/${doc.id}`)
+          if (res.ok) {
+            const data = (await res.json()) as { markdown?: string }
+            const md = data.markdown ?? ''
+            const blob = new Blob([md], { type: 'text/markdown' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${doc.title}.md`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+          }
+        } catch {
+          // leave state unchanged
+        }
+        break
+      }
+      case 'show-in-folder': {
+        onSetView('all')
+        navigateTo(doc.folderId ?? null)
+        break
+      }
+      case 'trash': {
+        try {
+          const res = await fetch(`/api/docs/${doc.id}/trash`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({}),
+          })
+          if (res.ok) onRefresh()
+        } catch {
+          // leave state unchanged
+        }
+        break
+      }
+      // template and share are disabled — no handler
+      default:
+        break
+    }
+  }
+
+  // Clamp position so menu doesn't overflow viewport
+  const menuStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: y,
+    left: x,
+    zIndex: 1000,
+  }
+
+  return (
+    <div
+      ref={ref}
+      role="menu"
+      aria-label={`Actions for ${doc.title}`}
+      style={menuStyle}
+      className="min-w-44 bg-[var(--paper)] border border-[var(--border)] rounded-md shadow-xl py-1 flex flex-col"
+    >
+      {items.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          role="menuitem"
+          aria-disabled={!item.enabled}
+          title={item.note}
+          onClick={() => {
+            if (item.enabled) handleAction(item.key)
+          }}
+          className={[
+            'text-left px-3 py-1.5 text-sm',
+            item.enabled
+              ? 'text-[var(--foreground)] hover:bg-[var(--accent-contrast)] hover:text-white cursor-pointer'
+              : 'text-[var(--muted)] cursor-default',
+          ].join(' ')}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ─── Doc rendering helpers ────────────────────────────────────────────────────
 
 interface DocActionsProps {
@@ -643,10 +811,21 @@ interface DocActionsProps {
   onRefresh: () => void
   allTags: TagDTO[]
   onTagsChanged?: (() => void) | undefined
+  navigateTo: (folderId: string | null) => void
+  onSetView: (v: 'all') => void
 }
 
-function DocActions({ doc, view, onRefresh, allTags, onTagsChanged }: DocActionsProps) {
+function DocActions({
+  doc,
+  view,
+  onRefresh,
+  allTags,
+  onTagsChanged,
+  navigateTo,
+  onSetView,
+}: DocActionsProps) {
   const [showTagPopover, setShowTagPopover] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   const handleStar = async () => {
     try {
@@ -743,6 +922,27 @@ function DocActions({ doc, view, onRefresh, allTags, onTagsChanged }: DocActions
         >
           Restore
         </button>
+      )}
+      {/* ⋯ More button — keyboard-accessible path to context menu */}
+      <button
+        type="button"
+        aria-label={`Actions for ${doc.title}`}
+        onClick={(e) => {
+          const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+          setContextMenu({ x: rect.left, y: rect.bottom + 4 })
+        }}
+        className="text-xs px-1 text-[var(--muted)] hover:text-[var(--foreground)]"
+      >
+        ⋯
+      </button>
+      {contextMenu !== null && (
+        <ContextMenu
+          state={{ doc, x: contextMenu.x, y: contextMenu.y }}
+          onClose={() => setContextMenu(null)}
+          onRefresh={onRefresh}
+          navigateTo={navigateTo}
+          onSetView={onSetView}
+        />
       )}
     </div>
   )
@@ -891,6 +1091,89 @@ function BulkActionBar({
   )
 }
 
+// ─── Single list-mode row (supports right-click context menu) ────────────────
+
+interface DocListRowProps {
+  doc: DocDTO
+  view: 'recents' | 'starred' | 'trash' | 'tag' | 'all'
+  fmt: Intl.DateTimeFormat
+  selected: boolean
+  orderedIds: string[]
+  onToggle: (docId: string, shiftKey: boolean, orderedIds: string[]) => void
+  onRefresh: () => void
+  allTags: TagDTO[]
+  onTagsChanged?: (() => void) | undefined
+  navigateTo: (folderId: string | null) => void
+  onSetView: (v: 'all') => void
+}
+
+function DocListRow({
+  doc,
+  view,
+  fmt,
+  selected,
+  orderedIds,
+  onToggle,
+  onRefresh,
+  allTags,
+  onTagsChanged,
+  navigateTo,
+  onSetView,
+}: DocListRowProps) {
+  const [rowContextMenu, setRowContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  return (
+    <li>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: context menu on row; ⋯ button is the keyboard-accessible path */}
+      <div
+        className="flex items-center justify-between py-2 gap-2"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setRowContextMenu({ x: e.clientX, y: e.clientY })
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={selected}
+          aria-label={`Select ${doc.title}`}
+          onClick={(e) => onToggle(doc.id, e.shiftKey, orderedIds)}
+          onChange={() => {
+            // handled by onClick to capture shiftKey
+          }}
+          className="rounded shrink-0"
+        />
+        <a
+          href={`/d/${doc.id}`}
+          className="flex-1 font-medium hover:text-[var(--accent-contrast)] truncate"
+        >
+          📄 {doc.title}
+        </a>
+        <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0">
+          {fmt.format(new Date(doc.updatedAt))}
+        </time>
+        <DocActions
+          doc={doc}
+          view={view}
+          onRefresh={onRefresh}
+          allTags={allTags}
+          onTagsChanged={onTagsChanged}
+          navigateTo={navigateTo}
+          onSetView={onSetView}
+        />
+      </div>
+      {rowContextMenu !== null && (
+        <ContextMenu
+          state={{ doc, x: rowContextMenu.x, y: rowContextMenu.y }}
+          onClose={() => setRowContextMenu(null)}
+          onRefresh={onRefresh}
+          navigateTo={navigateTo}
+          onSetView={onSetView}
+        />
+      )}
+    </li>
+  )
+}
+
 // ─── Shared doc renderer (list / grid / details) ──────────────────────────────
 
 interface DocListProps {
@@ -909,6 +1192,8 @@ interface DocListProps {
   anchorId: string | null
   onToggle: (docId: string, shiftKey: boolean, orderedIds: string[]) => void
   onSelectAll: (allIds: string[]) => void
+  navigateTo: (folderId: string | null) => void
+  onSetView: (v: 'all') => void
 }
 
 function DocList({
@@ -926,6 +1211,8 @@ function DocList({
   // anchorId is managed by the parent; we only use selected + orderedIds here
   onToggle,
   onSelectAll,
+  navigateTo,
+  onSetView,
 }: DocListProps) {
   const fmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -961,36 +1248,20 @@ function DocList({
         </div>
         <ul className="divide-y divide-[var(--border)]">
           {docs.map((doc) => (
-            <li key={doc.id}>
-              <div className="flex items-center justify-between py-2 gap-2">
-                <input
-                  type="checkbox"
-                  checked={selected.has(doc.id)}
-                  aria-label={`Select ${doc.title}`}
-                  onClick={(e) => onToggle(doc.id, e.shiftKey, orderedIds)}
-                  onChange={() => {
-                    // handled by onClick to capture shiftKey
-                  }}
-                  className="rounded shrink-0"
-                />
-                <a
-                  href={`/d/${doc.id}`}
-                  className="flex-1 font-medium hover:text-[var(--accent-contrast)] truncate"
-                >
-                  📄 {doc.title}
-                </a>
-                <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0">
-                  {fmt.format(new Date(doc.updatedAt))}
-                </time>
-                <DocActions
-                  doc={doc}
-                  view={view}
-                  onRefresh={onRefresh}
-                  allTags={allTags}
-                  onTagsChanged={onTagsChanged}
-                />
-              </div>
-            </li>
+            <DocListRow
+              key={doc.id}
+              doc={doc}
+              view={view}
+              fmt={fmt}
+              selected={selected.has(doc.id)}
+              orderedIds={orderedIds}
+              onToggle={onToggle}
+              onRefresh={onRefresh}
+              allTags={allTags}
+              onTagsChanged={onTagsChanged}
+              navigateTo={navigateTo}
+              onSetView={onSetView}
+            />
           ))}
         </ul>
       </>
@@ -1170,6 +1441,8 @@ function DocList({
                 onRefresh={onRefresh}
                 allTags={allTags}
                 onTagsChanged={onTagsChanged}
+                navigateTo={navigateTo}
+                onSetView={onSetView}
               />
             </td>
           </tr>
@@ -1186,13 +1459,32 @@ interface AllViewDocRowProps {
   allTags: TagDTO[]
   selected: boolean
   onToggle: (shiftKey: boolean) => void
+  onRefresh: () => void
+  navigateTo: (folderId: string | null) => void
+  onSetView: (v: 'all') => void
 }
 
-function AllViewDocRow({ doc, allTags, selected, onToggle }: AllViewDocRowProps) {
+function AllViewDocRow({
+  doc,
+  allTags,
+  selected,
+  onToggle,
+  onRefresh,
+  navigateTo,
+  onSetView,
+}: AllViewDocRowProps) {
   const [showTagPopover, setShowTagPopover] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   return (
-    <div className="flex items-center justify-between py-2 gap-2">
+    // biome-ignore lint/a11y/noStaticElementInteractions: context menu on row; ⋯ button is the keyboard-accessible path
+    <div
+      className="flex items-center justify-between py-2 gap-2"
+      onContextMenu={(e) => {
+        e.preventDefault()
+        setContextMenu({ x: e.clientX, y: e.clientY })
+      }}
+    >
       <input
         type="checkbox"
         checked={selected}
@@ -1238,6 +1530,27 @@ function AllViewDocRow({ doc, allTags, selected, onToggle }: AllViewDocRowProps)
           />
         )}
       </div>
+      {/* ⋯ More button */}
+      <button
+        type="button"
+        aria-label={`Actions for ${doc.title}`}
+        onClick={(e) => {
+          const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+          setContextMenu({ x: rect.left, y: rect.bottom + 4 })
+        }}
+        className="text-xs px-1 text-[var(--muted)] hover:text-[var(--foreground)] shrink-0"
+      >
+        ⋯
+      </button>
+      {contextMenu !== null && (
+        <ContextMenu
+          state={{ doc, x: contextMenu.x, y: contextMenu.y }}
+          onClose={() => setContextMenu(null)}
+          onRefresh={onRefresh}
+          navigateTo={navigateTo}
+          onSetView={onSetView}
+        />
+      )}
     </div>
   )
 }
@@ -1832,6 +2145,9 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                                       sortedDocs.map((d) => d.id),
                                     )
                                   }
+                                  onRefresh={() => fetchDocs(currentFolderId)}
+                                  navigateTo={navigateTo}
+                                  onSetView={(v) => setView(v)}
                                 />
                               </li>
                             ))}
@@ -1853,6 +2169,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                             anchorId={anchorId}
                             onToggle={handleToggle}
                             onSelectAll={handleSelectAll}
+                            navigateTo={navigateTo}
+                            onSetView={(v) => setView(v)}
                           />
                         </div>
                       ))}
@@ -1915,6 +2233,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           anchorId={anchorId}
                           onToggle={handleToggle}
                           onSelectAll={handleSelectAll}
+                          navigateTo={navigateTo}
+                          onSetView={(v) => setView(v)}
                         />
                       </>
                     )}
@@ -1980,6 +2300,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           anchorId={anchorId}
                           onToggle={handleToggle}
                           onSelectAll={handleSelectAll}
+                          navigateTo={navigateTo}
+                          onSetView={(v) => setView(v)}
                         />
                       </>
                     )}
@@ -2029,6 +2351,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 anchorId={anchorId}
                 onToggle={handleToggle}
                 onSelectAll={handleSelectAll}
+                navigateTo={navigateTo}
+                onSetView={(v) => setView(v)}
               />
             </>
           )}

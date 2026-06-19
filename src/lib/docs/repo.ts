@@ -229,3 +229,34 @@ export async function moveDocument(id: string, folderId: string | null): Promise
     .set({ folderId, updatedAt: new Date() })
     .where(eq(schema.documents.id, id))
 }
+
+/** Rename a doc's title (owner-scoped). Rejects empty/whitespace title. */
+export async function renameDocument(ownerId: string, id: string, title: string): Promise<void> {
+  const trimmed = title.trim()
+  if (trimmed.length === 0) throw new Error('empty title')
+  await db
+    .update(schema.documents)
+    .set({ title: trimmed, updatedAt: new Date() })
+    .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
+}
+
+/** Duplicate a doc: new row, title "{title} (copy)", same content/markdown/folderId,
+ *  owned by ownerId, not trashed, not starred. Returns the new id. Throws if the
+ *  source doc isn't owned by ownerId. */
+export async function duplicateDocument(ownerId: string, id: string): Promise<{ id: string }> {
+  const src = await getDocument(id)
+  if (!src || src.ownerId !== ownerId) throw new Error('not found')
+  const [row] = await db
+    .insert(schema.documents)
+    .values({
+      ownerId,
+      title: `${src.title} (copy)`,
+      content: src.content,
+      markdown: src.markdown ?? '',
+      folderId: src.folderId ?? undefined,
+      starred: false,
+    })
+    .returning({ id: schema.documents.id })
+  if (!row) throw new Error('duplicateDocument: insert returned no row')
+  return { id: row.id }
+}

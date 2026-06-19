@@ -268,7 +268,7 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
         {/* B9: find + replace panel — positioned relative to this wrapper */}
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-          <PageCanvas size={size} onPageCountChange={setPageCount}>
+          <PageCanvas size={size} onPageCountChange={setPageCount} editor={editor}>
             <EditorContent editor={editor} />
           </PageCanvas>
 

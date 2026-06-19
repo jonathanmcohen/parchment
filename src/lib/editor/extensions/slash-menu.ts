@@ -85,6 +85,14 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
     case 'footnote':
       editor.chain().focus().insertFootnote().run()
       break
+
+    case 'pageBreak':
+      editor.chain().focus().insertPageBreak().run()
+      break
+
+    case 'sectionBreak':
+      editor.chain().focus().insertSectionBreak().run()
+      break
   }
 }
 

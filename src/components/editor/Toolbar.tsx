@@ -599,6 +599,30 @@ export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink, onCr
         <sup style={{ fontSize: '0.6em', lineHeight: 1 }}>†</sup>
       </button>
 
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── Insert page break (B13) ──────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Insert page break"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().insertPageBreak().run()}
+      >
+        ⏎p
+      </button>
+
+      {/* ── Insert section break (B13) ───────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Insert section break"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().insertSectionBreak().run()}
+      >
+        §
+      </button>
+
       {/* ── Table context controls (visible when cursor is in a table) ── */}
       {s.table && (
         <>

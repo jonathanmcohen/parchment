@@ -77,6 +77,143 @@ body {
   user-select: none;
 }
 
+/* ── B13: page-boundary overlays ─────────────────────────────────────── */
+
+/* Container absolutely positioned at each computed break offset */
+.parchment-page-boundary {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Dashed divider line + "Page N" label */
+.parchment-page-divider {
+  border-top: 1px dashed var(--border);
+  position: relative;
+  height: 0;
+}
+
+.parchment-page-divider-label {
+  position: absolute;
+  right: 8px;
+  top: 2px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1;
+  user-select: none;
+}
+
+/* Running header — rendered at the top of the new page region */
+.parchment-running-header {
+  order: 1; /* after footer, before divider */
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 2px 8px 1px;
+  text-align: center;
+  user-select: none;
+  line-height: 1.3;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.parchment-running-header-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Running footer — rendered at the bottom of the departing page region */
+.parchment-running-footer {
+  order: -1; /* before divider */
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 1px 8px 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  line-height: 1.3;
+  border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+/* Page number position alignment variants */
+.parchment-pn-left {
+  justify-content: flex-start;
+}
+
+.parchment-pn-center {
+  justify-content: center;
+}
+
+.parchment-pn-right {
+  justify-content: flex-end;
+}
+
+.parchment-running-footer-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parchment-page-number {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Manual page-break node — inline in the doc */
+.parchment-page-break-node {
+  display: block;
+  width: 100%;
+  height: 0;
+  border: none;
+  border-top: 2px dashed color-mix(in srgb, var(--accent) 40%, var(--border));
+  margin: 4px 0;
+  position: relative;
+}
+
+.parchment-page-break-node::after {
+  content: 'Page break';
+  position: absolute;
+  left: 50%;
+  top: -0.6em;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  color: var(--muted);
+  background: var(--paper);
+  padding: 0 4px;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Section-break node — inline in the doc */
+.parchment-section-break-node {
+  display: block;
+  width: 100%;
+  height: 0;
+  border: none;
+  border-top: 2px solid color-mix(in srgb, var(--accent) 60%, var(--border));
+  margin: 4px 0;
+  position: relative;
+}
+
+.parchment-section-break-node::after {
+  content: 'Section break';
+  position: absolute;
+  left: 50%;
+  top: -0.6em;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  color: var(--muted);
+  background: var(--paper);
+  padding: 0 4px;
+  user-select: none;
+  white-space: nowrap;
+}
+
 .parchment-status-bar {
   margin-top: 8px;
   font-size: 0.78rem;

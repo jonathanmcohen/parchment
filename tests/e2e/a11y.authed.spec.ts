@@ -15,6 +15,7 @@ const routes = [
   '/settings/security',
   '/settings/admin/audit',
   '/settings/admin/health',
+  '/d/00000000-0000-0000-0000-0000000000d0',
 ]
 
 for (const route of routes) {

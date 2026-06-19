@@ -39,3 +39,64 @@ body {
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
+
+/* Editor content (B0 baseline; page canvas styling lands in B1). */
+.parchment-prose {
+  min-height: 60vh;
+  outline: none;
+  line-height: 1.6;
+}
+.parchment-prose h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 1.2em 0 0.4em;
+}
+.parchment-prose h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 1.1em 0 0.4em;
+}
+.parchment-prose h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 1em 0 0.3em;
+}
+.parchment-prose p {
+  margin: 0.5em 0;
+}
+.parchment-prose ul,
+.parchment-prose ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.parchment-prose ul {
+  list-style: disc;
+}
+.parchment-prose ol {
+  list-style: decimal;
+}
+.parchment-prose blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  color: var(--muted);
+  margin: 0.6em 0;
+}
+.parchment-prose pre {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.parchment-prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.parchment-prose p.is-editor-empty:first-child::before {
+  content: "Start writing…";
+  color: var(--muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

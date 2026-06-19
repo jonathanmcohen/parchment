@@ -4,12 +4,12 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   type Corner,
   type CropFormat,
-  type Rect,
   clampRect,
   displayRectToSource,
   extForFormat,
   initialCropRect,
   pickDefaultFormat,
+  type Rect,
   resizeCropRect,
 } from '@/lib/editor/crop'
 
@@ -209,7 +209,7 @@ export function CropDialog({ docId, src, alt, sourceType, onCropped, onClose }: 
               className="parchment-crop-frame"
               style={display ? { width: display.width, height: display.height } : undefined}
             >
-              {/* biome-ignore lint/a11y/useAltText: decorative crop preview; the real alt text is preserved on the document node */}
+              {/* biome-ignore lint/performance/noImgElement: crop needs a raw <img> drawn to a canvas with crossOrigin; next/image cannot supply a same-pixel source for drawImage. Decorative preview — real alt is preserved on the document node. */}
               <img
                 ref={imgRef}
                 src={src}
@@ -221,7 +221,6 @@ export function CropDialog({ docId, src, alt, sourceType, onCropped, onClose }: 
                 onError={() => setLoadError(true)}
               />
               {crop && (
-                // biome-ignore lint/a11y/noStaticElementInteractions: pointer-driven crop rectangle; the dialog stays keyboard-operable via its buttons and select
                 <div
                   className="parchment-crop-rect"
                   style={{ left: crop.x, top: crop.y, width: crop.width, height: crop.height }}

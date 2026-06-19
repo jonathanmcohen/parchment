@@ -79,9 +79,12 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
   }, [])
 
   // B5 crop: selected-image crop dialog state (pos + attrs captured at open time)
-  const [cropState, setCropState] = useState<
-    null | { src: string; alt: string; pos: number; attrs: Record<string, unknown> }
-  >(null)
+  const [cropState, setCropState] = useState<null | {
+    src: string
+    alt: string
+    pos: number
+    attrs: Record<string, unknown>
+  }>(null)
 
   const save = useCallback(
     (json: Record<string, unknown>) => {

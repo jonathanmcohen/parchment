@@ -21,6 +21,7 @@ const FIELD = 'default'
 // Hocuspocus network provider with no rework. For single-user v0.1 the Y.Doc is
 // seeded from the stored ProseMirror JSON and autosave persists JSON + markdown.
 export function Editor({ docId, initialTitle, initialJson }: Props) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: seed the Y.Doc once on mount; later edits flow through Yjs, not a re-seed.
   const ydoc = useMemo(() => {
     const doc = new Y.Doc()
     if (initialJson) {
@@ -29,7 +30,6 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
       Y.applyUpdate(doc, Y.encodeStateAsUpdate(seeded))
     }
     return doc
-    // Seed once on mount.
   }, [])
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)

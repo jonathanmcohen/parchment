@@ -85,6 +85,10 @@ export function Editor({
   // initialJson twice.
   const seededRef = useRef(false)
 
+  // D4: the offline-fallback timer, hoisted to a ref so unmount can clear it if
+  // the component goes away before the timeout fires.
+  const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   /**
    * Seed the Y.Doc from initialJson. Two modes:
    *   • online (force=false): only seed a never-collaborated doc (hasCollabState
@@ -144,11 +148,16 @@ export function Editor({
       // `p` is referenced inside the callbacks below; it is assigned before any
       // of them can fire (they are async socket events).
       let p: HocuspocusProvider
-      let offlineTimer: ReturnType<typeof setTimeout> | null = null
+      const clearOfflineTimer = () => {
+        if (offlineTimerRef.current) {
+          clearTimeout(offlineTimerRef.current)
+          offlineTimerRef.current = null
+        }
+      }
       const goOffline = () => {
         if (settled) return
         settled = true
-        if (offlineTimer) clearTimeout(offlineTimer)
+        clearOfflineTimer()
         seedFromInitial({ force: true })
         // Stop reconnect attempts: a reconnect would merge this offline seed with
         // any authoritative server state and duplicate content.
@@ -158,7 +167,7 @@ export function Editor({
           // ignore — provider may not have an open socket yet
         }
       }
-      offlineTimer = setTimeout(goOffline, OFFLINE_FALLBACK_MS)
+      offlineTimerRef.current = setTimeout(goOffline, OFFLINE_FALLBACK_MS)
       p = new HocuspocusProvider({
         url: COLLAB_URL,
         name: docId,
@@ -166,7 +175,7 @@ export function Editor({
         onSynced: () => {
           if (settled) return
           settled = true
-          if (offlineTimer) clearTimeout(offlineTimer)
+          clearOfflineTimer()
           // Online: gated seed — only a never-collaborated doc is seeded here.
           seedFromInitial()
         },
@@ -194,9 +203,14 @@ export function Editor({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Destroy the provider on unmount.
+  // Destroy the provider on unmount; also clear the offline-fallback timer so it
+  // can't fire goOffline() after the component is gone.
   useEffect(() => {
     return () => {
+      if (offlineTimerRef.current) {
+        clearTimeout(offlineTimerRef.current)
+        offlineTimerRef.current = null
+      }
       try {
         provider?.destroy()
       } catch {

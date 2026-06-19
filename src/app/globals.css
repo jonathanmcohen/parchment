@@ -832,7 +832,9 @@ body {
   border-right: 1px solid var(--border);
   background: color-mix(in srgb, var(--background) 90%, var(--paper));
   flex-shrink: 0;
-  transition: width 0.15s ease, min-width 0.15s ease;
+  transition:
+    width 0.15s ease,
+    min-width 0.15s ease;
   overflow: hidden;
 }
 
@@ -860,7 +862,9 @@ body {
   color: var(--muted);
   font-size: 0.9rem;
   border-radius: 3px;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .parchment-outline-toggle:hover {
@@ -919,7 +923,7 @@ body {
   background: color-mix(in srgb, var(--border) 60%, transparent);
 }
 
-.parchment-outline-item[data-drag-over='true'] {
+.parchment-outline-item[data-drag-over="true"] {
   background: color-mix(in srgb, var(--accent-contrast) 15%, transparent);
   outline: 1px dashed var(--accent-contrast);
 }

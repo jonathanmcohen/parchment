@@ -6,6 +6,8 @@ import { TableControls } from '@/components/editor/TableControls'
 
 type Props = {
   editor: Editor
+  docId: string
+  onInsertImage: (prefillSrc?: string) => void
 }
 
 const FONT_FAMILIES = [
@@ -69,7 +71,7 @@ function parseSize(raw: string | undefined): { value: number; unit: 'pt' | 'px' 
 // Prevent the toolbar from stealing the editor selection on click.
 const keepSelection = (e: React.MouseEvent) => e.preventDefault()
 
-export function Toolbar({ editor }: Props) {
+export function Toolbar({ editor, docId: _docId, onInsertImage }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
   const s = useEditorState({
@@ -525,6 +527,19 @@ export function Toolbar({ editor }: Props) {
         }
       >
         ⊞
+      </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── Insert image (B5) ────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Insert image"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => onInsertImage()}
+      >
+        🖼
       </button>
 
       {/* ── Table context controls (visible when cursor is in a table) ── */}

@@ -387,6 +387,305 @@ body {
   margin: 0;
 }
 
+/* ── Images (B5) ─────────────────────────────────────────────────────── */
+
+/* Position modes */
+.parchment-prose img[data-position="wrap-left"],
+.parchment-prose .parchment-image-wrapper[data-image-position="wrap-left"] {
+  float: left;
+  margin: 0.25em 1em 0.25em 0;
+  clear: left;
+}
+
+.parchment-prose img[data-position="wrap-right"],
+.parchment-prose .parchment-image-wrapper[data-image-position="wrap-right"] {
+  float: right;
+  margin: 0.25em 0 0.25em 1em;
+  clear: right;
+}
+
+.parchment-prose img[data-position="break"],
+.parchment-prose .parchment-image-wrapper[data-image-position="break"] {
+  display: block;
+  clear: both;
+  margin: 0.75em auto;
+}
+
+.parchment-prose img[data-position="behind"],
+.parchment-prose .parchment-image-wrapper[data-image-position="behind"] {
+  display: block;
+  opacity: 0.3;
+  margin: 0.5em 0;
+}
+
+.parchment-prose img[data-position="inline"],
+.parchment-prose .parchment-image-wrapper[data-image-position="inline"] {
+  display: inline;
+  vertical-align: middle;
+}
+
+/* Image wrapper (NodeView host) */
+.parchment-image-wrapper {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  user-select: none;
+}
+
+.parchment-image-wrapper img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Resize handles — visible only when selected */
+.parchment-image-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--accent-contrast);
+  border: 1px solid #fff;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+  z-index: 10;
+}
+
+.parchment-image-selected .parchment-image-handle {
+  opacity: 1;
+}
+
+.parchment-image-handle--nw {
+  top: -5px;
+  left: -5px;
+  cursor: nw-resize;
+}
+.parchment-image-handle--ne {
+  top: -5px;
+  right: -5px;
+  cursor: ne-resize;
+}
+.parchment-image-handle--sw {
+  bottom: -5px;
+  left: -5px;
+  cursor: sw-resize;
+}
+.parchment-image-handle--se {
+  bottom: -5px;
+  right: -5px;
+  cursor: se-resize;
+}
+
+/* Selected image outline */
+.parchment-image-selected img {
+  outline: 2px solid var(--accent-contrast);
+  outline-offset: 2px;
+}
+
+/* ── Image dialog (B5) ────────────────────────────────────────────────── */
+
+.parchment-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.parchment-dialog {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.2);
+  width: min(480px, 96vw);
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.parchment-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.parchment-dialog-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--foreground);
+}
+
+.parchment-dialog-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.parchment-dialog-close:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+.parchment-dialog-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.parchment-dialog-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.parchment-dialog-tab[aria-selected="true"] {
+  background: var(--accent-contrast);
+  color: #fff;
+  border-color: var(--accent-contrast);
+}
+
+.parchment-dialog-tab:not([aria-selected="true"]):hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+.parchment-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.parchment-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.parchment-dialog-field--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.parchment-dialog-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.parchment-dialog-required {
+  color: #dc2626;
+  margin-left: 2px;
+}
+
+.parchment-dialog-input {
+  height: 34px;
+  padding: 0 10px;
+  font-size: 0.9rem;
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.parchment-dialog-input:focus {
+  outline: 2px solid var(--accent-contrast);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.parchment-dialog-select {
+  height: 34px;
+  padding: 0 8px;
+  font-size: 0.9rem;
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.parchment-dialog-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-contrast);
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.parchment-dialog-file-input {
+  font-size: 0.85rem;
+  color: var(--foreground);
+}
+
+.parchment-dialog-error {
+  font-size: 0.82rem;
+  color: #dc2626;
+  margin-top: 2px;
+}
+
+.parchment-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.parchment-dialog-btn-primary {
+  height: 34px;
+  padding: 0 18px;
+  font-size: 0.9rem;
+  background: var(--accent-contrast);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: opacity 0.1s;
+}
+
+.parchment-dialog-btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.parchment-dialog-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.parchment-dialog-btn-secondary {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 0.9rem;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.parchment-dialog-btn-secondary:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
 /* Editor content (B0 baseline; page canvas styling lands in B1). */
 .parchment-prose {
   min-height: 60vh;

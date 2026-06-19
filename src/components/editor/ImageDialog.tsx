@@ -2,6 +2,7 @@
 
 import type { Editor } from '@tiptap/core'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { CropDialog } from '@/components/editor/CropDialog'
 import type { ImagePosition } from '@/lib/editor/extensions/image'
 
 type Props = {
@@ -43,6 +44,13 @@ export function ImageDialog({ editor, docId, prefillSrc, onClose }: Props) {
   const [uploadError, setUploadError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // B5 crop-on-insert: crop the pending source before inserting.
+  const [cropOpen, setCropOpen] = useState(false)
+  const [cropSrc, setCropSrc] = useState('')
+  const [cropSourceType, setCropSourceType] = useState<string | undefined>(undefined)
+  const [croppedUrl, setCroppedUrl] = useState<string | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
+
   // When dialog opens with a prefill src (paste/drop), focus the alt field.
   useEffect(() => {
     if (prefillSrc) {
@@ -68,23 +76,70 @@ export function ImageDialog({ editor, docId, prefillSrc, onClose }: Props) {
     [editor, alt, position, lockAspect, onClose],
   )
 
+  const openCrop = useCallback(() => {
+    setUploadError('')
+    if (tab === 'file' && !prefillSrc) {
+      const file = fileRef.current?.files?.[0]
+      if (!file) {
+        setUploadError('Select a file to crop first.')
+        return
+      }
+      const obj = URL.createObjectURL(file)
+      objectUrlRef.current = obj
+      setCropSrc(obj)
+      setCropSourceType(file.type)
+    } else {
+      if (!url.trim()) {
+        setUploadError('Enter an image URL to crop first.')
+        return
+      }
+      setCropSrc(url.trim())
+      setCropSourceType(undefined)
+    }
+    setCropOpen(true)
+  }, [tab, prefillSrc, url])
+
+  const handleCropped = useCallback((cropUrl: string) => {
+    setCroppedUrl(cropUrl)
+    setCropOpen(false)
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
+  }, [])
+
+  // Revoke any pending object URL on unmount.
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    }
+  }, [])
+
   const handleUrlSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault()
       if (!validate()) return
+      if (croppedUrl) {
+        doInsert(croppedUrl)
+        return
+      }
       if (!url.trim()) {
         setUploadError('Please enter an image URL.')
         return
       }
       doInsert(url.trim())
     },
-    [validate, url, doInsert],
+    [validate, url, doInsert, croppedUrl],
   )
 
   const handleFileSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault()
       if (!validate()) return
+      if (croppedUrl) {
+        doInsert(croppedUrl)
+        return
+      }
       const file = fileRef.current?.files?.[0]
       if (!file) {
         setUploadError('Please select a file.')
@@ -109,7 +164,7 @@ export function ImageDialog({ editor, docId, prefillSrc, onClose }: Props) {
         setUploading(false)
       }
     },
-    [validate, docId, doInsert],
+    [validate, docId, doInsert, croppedUrl],
   )
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -238,6 +293,8 @@ export function ImageDialog({ editor, docId, prefillSrc, onClose }: Props) {
           </span>
         )}
 
+        {croppedUrl && <p className="parchment-dialog-label">Using cropped image.</p>}
+
         {/* Source-specific form */}
         {tab === 'file' && !prefillSrc ? (
           <form onSubmit={handleFileSubmit} className="parchment-dialog-form">
@@ -256,6 +313,9 @@ export function ImageDialog({ editor, docId, prefillSrc, onClose }: Props) {
             <div className="parchment-dialog-actions">
               <button type="button" className="parchment-dialog-btn-secondary" onClick={onClose}>
                 Cancel
+              </button>
+              <button type="button" className="parchment-dialog-btn-secondary" onClick={openCrop}>
+                {croppedUrl ? 'Re-crop' : 'Crop'}
               </button>
               <button
                 type="submit"
@@ -287,6 +347,9 @@ export function ImageDialog({ editor, docId, prefillSrc, onClose }: Props) {
               <button type="button" className="parchment-dialog-btn-secondary" onClick={onClose}>
                 Cancel
               </button>
+              <button type="button" className="parchment-dialog-btn-secondary" onClick={openCrop}>
+                {croppedUrl ? 'Re-crop' : 'Crop'}
+              </button>
               <button type="submit" className="parchment-dialog-btn-primary">
                 Insert
               </button>
@@ -294,9 +357,17 @@ export function ImageDialog({ editor, docId, prefillSrc, onClose }: Props) {
           </form>
         )}
 
-        {/* TODO(B5): full crop — implement a canvas-based crop dialog in a follow-up.
-            v0.1 delivers resize handles (drag corners) + position + lock-aspect.
-            Full crop (select rect → produce new cropped asset) is deferred. */}
+        {/* B5: crop the pending source before inserting */}
+        {cropOpen && (
+          <CropDialog
+            docId={docId}
+            src={cropSrc}
+            alt={alt}
+            sourceType={cropSourceType}
+            onCropped={handleCropped}
+            onClose={() => setCropOpen(false)}
+          />
+        )}
       </div>
     </div>
   )

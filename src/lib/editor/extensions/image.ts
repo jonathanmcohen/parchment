@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import Image from '@tiptap/extension-image'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
+import { NodeSelection } from '@tiptap/pm/state'
 import type { NodeView as ProseMirrorNodeView } from '@tiptap/pm/view'
 
 // ── Attribute types ────────────────────────────────────────────────────────
@@ -138,6 +139,33 @@ function buildImageNodeView(
 
     wrapper.appendChild(handle)
   }
+
+  // ── Overlay crop button (visible when selected) ─────────────────────────
+  const cropBtn = document.createElement('button')
+  cropBtn.type = 'button'
+  cropBtn.className = 'parchment-image-crop-btn'
+  cropBtn.textContent = 'Crop'
+  cropBtn.setAttribute('aria-label', 'Crop image')
+  // Keep the node selected through the click (don't let mousedown blur/reselect).
+  cropBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+  })
+  cropBtn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (typeof getPos === 'function') {
+      const p = getPos()
+      if (p !== undefined) {
+        _editor.commands.command(({ tr, dispatch }) => {
+          if (dispatch) dispatch(tr.setSelection(NodeSelection.create(tr.doc, p)))
+          return true
+        })
+      }
+    }
+    _editor.view.dom.dispatchEvent(new CustomEvent('parchment:crop-image', { bubbles: true }))
+  })
+  wrapper.appendChild(cropBtn)
 
   wrapper.appendChild(img)
 

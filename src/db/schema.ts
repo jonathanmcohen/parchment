@@ -184,5 +184,21 @@ export const docVersions = pgTable(
   (t) => [index('doc_versions_doc_created_idx').on(t.docId, t.createdAt)],
 )
 
+// ─── Smart Folders (E3) — live saved searches ────────────────────────────────
+export const smartFolders = pgTable(
+  'smart_folders',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    criteria: jsonb('criteria').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('smart_folders_owner_idx').on(t.ownerId)],
+)
+
 // Hint for the migration generator: ensure extensions exist.
 export const _extensions = sql`create extension if not exists vector;`

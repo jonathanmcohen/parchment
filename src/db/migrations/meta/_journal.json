@@ -43,6 +43,13 @@
       "when": 1781899769896,
       "tag": "0005_slow_ezekiel",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781900437622,
+      "tag": "0006_strange_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }

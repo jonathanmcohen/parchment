@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FolderNode, TreeNode } from '@/lib/docs/folder-tree'
 import { buildTree, folderPath } from '@/lib/docs/folder-tree'
+import { describeCriteria, parseCriteria } from '@/lib/docs/smart-folder-criteria'
 
 export type FolderDTO = {
   id: string
@@ -18,7 +19,13 @@ export type DocDTO = {
   starred?: boolean
 }
 
-type View = 'all' | 'recents' | 'starred' | 'shared' | 'trash'
+type SmartFolderDTO = {
+  id: string
+  name: string
+  criteria: unknown
+}
+
+type View = 'all' | 'recents' | 'starred' | 'shared' | 'trash' | 'smart'
 
 const VIEWS: { key: View; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -31,6 +38,109 @@ const VIEWS: { key: View; label: string }[] = [
 interface Props {
   initialFolders: FolderDTO[]
   initialDocs: DocDTO[]
+}
+
+// ─── Smart folder create form ─────────────────────────────────────────────────
+
+interface SmartFolderCreateFormProps {
+  onCreated: () => void
+  onCancel: () => void
+}
+
+function SmartFolderCreateForm({ onCreated, onCancel }: SmartFolderCreateFormProps) {
+  const [name, setName] = useState('')
+  const [titleContains, setTitleContains] = useState('')
+  const [starredOnly, setStarredOnly] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) {
+      setError('Name is required')
+      return
+    }
+    const criteria: Record<string, unknown> = {}
+    if (titleContains.trim()) criteria.titleContains = titleContains.trim()
+    if (starredOnly) criteria.starred = true
+
+    try {
+      const res = await fetch('/api/smart-folders', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), criteria }),
+      })
+      if (res.ok) {
+        onCreated()
+      } else {
+        const data = (await res.json()) as { error?: string }
+        setError(data.error ?? 'Failed to create smart folder')
+      }
+    } catch {
+      setError('Failed to create smart folder')
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-2 p-3 border border-[var(--border)] rounded-md bg-[var(--paper)] mt-2"
+    >
+      <div className="flex flex-col gap-1">
+        <label htmlFor="sf-name" className="text-xs font-medium text-[var(--foreground)]">
+          Name
+        </label>
+        <input
+          id="sf-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Smart folder name"
+          className="px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="sf-title" className="text-xs font-medium text-[var(--foreground)]">
+          Title contains
+        </label>
+        <input
+          id="sf-title"
+          type="text"
+          value={titleContains}
+          onChange={(e) => setTitleContains(e.target.value)}
+          placeholder="e.g. report"
+          className="px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          id="sf-starred"
+          type="checkbox"
+          checked={starredOnly}
+          onChange={(e) => setStarredOnly(e.target.checked)}
+          className="rounded"
+        />
+        <label htmlFor="sf-starred" className="text-xs font-medium text-[var(--foreground)]">
+          Starred only
+        </label>
+      </div>
+      {error !== null && <p className="text-xs text-red-600">{error}</p>}
+      <div className="flex gap-2 mt-1">
+        <button
+          type="submit"
+          className="px-3 py-1 text-xs rounded bg-[var(--accent-contrast)] text-white font-medium"
+        >
+          Create
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)]"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
 }
 
 // ─── Drag data ───────────────────────────────────────────────────────────────
@@ -289,6 +399,10 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [docs, setDocs] = useState<DocDTO[]>(initialDocs)
   const [flatDocs, setFlatDocs] = useState<DocDTO[]>([])
+  const [smartFolders, setSmartFolders] = useState<SmartFolderDTO[]>([])
+  const [activeSmartId, setActiveSmartId] = useState<string | null>(null)
+  const [smartDocs, setSmartDocs] = useState<DocDTO[]>([])
+  const [showCreateForm, setShowCreateForm] = useState(false)
 
   // Fetch docs for the All view (current folder)
   const fetchDocs = useCallback(async (folderId: string | null) => {
@@ -330,6 +444,32 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
     }
   }, [])
 
+  // Fetch smart folders
+  const fetchSmartFolders = useCallback(async () => {
+    try {
+      const res = await fetch('/api/smart-folders')
+      if (res.ok) {
+        const data = (await res.json()) as SmartFolderDTO[]
+        setSmartFolders(data)
+      }
+    } catch {
+      // leave state unchanged
+    }
+  }, [])
+
+  // Fetch results for the active smart folder
+  const fetchSmartResults = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/smart-folders/${id}/results`)
+      if (res.ok) {
+        const data = (await res.json()) as DocDTO[]
+        setSmartDocs(data)
+      }
+    } catch {
+      // leave state unchanged
+    }
+  }, [])
+
   const refreshAll = useCallback(
     async (folderId: string | null) => {
       await Promise.all([fetchFolders(), fetchDocs(folderId)])
@@ -351,6 +491,11 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
       fetchFlatDocs(view)
     }
   }, [view, fetchFlatDocs])
+
+  // Fetch smart folders on mount
+  useEffect(() => {
+    fetchSmartFolders()
+  }, [fetchSmartFolders])
 
   const handleNewFolder = async () => {
     const name = window.prompt('Folder name')
@@ -388,11 +533,14 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
           <button
             key={key}
             type="button"
-            onClick={() => setView(key)}
-            aria-current={view === key ? 'page' : undefined}
+            onClick={() => {
+              setView(key)
+              setActiveSmartId(null)
+            }}
+            aria-current={view === key && view !== 'smart' ? 'page' : undefined}
             className={[
               'px-3 py-1.5 text-sm rounded-t font-medium',
-              view === key
+              view === key && view !== 'smart'
                 ? 'text-[var(--accent-contrast)] border-b-2 border-[var(--accent-contrast)]'
                 : 'text-[var(--muted)] hover:text-[var(--foreground)]',
             ].join(' ')}
@@ -403,9 +551,9 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
       </nav>
 
       {/* View content */}
-      {view === 'all' && (
+      {(view === 'all' || view === 'smart') && (
         <div className="flex gap-6 flex-1 min-h-0">
-          {/* Left rail — folder tree */}
+          {/* Left rail — folder tree + smart folders */}
           <aside className="w-56 shrink-0 border-r border-[var(--border)] pr-4 flex flex-col gap-2">
             <button
               type="button"
@@ -450,97 +598,204 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 />
               ))}
             </ul>
+
+            {/* Smart Folders section */}
+            <div className="mt-4 flex flex-col gap-1">
+              <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide px-1">
+                Smart Folders
+              </p>
+              <ul className="flex flex-col gap-0.5">
+                {smartFolders.map((sf) => (
+                  <li key={sf.id} className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView('smart')
+                        setActiveSmartId(sf.id)
+                        fetchSmartResults(sf.id)
+                      }}
+                      className={[
+                        'flex-1 text-left px-2 py-1 text-sm rounded truncate',
+                        view === 'smart' && activeSmartId === sf.id
+                          ? 'font-semibold text-[var(--accent-contrast)]'
+                          : 'text-[var(--foreground)] hover:text-[var(--accent-contrast)]',
+                      ].join(' ')}
+                    >
+                      🔍 {sf.name}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete smart folder ${sf.name}`}
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/smart-folders/${sf.id}`, {
+                            method: 'DELETE',
+                          })
+                          if (res.ok) {
+                            if (activeSmartId === sf.id) {
+                              setView('all')
+                              setActiveSmartId(null)
+                            }
+                            await fetchSmartFolders()
+                          }
+                        } catch {
+                          // leave state unchanged
+                        }
+                      }}
+                      className="text-xs text-[var(--muted)] hover:text-red-600 px-1 shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => setShowCreateForm((v) => !v)}
+                className="text-xs text-[var(--muted)] hover:text-[var(--accent-contrast)] text-left px-2 py-1"
+              >
+                + Smart folder
+              </button>
+              {showCreateForm && (
+                <SmartFolderCreateForm
+                  onCreated={async () => {
+                    await fetchSmartFolders()
+                    setShowCreateForm(false)
+                  }}
+                  onCancel={() => setShowCreateForm(false)}
+                />
+              )}
+            </div>
           </aside>
 
           {/* Main panel */}
           <main className="flex-1 min-w-0">
-            {/* Breadcrumb */}
-            <nav
-              aria-label="folder path"
-              className="flex items-center gap-1 text-sm mb-4 flex-wrap"
-            >
-              <button
-                type="button"
-                onClick={() => navigateTo(null)}
-                className="text-[var(--accent-contrast)] hover:underline"
-              >
-                Root
-              </button>
-              {breadcrumb.map((segment) => (
-                <span key={segment.id} className="flex items-center gap-1">
-                  <span className="text-[var(--muted)]" aria-hidden="true">
-                    /
-                  </span>
+            {view === 'all' && (
+              <>
+                {/* Breadcrumb */}
+                <nav
+                  aria-label="folder path"
+                  className="flex items-center gap-1 text-sm mb-4 flex-wrap"
+                >
                   <button
                     type="button"
-                    onClick={() => navigateTo(segment.id)}
+                    onClick={() => navigateTo(null)}
                     className="text-[var(--accent-contrast)] hover:underline"
                   >
-                    {segment.name}
+                    Root
                   </button>
-                </span>
-              ))}
-            </nav>
-
-            {/* Content list */}
-            {subfolders.length === 0 && docs.length === 0 ? (
-              <p className="text-[var(--muted)]">This folder is empty.</p>
-            ) : (
-              <ul className="divide-y divide-[var(--border)]">
-                {/* Subfolder rows */}
-                {subfolders.map((folder) => (
-                  <li key={folder.id}>
-                    <DropZone targetFolderId={folder.id} onDropped={onDropped}>
-                      {(over, handlers) => (
-                        <button
-                          type="button"
-                          draggable
-                          onDragStart={(e) => setDrag(e, { type: 'folder', id: folder.id })}
-                          onDragOver={handlers.onDragOver}
-                          onDragLeave={handlers.onDragLeave}
-                          onDrop={handlers.onDrop}
-                          onClick={() => navigateTo(folder.id)}
-                          className={[
-                            'flex w-full items-center gap-2 py-2 rounded font-medium text-left',
-                            over
-                              ? 'bg-[var(--paper)] text-[var(--accent-contrast)]'
-                              : 'hover:text-[var(--accent-contrast)]',
-                          ].join(' ')}
-                        >
-                          <span aria-hidden="true">📁</span>
-                          {folder.name}
-                        </button>
-                      )}
-                    </DropZone>
-                  </li>
-                ))}
-
-                {/* Document rows */}
-                {docs.map((doc) => (
-                  <li key={doc.id}>
-                    <div className="flex items-center justify-between py-2">
-                      <a
-                        href={`/d/${doc.id}`}
-                        draggable
-                        onDragStart={(e) => setDrag(e, { type: 'doc', id: doc.id })}
-                        className="flex-1 font-medium hover:text-[var(--accent-contrast)]"
+                  {breadcrumb.map((segment) => (
+                    <span key={segment.id} className="flex items-center gap-1">
+                      <span className="text-[var(--muted)]" aria-hidden="true">
+                        /
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => navigateTo(segment.id)}
+                        className="text-[var(--accent-contrast)] hover:underline"
                       >
-                        📄 {doc.title}
-                      </a>
-                      <time
-                        dateTime={doc.updatedAt}
-                        className="text-[var(--muted)] text-xs shrink-0 ml-4"
-                      >
-                        {new Intl.DateTimeFormat('en', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        }).format(new Date(doc.updatedAt))}
-                      </time>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                        {segment.name}
+                      </button>
+                    </span>
+                  ))}
+                </nav>
+
+                {/* Content list */}
+                {subfolders.length === 0 && docs.length === 0 ? (
+                  <p className="text-[var(--muted)]">This folder is empty.</p>
+                ) : (
+                  <ul className="divide-y divide-[var(--border)]">
+                    {/* Subfolder rows */}
+                    {subfolders.map((folder) => (
+                      <li key={folder.id}>
+                        <DropZone targetFolderId={folder.id} onDropped={onDropped}>
+                          {(over, handlers) => (
+                            <button
+                              type="button"
+                              draggable
+                              onDragStart={(e) => setDrag(e, { type: 'folder', id: folder.id })}
+                              onDragOver={handlers.onDragOver}
+                              onDragLeave={handlers.onDragLeave}
+                              onDrop={handlers.onDrop}
+                              onClick={() => navigateTo(folder.id)}
+                              className={[
+                                'flex w-full items-center gap-2 py-2 rounded font-medium text-left',
+                                over
+                                  ? 'bg-[var(--paper)] text-[var(--accent-contrast)]'
+                                  : 'hover:text-[var(--accent-contrast)]',
+                              ].join(' ')}
+                            >
+                              <span aria-hidden="true">📁</span>
+                              {folder.name}
+                            </button>
+                          )}
+                        </DropZone>
+                      </li>
+                    ))}
+
+                    {/* Document rows */}
+                    {docs.map((doc) => (
+                      <li key={doc.id}>
+                        <div className="flex items-center justify-between py-2">
+                          <a
+                            href={`/d/${doc.id}`}
+                            draggable
+                            onDragStart={(e) => setDrag(e, { type: 'doc', id: doc.id })}
+                            className="flex-1 font-medium hover:text-[var(--accent-contrast)]"
+                          >
+                            📄 {doc.title}
+                          </a>
+                          <time
+                            dateTime={doc.updatedAt}
+                            className="text-[var(--muted)] text-xs shrink-0 ml-4"
+                          >
+                            {new Intl.DateTimeFormat('en', {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            }).format(new Date(doc.updatedAt))}
+                          </time>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
+
+            {view === 'smart' &&
+              activeSmartId !== null &&
+              (() => {
+                const sf = smartFolders.find((s) => s.id === activeSmartId)
+                const criteria = parseCriteria(sf?.criteria)
+                return (
+                  <>
+                    <div className="mb-4">
+                      <h2 className="text-base font-semibold text-[var(--foreground)]">
+                        {sf?.name ?? 'Smart Folder'}
+                      </h2>
+                      <p className="text-xs text-[var(--muted)] mt-0.5">
+                        {describeCriteria(criteria)}
+                      </p>
+                    </div>
+                    {smartDocs.length === 0 ? (
+                      <p className="text-[var(--muted)]">No documents match this smart folder.</p>
+                    ) : (
+                      <ul className="divide-y divide-[var(--border)]">
+                        {smartDocs.map((doc) => (
+                          <FlatDocRow
+                            key={doc.id}
+                            doc={doc}
+                            view="recents"
+                            onRefresh={() => {
+                              if (activeSmartId !== null) fetchSmartResults(activeSmartId)
+                            }}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )
+              })()}
           </main>
         </div>
       )}

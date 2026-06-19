@@ -1,5 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import { blockExtensions } from '@/lib/editor/block-extensions'
+import { imageExtensions } from '@/lib/editor/extensions/image'
 import { tableExtensions } from '@/lib/editor/extensions/table'
 import { inlineExtensions } from '@/lib/editor/inline-extensions'
 
@@ -14,4 +15,5 @@ export const baseExtensions = [
   ...inlineExtensions,
   ...blockExtensions,
   ...tableExtensions,
+  imageExtensions,
 ]

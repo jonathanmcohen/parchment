@@ -7,6 +7,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
+import { ImageDialog } from '@/components/editor/ImageDialog'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { Toolbar } from '@/components/editor/Toolbar'
@@ -43,6 +44,20 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
   const [pageCount, setPageCount] = useState(1)
   const [wordCount, setWordCount] = useState(0)
 
+  // B5: image dialog state — null = closed; string = prefill src for paste/drop flow
+  const [imageDialogOpen, setImageDialogOpen] = useState(false)
+  const [imageDialogPrefillSrc, setImageDialogPrefillSrc] = useState<string | undefined>(undefined)
+
+  const openImageDialog = useCallback((prefillSrc?: string) => {
+    setImageDialogPrefillSrc(prefillSrc)
+    setImageDialogOpen(true)
+  }, [])
+
+  const closeImageDialog = useCallback(() => {
+    setImageDialogOpen(false)
+    setImageDialogPrefillSrc(undefined)
+  }, [])
+
   const save = useCallback(
     (json: Record<string, unknown>) => {
       const markdown = serializeMarkdown(json)
@@ -55,11 +70,66 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
     [docId],
   )
 
+  // Upload a File to the assets route and return the resulting URL.
+  const uploadFile = useCallback(
+    async (file: File): Promise<string | null> => {
+      const form = new FormData()
+      form.append('file', file)
+      try {
+        const res = await fetch(`/api/docs/${docId}/assets`, { method: 'POST', body: form })
+        if (!res.ok) return null
+        const body = (await res.json()) as { url: string }
+        return body.url
+      } catch {
+        return null
+      }
+    },
+    [docId],
+  )
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [...baseExtensions, Collaboration.configure({ document: ydoc, field: FIELD })],
     editorProps: {
       attributes: { class: 'parchment-prose', 'aria-label': 'Document editor' },
+      // B5: handle image paste and drop
+      handleDOMEvents: {
+        paste: (_view, event) => {
+          const items = event.clipboardData?.items
+          if (!items) return false
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i]
+            if (item?.type.startsWith('image/')) {
+              const file = item.getAsFile()
+              if (!file) continue
+              event.preventDefault()
+              // Upload first, then open dialog with pre-filled src so user supplies alt
+              void uploadFile(file).then((url) => {
+                if (url) openImageDialog(url)
+              })
+              return true
+            }
+          }
+          return false
+        },
+        drop: (_view, event) => {
+          const files = event.dataTransfer?.files
+          if (!files || files.length === 0) return false
+          let handled = false
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i]
+            if (file?.type.startsWith('image/')) {
+              event.preventDefault()
+              handled = true
+              void uploadFile(file).then((url) => {
+                if (url) openImageDialog(url)
+              })
+              break // only handle first image file per drop for simplicity
+            }
+          }
+          return handled
+        },
+      },
     },
     onUpdate: ({ editor: ed }) => {
       if (timer.current) clearTimeout(timer.current)
@@ -73,7 +143,7 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
   return (
     <div className="mx-auto max-w-5xl">
       {/* Inline formatting toolbar (B2) */}
-      {editor && <Toolbar editor={editor} />}
+      {editor && <Toolbar editor={editor} docId={docId} onInsertImage={openImageDialog} />}
 
       {/* Page size toggle */}
       <div className="mb-4 flex items-center gap-2">
@@ -100,6 +170,16 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
       {editor && <BubbleMenu editor={editor} />}
 
       <StatusBar pageCount={pageCount} wordCount={wordCount} />
+
+      {/* B5: Image insert dialog */}
+      {editor && imageDialogOpen && (
+        <ImageDialog
+          editor={editor}
+          docId={docId}
+          {...(imageDialogPrefillSrc !== undefined ? { prefillSrc: imageDialogPrefillSrc } : {})}
+          onClose={closeImageDialog}
+        />
+      )}
     </div>
   )
 }

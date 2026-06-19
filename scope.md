@@ -64,9 +64,9 @@
 | C2 | Auto-detect — `highlight.js/lib/core` + `auto`, low-confidence → plaintext | DONE | ✓ | ✓ | `detectLanguage` via hljs/lib/core + 19 registered langs → `normalizeLang`; relevance<5 or <12 chars → plaintext; never throws. auto-detect unit 8/8 (python/go/ts real snippets); browser-verified (13 colored spans after detect) |
 | C3 | Shiki render — 6 bundled themes, default + per-block override | DONE | ✓ | ✓ | Shiki 4.2 singleton (6 themes), highlights via ProseMirror **decorations** (code stays editable); per-block `theme` attr (default github-light). 311 tests; axe clean; browser-verified (TS → 20 colored spans, 6 token colors) |
 | C4 | Top-50 languages, lazy-load grammars by name | DONE | ✓ | ✓ | `TOP_LANGUAGES` (50) + `normalizeLang` aliases + `isSupportedLanguage`; grammars lazy-loaded on demand (`ensureLanguage`), unknown→plaintext, async re-decorate via `shikiReady` meta. shiki-languages unit 28/28; browser-verified (typescript grammar loaded on use) |
-| C5 | Line numbers (per-block toggle), line highlight `{1,3-5}`, filename caption | TODO | ☐ | ☐ | |
-| C6 | Copy button + collapse on hover | TODO | ☐ | ☐ | |
-| C7 | Diff highlighting for `diff` language | TODO | ☐ | ☐ | |
+| C5 | Line numbers (per-block toggle), line highlight `{1,3-5}`, filename caption | DONE | ✓ | ✓ | CodeBlockView NodeView header: line-num toggle (widget-decoration gutter), highlight-lines input (`parseLineRanges`), filename caption. code-block-lines unit 15/15; browser-verified (line #, filename "patch.diff") |
+| C6 | Copy button + collapse on hover | DONE | ✓ | ✓ | header Copy (clipboard + transient ✓) + Collapse/Expand (`collapsed` attr, aria-expanded) buttons; keyboard-reachable. browser-verified (buttons present in header). axe clean |
+| C7 | Diff highlighting for `diff` language | DONE | ✓ | ✓ | `diffLineKind` → inline +green/−red line decorations when language='diff' (`+++`/`---` excluded). picker now lists all 50 langs incl Diff (was missing — fixed). browser-verified (green +line). |
 
 ## Plan D — Collab / review (5)
 
@@ -199,7 +199,7 @@
 |---|---|---|---|---|
 | A Foundations | 5 | 5 | 0 | 0 |
 | B Editor core | 14 | 14 | 0 | 0 |
-| C Code block | 7 | 4 | 0 | 3 |
+| C Code block | 7 | 7 | 0 | 0 |
 | D Collab | 5 | 0 | 0 | 5 |
 | E File manager | 11 | 0 | 0 | 11 |
 | F Disk mirror | 6 | 0 | 0 | 6 |
@@ -209,6 +209,6 @@
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **23** | **0** | **81** |
+| **Total** | **104** | **26** | **0** | **78** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

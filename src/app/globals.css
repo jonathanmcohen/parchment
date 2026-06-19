@@ -1387,7 +1387,7 @@ body {
   color: var(--foreground);
   outline: none;
 }
-.parchment-cb-btn[aria-pressed='true'] {
+.parchment-cb-btn[aria-pressed="true"] {
   background: color-mix(in srgb, var(--accent) 20%, transparent);
   color: var(--accent);
   border-color: var(--accent);

@@ -57,6 +57,7 @@ describe('A1 — migration + schema', () => {
       'folders',
       'pats',
       'sessions',
+      'smart_folders',
       'users',
     ])
   })

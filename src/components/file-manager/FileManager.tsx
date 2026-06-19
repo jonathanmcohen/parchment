@@ -2029,30 +2029,55 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
           <main className="flex-1 min-w-0">
             {view === 'all' && (
               <>
-                {/* Breadcrumb */}
+                {/* Breadcrumb — each crumb is also a drop target (E8): drag a doc
+                    or folder onto a crumb to reparent it into that folder. */}
                 <nav
                   aria-label="folder path"
                   className="flex items-center gap-1 text-sm mb-4 flex-wrap"
                 >
-                  <button
-                    type="button"
-                    onClick={() => navigateTo(null)}
-                    className="text-[var(--accent-contrast)] hover:underline"
-                  >
-                    Root
-                  </button>
+                  <DropZone targetFolderId={null} onDropped={onDropped}>
+                    {(over, handlers) => (
+                      <button
+                        type="button"
+                        onClick={() => navigateTo(null)}
+                        onDragOver={handlers.onDragOver}
+                        onDragLeave={handlers.onDragLeave}
+                        onDrop={handlers.onDrop}
+                        className={[
+                          'rounded px-1 hover:underline',
+                          over
+                            ? 'bg-[var(--accent-contrast)] text-white'
+                            : 'text-[var(--accent-contrast)]',
+                        ].join(' ')}
+                      >
+                        Root
+                      </button>
+                    )}
+                  </DropZone>
                   {breadcrumb.map((segment) => (
                     <span key={segment.id} className="flex items-center gap-1">
                       <span className="text-[var(--muted)]" aria-hidden="true">
                         /
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => navigateTo(segment.id)}
-                        className="text-[var(--accent-contrast)] hover:underline"
-                      >
-                        {segment.name}
-                      </button>
+                      <DropZone targetFolderId={segment.id} onDropped={onDropped}>
+                        {(over, handlers) => (
+                          <button
+                            type="button"
+                            onClick={() => navigateTo(segment.id)}
+                            onDragOver={handlers.onDragOver}
+                            onDragLeave={handlers.onDragLeave}
+                            onDrop={handlers.onDrop}
+                            className={[
+                              'rounded px-1 hover:underline',
+                              over
+                                ? 'bg-[var(--accent-contrast)] text-white'
+                                : 'text-[var(--accent-contrast)]',
+                            ].join(' ')}
+                          >
+                            {segment.name}
+                          </button>
+                        )}
+                      </DropZone>
                     </span>
                   ))}
                 </nav>

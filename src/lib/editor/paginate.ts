@@ -1,5 +1,75 @@
+export const PAGE_SIZES = ['Letter', 'A4', 'Legal', 'Tabloid', 'Custom'] as const
+export type PageSizeName = (typeof PAGE_SIZES)[number]
+/** Legacy alias — kept for backward compat; new code should use PageSizeName. */
 export type PageSize = 'Letter' | 'A4' | 'Legal' | 'Tabloid'
 export type Orientation = 'portrait' | 'landscape'
+
+/** All margin values are stored in px (96 dpi). */
+export interface Margins {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+export interface PageSetup {
+  size: PageSizeName
+  orientation: Orientation
+  /** Used only when size === 'Custom'; stored in portrait orientation (landscape swaps). */
+  widthPx: number
+  heightPx: number
+  margins: Margins
+}
+
+// ── Unit conversion helpers ──────────────────────────────────────────────────
+
+/** Convert inches to pixels at 96 dpi. */
+export function inToPx(inches: number): number {
+  return inches * 96
+}
+
+/** Convert pixels (96 dpi) to inches. */
+export function pxToIn(px: number): number {
+  return px / 96
+}
+
+/** Convert centimetres to pixels at 96 dpi. */
+export function cmToPx(cm: number): number {
+  return (cm / 2.54) * 96
+}
+
+/** Convert pixels (96 dpi) to centimetres. */
+export function pxToCm(px: number): number {
+  return (px / 96) * 2.54
+}
+
+/**
+ * Resolve the final pixel width + height for a PageSetup.
+ * For named sizes, delegates to pageDims(); for 'Custom', uses the stored
+ * widthPx/heightPx, swapping them when orientation is landscape.
+ */
+export function resolvePageDims(
+  setup: Pick<PageSetup, 'size' | 'orientation' | 'widthPx' | 'heightPx'>,
+): { widthPx: number; heightPx: number } {
+  if (setup.size === 'Custom') {
+    const w = setup.widthPx
+    const h = setup.heightPx
+    return setup.orientation === 'landscape'
+      ? { widthPx: h, heightPx: w }
+      : { widthPx: w, heightPx: h }
+  }
+  // Non-custom sizes: pageDims handles orientation internally.
+  return pageDims(setup.size as PageSize, setup.orientation)
+}
+
+/** Default page setup: Letter, portrait, 1-inch margins on all sides. */
+export const DEFAULT_PAGE_SETUP: PageSetup = {
+  size: 'Letter',
+  orientation: 'portrait',
+  widthPx: 816,
+  heightPx: 1056,
+  margins: { top: 96, right: 96, bottom: 96, left: 96 },
+}
 
 // Page dimensions at 96 dpi, portrait orientation.
 const PORTRAIT_DIMS: Record<PageSize, { widthPx: number; heightPx: number }> = {

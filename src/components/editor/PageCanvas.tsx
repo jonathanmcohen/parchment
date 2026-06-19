@@ -11,13 +11,19 @@ import {
   type PageNumberPosition,
   type SectionConfig,
 } from '@/lib/editor/page-primitives'
-import type { PageSize } from '@/lib/editor/paginate'
-import { pageCount as computePageCount, measurePageBreaks, pageDims } from '@/lib/editor/paginate'
+import {
+  pageCount as computePageCount,
+  DEFAULT_PAGE_SETUP,
+  measurePageBreaks,
+  type PageSetup,
+  resolvePageDims,
+} from '@/lib/editor/paginate'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type Props = {
-  size: PageSize
+  /** Full page setup (size, orientation, margins). Falls back to DEFAULT_PAGE_SETUP. */
+  pageSetup?: PageSetup
   children: React.ReactNode
   onPageCountChange?: (n: number) => void
   /** When provided, the canvas reads manual page breaks and section config from the doc. */
@@ -66,8 +72,14 @@ function resolveSection(
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function PageCanvas({ size, children, onPageCountChange, editor }: Props) {
-  const { widthPx, heightPx } = pageDims(size)
+export function PageCanvas({
+  pageSetup = DEFAULT_PAGE_SETUP,
+  children,
+  onPageCountChange,
+  editor,
+}: Props) {
+  const { widthPx, heightPx } = resolvePageDims(pageSetup)
+  const { margins } = pageSetup
   const contentRef = useRef<HTMLDivElement>(null)
   const [autoBreaks, setAutoBreaks] = useState<number[]>([])
 
@@ -187,7 +199,16 @@ export function PageCanvas({ size, children, onPageCountChange, editor }: Props)
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div style={{ width: widthPx }} className="parchment-page mx-auto">
+    <div
+      style={{
+        width: widthPx,
+        paddingTop: margins.top,
+        paddingRight: margins.right,
+        paddingBottom: margins.bottom,
+        paddingLeft: margins.left,
+      }}
+      className="parchment-page mx-auto"
+    >
       {/* Page-boundary overlays — decorative, aria-hidden */}
       {allBreaks.map((offset, i) => {
         // This boundary separates page i+1 (above) from page i+2 (below)

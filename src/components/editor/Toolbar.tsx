@@ -9,6 +9,7 @@ type Props = {
   docId: string
   onInsertImage: (prefillSrc?: string) => void
   onOpenLink: () => void
+  onCropImage: () => void
 }
 
 const FONT_FAMILIES = [
@@ -72,7 +73,7 @@ function parseSize(raw: string | undefined): { value: number; unit: 'pt' | 'px' 
 // Prevent the toolbar from stealing the editor selection on click.
 const keepSelection = (e: React.MouseEvent) => e.preventDefault()
 
-export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink }: Props) {
+export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink, onCropImage }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
   const s = useEditorState({
@@ -119,6 +120,8 @@ export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink }: Pr
       table: ed.isActive('table'),
       // Link (B6)
       link: ed.isActive('link'),
+      // Image (selected node) — gates the crop button
+      image: ed.isActive('image'),
     }),
   })
 
@@ -543,6 +546,18 @@ export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink }: Pr
         onClick={() => onInsertImage()}
       >
         🖼
+      </button>
+
+      {/* ── Crop image (enabled when an image node is selected) ───────── */}
+      <button
+        type="button"
+        aria-label="Crop image"
+        className="parchment-toolbar-btn"
+        disabled={!s.image}
+        onMouseDown={keepSelection}
+        onClick={() => onCropImage()}
+      >
+        ✂
       </button>
 
       {/* ── Link (B6) ────────────────────────────────────────────────── */}

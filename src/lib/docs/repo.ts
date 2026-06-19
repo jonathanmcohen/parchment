@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db, schema } from '@/db'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
@@ -53,4 +53,30 @@ export async function listDocuments(ownerId: string): Promise<DocSummary[]> {
     .from(schema.documents)
     .where(and(eq(schema.documents.ownerId, ownerId), isNull(schema.documents.trashedAt)))
     .orderBy(desc(schema.documents.updatedAt))
+}
+
+/**
+ * B6: fuzzy (case-insensitive substring) title search for the link-to-doc picker.
+ * Empty `q` → returns the most recently updated docs (up to `limit`).
+ */
+export async function searchDocuments(
+  ownerId: string,
+  q: string,
+  limit = 10,
+): Promise<DocSummary[]> {
+  const baseWhere = and(eq(schema.documents.ownerId, ownerId), isNull(schema.documents.trashedAt))
+  const where =
+    q.trim().length === 0
+      ? baseWhere
+      : and(baseWhere, or(ilike(schema.documents.title, `%${q.trim()}%`)))
+  return db
+    .select({
+      id: schema.documents.id,
+      title: schema.documents.title,
+      updatedAt: schema.documents.updatedAt,
+    })
+    .from(schema.documents)
+    .where(where)
+    .orderBy(desc(schema.documents.updatedAt))
+    .limit(limit)
 }

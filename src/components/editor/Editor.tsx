@@ -8,6 +8,7 @@ import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { ImageDialog } from '@/components/editor/ImageDialog'
+import { LinkPopover } from '@/components/editor/LinkPopover'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { Toolbar } from '@/components/editor/Toolbar'
@@ -47,6 +48,11 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
   // B5: image dialog state — null = closed; string = prefill src for paste/drop flow
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
   const [imageDialogPrefillSrc, setImageDialogPrefillSrc] = useState<string | undefined>(undefined)
+
+  // B6: link popover state
+  const [linkPopoverOpen, setLinkPopoverOpen] = useState(false)
+  const openLinkPopover = useCallback(() => setLinkPopoverOpen(true), [])
+  const closeLinkPopover = useCallback(() => setLinkPopoverOpen(false), [])
 
   const openImageDialog = useCallback((prefillSrc?: string) => {
     setImageDialogPrefillSrc(prefillSrc)
@@ -143,7 +149,14 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
   return (
     <div className="mx-auto max-w-5xl">
       {/* Inline formatting toolbar (B2) */}
-      {editor && <Toolbar editor={editor} docId={docId} onInsertImage={openImageDialog} />}
+      {editor && (
+        <Toolbar
+          editor={editor}
+          docId={docId}
+          onInsertImage={openImageDialog}
+          onOpenLink={openLinkPopover}
+        />
+      )}
 
       {/* Page size toggle */}
       <div className="mb-4 flex items-center gap-2">
@@ -180,6 +193,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
           onClose={closeImageDialog}
         />
       )}
+
+      {/* B6: Link popover */}
+      {editor && linkPopoverOpen && <LinkPopover editor={editor} onClose={closeLinkPopover} />}
     </div>
   )
 }

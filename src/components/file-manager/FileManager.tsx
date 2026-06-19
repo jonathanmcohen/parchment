@@ -14,8 +14,19 @@ export type DocDTO = {
   id: string
   title: string
   updatedAt: string
-  folderId: string | null
+  folderId?: string | null
+  starred?: boolean
 }
+
+type View = 'all' | 'recents' | 'starred' | 'shared' | 'trash'
+
+const VIEWS: { key: View; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'recents', label: 'Recents' },
+  { key: 'starred', label: 'Starred' },
+  { key: 'shared', label: 'Shared' },
+  { key: 'trash', label: 'Trash' },
+]
 
 interface Props {
   initialFolders: FolderDTO[]
@@ -171,14 +182,115 @@ function FolderTreeItem({
   )
 }
 
+// ─── Flat doc row (used in Recents / Starred / Trash views) ──────────────────
+
+interface FlatDocRowProps {
+  doc: DocDTO
+  view: 'recents' | 'starred' | 'trash'
+  onRefresh: () => void
+}
+
+function FlatDocRow({ doc, view, onRefresh }: FlatDocRowProps) {
+  const handleStar = async () => {
+    try {
+      const res = await fetch(`/api/docs/${doc.id}/star`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ starred: !doc.starred }),
+      })
+      if (res.ok) onRefresh()
+    } catch {
+      // leave state unchanged
+    }
+  }
+
+  const handleTrash = async () => {
+    try {
+      const res = await fetch(`/api/docs/${doc.id}/trash`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) onRefresh()
+    } catch {
+      // leave state unchanged
+    }
+  }
+
+  const handleRestore = async () => {
+    try {
+      const res = await fetch(`/api/docs/${doc.id}/restore`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) onRefresh()
+    } catch {
+      // leave state unchanged
+    }
+  }
+
+  const isStarred = doc.starred ?? false
+
+  return (
+    <li>
+      <div className="flex items-center justify-between py-2 gap-2">
+        <a
+          href={`/d/${doc.id}`}
+          className="flex-1 font-medium hover:text-[var(--accent-contrast)] truncate"
+        >
+          📄 {doc.title}
+        </a>
+        <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0">
+          {new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(
+            new Date(doc.updatedAt),
+          )}
+        </time>
+        {view !== 'trash' && (
+          <>
+            <button
+              type="button"
+              onClick={handleStar}
+              aria-label={isStarred ? `Unstar ${doc.title}` : `Star ${doc.title}`}
+              className="text-base leading-none px-1 shrink-0 hover:text-[var(--accent-contrast)]"
+            >
+              {isStarred ? '★' : '☆'}
+            </button>
+            <button
+              type="button"
+              onClick={handleTrash}
+              aria-label={`Move ${doc.title} to trash`}
+              className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-red-600 hover:border-red-400 shrink-0"
+            >
+              🗑 Trash
+            </button>
+          </>
+        )}
+        {view === 'trash' && (
+          <button
+            type="button"
+            onClick={handleRestore}
+            aria-label={`Restore ${doc.title}`}
+            className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--accent-contrast)] hover:border-[var(--accent-contrast)] shrink-0"
+          >
+            Restore
+          </button>
+        )}
+      </div>
+    </li>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function FileManager({ initialFolders, initialDocs }: Props) {
+  const [view, setView] = useState<View>('all')
   const [folders, setFolders] = useState<FolderDTO[]>(initialFolders)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [docs, setDocs] = useState<DocDTO[]>(initialDocs)
+  const [flatDocs, setFlatDocs] = useState<DocDTO[]>([])
 
-  // Fetch docs for the current folder
+  // Fetch docs for the All view (current folder)
   const fetchDocs = useCallback(async (folderId: string | null) => {
     const param = folderId ?? 'root'
     try {
@@ -186,6 +298,19 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
       if (res.ok) {
         const data = (await res.json()) as DocDTO[]
         setDocs(data)
+      }
+    } catch {
+      // leave state unchanged
+    }
+  }, [])
+
+  // Fetch flat docs for Recents / Starred / Trash views
+  const fetchFlatDocs = useCallback(async (v: 'recents' | 'starred' | 'trash') => {
+    try {
+      const res = await fetch(`/api/docs?view=${v}`)
+      if (res.ok) {
+        const data = (await res.json()) as DocDTO[]
+        setFlatDocs(data)
       }
     } catch {
       // leave state unchanged
@@ -220,10 +345,12 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
     [fetchDocs],
   )
 
-  // On mount, docs are already passed in as initialDocs (root)
+  // When switching to a flat view, fetch that view's docs
   useEffect(() => {
-    // nothing — initial data comes from SSR props
-  }, [])
+    if (view === 'recents' || view === 'starred' || view === 'trash') {
+      fetchFlatDocs(view)
+    }
+  }, [view, fetchFlatDocs])
 
   const handleNewFolder = async () => {
     const name = window.prompt('Folder name')
@@ -243,150 +370,204 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   }
 
   const tree = buildTree(folders as FolderNode[])
-
-  // Folders that are direct children of currentFolderId
   const subfolders = folders.filter((f) => f.parentId === currentFolderId)
-
   const breadcrumb = currentFolderId ? folderPath(folders as FolderNode[], currentFolderId) : []
-
   const onDropped = () => refreshAll(currentFolderId)
 
-  return (
-    <div className="flex gap-6 h-full min-h-0">
-      {/* Left rail — folder tree */}
-      <aside className="w-56 shrink-0 border-r border-[var(--border)] pr-4 flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={handleNewFolder}
-          className="rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 font-medium text-sm text-white"
-        >
-          + New folder
-        </button>
+  const handleFlatRefresh = useCallback(() => {
+    if (view === 'recents' || view === 'starred' || view === 'trash') {
+      fetchFlatDocs(view)
+    }
+  }, [view, fetchFlatDocs])
 
-        {/* Root drop zone */}
-        <DropZone targetFolderId={null} onDropped={onDropped}>
-          {(over, handlers) => (
+  return (
+    <div className="flex flex-col gap-4 h-full min-h-0">
+      {/* View switcher tab bar */}
+      <nav aria-label="views" className="flex gap-1 border-b border-[var(--border)] pb-2">
+        {VIEWS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            aria-current={view === key ? 'page' : undefined}
+            className={[
+              'px-3 py-1.5 text-sm rounded-t font-medium',
+              view === key
+                ? 'text-[var(--accent-contrast)] border-b-2 border-[var(--accent-contrast)]'
+                : 'text-[var(--muted)] hover:text-[var(--foreground)]',
+            ].join(' ')}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {/* View content */}
+      {view === 'all' && (
+        <div className="flex gap-6 flex-1 min-h-0">
+          {/* Left rail — folder tree */}
+          <aside className="w-56 shrink-0 border-r border-[var(--border)] pr-4 flex flex-col gap-2">
             <button
               type="button"
-              onDragOver={handlers.onDragOver}
-              onDragLeave={handlers.onDragLeave}
-              onDrop={handlers.onDrop}
-              onClick={() => navigateTo(null)}
-              className={[
-                'rounded px-2 py-1 text-sm text-left w-full',
-                over
-                  ? 'bg-[var(--accent-contrast)] text-white'
-                  : currentFolderId === null
-                    ? 'font-semibold text-[var(--foreground)]'
-                    : 'text-[var(--muted)]',
-              ].join(' ')}
+              onClick={handleNewFolder}
+              className="rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 font-medium text-sm text-white"
             >
-              🏠 Root
+              + New folder
             </button>
-          )}
-        </DropZone>
 
-        <ul className="flex flex-col gap-0.5">
-          {tree.map((node) => (
-            <FolderTreeItem
-              key={node.id}
-              node={node}
-              depth={0}
-              currentFolderId={currentFolderId}
-              onSelect={(id) => navigateTo(id)}
-              onDropped={onDropped}
-            />
-          ))}
-        </ul>
-      </aside>
+            {/* Root drop zone */}
+            <DropZone targetFolderId={null} onDropped={onDropped}>
+              {(over, handlers) => (
+                <button
+                  type="button"
+                  onDragOver={handlers.onDragOver}
+                  onDragLeave={handlers.onDragLeave}
+                  onDrop={handlers.onDrop}
+                  onClick={() => navigateTo(null)}
+                  className={[
+                    'rounded px-2 py-1 text-sm text-left w-full',
+                    over
+                      ? 'bg-[var(--accent-contrast)] text-white'
+                      : currentFolderId === null
+                        ? 'font-semibold text-[var(--foreground)]'
+                        : 'text-[var(--muted)]',
+                  ].join(' ')}
+                >
+                  🏠 Root
+                </button>
+              )}
+            </DropZone>
 
-      {/* Main panel */}
-      <main className="flex-1 min-w-0">
-        {/* Breadcrumb */}
-        <nav aria-label="folder path" className="flex items-center gap-1 text-sm mb-4 flex-wrap">
-          <button
-            type="button"
-            onClick={() => navigateTo(null)}
-            className="text-[var(--accent-contrast)] hover:underline"
-          >
-            Root
-          </button>
-          {breadcrumb.map((segment) => (
-            <span key={segment.id} className="flex items-center gap-1">
-              <span className="text-[var(--muted)]" aria-hidden="true">
-                /
-              </span>
+            <ul className="flex flex-col gap-0.5">
+              {tree.map((node) => (
+                <FolderTreeItem
+                  key={node.id}
+                  node={node}
+                  depth={0}
+                  currentFolderId={currentFolderId}
+                  onSelect={(id) => navigateTo(id)}
+                  onDropped={onDropped}
+                />
+              ))}
+            </ul>
+          </aside>
+
+          {/* Main panel */}
+          <main className="flex-1 min-w-0">
+            {/* Breadcrumb */}
+            <nav
+              aria-label="folder path"
+              className="flex items-center gap-1 text-sm mb-4 flex-wrap"
+            >
               <button
                 type="button"
-                onClick={() => navigateTo(segment.id)}
+                onClick={() => navigateTo(null)}
                 className="text-[var(--accent-contrast)] hover:underline"
               >
-                {segment.name}
+                Root
               </button>
-            </span>
-          ))}
-        </nav>
-
-        {/* Content list */}
-        {subfolders.length === 0 && docs.length === 0 ? (
-          <p className="text-[var(--muted)]">This folder is empty.</p>
-        ) : (
-          <ul className="divide-y divide-[var(--border)]">
-            {/* Subfolder rows */}
-            {subfolders.map((folder) => (
-              <li key={folder.id}>
-                <DropZone targetFolderId={folder.id} onDropped={onDropped}>
-                  {(over, handlers) => (
-                    <button
-                      type="button"
-                      draggable
-                      onDragStart={(e) => setDrag(e, { type: 'folder', id: folder.id })}
-                      onDragOver={handlers.onDragOver}
-                      onDragLeave={handlers.onDragLeave}
-                      onDrop={handlers.onDrop}
-                      onClick={() => navigateTo(folder.id)}
-                      className={[
-                        'flex w-full items-center gap-2 py-2 rounded font-medium text-left',
-                        over
-                          ? 'bg-[var(--paper)] text-[var(--accent-contrast)]'
-                          : 'hover:text-[var(--accent-contrast)]',
-                      ].join(' ')}
-                    >
-                      <span aria-hidden="true">📁</span>
-                      {folder.name}
-                    </button>
-                  )}
-                </DropZone>
-              </li>
-            ))}
-
-            {/* Document rows */}
-            {docs.map((doc) => (
-              <li key={doc.id}>
-                <div className="flex items-center justify-between py-2">
-                  <a
-                    href={`/d/${doc.id}`}
-                    draggable
-                    onDragStart={(e) => setDrag(e, { type: 'doc', id: doc.id })}
-                    className="flex-1 font-medium hover:text-[var(--accent-contrast)]"
+              {breadcrumb.map((segment) => (
+                <span key={segment.id} className="flex items-center gap-1">
+                  <span className="text-[var(--muted)]" aria-hidden="true">
+                    /
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigateTo(segment.id)}
+                    className="text-[var(--accent-contrast)] hover:underline"
                   >
-                    📄 {doc.title}
-                  </a>
-                  <time
-                    dateTime={doc.updatedAt}
-                    className="text-[var(--muted)] text-xs shrink-0 ml-4"
-                  >
-                    {new Intl.DateTimeFormat('en', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    }).format(new Date(doc.updatedAt))}
-                  </time>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </main>
+                    {segment.name}
+                  </button>
+                </span>
+              ))}
+            </nav>
+
+            {/* Content list */}
+            {subfolders.length === 0 && docs.length === 0 ? (
+              <p className="text-[var(--muted)]">This folder is empty.</p>
+            ) : (
+              <ul className="divide-y divide-[var(--border)]">
+                {/* Subfolder rows */}
+                {subfolders.map((folder) => (
+                  <li key={folder.id}>
+                    <DropZone targetFolderId={folder.id} onDropped={onDropped}>
+                      {(over, handlers) => (
+                        <button
+                          type="button"
+                          draggable
+                          onDragStart={(e) => setDrag(e, { type: 'folder', id: folder.id })}
+                          onDragOver={handlers.onDragOver}
+                          onDragLeave={handlers.onDragLeave}
+                          onDrop={handlers.onDrop}
+                          onClick={() => navigateTo(folder.id)}
+                          className={[
+                            'flex w-full items-center gap-2 py-2 rounded font-medium text-left',
+                            over
+                              ? 'bg-[var(--paper)] text-[var(--accent-contrast)]'
+                              : 'hover:text-[var(--accent-contrast)]',
+                          ].join(' ')}
+                        >
+                          <span aria-hidden="true">📁</span>
+                          {folder.name}
+                        </button>
+                      )}
+                    </DropZone>
+                  </li>
+                ))}
+
+                {/* Document rows */}
+                {docs.map((doc) => (
+                  <li key={doc.id}>
+                    <div className="flex items-center justify-between py-2">
+                      <a
+                        href={`/d/${doc.id}`}
+                        draggable
+                        onDragStart={(e) => setDrag(e, { type: 'doc', id: doc.id })}
+                        className="flex-1 font-medium hover:text-[var(--accent-contrast)]"
+                      >
+                        📄 {doc.title}
+                      </a>
+                      <time
+                        dateTime={doc.updatedAt}
+                        className="text-[var(--muted)] text-xs shrink-0 ml-4"
+                      >
+                        {new Intl.DateTimeFormat('en', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(doc.updatedAt))}
+                      </time>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </main>
+        </div>
+      )}
+
+      {(view === 'recents' || view === 'starred' || view === 'trash') && (
+        <main className="flex-1 min-w-0">
+          {flatDocs.length === 0 ? (
+            <p className="text-[var(--muted)]">
+              {view === 'trash' ? 'Trash is empty.' : 'Nothing here yet.'}
+            </p>
+          ) : (
+            <ul className="divide-y divide-[var(--border)]">
+              {flatDocs.map((doc) => (
+                <FlatDocRow key={doc.id} doc={doc} view={view} onRefresh={handleFlatRefresh} />
+              ))}
+            </ul>
+          )}
+        </main>
+      )}
+
+      {view === 'shared' && (
+        <main className="flex-1 min-w-0 flex items-center justify-center">
+          <p className="text-[var(--muted)] text-center">
+            Shared documents arrive in v0.2. Parchment v0.1 is single-owner.
+          </p>
+        </main>
+      )}
     </div>
   )
 }

@@ -71,6 +71,7 @@ export const documents = pgTable(
     embedding: vector('embedding', { dimensions: 768 }),
     searchVector: tsvector('search_vector'),
     trashedAt: timestamp('trashed_at', { withTimezone: true }),
+    starred: boolean('starred').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

@@ -1,0 +1,1 @@
+ALTER TABLE "documents" ADD COLUMN "starred" boolean DEFAULT false NOT NULL;

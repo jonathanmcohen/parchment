@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, desc, eq, ilike, isNotNull, isNull, or } from 'drizzle-orm'
 import { db, schema } from '@/db'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
@@ -123,6 +123,85 @@ export async function listDocumentsInFolder(
       ),
     )
     .orderBy(desc(schema.documents.updatedAt))
+}
+
+/** DocRow extends DocSummary with the `starred` flag — returned by view queries. */
+export type DocRow = DocSummary & { starred: boolean }
+
+/** N most-recently-updated non-trashed docs across all folders (default 30). */
+export async function listRecents(ownerId: string, limit = 30): Promise<DocRow[]> {
+  return db
+    .select({
+      id: schema.documents.id,
+      title: schema.documents.title,
+      updatedAt: schema.documents.updatedAt,
+      folderId: schema.documents.folderId,
+      starred: schema.documents.starred,
+    })
+    .from(schema.documents)
+    .where(and(eq(schema.documents.ownerId, ownerId), isNull(schema.documents.trashedAt)))
+    .orderBy(desc(schema.documents.updatedAt))
+    .limit(limit)
+}
+
+/** Starred, non-trashed docs, newest-first. */
+export async function listStarred(ownerId: string): Promise<DocRow[]> {
+  return db
+    .select({
+      id: schema.documents.id,
+      title: schema.documents.title,
+      updatedAt: schema.documents.updatedAt,
+      folderId: schema.documents.folderId,
+      starred: schema.documents.starred,
+    })
+    .from(schema.documents)
+    .where(
+      and(
+        eq(schema.documents.ownerId, ownerId),
+        isNull(schema.documents.trashedAt),
+        eq(schema.documents.starred, true),
+      ),
+    )
+    .orderBy(desc(schema.documents.updatedAt))
+}
+
+/** Trashed docs (trashedAt not null), most-recently-trashed first. */
+export async function listTrashed(ownerId: string): Promise<DocRow[]> {
+  return db
+    .select({
+      id: schema.documents.id,
+      title: schema.documents.title,
+      updatedAt: schema.documents.updatedAt,
+      folderId: schema.documents.folderId,
+      starred: schema.documents.starred,
+    })
+    .from(schema.documents)
+    .where(and(eq(schema.documents.ownerId, ownerId), isNotNull(schema.documents.trashedAt)))
+    .orderBy(desc(schema.documents.trashedAt))
+}
+
+/** Toggle a doc's star (owner-scoped). */
+export async function setStarred(ownerId: string, id: string, starred: boolean): Promise<void> {
+  await db
+    .update(schema.documents)
+    .set({ starred, updatedAt: new Date() })
+    .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
+}
+
+/** Soft-delete: set trashedAt = now (owner-scoped). */
+export async function trashDocument(ownerId: string, id: string): Promise<void> {
+  await db
+    .update(schema.documents)
+    .set({ trashedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
+}
+
+/** Restore: set trashedAt = null (owner-scoped). */
+export async function restoreDocument(ownerId: string, id: string): Promise<void> {
+  await db
+    .update(schema.documents)
+    .set({ trashedAt: null, updatedAt: new Date() })
+    .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
 }
 
 /** Move a doc to a folder (null = root). Owner-scoped by id. */

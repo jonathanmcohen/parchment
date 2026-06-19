@@ -36,6 +36,13 @@
       "when": 1781896431101,
       "tag": "0004_sudden_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781899769896,
+      "tag": "0005_slow_ezekiel",
+      "breakpoints": true
     }
   ]
 }

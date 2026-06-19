@@ -24,11 +24,14 @@ const server = new Server({
         return rows[0]?.state ?? null
       },
       store: async ({ documentName, state }) => {
+        // `state` is a Uint8Array; wrap in a Buffer so node-postgres binds it as
+        // a bytea param (a raw Uint8Array would be sent as text and rejected with
+        // "invalid byte sequence for encoding").
         await pool.query(
           `insert into collab_state (name, state, updated_at)
            values ($1, $2, now())
            on conflict (name) do update set state = excluded.state, updated_at = now()`,
-          [documentName, state],
+          [documentName, Buffer.from(state)],
         )
       },
     }),

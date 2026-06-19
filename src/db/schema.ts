@@ -20,6 +20,14 @@ const tsvector = customType<{ data: string }>({
   },
 })
 
+// Postgres bytea — drizzle has no native type. Used for binary Yjs document
+// updates (collab_state). node-postgres maps Buffer params/results to bytea.
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return 'bytea'
+  },
+})
+
 // ─── Users (single owner at v0.1; table shape ready for multi-user v0.2) ───
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -125,7 +133,7 @@ export const pats = pgTable(
 // ─── Collab state (Yjs document snapshots, written by parchment-collab) ───
 export const collabState = pgTable('collab_state', {
   name: text('name').primaryKey(),
-  state: text('state'), // bytea in SQL; see migration. Stored as binary Yjs update.
+  state: bytea('state'), // binary Yjs document update, written by parchment-collab
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

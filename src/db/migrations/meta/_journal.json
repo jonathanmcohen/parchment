@@ -29,6 +29,13 @@
       "when": 1781888104835,
       "tag": "0003_massive_quasar",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781896431101,
+      "tag": "0004_sudden_serpent_society",
+      "breakpoints": true
     }
   ]
 }

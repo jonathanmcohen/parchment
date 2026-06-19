@@ -6,5 +6,4 @@ CREATE TABLE "settings" (
 	CONSTRAINT "settings_owner_id_key_pk" PRIMARY KEY("owner_id","key")
 );
 --> statement-breakpoint
-ALTER TABLE "documents" ALTER COLUMN "search_vector" DROP EXPRESSION;--> statement-breakpoint
 ALTER TABLE "settings" ADD CONSTRAINT "settings_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;

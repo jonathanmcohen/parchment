@@ -4,6 +4,7 @@ import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
 import { TableControls } from '@/components/editor/TableControls'
 import { detectLanguage, getActiveCodeBlockText } from '@/lib/editor/shiki/auto-detect'
+import { TOP_LANGUAGES } from '@/lib/editor/shiki/languages'
 
 type Props = {
   editor: Editor
@@ -54,20 +55,40 @@ const BLOCK_TYPES = [
 /** Sentinel value for the "Auto-detect" option — not persisted to the node attribute. */
 const AUTO_DETECT_VALUE = '__auto__'
 
+// Display labels for language ids that need special casing; others are capitalized.
+const LANG_LABELS: Record<string, string> = {
+  javascript: 'JavaScript',
+  typescript: 'TypeScript',
+  cpp: 'C++',
+  csharp: 'C#',
+  fsharp: 'F#',
+  html: 'HTML',
+  css: 'CSS',
+  scss: 'SCSS',
+  json: 'JSON',
+  yaml: 'YAML',
+  toml: 'TOML',
+  xml: 'XML',
+  sql: 'SQL',
+  php: 'PHP',
+  graphql: 'GraphQL',
+  ocaml: 'OCaml',
+  purescript: 'PureScript',
+  powershell: 'PowerShell',
+  dockerfile: 'Dockerfile',
+  matlab: 'MATLAB',
+  diff: 'Diff',
+}
+
+function langLabel(id: string): string {
+  return LANG_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1)
+}
+
+// Full picker covers the supported set (C4) so every Shiki language — incl. diff (C7) — is selectable.
 const CODE_LANGUAGES = [
   { label: 'Auto-detect', value: AUTO_DETECT_VALUE },
   { label: 'Plaintext', value: '' },
-  { label: 'JavaScript', value: 'javascript' },
-  { label: 'TypeScript', value: 'typescript' },
-  { label: 'Python', value: 'python' },
-  { label: 'Go', value: 'go' },
-  { label: 'Rust', value: 'rust' },
-  { label: 'HTML', value: 'html' },
-  { label: 'CSS', value: 'css' },
-  { label: 'JSON', value: 'json' },
-  { label: 'Bash', value: 'bash' },
-  { label: 'SQL', value: 'sql' },
-  { label: 'Markdown', value: 'markdown' },
+  ...TOP_LANGUAGES.map((id) => ({ label: langLabel(id), value: id })),
 ]
 
 function parseSize(raw: string | undefined): { value: number; unit: 'pt' | 'px' } {

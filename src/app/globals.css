@@ -1279,6 +1279,186 @@ body {
   pointer-events: none;
 }
 
+/* ── Code-block chrome: C5 line numbers/filename/highlight, C6 copy/collapse, C7 diff ── */
+
+/*
+ * .parchment-cb-wrapper is the NodeView outer element. It replaces the bare
+ * <pre> that Tiptap normally renders, so we must reproduce the pre's rounding
+ * and border here and suppress them on the inner .parchment-cb-pre.
+ */
+.parchment-cb-wrapper {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  overflow: hidden;
+  margin: 0.5em 0;
+  /* Show header controls on hover/focus-within */
+}
+
+/* Header bar — filename + action buttons */
+.parchment-cb-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: color-mix(in srgb, var(--border) 40%, transparent);
+  border-bottom: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  user-select: none;
+  /* Always visible — hosts editing controls */
+}
+
+/* Filename input — inline, looks like plain text until focused */
+.parchment-cb-filename-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  outline: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0 0.125rem;
+  transition: border-color 0.1s;
+}
+.parchment-cb-filename-input:focus {
+  border-bottom-color: var(--accent);
+  color: var(--foreground);
+}
+.parchment-cb-filename-input::placeholder {
+  color: color-mix(in srgb, var(--muted) 50%, transparent);
+}
+.parchment-cb-filename-input:not(:placeholder-shown) {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+/* Highlight-lines input — compact, right of filename */
+.parchment-cb-hl-input {
+  width: 6rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  outline: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0 0.125rem;
+  transition: border-color 0.1s;
+}
+.parchment-cb-hl-input:focus {
+  border-bottom-color: var(--accent);
+  color: var(--foreground);
+}
+.parchment-cb-hl-input::placeholder {
+  color: color-mix(in srgb, var(--muted) 50%, transparent);
+}
+
+/* Action button group */
+.parchment-cb-actions {
+  display: flex;
+  gap: 0.125rem;
+  flex-shrink: 0;
+}
+
+/* Shared header button style */
+.parchment-cb-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.125rem 0.35rem;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    border-color 0.1s;
+  user-select: none;
+}
+.parchment-cb-btn:hover,
+.parchment-cb-btn:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--foreground);
+  outline: none;
+}
+.parchment-cb-btn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Inner <pre> — reset border/radius since wrapper owns chrome */
+.parchment-cb-pre {
+  margin: 0;
+  background: #f6f8fa;
+  border: none;
+  border-radius: 0;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: inherit;
+}
+@media (prefers-color-scheme: dark) {
+  .parchment-cb-pre {
+    background: #1e2030;
+  }
+}
+
+/* Collapsed state — hide the pre, keep header */
+.parchment-cb-wrapper[data-collapsed] .parchment-cb-pre {
+  display: none;
+}
+
+/* ── Line numbers (C5) ─────────────────────────────────────────────────── */
+.parchment-cb-linenum {
+  display: inline-block;
+  width: 2.5ch;
+  text-align: right;
+  margin-right: 1ch;
+  color: var(--muted);
+  font-size: 0.85em;
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* ── Line highlight (C5) ───────────────────────────────────────────────── */
+/*
+ * Applied as Decoration.inline over the line's text range.
+ * border-left provides a visible column marker; background tint spans the text.
+ * box-decoration-break:clone ensures the tint covers the full virtual line
+ * even when the code wraps (rare in monospace blocks, but safe).
+ */
+.parchment-cb-line-hl {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-left: 3px solid var(--accent);
+  padding-left: 2px;
+  margin-left: -5px; /* compensate so text stays aligned */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* ── Diff highlighting (C7) ────────────────────────────────────────────── */
+.parchment-cb-diff-add {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  /* green — contrast-safe against both light and dark pre backgrounds */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.parchment-cb-diff-del {
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+  /* red — contrast-safe */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
 /* ── Footnotes / Endnotes (B8) ───────────────────────────────────────────── */
 
 /* Inline superscript reference */

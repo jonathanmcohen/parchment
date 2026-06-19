@@ -103,6 +103,175 @@ body {
   border-color: var(--accent-contrast);
 }
 
+/* ── Inline formatting toolbar (B2) ─────────────────────────────────── */
+
+.parchment-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.parchment-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.parchment-toolbar-btn:hover {
+  background: var(--border);
+}
+
+.parchment-toolbar-btn[aria-pressed="true"] {
+  background: var(--accent-contrast);
+  color: #fff;
+  border-color: var(--accent-contrast);
+}
+
+.parchment-toolbar-sep {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.parchment-toolbar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: default;
+}
+
+.parchment-toolbar-select {
+  height: 26px;
+  padding: 0 4px;
+  font-size: 0.8rem;
+  background: var(--paper);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.parchment-color-input {
+  width: 28px;
+  height: 26px;
+  padding: 1px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+}
+
+.parchment-size-input {
+  width: 48px;
+  height: 26px;
+  padding: 0 4px;
+  font-size: 0.8rem;
+  background: var(--paper);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-align: right;
+}
+
+.parchment-unit-btn {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  height: 26px;
+  background: var(--background);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.parchment-unit-btn:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+/* ── Bubble menu (B2) ────────────────────────────────────────────────── */
+
+.parchment-bubble-menu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+}
+
+.parchment-bubble-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.parchment-bubble-btn:hover {
+  background: var(--border);
+}
+
+.parchment-bubble-btn[aria-pressed="true"] {
+  background: var(--accent-contrast);
+  color: #fff;
+  border-color: var(--accent-contrast);
+}
+
+/* ── Highlight mark (B2) ─────────────────────────────────────────────── */
+
+.parchment-prose mark {
+  background-color: #fef08a;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ── Inline code (B2 polish) ─────────────────────────────────────────── */
+/* Base monospace font for all code — lower specificity, comes first. */
+.parchment-prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+/* Extra decoration only for inline code (not code inside <pre>). */
+.parchment-prose :not(pre) > code {
+  background: var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 0.88em;
+}
+
 /* Editor content (B0 baseline; page canvas styling lands in B1). */
 .parchment-prose {
   min-height: 60vh;
@@ -151,10 +320,6 @@ body {
   padding: 0.75em 1em;
   overflow-x: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-.parchment-prose code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.9em;
 }
 .parchment-prose p.is-editor-empty:first-child::before {
   content: "Start writing…";

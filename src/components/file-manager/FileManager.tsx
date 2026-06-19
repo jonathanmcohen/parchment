@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FolderNode, TreeNode } from '@/lib/docs/folder-tree'
 import { buildTree, folderPath } from '@/lib/docs/folder-tree'
 import { describeCriteria, parseCriteria } from '@/lib/docs/smart-folder-criteria'
+import { resolveTagColor, TAG_COLORS } from '@/lib/docs/tag-colors'
 
 export type FolderDTO = {
   id: string
@@ -25,7 +26,20 @@ type SmartFolderDTO = {
   criteria: unknown
 }
 
-type View = 'all' | 'recents' | 'starred' | 'shared' | 'trash' | 'smart'
+type TagDTO = {
+  id: string
+  name: string
+  color: string
+  count: number
+}
+
+type DocTagDTO = {
+  id: string
+  name: string
+  color: string
+}
+
+type View = 'all' | 'recents' | 'starred' | 'shared' | 'trash' | 'smart' | 'tag'
 
 const VIEWS: { key: View; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -140,6 +154,225 @@ function SmartFolderCreateForm({ onCreated, onCancel }: SmartFolderCreateFormPro
         </button>
       </div>
     </form>
+  )
+}
+
+// ─── Tag create form ──────────────────────────────────────────────────────────
+
+interface TagCreateFormProps {
+  onCreated: () => void
+  onCancel: () => void
+}
+
+function TagCreateForm({ onCreated, onCancel }: TagCreateFormProps) {
+  const [name, setName] = useState('')
+  const [color, setColor] = useState('slate')
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) {
+      setError('Name is required')
+      return
+    }
+    try {
+      const res = await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), color }),
+      })
+      if (res.ok) {
+        onCreated()
+      } else {
+        const data = (await res.json()) as { error?: string }
+        setError(data.error ?? 'Failed to create tag')
+      }
+    } catch {
+      setError('Failed to create tag')
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-2 p-3 border border-[var(--border)] rounded-md bg-[var(--paper)] mt-2"
+    >
+      <div className="flex flex-col gap-1">
+        <label htmlFor="tag-name" className="text-xs font-medium text-[var(--foreground)]">
+          Name
+        </label>
+        <input
+          id="tag-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Tag name"
+          className="px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="tag-color" className="text-xs font-medium text-[var(--foreground)]">
+          Color
+        </label>
+        <select
+          id="tag-color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          className="px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+        >
+          {TAG_COLORS.map((c) => (
+            <option key={c.name} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {error !== null && <p className="text-xs text-red-600">{error}</p>}
+      <div className="flex gap-2 mt-1">
+        <button
+          type="submit"
+          className="px-3 py-1 text-xs rounded bg-[var(--accent-contrast)] text-white font-medium"
+        >
+          Create
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-3 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)]"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ─── Tag popover (per-doc tag assignment) ─────────────────────────────────────
+
+interface TagPopoverProps {
+  docId: string
+  docTitle: string
+  allTags: TagDTO[]
+  onClose: () => void
+  /** Called after a tag is added/removed so the parent can refresh sidebar
+   *  counts and the current view. */
+  onChanged?: () => void
+}
+
+function TagPopover({ docId, docTitle, allTags, onClose, onChanged }: TagPopoverProps) {
+  const [docTags, setDocTags] = useState<DocTagDTO[]>([])
+  const [loading, setLoading] = useState(true)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/docs/${docId}/tags`)
+      .then((r) => r.json() as Promise<DocTagDTO[]>)
+      .then((data) => {
+        if (!cancelled) {
+          setDocTags(data)
+          setLoading(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [docId])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  const isAssigned = (tagId: string) => docTags.some((t) => t.id === tagId)
+
+  const toggle = async (tagId: string) => {
+    if (isAssigned(tagId)) {
+      try {
+        await fetch(`/api/docs/${docId}/tags?tagId=${encodeURIComponent(tagId)}`, {
+          method: 'DELETE',
+        })
+        setDocTags((prev) => prev.filter((t) => t.id !== tagId))
+        onChanged?.()
+      } catch {
+        // leave state unchanged
+      }
+    } else {
+      try {
+        const res = await fetch(`/api/docs/${docId}/tags`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ tagId }),
+        })
+        if (res.ok) {
+          const tag = allTags.find((t) => t.id === tagId)
+          if (tag) setDocTags((prev) => [...prev, { id: tag.id, name: tag.name, color: tag.color }])
+          onChanged?.()
+        }
+      } catch {
+        // leave state unchanged
+      }
+    }
+  }
+
+  return (
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label={`Edit tags for ${docTitle}`}
+      className="absolute z-50 right-0 top-8 w-52 bg-[var(--paper)] border border-[var(--border)] rounded-md shadow-lg p-3 flex flex-col gap-2"
+    >
+      <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Tags</p>
+      {loading ? (
+        <p className="text-xs text-[var(--muted)]">Loading…</p>
+      ) : allTags.length === 0 ? (
+        <p className="text-xs text-[var(--muted)]">No tags yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {allTags.map((tag) => {
+            const assigned = isAssigned(tag.id)
+            return (
+              <li key={tag.id} className="flex items-center gap-2">
+                <input
+                  id={`tag-cb-${docId}-${tag.id}`}
+                  type="checkbox"
+                  checked={assigned}
+                  onChange={() => toggle(tag.id)}
+                  className="rounded"
+                />
+                <label
+                  htmlFor={`tag-cb-${docId}-${tag.id}`}
+                  className="flex items-center gap-1.5 text-sm cursor-pointer"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-block w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: resolveTagColor(tag.color).bg }}
+                  />
+                  {tag.name}
+                </label>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <button
+        type="button"
+        onClick={onClose}
+        className="text-xs text-[var(--muted)] hover:text-[var(--foreground)] text-right mt-1"
+      >
+        Close
+      </button>
+    </div>
   )
 }
 
@@ -292,15 +525,19 @@ function FolderTreeItem({
   )
 }
 
-// ─── Flat doc row (used in Recents / Starred / Trash views) ──────────────────
+// ─── Flat doc row (used in Recents / Starred / Trash / Tag views) ────────────
 
 interface FlatDocRowProps {
   doc: DocDTO
-  view: 'recents' | 'starred' | 'trash'
+  view: 'recents' | 'starred' | 'trash' | 'tag'
   onRefresh: () => void
+  allTags?: TagDTO[]
+  /** Refetch sidebar tag counts after a per-doc tag change. */
+  onTagsChanged?: () => void
 }
 
-function FlatDocRow({ doc, view, onRefresh }: FlatDocRowProps) {
+function FlatDocRow({ doc, view, onRefresh, allTags = [], onTagsChanged }: FlatDocRowProps) {
+  const [showTagPopover, setShowTagPopover] = useState(false)
   const handleStar = async () => {
     try {
       const res = await fetch(`/api/docs/${doc.id}/star`, {
@@ -356,6 +593,29 @@ function FlatDocRow({ doc, view, onRefresh }: FlatDocRowProps) {
             new Date(doc.updatedAt),
           )}
         </time>
+        {/* Tag button + popover */}
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowTagPopover((v) => !v)}
+            aria-label={`Edit tags for ${doc.title}`}
+            className="text-sm px-1 text-[var(--muted)] hover:text-[var(--accent-contrast)]"
+          >
+            🏷
+          </button>
+          {showTagPopover && (
+            <TagPopover
+              docId={doc.id}
+              docTitle={doc.title}
+              allTags={allTags}
+              onClose={() => setShowTagPopover(false)}
+              onChanged={() => {
+                onRefresh()
+                onTagsChanged?.()
+              }}
+            />
+          )}
+        </div>
         {view !== 'trash' && (
           <>
             <button
@@ -391,6 +651,57 @@ function FlatDocRow({ doc, view, onRefresh }: FlatDocRowProps) {
   )
 }
 
+// ─── All-view doc row (drag + tag button) ────────────────────────────────────
+
+interface AllViewDocRowProps {
+  doc: DocDTO
+  allTags: TagDTO[]
+}
+
+function AllViewDocRow({ doc, allTags }: AllViewDocRowProps) {
+  const [showTagPopover, setShowTagPopover] = useState(false)
+
+  return (
+    <div className="flex items-center justify-between py-2 gap-2">
+      <a
+        href={`/d/${doc.id}`}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('application/json', JSON.stringify({ type: 'doc', id: doc.id }))
+          e.dataTransfer.effectAllowed = 'move'
+        }}
+        className="flex-1 font-medium hover:text-[var(--accent-contrast)]"
+      >
+        📄 {doc.title}
+      </a>
+      <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0 ml-4">
+        {new Intl.DateTimeFormat('en', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(doc.updatedAt))}
+      </time>
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setShowTagPopover((v) => !v)}
+          aria-label={`Edit tags for ${doc.title}`}
+          className="text-sm px-1 text-[var(--muted)] hover:text-[var(--accent-contrast)]"
+        >
+          🏷
+        </button>
+        {showTagPopover && (
+          <TagPopover
+            docId={doc.id}
+            docTitle={doc.title}
+            allTags={allTags}
+            onClose={() => setShowTagPopover(false)}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function FileManager({ initialFolders, initialDocs }: Props) {
@@ -403,6 +714,10 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   const [activeSmartId, setActiveSmartId] = useState<string | null>(null)
   const [smartDocs, setSmartDocs] = useState<DocDTO[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [tags, setTags] = useState<TagDTO[]>([])
+  const [activeTagId, setActiveTagId] = useState<string | null>(null)
+  const [tagDocs, setTagDocs] = useState<DocDTO[]>([])
+  const [showTagCreateForm, setShowTagCreateForm] = useState(false)
 
   // Fetch docs for the All view (current folder)
   const fetchDocs = useCallback(async (folderId: string | null) => {
@@ -470,6 +785,32 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
     }
   }, [])
 
+  // Fetch tags
+  const fetchTags = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tags')
+      if (res.ok) {
+        const data = (await res.json()) as TagDTO[]
+        setTags(data)
+      }
+    } catch {
+      // leave state unchanged
+    }
+  }, [])
+
+  // Fetch docs for active tag
+  const fetchTagResults = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/tags/${id}/results`)
+      if (res.ok) {
+        const data = (await res.json()) as DocDTO[]
+        setTagDocs(data)
+      }
+    } catch {
+      // leave state unchanged
+    }
+  }, [])
+
   const refreshAll = useCallback(
     async (folderId: string | null) => {
       await Promise.all([fetchFolders(), fetchDocs(folderId)])
@@ -496,6 +837,11 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   useEffect(() => {
     fetchSmartFolders()
   }, [fetchSmartFolders])
+
+  // Fetch tags on mount
+  useEffect(() => {
+    fetchTags()
+  }, [fetchTags])
 
   const handleNewFolder = async () => {
     const name = window.prompt('Folder name')
@@ -536,11 +882,12 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
             onClick={() => {
               setView(key)
               setActiveSmartId(null)
+              setActiveTagId(null)
             }}
-            aria-current={view === key && view !== 'smart' ? 'page' : undefined}
+            aria-current={view === key && view !== 'smart' && view !== 'tag' ? 'page' : undefined}
             className={[
               'px-3 py-1.5 text-sm rounded-t font-medium',
-              view === key && view !== 'smart'
+              view === key && view !== 'smart' && view !== 'tag'
                 ? 'text-[var(--accent-contrast)] border-b-2 border-[var(--accent-contrast)]'
                 : 'text-[var(--muted)] hover:text-[var(--foreground)]',
             ].join(' ')}
@@ -551,7 +898,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
       </nav>
 
       {/* View content */}
-      {(view === 'all' || view === 'smart') && (
+      {(view === 'all' || view === 'smart' || view === 'tag') && (
         <div className="flex gap-6 flex-1 min-h-0">
           {/* Left rail — folder tree + smart folders */}
           <aside className="w-56 shrink-0 border-r border-[var(--border)] pr-4 flex flex-col gap-2">
@@ -666,6 +1013,84 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 />
               )}
             </div>
+
+            {/* Tags section */}
+            <div className="mt-4 flex flex-col gap-1">
+              <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide px-1">
+                Tags
+              </p>
+              <ul className="flex flex-col gap-0.5">
+                {tags.map((tag) => {
+                  const tc = resolveTagColor(tag.color)
+                  return (
+                    <li key={tag.id} className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setView('tag')
+                          setActiveTagId(tag.id)
+                          setActiveSmartId(null)
+                          fetchTagResults(tag.id)
+                        }}
+                        className={[
+                          'flex-1 text-left px-2 py-1 text-sm rounded truncate flex items-center gap-1.5',
+                          view === 'tag' && activeTagId === tag.id
+                            ? 'font-semibold text-[var(--accent-contrast)]'
+                            : 'text-[var(--foreground)] hover:text-[var(--accent-contrast)]',
+                        ].join(' ')}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: tc.bg }}
+                        />
+                        <span className="truncate">{tag.name}</span>
+                        <span className="text-[var(--muted)] text-xs ml-auto shrink-0">
+                          {tag.count}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Delete tag ${tag.name}`}
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/tags/${tag.id}`, { method: 'DELETE' })
+                            if (res.ok) {
+                              if (activeTagId === tag.id) {
+                                setView('all')
+                                setActiveTagId(null)
+                              }
+                              await fetchTags()
+                            }
+                          } catch {
+                            // leave state unchanged
+                          }
+                        }}
+                        className="text-xs text-[var(--muted)] hover:text-red-600 px-1 shrink-0"
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+              <button
+                type="button"
+                onClick={() => setShowTagCreateForm((v) => !v)}
+                className="text-xs text-[var(--muted)] hover:text-[var(--accent-contrast)] text-left px-2 py-1"
+              >
+                + New tag
+              </button>
+              {showTagCreateForm && (
+                <TagCreateForm
+                  onCreated={async () => {
+                    await fetchTags()
+                    setShowTagCreateForm(false)
+                  }}
+                  onCancel={() => setShowTagCreateForm(false)}
+                />
+              )}
+            </div>
           </aside>
 
           {/* Main panel */}
@@ -736,25 +1161,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                     {/* Document rows */}
                     {docs.map((doc) => (
                       <li key={doc.id}>
-                        <div className="flex items-center justify-between py-2">
-                          <a
-                            href={`/d/${doc.id}`}
-                            draggable
-                            onDragStart={(e) => setDrag(e, { type: 'doc', id: doc.id })}
-                            className="flex-1 font-medium hover:text-[var(--accent-contrast)]"
-                          >
-                            📄 {doc.title}
-                          </a>
-                          <time
-                            dateTime={doc.updatedAt}
-                            className="text-[var(--muted)] text-xs shrink-0 ml-4"
-                          >
-                            {new Intl.DateTimeFormat('en', {
-                              dateStyle: 'medium',
-                              timeStyle: 'short',
-                            }).format(new Date(doc.updatedAt))}
-                          </time>
-                        </div>
+                        <AllViewDocRow doc={doc} allTags={tags} />
                       </li>
                     ))}
                   </ul>
@@ -789,6 +1196,49 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                             onRefresh={() => {
                               if (activeSmartId !== null) fetchSmartResults(activeSmartId)
                             }}
+                            allTags={tags}
+                            onTagsChanged={fetchTags}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )
+              })()}
+
+            {view === 'tag' &&
+              activeTagId !== null &&
+              (() => {
+                const activeTag = tags.find((t) => t.id === activeTagId)
+                const tc = resolveTagColor(activeTag?.color ?? 'slate')
+                return (
+                  <>
+                    <div className="mb-4 flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="inline-block w-3 h-3 rounded-full shrink-0"
+                        style={{ backgroundColor: tc.bg }}
+                      />
+                      <h2 className="text-base font-semibold text-[var(--foreground)]">
+                        Tag: {activeTag?.name ?? ''}
+                      </h2>
+                    </div>
+                    {tagDocs.length === 0 ? (
+                      <p className="text-[var(--muted)]">
+                        No documents tagged {activeTag?.name ?? ''}.
+                      </p>
+                    ) : (
+                      <ul className="divide-y divide-[var(--border)]">
+                        {tagDocs.map((doc) => (
+                          <FlatDocRow
+                            key={doc.id}
+                            doc={doc}
+                            view="tag"
+                            onRefresh={() => {
+                              if (activeTagId !== null) fetchTagResults(activeTagId)
+                            }}
+                            allTags={tags}
+                            onTagsChanged={fetchTags}
                           />
                         ))}
                       </ul>
@@ -809,7 +1259,14 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
           ) : (
             <ul className="divide-y divide-[var(--border)]">
               {flatDocs.map((doc) => (
-                <FlatDocRow key={doc.id} doc={doc} view={view} onRefresh={handleFlatRefresh} />
+                <FlatDocRow
+                  key={doc.id}
+                  doc={doc}
+                  view={view}
+                  onRefresh={handleFlatRefresh}
+                  allTags={tags}
+                  onTagsChanged={fetchTags}
+                />
               ))}
             </ul>
           )}

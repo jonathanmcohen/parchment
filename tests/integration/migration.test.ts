@@ -53,11 +53,13 @@ describe('A1 — migration + schema', () => {
       'collab_state',
       'comments',
       'doc_versions',
+      'document_tags',
       'documents',
       'folders',
       'pats',
       'sessions',
       'smart_folders',
+      'tags',
       'users',
     ])
   })

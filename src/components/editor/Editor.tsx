@@ -2,11 +2,13 @@
 
 import { getSchema } from '@tiptap/core'
 import Collaboration from '@tiptap/extension-collaboration'
+import { NodeSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
+import { CropDialog } from '@/components/editor/CropDialog'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
@@ -75,6 +77,11 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
     setImageDialogOpen(false)
     setImageDialogPrefillSrc(undefined)
   }, [])
+
+  // B5 crop: selected-image crop dialog state (pos + attrs captured at open time)
+  const [cropState, setCropState] = useState<
+    null | { src: string; alt: string; pos: number; attrs: Record<string, unknown> }
+  >(null)
 
   const save = useCallback(
     (json: Record<string, unknown>) => {
@@ -178,6 +185,46 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
   const full: Counts = counts?.full ?? { words: 0, chars: 0 }
   const selection: Counts | null = counts?.selection ?? null
 
+  const openCropForSelection = useCallback(() => {
+    if (!editor) return
+    const sel = editor.state.selection
+    if (!(sel instanceof NodeSelection)) return
+    const node = sel.node
+    if (node.type.name !== 'image') return
+    const src = node.attrs.src as string | null
+    if (!src) return
+    setCropState({
+      src,
+      alt: (node.attrs.alt as string | null) ?? '',
+      pos: sel.from,
+      attrs: node.attrs,
+    })
+  }, [editor])
+
+  const applyCrop = useCallback(
+    (url: string) => {
+      if (!editor || !cropState) return
+      const { pos, attrs } = cropState
+      editor.commands.command(({ tr, dispatch }) => {
+        if (dispatch) {
+          tr.setNodeMarkup(pos, undefined, { ...attrs, src: url, width: null, height: null })
+        }
+        return true
+      })
+      setCropState(null)
+    },
+    [editor, cropState],
+  )
+
+  // Overlay crop button (image NodeView) dispatches this DOM event.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = () => openCropForSelection()
+    dom.addEventListener('parchment:crop-image', handler)
+    return () => dom.removeEventListener('parchment:crop-image', handler)
+  }, [editor, openCropForSelection])
+
   return (
     <div className="mx-auto max-w-5xl">
       {/* Inline formatting toolbar (B2) */}
@@ -187,6 +234,7 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
           docId={docId}
           onInsertImage={openImageDialog}
           onOpenLink={openLinkPopover}
+          onCropImage={openCropForSelection}
         />
       )}
 
@@ -241,6 +289,17 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
       {/* B6: Link popover */}
       {editor && linkPopoverOpen && <LinkPopover editor={editor} onClose={closeLinkPopover} />}
+
+      {/* B5: Image crop dialog (selected image) */}
+      {editor && cropState && (
+        <CropDialog
+          docId={docId}
+          src={cropState.src}
+          alt={cropState.alt}
+          onCropped={applyCrop}
+          onClose={() => setCropState(null)}
+        />
+      )}
     </div>
   )
 }

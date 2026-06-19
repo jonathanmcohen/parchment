@@ -32,6 +32,33 @@ const LETTER_SPACINGS = [
   { label: 'Widest (0.2em)', value: '0.2em' },
 ]
 
+const BLOCK_TYPES = [
+  { label: 'Paragraph', value: 'paragraph' },
+  { label: 'Heading 1', value: 'heading1' },
+  { label: 'Heading 2', value: 'heading2' },
+  { label: 'Heading 3', value: 'heading3' },
+  { label: 'Heading 4', value: 'heading4' },
+  { label: 'Heading 5', value: 'heading5' },
+  { label: 'Heading 6', value: 'heading6' },
+  { label: 'Blockquote', value: 'blockquote' },
+  { label: 'Code block', value: 'codeBlock' },
+]
+
+const CODE_LANGUAGES = [
+  { label: 'Plaintext', value: '' },
+  { label: 'JavaScript', value: 'javascript' },
+  { label: 'TypeScript', value: 'typescript' },
+  { label: 'Python', value: 'python' },
+  { label: 'Go', value: 'go' },
+  { label: 'Rust', value: 'rust' },
+  { label: 'HTML', value: 'html' },
+  { label: 'CSS', value: 'css' },
+  { label: 'JSON', value: 'json' },
+  { label: 'Bash', value: 'bash' },
+  { label: 'SQL', value: 'sql' },
+  { label: 'Markdown', value: 'markdown' },
+]
+
 function parseSize(raw: string | undefined): { value: number; unit: 'pt' | 'px' } {
   if (!raw) return { value: 12, unit: 'pt' }
   if (raw.endsWith('px')) return { value: Number.parseInt(raw, 10), unit: 'px' }
@@ -46,30 +73,215 @@ export function Toolbar({ editor }: Props) {
   // aria-pressed and the control values track the editor.
   const s = useEditorState({
     editor,
-    selector: ({ editor }) => ({
-      bold: editor.isActive('bold'),
-      italic: editor.isActive('italic'),
-      underline: editor.isActive('underline'),
-      strike: editor.isActive('strike'),
-      subscript: editor.isActive('subscript'),
-      superscript: editor.isActive('superscript'),
-      code: editor.isActive('code'),
-      highlight: editor.isActive('highlight'),
-      color: editor.getAttributes('textStyle').color as string | undefined,
-      fontFamily: editor.getAttributes('textStyle').fontFamily as string | undefined,
-      fontSize: editor.getAttributes('textStyle').fontSize as string | undefined,
-      lineHeight: editor.getAttributes('textStyle').lineHeight as string | undefined,
-      letterSpacing: editor.getAttributes('textStyle').letterSpacing as string | undefined,
+    selector: ({ editor: ed }) => ({
+      // Inline marks
+      bold: ed.isActive('bold'),
+      italic: ed.isActive('italic'),
+      underline: ed.isActive('underline'),
+      strike: ed.isActive('strike'),
+      subscript: ed.isActive('subscript'),
+      superscript: ed.isActive('superscript'),
+      code: ed.isActive('code'),
+      highlight: ed.isActive('highlight'),
+      color: ed.getAttributes('textStyle').color as string | undefined,
+      fontFamily: ed.getAttributes('textStyle').fontFamily as string | undefined,
+      fontSize: ed.getAttributes('textStyle').fontSize as string | undefined,
+      lineHeight: ed.getAttributes('textStyle').lineHeight as string | undefined,
+      letterSpacing: ed.getAttributes('textStyle').letterSpacing as string | undefined,
+      // Block types
+      paragraph: ed.isActive('paragraph'),
+      heading1: ed.isActive('heading', { level: 1 }),
+      heading2: ed.isActive('heading', { level: 2 }),
+      heading3: ed.isActive('heading', { level: 3 }),
+      heading4: ed.isActive('heading', { level: 4 }),
+      heading5: ed.isActive('heading', { level: 5 }),
+      heading6: ed.isActive('heading', { level: 6 }),
+      blockquote: ed.isActive('blockquote'),
+      codeBlock: ed.isActive('codeBlock'),
+      // Lists
+      bulletList: ed.isActive('bulletList'),
+      orderedList: ed.isActive('orderedList'),
+      taskList: ed.isActive('taskList'),
+      // Alignment
+      alignLeft: ed.isActive({ textAlign: 'left' }),
+      alignCenter: ed.isActive({ textAlign: 'center' }),
+      alignRight: ed.isActive({ textAlign: 'right' }),
+      alignJustify: ed.isActive({ textAlign: 'justify' }),
+      // First-line indent
+      firstLineIndent: Boolean(ed.getAttributes('paragraph').firstLineIndent),
+      // Code block language
+      codeLanguage: ed.getAttributes('codeBlock').language as string | undefined,
     }),
   })
+
+  // Derive the active block type for the <select>
+  const activeBlockType = (() => {
+    if (s.heading1) return 'heading1'
+    if (s.heading2) return 'heading2'
+    if (s.heading3) return 'heading3'
+    if (s.heading4) return 'heading4'
+    if (s.heading5) return 'heading5'
+    if (s.heading6) return 'heading6'
+    if (s.blockquote) return 'blockquote'
+    if (s.codeBlock) return 'codeBlock'
+    return 'paragraph'
+  })()
 
   const { value: sizeValue, unit: sizeUnit } = parseSize(s.fontSize)
   const applySize = (value: number, unit: 'pt' | 'px') => {
     editor.chain().focus().setFontSize(`${value}${unit}`).run()
   }
 
+  const handleBlockTypeChange = (value: string) => {
+    switch (value) {
+      case 'paragraph':
+        editor.chain().focus().setParagraph().run()
+        break
+      case 'heading1':
+        editor.chain().focus().toggleHeading({ level: 1 }).run()
+        break
+      case 'heading2':
+        editor.chain().focus().toggleHeading({ level: 2 }).run()
+        break
+      case 'heading3':
+        editor.chain().focus().toggleHeading({ level: 3 }).run()
+        break
+      case 'heading4':
+        editor.chain().focus().toggleHeading({ level: 4 }).run()
+        break
+      case 'heading5':
+        editor.chain().focus().toggleHeading({ level: 5 }).run()
+        break
+      case 'heading6':
+        editor.chain().focus().toggleHeading({ level: 6 }).run()
+        break
+      case 'blockquote':
+        editor.chain().focus().toggleBlockquote().run()
+        break
+      case 'codeBlock':
+        editor.chain().focus().toggleCodeBlock().run()
+        break
+    }
+  }
+
   return (
     <div className="parchment-toolbar" role="toolbar" aria-label="Formatting">
+      {/* ── Block type selector ───────────────────────────────────────── */}
+      <label className="parchment-toolbar-label" htmlFor="toolbar-block-type">
+        Block
+        <select
+          id="toolbar-block-type"
+          aria-label="Block type"
+          value={activeBlockType}
+          onChange={(e) => {
+            handleBlockTypeChange(e.target.value)
+            e.target.focus()
+          }}
+          className="parchment-toolbar-select"
+        >
+          {BLOCK_TYPES.map((bt) => (
+            <option key={bt.value} value={bt.value}>
+              {bt.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── List buttons ─────────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Bullet list"
+        aria-pressed={s.bulletList}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      >
+        •≡
+      </button>
+      <button
+        type="button"
+        aria-label="Numbered list"
+        aria-pressed={s.orderedList}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      >
+        1≡
+      </button>
+      <button
+        type="button"
+        aria-label="Task list"
+        aria-pressed={s.taskList}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().toggleTaskList().run()}
+      >
+        ☑
+      </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── Text alignment buttons ────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Align left"
+        aria-pressed={s.alignLeft}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().setTextAlign('left').run()}
+      >
+        ⬛L
+      </button>
+      <button
+        type="button"
+        aria-label="Align center"
+        aria-pressed={s.alignCenter}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().setTextAlign('center').run()}
+      >
+        ⬛C
+      </button>
+      <button
+        type="button"
+        aria-label="Align right"
+        aria-pressed={s.alignRight}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().setTextAlign('right').run()}
+      >
+        ⬛R
+      </button>
+      <button
+        type="button"
+        aria-label="Justify"
+        aria-pressed={s.alignJustify}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+      >
+        ⬛J
+      </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── First-line indent ─────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="First-line indent"
+        aria-pressed={s.firstLineIndent}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().toggleFirstLineIndent().run()}
+      >
+        ¶→
+      </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── Inline marks ─────────────────────────────────────────────── */}
       <button
         type="button"
         aria-label="Bold"
@@ -266,6 +478,35 @@ export function Toolbar({ editor }: Props) {
           ))}
         </select>
       </label>
+
+      {/* ── Code block language picker (visible only when codeBlock is active) ── */}
+      {s.codeBlock && (
+        <>
+          <span className="parchment-toolbar-sep" aria-hidden="true" />
+          <label className="parchment-toolbar-label" htmlFor="toolbar-code-language">
+            Lang
+            <select
+              id="toolbar-code-language"
+              aria-label="Code block language"
+              value={s.codeLanguage ?? ''}
+              onChange={(e) =>
+                editor
+                  .chain()
+                  .focus()
+                  .updateAttributes('codeBlock', { language: e.target.value })
+                  .run()
+              }
+              className="parchment-toolbar-select"
+            >
+              {CODE_LANGUAGES.map((lang) => (
+                <option key={lang.value} value={lang.value}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
     </div>
   )
 }

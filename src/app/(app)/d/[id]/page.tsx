@@ -14,6 +14,8 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
       docId={doc.id}
       initialTitle={doc.title}
       initialJson={(doc.content as Record<string, unknown> | null) ?? null}
+      currentUserName={user.name}
+      currentUserId={user.id}
     />
   )
 }

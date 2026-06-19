@@ -2199,3 +2199,48 @@ body {
   background: #be123c;
   color: #fff;
 }
+
+/* ── D4: collaboration cursors (CollaborationCaret extension) ─────────────
+   The extension renders into .collaboration-carets__caret / __label classes.
+   The border-color / background-color are set inline by the extension using
+   the user's authorColor value, so we only need to control shape + label.
+───────────────────────────────────────────────────────────────────────── */
+
+/* Vertical caret bar — uses border-color set inline by the extension. */
+.collaboration-carets__caret {
+  position: relative;
+  display: inline-block;
+  border-left: 2px solid currentColor;
+  /* Negative margin keeps the caret from shifting surrounding text. */
+  margin-left: -1px;
+  margin-right: -1px;
+  pointer-events: none;
+  word-break: normal;
+}
+
+/* Name label that appears above the caret. */
+.collaboration-carets__label {
+  position: absolute;
+  top: -1.4em;
+  left: -2px;
+  display: inline-block;
+  /* background-color is set inline by the extension */
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+  /* Prevent label from wrapping at narrow widths */
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Remote selection highlight — inherits the user color via background alpha. */
+.collaboration-carets__selection {
+  background-color: rgba(0, 0, 0, 0.08);
+}

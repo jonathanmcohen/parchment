@@ -1,7 +1,9 @@
 'use client'
 
+import { HocuspocusProvider } from '@hocuspocus/provider'
 import { getSchema } from '@tiptap/core'
 import Collaboration from '@tiptap/extension-collaboration'
+import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import { NodeSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -26,12 +28,20 @@ import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import { DEFAULT_PAGE_SETUP, type PageSetup } from '@/lib/editor/paginate'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
+import { authorColor } from '@/lib/editor/track-changes'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
+
+// Public collab URL — falls back to localhost in dev when env var is absent.
+const COLLAB_URL =
+  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_COLLAB_URL) || 'ws://localhost:1234'
 
 type Props = {
   docId: string
   initialTitle: string
   initialJson: Record<string, unknown> | null
+  /** D4: current authenticated user — threaded from the server component. */
+  currentUserName: string
+  currentUserId: string
 }
 
 const FIELD = 'default'
@@ -39,17 +49,108 @@ const FIELD = 'default'
 // B0 editor island. Bound to a Y.Doc via Collaboration so Plan D drops in the
 // Hocuspocus network provider with no rework. For single-user v0.1 the Y.Doc is
 // seeded from the stored ProseMirror JSON and autosave persists JSON + markdown.
-export function Editor({ docId, initialTitle, initialJson }: Props) {
-  // biome-ignore lint/correctness/useExhaustiveDependencies: seed the Y.Doc once on mount; later edits flow through Yjs, not a re-seed.
-  const ydoc = useMemo(() => {
-    const doc = new Y.Doc()
-    if (initialJson) {
-      const schema = getSchema(baseExtensions)
-      const seeded = prosemirrorJSONToYDoc(schema, initialJson, FIELD)
-      Y.applyUpdate(doc, Y.encodeStateAsUpdate(seeded))
+// D4: HocuspocusProvider syncs the Y.Doc to the collab server in real-time.
+export function Editor({
+  docId,
+  initialTitle,
+  initialJson,
+  currentUserName,
+  currentUserId,
+}: Props) {
+  // The Y.Doc is created empty — we do NOT eagerly seed it here anymore (D4).
+  // Seeding now happens in one of two paths:
+  //   a) Provider connected + synced → seed if server state is empty (first open).
+  //   b) Provider unreachable (offline) → seed immediately so editor works standalone.
+  // Empty deps [] is correct: Y.Doc is created once on mount.
+  const ydoc = useMemo(() => new Y.Doc(), [])
+
+  // D4: Track whether we have already seeded the Y.Doc to avoid applying
+  // initialJson twice (once eagerly + once from the server state).
+  const seededRef = useRef(false)
+
+  /** Seed the Y.Doc from initialJson if not already done and the shared fragment is empty. */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: initialJson and ydoc are stable per mount.
+  const seedFromInitial = useCallback(() => {
+    if (seededRef.current || !initialJson) return
+    // Only seed when the 'default' XML fragment is genuinely empty (no server state).
+    const xmlFrag = ydoc.get(FIELD, Y.XmlFragment)
+    if (xmlFrag.length > 0) {
+      // Server already has content — do not overwrite.
+      seededRef.current = true
+      return
     }
-    return doc
-  }, [])
+    const schema = getSchema(baseExtensions)
+    const seeded = prosemirrorJSONToYDoc(schema, initialJson, FIELD)
+    Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(seeded))
+    seededRef.current = true
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // D4: HocuspocusProvider — wires the Y.Doc to the collab WebSocket server.
+  //
+  // RESILIENCE: The provider is created synchronously in useMemo (not in
+  // useEffect) so that CollaborationCaret — which requires a provider at
+  // configure time — can receive it before useEditor runs. Creation is wrapped
+  // in try/catch: if it throws (bad URL, missing module, SSR leak) we fall back
+  // to null and seed the doc immediately so the editor works offline.
+  //
+  // Seed-once contract:
+  //   • provider present & syncs → onSynced checks xmlFrag length; seeds only
+  //     when the shared fragment is empty (first open / no server state yet).
+  //   • provider present but connection closes before first sync → onClose
+  //     falls back to seeding so the editor shows content.
+  //   • provider creation fails → seedFromInitial() called immediately below.
+  //   • seededRef guards against double-seeding in all paths.
+  //
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally stable — docId and ydoc don't change after mount.
+  const provider = useMemo<HocuspocusProvider | null>(() => {
+    let synced = false
+    try {
+      return new HocuspocusProvider({
+        url: COLLAB_URL,
+        name: docId,
+        document: ydoc,
+        onSynced: () => {
+          if (!synced) {
+            synced = true
+            seedFromInitial()
+          }
+        },
+        onClose: ({ event }) => {
+          if (process.env.NODE_ENV !== 'production') {
+            console.debug('[parchment-collab] connection closed', event)
+          }
+          // Never got a sync — fall back to local seed so editor shows content.
+          if (!synced) {
+            synced = true
+            seedFromInitial()
+          }
+        },
+        onStatus: ({ status }) => {
+          if (process.env.NODE_ENV !== 'production') {
+            console.debug('[parchment-collab] status:', status)
+          }
+        },
+      })
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[parchment-collab] provider creation failed, running offline:', err)
+      }
+      // Seed immediately so the editor has content without a network connection.
+      seedFromInitial()
+      return null
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Destroy the provider on unmount.
+  useEffect(() => {
+    return () => {
+      try {
+        provider?.destroy()
+      } catch {
+        // Ignore errors on unmount.
+      }
+    }
+  }, [provider])
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -134,11 +235,25 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
     [docId],
   )
 
+  // D4: cursor color is deterministic and stable — derive once from the user id.
+  const cursorColor = useMemo(() => authorColor(currentUserId), [currentUserId])
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
       ...baseExtensions,
       Collaboration.configure({ document: ydoc, field: FIELD }),
+      // D4: CollaborationCaret renders remote cursors + name labels.
+      // Only added when provider is available (creation may fail if collab
+      // server is unreachable at startup — the editor still works offline).
+      ...(provider
+        ? [
+            CollaborationCaret.configure({
+              provider,
+              user: { name: currentUserName, color: cursorColor },
+            }),
+          ]
+        : []),
       // B9: configured with onOpen so Cmd-F / Cmd-Shift-H open the React panel.
       FindReplaceExtension.configure({ onOpen: openFind }),
       // B12: slash menu — onOpenImage delegates to the existing image dialog.

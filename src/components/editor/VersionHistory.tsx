@@ -141,7 +141,9 @@ export function VersionHistory({ docId, editor }: Props) {
         const body = (await res.json()) as { content: unknown; markdown: string }
         // Update the editor content in-place with the restored JSON
         if (body.content && typeof body.content === 'object') {
-          editor.commands.setContent(body.content as Parameters<typeof editor.commands.setContent>[0])
+          editor.commands.setContent(
+            body.content as Parameters<typeof editor.commands.setContent>[0],
+          )
         }
         await load()
       } catch {

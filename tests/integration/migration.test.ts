@@ -52,6 +52,7 @@ describe('A1 — migration + schema', () => {
       'audit_log',
       'collab_state',
       'comments',
+      'doc_versions',
       'documents',
       'folders',
       'pats',

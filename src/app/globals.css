@@ -976,6 +976,7 @@ body {
   padding-left: 3.5em; /* leave room for the back-link column */
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: footnote list item styling is intentional and order-independent */
 .parchment-fn-list-inner li {
   padding: 0.15em 0;
   min-height: 1.6em;
@@ -1052,15 +1053,17 @@ body {
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 500;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
-.parchment-find-tab[aria-selected='true'] {
+.parchment-find-tab[aria-selected="true"] {
   background: var(--border);
   color: var(--foreground);
 }
 
-.parchment-find-tab:hover:not([aria-selected='true']) {
+.parchment-find-tab:hover:not([aria-selected="true"]) {
   background: color-mix(in srgb, var(--border) 60%, transparent);
   color: var(--foreground);
 }
@@ -1074,7 +1077,9 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
   line-height: 1;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .parchment-find-close:hover {
@@ -1126,16 +1131,19 @@ body {
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 600;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s,
+    border-color 0.1s;
 }
 
-.parchment-find-opt-btn[aria-pressed='true'] {
+.parchment-find-opt-btn[aria-pressed="true"] {
   background: var(--accent);
   color: var(--background);
   border-color: var(--accent);
 }
 
-.parchment-find-opt-btn:hover:not([aria-pressed='true']) {
+.parchment-find-opt-btn:hover:not([aria-pressed="true"]) {
   background: var(--border);
   color: var(--foreground);
 }
@@ -1158,7 +1166,9 @@ body {
   color: var(--muted);
   cursor: pointer;
   font-size: 0.65rem;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
   display: flex;
   align-items: center;
   justify-content: center;

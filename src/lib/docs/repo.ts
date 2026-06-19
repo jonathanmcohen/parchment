@@ -43,6 +43,23 @@ export async function getDocument(id: string): Promise<Doc | null> {
   return row ?? null
 }
 
+/**
+ * D4: Does the collab server already hold a persisted Yjs snapshot for this doc?
+ * The editor uses this as the authoritative gate for first-open seeding: when a
+ * snapshot exists the server is the source of truth and the client must NOT seed
+ * from `documents.content` (doing so races the server sync and duplicates
+ * content). When it's absent, this is a never-collaborated doc and the client
+ * seeds it from the stored ProseMirror JSON.
+ */
+export async function hasCollabState(docId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ name: schema.collabState.name })
+    .from(schema.collabState)
+    .where(eq(schema.collabState.name, docId))
+    .limit(1)
+  return row !== undefined
+}
+
 export async function listDocuments(ownerId: string): Promise<DocSummary[]> {
   return db
     .select({

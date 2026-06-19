@@ -42,6 +42,13 @@ type Props = {
   /** D4: current authenticated user — threaded from the server component. */
   currentUserName: string
   currentUserId: string
+  /**
+   * D4: true when the collab server already holds a persisted Yjs snapshot for
+   * this doc. Authoritative gate for first-open seeding — when true the client
+   * never seeds from initialJson (the server state wins), eliminating the
+   * onSynced-timing race that duplicated content.
+   */
+  hasCollabState: boolean
 }
 
 const FIELD = 'default'
@@ -56,26 +63,51 @@ export function Editor({
   initialJson,
   currentUserName,
   currentUserId,
+  hasCollabState,
 }: Props) {
-  // The Y.Doc is created empty — we do NOT eagerly seed it here anymore (D4).
-  // Seeding now happens in one of two paths:
-  //   a) Provider connected + synced → seed if server state is empty (first open).
-  //   b) Provider unreachable (offline) → seed immediately so editor works standalone.
+  // The Y.Doc is created empty — we do NOT eagerly seed it here (D4). Seeding is
+  // gated on `hasCollabState` (a server-rendered fact, not a live fragment check)
+  // to avoid the onSynced timing race that duplicated content:
+  //   • hasCollabState === true  → the collab server is authoritative; the client
+  //     NEVER seeds. Content arrives over the wire on sync.
+  //   • hasCollabState === false → never-collaborated doc; the client seeds from
+  //     initialJson once, either on first sync (server confirmed empty) or via the
+  //     offline fallback when the server is unreachable.
   // Empty deps [] is correct: Y.Doc is created once on mount.
   const ydoc = useMemo(() => new Y.Doc(), [])
 
-  // D4: Track whether we have already seeded the Y.Doc to avoid applying
-  // initialJson twice (once eagerly + once from the server state).
+  // `hasCollabState` captured in a ref so the provider's (mount-stable) callbacks
+  // read it without re-creating the provider.
+  const hasCollabStateRef = useRef(hasCollabState)
+  hasCollabStateRef.current = hasCollabState
+
+  // D4: Track whether we have already seeded the Y.Doc so no path applies
+  // initialJson twice.
   const seededRef = useRef(false)
 
-  /** Seed the Y.Doc from initialJson if not already done and the shared fragment is empty. */
+  /**
+   * Seed the Y.Doc from initialJson. Two modes:
+   *   • online (force=false): only seed a never-collaborated doc (hasCollabState
+   *     === false). The collab server is authoritative when it has a snapshot, so
+   *     seeding on top of it would duplicate content.
+   *   • offline (force=true): the collab server is unreachable — seed regardless
+   *     of hasCollabState so the editor shows the last-mirrored content from
+   *     `documents.content`. The caller disconnects the provider in this path so
+   *     the local seed never merges with server state on a later reconnect.
+   * Both modes keep the fragment-empty guard (two-tab race) and seededRef
+   * idempotency.
+   */
   // biome-ignore lint/correctness/useExhaustiveDependencies: initialJson and ydoc are stable per mount.
-  const seedFromInitial = useCallback(() => {
+  const seedFromInitial = useCallback((opts?: { force?: boolean }) => {
     if (seededRef.current || !initialJson) return
-    // Only seed when the 'default' XML fragment is genuinely empty (no server state).
+    // Online path: server holds an authoritative snapshot — never seed on top.
+    if (!opts?.force && hasCollabStateRef.current) {
+      seededRef.current = true
+      return
+    }
+    // Guard against a peer that already seeded this fragment (two-tab race).
     const xmlFrag = ydoc.get(FIELD, Y.XmlFragment)
     if (xmlFrag.length > 0) {
-      // Server already has content — do not overwrite.
       seededRef.current = true
       return
     }
@@ -93,37 +125,57 @@ export function Editor({
   // in try/catch: if it throws (bad URL, missing module, SSR leak) we fall back
   // to null and seed the doc immediately so the editor works offline.
   //
-  // Seed-once contract:
-  //   • provider present & syncs → onSynced checks xmlFrag length; seeds only
-  //     when the shared fragment is empty (first open / no server state yet).
-  //   • provider present but connection closes before first sync → onClose
-  //     falls back to seeding so the editor shows content.
-  //   • provider creation fails → seedFromInitial() called immediately below.
-  //   • seededRef guards against double-seeding in all paths.
+  // Seed-once contract (seeding decision is owned by seedFromInitial):
+  //   • provider syncs → seedFromInitial() (online, gated on hasCollabState).
+  //   • connection closes or hangs before first sync → the editor is offline:
+  //     seedFromInitial({force:true}) shows the mirrored content AND we
+  //     disconnect() so the local seed can never merge with server state on a
+  //     later reconnect (which would duplicate content).
+  //   • provider creation fails → force-seed immediately; there is no socket.
+  //   • seededRef guards against double-seeding across all paths.
   //
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally stable — docId and ydoc don't change after mount.
   const provider = useMemo<HocuspocusProvider | null>(() => {
-    let synced = false
+    let settled = false
+    // After this many ms with no sync, assume the collab server is unreachable
+    // and fall back to offline mode so the editor is never stuck empty.
+    const OFFLINE_FALLBACK_MS = 4000
     try {
-      return new HocuspocusProvider({
+      // `p` is referenced inside the callbacks below; it is assigned before any
+      // of them can fire (they are async socket events).
+      let p: HocuspocusProvider
+      let offlineTimer: ReturnType<typeof setTimeout> | null = null
+      const goOffline = () => {
+        if (settled) return
+        settled = true
+        if (offlineTimer) clearTimeout(offlineTimer)
+        seedFromInitial({ force: true })
+        // Stop reconnect attempts: a reconnect would merge this offline seed with
+        // any authoritative server state and duplicate content.
+        try {
+          p.disconnect()
+        } catch {
+          // ignore — provider may not have an open socket yet
+        }
+      }
+      offlineTimer = setTimeout(goOffline, OFFLINE_FALLBACK_MS)
+      p = new HocuspocusProvider({
         url: COLLAB_URL,
         name: docId,
         document: ydoc,
         onSynced: () => {
-          if (!synced) {
-            synced = true
-            seedFromInitial()
-          }
+          if (settled) return
+          settled = true
+          if (offlineTimer) clearTimeout(offlineTimer)
+          // Online: gated seed — only a never-collaborated doc is seeded here.
+          seedFromInitial()
         },
         onClose: ({ event }) => {
           if (process.env.NODE_ENV !== 'production') {
             console.debug('[parchment-collab] connection closed', event)
           }
-          // Never got a sync — fall back to local seed so editor shows content.
-          if (!synced) {
-            synced = true
-            seedFromInitial()
-          }
+          // Closed before first sync → offline fallback.
+          goOffline()
         },
         onStatus: ({ status }) => {
           if (process.env.NODE_ENV !== 'production') {
@@ -131,12 +183,13 @@ export function Editor({
           }
         },
       })
+      return p
     } catch (err) {
       if (process.env.NODE_ENV !== 'production') {
         console.warn('[parchment-collab] provider creation failed, running offline:', err)
       }
-      // Seed immediately so the editor has content without a network connection.
-      seedFromInitial()
+      // No socket exists — force-seed so the editor has content.
+      seedFromInitial({ force: true })
       return null
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

@@ -1,11 +1,19 @@
+import { notFound } from 'next/navigation'
+import { Editor } from '@/components/editor/Editor'
+import { requireUser } from '@/lib/auth/guard'
+import { getDocument } from '@/lib/docs/repo'
+
 export default async function DocPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const user = await requireUser()
+  const doc = await getDocument(id)
+  if (!doc || doc.ownerId !== user.id) notFound()
+
   return (
-    <section>
-      <h1 className="font-semibold text-2xl tracking-tight">Document</h1>
-      <p className="mt-2 text-[var(--muted)]">
-        Page-bounded Tiptap canvas for <code>{id}</code> — Plans B / C / D.
-      </p>
-    </section>
+    <Editor
+      docId={doc.id}
+      initialTitle={doc.title}
+      initialJson={(doc.content as Record<string, unknown> | null) ?? null}
+    />
   )
 }

@@ -24,7 +24,7 @@ export async function createOwner(_prev: SetupState, formData: FormData): Promis
   const password = String(formData.get('password') ?? '')
 
   if (!name) return { error: 'Name is required.' }
-  if (!email || !email.includes('@')) return { error: 'A valid email is required.' }
+  if (!email?.includes('@')) return { error: 'A valid email is required.' }
   if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
 
   const passwordHash = await hashPassword(password)

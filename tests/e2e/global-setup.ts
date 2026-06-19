@@ -9,6 +9,7 @@ import { Client } from 'pg'
 // cookie 'parchment_session' = base64url token; DB stores sha256(token).
 const DB = process.env.E2E_DATABASE_URL ?? 'postgres://parchment:parchment@127.0.0.1:5434/parchment'
 const STATE = path.resolve('tests/e2e/.auth/state.json')
+export const SEEDED_DOC_ID = '00000000-0000-0000-0000-0000000000d0'
 
 export default async function globalSetup(): Promise<void> {
   const c = new Client({ connectionString: DB })
@@ -26,6 +27,21 @@ export default async function globalSetup(): Promise<void> {
     tokenHash,
     expiresAt,
   ])
+
+  // Seeded document with a fixed id so the editor route has a stable a11y target.
+  await c.query(
+    `insert into documents (id, owner_id, title, markdown, content)
+     values ($1, $2, 'Seeded doc', $3, $4::jsonb)`,
+    [
+      SEEDED_DOC_ID,
+      userId,
+      'Hello\n',
+      JSON.stringify({
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello' }] }],
+      }),
+    ],
+  )
   await c.end()
 
   await mkdir(path.dirname(STATE), { recursive: true })

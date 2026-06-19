@@ -876,3 +876,125 @@ body {
   height: 0;
   pointer-events: none;
 }
+
+/* ── Footnotes / Endnotes (B8) ───────────────────────────────────────────── */
+
+/* Inline superscript reference */
+.parchment-fn-ref {
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 1;
+}
+
+.parchment-fn-ref-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0 1px;
+}
+
+.parchment-fn-ref-link:hover {
+  text-decoration: underline;
+  color: var(--accent-contrast);
+}
+
+/* End-of-doc footnotes/endnotes block */
+.parchment-fn-section {
+  display: block;
+  margin-top: 2.5em;
+  padding-top: 1em;
+  border-top: 2px solid var(--border);
+  font-size: 0.88em;
+  color: var(--foreground);
+}
+
+.parchment-fn-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.6em;
+}
+
+.parchment-fn-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  user-select: none;
+}
+
+/* Wrapper for back-link overlay + editable list */
+.parchment-fn-items {
+  position: relative;
+}
+
+/*
+ * Back-links (↩) — rendered as a contentEditable=false overlay positioned
+ * to the left of each list item. We use an absolutely-positioned column
+ * so the editable text aligns with normal list-item left padding.
+ */
+.parchment-fn-backlinks {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3em;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  pointer-events: none;
+}
+
+.parchment-fn-backlink-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2em;
+  height: 1.8em; /* approximate line height of each item */
+  pointer-events: auto;
+}
+
+.parchment-fn-number {
+  color: var(--muted);
+  font-size: 0.85em;
+  min-width: 1.2em;
+  text-align: right;
+}
+
+.parchment-fn-backlink {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9em;
+}
+
+.parchment-fn-backlink:hover {
+  color: var(--accent-contrast);
+}
+
+/* The editable <ol> rendered by NodeViewContent */
+.parchment-fn-list-inner {
+  list-style: none;
+  margin: 0;
+  padding-left: 3.5em; /* leave room for the back-link column */
+}
+
+.parchment-fn-list-inner li {
+  padding: 0.15em 0;
+  min-height: 1.6em;
+}
+
+.parchment-fn-list-inner li p {
+  margin: 0;
+}
+
+/*
+ * Print / paged.js TODO (Plan H2):
+ * When [data-fn-placement="footnote"], move this section to the page footer
+ * area. Example:
+ *
+ *   @media print {
+ *     .parchment-fn-section[data-fn-placement="footnote"] {
+ *       // paged.js @footnote target or running element
+ *     }
+ *   }
+ *
+ * For now, both 'footnote' and 'endnote' render identically at end-of-doc.
+ */

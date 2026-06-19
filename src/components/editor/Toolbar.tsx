@@ -570,6 +570,20 @@ export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink }: Pr
         ☰
       </button>
 
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── Insert footnote (B8) ─────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Insert footnote"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().insertFootnote().run()}
+      >
+        fn
+        <sup style={{ fontSize: '0.6em', lineHeight: 1 }}>†</sup>
+      </button>
+
       {/* ── Table context controls (visible when cursor is in a table) ── */}
       {s.table && (
         <>

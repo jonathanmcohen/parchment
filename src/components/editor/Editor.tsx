@@ -3,9 +3,12 @@
 import { getSchema } from '@tiptap/core'
 import Collaboration from '@tiptap/extension-collaboration'
 import { EditorContent, useEditor } from '@tiptap/react'
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
+import { PageCanvas } from '@/components/editor/PageCanvas'
+import { StatusBar } from '@/components/editor/StatusBar'
+import type { PageSize } from '@/lib/editor/paginate'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
 
@@ -34,6 +37,10 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [size, setSize] = useState<PageSize>('Letter')
+  const [pageCount, setPageCount] = useState(1)
+  const [wordCount, setWordCount] = useState(0)
+
   const save = useCallback(
     (json: Record<string, unknown>) => {
       const markdown = serializeMarkdown(json)
@@ -52,16 +59,39 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
     editorProps: {
       attributes: { class: 'parchment-prose', 'aria-label': 'Document editor' },
     },
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor: ed }) => {
       if (timer.current) clearTimeout(timer.current)
-      timer.current = setTimeout(() => save(editor.getJSON() as Record<string, unknown>), 800)
+      timer.current = setTimeout(() => save(ed.getJSON() as Record<string, unknown>), 800)
+      // Count words from plain text (split on whitespace, filter empties)
+      const text = ed.getText()
+      setWordCount(text.trim() === '' ? 0 : text.trim().split(/\s+/).length)
     },
   })
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
+      {/* Page size toggle */}
+      <div className="mb-4 flex items-center gap-2">
+        {(['Letter', 'A4'] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            aria-pressed={size === s}
+            onClick={() => setSize(s)}
+            className="parchment-size-btn"
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
       <h1 className="mb-4 font-semibold text-2xl tracking-tight">{initialTitle}</h1>
-      <EditorContent editor={editor} />
+
+      <PageCanvas size={size} onPageCountChange={setPageCount}>
+        <EditorContent editor={editor} />
+      </PageCanvas>
+
+      <StatusBar pageCount={pageCount} wordCount={wordCount} />
     </div>
   )
 }

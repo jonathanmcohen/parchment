@@ -1,5 +1,6 @@
 import { and, desc, eq, ilike, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
+import { removeDocFromDisk, syncDocToDisk } from '@/lib/disk/mirror'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
@@ -51,6 +52,9 @@ export async function saveDocument(
       // ignore — embedding is best-effort
     }
   }
+
+  // Best-effort disk mirror — never blocks or fails the save.
+  await syncDocToDisk(id)
 }
 
 export async function getDocument(id: string): Promise<Doc | null> {
@@ -227,6 +231,9 @@ export async function trashDocument(ownerId: string, id: string): Promise<void> 
     .update(schema.documents)
     .set({ trashedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
+
+  // Best-effort disk mirror — remove the mirrored file.
+  await removeDocFromDisk(id)
 }
 
 /** Restore: set trashedAt = null (owner-scoped). */
@@ -235,6 +242,9 @@ export async function restoreDocument(ownerId: string, id: string): Promise<void
     .update(schema.documents)
     .set({ trashedAt: null, updatedAt: new Date() })
     .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
+
+  // Best-effort disk mirror — re-mirror on restore.
+  await syncDocToDisk(id)
 }
 
 /**
@@ -275,6 +285,9 @@ export async function moveDocument(id: string, folderId: string | null): Promise
     .update(schema.documents)
     .set({ folderId, updatedAt: new Date() })
     .where(eq(schema.documents.id, id))
+
+  // Best-effort disk mirror — folder changed → relocate.
+  await syncDocToDisk(id)
 }
 
 /** Rename a doc's title (owner-scoped). Rejects empty/whitespace title. */
@@ -285,6 +298,9 @@ export async function renameDocument(ownerId: string, id: string, title: string)
     .update(schema.documents)
     .set({ title: trimmed, updatedAt: new Date() })
     .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
+
+  // Best-effort disk mirror — title changed → relocate.
+  await syncDocToDisk(id)
 }
 
 /** Duplicate a doc: new row, title "{title} (copy)", same content/markdown/folderId,
@@ -305,5 +321,9 @@ export async function duplicateDocument(ownerId: string, id: string): Promise<{ 
     })
     .returning({ id: schema.documents.id })
   if (!row) throw new Error('duplicateDocument: insert returned no row')
+
+  // Best-effort disk mirror — write the copy.
+  await syncDocToDisk(row.id)
+
   return { id: row.id }
 }

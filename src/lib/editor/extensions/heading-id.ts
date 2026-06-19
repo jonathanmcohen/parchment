@@ -29,6 +29,26 @@ export function slugify(text: string): string {
 export const HeadingId = Extension.create({
   name: 'headingId',
 
+  // Register `id` on the heading node's schema so setNodeMarkup persists it and
+  // it renders to the DOM `<h1..6 id="...">` (anchor target for link-to-heading).
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['heading'],
+        attributes: {
+          id: {
+            default: null,
+            parseHTML: (element) => element.getAttribute('id'),
+            renderHTML: (attributes) => {
+              const id = attributes.id as string | null
+              return id ? { id } : {}
+            },
+          },
+        },
+      },
+    ]
+  },
+
   addProseMirrorPlugins() {
     return [
       new Plugin({

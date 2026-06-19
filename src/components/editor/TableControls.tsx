@@ -1,6 +1,7 @@
 'use client'
 
 import type { Editor } from '@tiptap/core'
+import { recomputeFormulas } from '@/lib/editor/formula-cells'
 import { sortTableByColumn } from '@/lib/editor/table-sort'
 
 type Props = {
@@ -159,6 +160,19 @@ export function TableControls({ editor }: Props) {
         }}
       >
         ↓Z
+      </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── Formulas ──────────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Recompute formulas"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => recomputeFormulas(editor)}
+      >
+        Σ
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />

@@ -13,6 +13,8 @@ type Props = {
   onOpenLink: () => void
   onCropImage: () => void
   onOpenPageSetup: () => void
+  onToggleComments: () => void
+  commentsSidebarOpen: boolean
 }
 
 const FONT_FAMILIES = [
@@ -107,6 +109,8 @@ export function Toolbar({
   onOpenLink,
   onCropImage,
   onOpenPageSetup,
+  onToggleComments,
+  commentsSidebarOpen,
 }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
@@ -684,6 +688,20 @@ export function Toolbar({
           <TableControls editor={editor} />
         </>
       )}
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── D1: Toggle comments sidebar ───────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Toggle comments"
+        aria-pressed={commentsSidebarOpen}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={onToggleComments}
+      >
+        💬
+      </button>
     </div>
   )
 }

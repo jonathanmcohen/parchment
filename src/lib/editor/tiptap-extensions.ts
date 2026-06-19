@@ -1,6 +1,7 @@
 import StarterKit from '@tiptap/starter-kit'
 import { blockExtensions } from '@/lib/editor/block-extensions'
 import { CodeBlockShiki } from '@/lib/editor/extensions/code-block-shiki'
+import { CommentMark } from '@/lib/editor/extensions/comment'
 import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
@@ -46,6 +47,8 @@ export const baseExtensions = [
   // B13: manual page breaks + section breaks.
   PageBreakExtension,
   SectionBreakExtension,
+  // D1: comment thread anchoring mark.
+  CommentMark,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

@@ -1,0 +1,1 @@
+ALTER TABLE "documents" ADD COLUMN "disk_path" text;

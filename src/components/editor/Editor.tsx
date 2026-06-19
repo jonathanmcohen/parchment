@@ -15,6 +15,7 @@ import { LinkPopover } from '@/components/editor/LinkPopover'
 import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
+import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { type Counts, countText } from '@/lib/editor/counts'
@@ -88,6 +89,9 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
     pos: number
     attrs: Record<string, unknown>
   }>(null)
+
+  // B13: section-break edit dialog — holds the doc position of the node to edit.
+  const [sectionDialogPos, setSectionDialogPos] = useState<number | null>(null)
 
   const save = useCallback(
     (json: Record<string, unknown>) => {
@@ -233,6 +237,18 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
     return () => dom.removeEventListener('parchment:crop-image', handler)
   }, [editor, openCropForSelection])
 
+  // B13: section-break NodeView "Edit section" button dispatches this DOM event.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const pos = (e as CustomEvent<{ pos: number }>).detail?.pos
+      if (typeof pos === 'number') setSectionDialogPos(pos)
+    }
+    dom.addEventListener('parchment:edit-section', handler)
+    return () => dom.removeEventListener('parchment:edit-section', handler)
+  }, [editor])
+
   return (
     <div className="mx-auto max-w-5xl">
       {/* Inline formatting toolbar (B2) */}
@@ -283,6 +299,15 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
       {/* B6: Link popover */}
       {editor && linkPopoverOpen && <LinkPopover editor={editor} onClose={closeLinkPopover} />}
+
+      {/* B13: section-break edit dialog */}
+      {editor && sectionDialogPos !== null && (
+        <SectionBreakDialog
+          editor={editor}
+          pos={sectionDialogPos}
+          onClose={() => setSectionDialogPos(null)}
+        />
+      )}
 
       {/* B5: Image crop dialog (selected image) */}
       {editor && cropState && (

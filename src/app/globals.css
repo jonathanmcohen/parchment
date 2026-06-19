@@ -1796,3 +1796,25 @@ body {
 .parchment-page-setup-num {
   width: 80px;
 }
+
+/* B13: section-break NodeView layout + "Edit section" button */
+.parchment-section-break-nodeview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.parchment-section-break-edit-btn {
+  flex: none;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--foreground);
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.parchment-section-break-edit-btn:hover {
+  border-color: var(--accent-contrast);
+  color: var(--accent-contrast);
+}

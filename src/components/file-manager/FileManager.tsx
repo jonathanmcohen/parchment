@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { SortDir, SortKey } from '@/lib/docs/doc-sort'
+import { sortDocs } from '@/lib/docs/doc-sort'
 import type { FolderNode, TreeNode } from '@/lib/docs/folder-tree'
 import { buildTree, folderPath } from '@/lib/docs/folder-tree'
 import { describeCriteria, parseCriteria } from '@/lib/docs/smart-folder-criteria'
@@ -16,8 +18,11 @@ export type DocDTO = {
   id: string
   title: string
   updatedAt: string
+  createdAt: string
   folderId?: string | null
   starred?: boolean
+  size: number
+  preview: string
 }
 
 type SmartFolderDTO = {
@@ -40,6 +45,7 @@ type DocTagDTO = {
 }
 
 type View = 'all' | 'recents' | 'starred' | 'shared' | 'trash' | 'smart' | 'tag'
+type ViewMode = 'list' | 'grid' | 'details'
 
 const VIEWS: { key: View; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -48,6 +54,38 @@ const VIEWS: { key: View; label: string }[] = [
   { key: 'shared', label: 'Shared' },
   { key: 'trash', label: 'Trash' },
 ]
+
+const SORT_KEYS: { key: SortKey; label: string }[] = [
+  { key: 'modified', label: 'Modified' },
+  { key: 'name', label: 'Name' },
+  { key: 'created', label: 'Created' },
+  { key: 'size', label: 'Size' },
+]
+
+const LS_SORT_KEY = 'parchment.fm.sortKey'
+const LS_SORT_DIR = 'parchment.fm.sortDir'
+const LS_VIEW_MODE = 'parchment.fm.viewMode'
+
+function lsGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function lsSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // ignore
+  }
+}
+
+function formatSize(chars: number): string {
+  if (chars < 1000) return `${chars}`
+  return `${(chars / 1000).toFixed(1)}k`
+}
 
 interface Props {
   initialFolders: FolderDTO[]
@@ -525,19 +563,90 @@ function FolderTreeItem({
   )
 }
 
-// ─── Flat doc row (used in Recents / Starred / Trash / Tag views) ────────────
+// ─── Sort + View toolbar ──────────────────────────────────────────────────────
 
-interface FlatDocRowProps {
-  doc: DocDTO
-  view: 'recents' | 'starred' | 'trash' | 'tag'
-  onRefresh: () => void
-  allTags?: TagDTO[]
-  /** Refetch sidebar tag counts after a per-doc tag change. */
-  onTagsChanged?: () => void
+interface SortViewToolbarProps {
+  sortKey: SortKey
+  sortDir: SortDir
+  viewMode: ViewMode
+  onSortKey: (key: SortKey) => void
+  onSortDir: (dir: SortDir) => void
+  onViewMode: (mode: ViewMode) => void
 }
 
-function FlatDocRow({ doc, view, onRefresh, allTags = [], onTagsChanged }: FlatDocRowProps) {
+function SortViewToolbar({
+  sortKey,
+  sortDir,
+  viewMode,
+  onSortKey,
+  onSortDir,
+  onViewMode,
+}: SortViewToolbarProps) {
+  return (
+    <div className="flex items-center gap-3 mb-3 flex-wrap">
+      {/* Sort controls */}
+      <div className="flex items-center gap-1">
+        <label htmlFor="fm-sort-key" className="text-xs text-[var(--muted)] shrink-0">
+          Sort by
+        </label>
+        <select
+          id="fm-sort-key"
+          value={sortKey}
+          onChange={(e) => onSortKey(e.target.value as SortKey)}
+          className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+        >
+          {SORT_KEYS.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => onSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+          aria-label={sortDir === 'asc' ? 'Sort descending' : 'Sort ascending'}
+          className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)] hover:text-[var(--accent-contrast)]"
+        >
+          {sortDir === 'asc' ? '↑ Asc' : '↓ Desc'}
+        </button>
+      </div>
+
+      {/* View mode toggle */}
+      <div className="flex items-center gap-0.5 border border-[var(--border)] rounded overflow-hidden ml-auto">
+        {(['list', 'grid', 'details'] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => onViewMode(mode)}
+            aria-pressed={viewMode === mode}
+            className={[
+              'px-2 py-1 text-xs capitalize',
+              viewMode === mode
+                ? 'bg-[var(--accent-contrast)] text-white'
+                : 'bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]',
+            ].join(' ')}
+          >
+            {mode === 'list' ? '☰ List' : mode === 'grid' ? '⊞ Grid' : '≡ Details'}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Doc rendering helpers ────────────────────────────────────────────────────
+
+interface DocActionsProps {
+  doc: DocDTO
+  view: 'recents' | 'starred' | 'trash' | 'tag' | 'all'
+  onRefresh: () => void
+  allTags: TagDTO[]
+  onTagsChanged?: (() => void) | undefined
+}
+
+function DocActions({ doc, view, onRefresh, allTags, onTagsChanged }: DocActionsProps) {
   const [showTagPopover, setShowTagPopover] = useState(false)
+
   const handleStar = async () => {
     try {
       const res = await fetch(`/api/docs/${doc.id}/star`, {
@@ -580,74 +689,261 @@ function FlatDocRow({ doc, view, onRefresh, allTags = [], onTagsChanged }: FlatD
   const isStarred = doc.starred ?? false
 
   return (
-    <li>
-      <div className="flex items-center justify-between py-2 gap-2">
-        <a
-          href={`/d/${doc.id}`}
-          className="flex-1 font-medium hover:text-[var(--accent-contrast)] truncate"
+    <div className="flex items-center gap-1 shrink-0">
+      {/* Tag button + popover */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setShowTagPopover((v) => !v)}
+          aria-label={`Edit tags for ${doc.title}`}
+          className="text-sm px-1 text-[var(--muted)] hover:text-[var(--accent-contrast)]"
         >
-          📄 {doc.title}
-        </a>
-        <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0">
-          {new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(
-            new Date(doc.updatedAt),
-          )}
-        </time>
-        {/* Tag button + popover */}
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowTagPopover((v) => !v)}
-            aria-label={`Edit tags for ${doc.title}`}
-            className="text-sm px-1 text-[var(--muted)] hover:text-[var(--accent-contrast)]"
-          >
-            🏷
-          </button>
-          {showTagPopover && (
-            <TagPopover
-              docId={doc.id}
-              docTitle={doc.title}
-              allTags={allTags}
-              onClose={() => setShowTagPopover(false)}
-              onChanged={() => {
-                onRefresh()
-                onTagsChanged?.()
-              }}
-            />
-          )}
-        </div>
-        {view !== 'trash' && (
-          <>
-            <button
-              type="button"
-              onClick={handleStar}
-              aria-label={isStarred ? `Unstar ${doc.title}` : `Star ${doc.title}`}
-              className="text-base leading-none px-1 shrink-0 hover:text-[var(--accent-contrast)]"
-            >
-              {isStarred ? '★' : '☆'}
-            </button>
-            <button
-              type="button"
-              onClick={handleTrash}
-              aria-label={`Move ${doc.title} to trash`}
-              className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-red-600 hover:border-red-400 shrink-0"
-            >
-              🗑 Trash
-            </button>
-          </>
-        )}
-        {view === 'trash' && (
-          <button
-            type="button"
-            onClick={handleRestore}
-            aria-label={`Restore ${doc.title}`}
-            className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--accent-contrast)] hover:border-[var(--accent-contrast)] shrink-0"
-          >
-            Restore
-          </button>
+          🏷
+        </button>
+        {showTagPopover && (
+          <TagPopover
+            docId={doc.id}
+            docTitle={doc.title}
+            allTags={allTags}
+            onClose={() => setShowTagPopover(false)}
+            onChanged={() => {
+              onRefresh()
+              onTagsChanged?.()
+            }}
+          />
         )}
       </div>
-    </li>
+      {view !== 'trash' && (
+        <>
+          <button
+            type="button"
+            onClick={handleStar}
+            aria-label={isStarred ? `Unstar ${doc.title}` : `Star ${doc.title}`}
+            className="text-base leading-none px-1 hover:text-[var(--accent-contrast)]"
+          >
+            {isStarred ? '★' : '☆'}
+          </button>
+          <button
+            type="button"
+            onClick={handleTrash}
+            aria-label={`Move ${doc.title} to trash`}
+            className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-red-600 hover:border-red-400"
+          >
+            🗑 Trash
+          </button>
+        </>
+      )}
+      {view === 'trash' && (
+        <button
+          type="button"
+          onClick={handleRestore}
+          aria-label={`Restore ${doc.title}`}
+          className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--accent-contrast)] hover:border-[var(--accent-contrast)]"
+        >
+          Restore
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Shared doc renderer (list / grid / details) ──────────────────────────────
+
+interface DocListProps {
+  docs: DocDTO[]
+  viewMode: ViewMode
+  sortKey: SortKey
+  sortDir: SortDir
+  onSortKey: (key: SortKey) => void
+  onSortDir: (dir: SortDir) => void
+  view: 'recents' | 'starred' | 'trash' | 'tag' | 'all'
+  onRefresh: () => void
+  allTags: TagDTO[]
+  onTagsChanged?: () => void
+}
+
+function DocList({
+  docs,
+  viewMode,
+  sortKey,
+  sortDir,
+  onSortKey,
+  onSortDir,
+  view,
+  onRefresh,
+  allTags,
+  onTagsChanged,
+}: DocListProps) {
+  const fmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' })
+
+  const handleHeaderClick = (key: SortKey) => {
+    if (sortKey === key) {
+      onSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      onSortKey(key)
+    }
+  }
+
+  const thAriaSort = (key: SortKey): 'ascending' | 'descending' | 'none' => {
+    if (sortKey !== key) return 'none'
+    return sortDir === 'asc' ? 'ascending' : 'descending'
+  }
+
+  if (viewMode === 'list') {
+    return (
+      <ul className="divide-y divide-[var(--border)]">
+        {docs.map((doc) => (
+          <li key={doc.id}>
+            <div className="flex items-center justify-between py-2 gap-2">
+              <a
+                href={`/d/${doc.id}`}
+                className="flex-1 font-medium hover:text-[var(--accent-contrast)] truncate"
+              >
+                📄 {doc.title}
+              </a>
+              <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0">
+                {fmt.format(new Date(doc.updatedAt))}
+              </time>
+              <DocActions
+                doc={doc}
+                view={view}
+                onRefresh={onRefresh}
+                allTags={allTags}
+                onTagsChanged={onTagsChanged}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  if (viewMode === 'grid') {
+    return (
+      <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {docs.map((doc) => (
+          <li key={doc.id} className="relative">
+            <a
+              href={`/d/${doc.id}`}
+              aria-label={doc.title}
+              className="flex flex-col gap-1 p-3 border border-[var(--border)] rounded-lg bg-[var(--paper)] hover:border-[var(--accent-contrast)] transition-colors h-full"
+            >
+              <span className="text-2xl" aria-hidden="true">
+                📄
+              </span>
+              <span className="font-medium text-sm truncate text-[var(--foreground)]">
+                {doc.title}
+              </span>
+              {doc.preview.length > 0 && (
+                <span
+                  className="text-xs text-[var(--muted)] line-clamp-3 break-words"
+                  aria-hidden="true"
+                >
+                  {doc.preview}
+                </span>
+              )}
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  // details
+  return (
+    <table className="w-full text-sm border-collapse">
+      <thead>
+        <tr className="border-b border-[var(--border)] text-[var(--muted)] text-xs">
+          <th
+            scope="col"
+            aria-sort={thAriaSort('name')}
+            className="text-left py-2 pr-3 font-medium"
+          >
+            <button
+              type="button"
+              onClick={() => handleHeaderClick('name')}
+              className="hover:text-[var(--foreground)]"
+            >
+              Name {sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+            </button>
+          </th>
+          <th
+            scope="col"
+            aria-sort={thAriaSort('modified')}
+            className="text-left py-2 pr-3 font-medium"
+          >
+            <button
+              type="button"
+              onClick={() => handleHeaderClick('modified')}
+              className="hover:text-[var(--foreground)]"
+            >
+              Modified {sortKey === 'modified' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+            </button>
+          </th>
+          <th
+            scope="col"
+            aria-sort={thAriaSort('created')}
+            className="text-left py-2 pr-3 font-medium"
+          >
+            <button
+              type="button"
+              onClick={() => handleHeaderClick('created')}
+              className="hover:text-[var(--foreground)]"
+            >
+              Created {sortKey === 'created' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+            </button>
+          </th>
+          <th
+            scope="col"
+            aria-sort={thAriaSort('size')}
+            className="text-left py-2 pr-3 font-medium"
+          >
+            <button
+              type="button"
+              onClick={() => handleHeaderClick('size')}
+              className="hover:text-[var(--foreground)]"
+            >
+              Size {sortKey === 'size' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+            </button>
+          </th>
+          <th scope="col" className="text-left py-2 font-medium">
+            Actions
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {docs.map((doc) => (
+          <tr key={doc.id} className="border-b border-[var(--border)] hover:bg-[var(--paper)]">
+            <td className="py-2 pr-3">
+              <a
+                href={`/d/${doc.id}`}
+                className="font-medium hover:text-[var(--accent-contrast)] truncate block max-w-xs"
+              >
+                📄 {doc.title}
+              </a>
+            </td>
+            <td className="py-2 pr-3 text-[var(--muted)] text-xs whitespace-nowrap">
+              <time dateTime={doc.updatedAt}>{fmt.format(new Date(doc.updatedAt))}</time>
+            </td>
+            <td className="py-2 pr-3 text-[var(--muted)] text-xs whitespace-nowrap">
+              <time dateTime={doc.createdAt}>{fmt.format(new Date(doc.createdAt))}</time>
+            </td>
+            <td className="py-2 pr-3 text-[var(--muted)] text-xs" aria-label={`${doc.size} chars`}>
+              {formatSize(doc.size)}
+            </td>
+            <td className="py-2">
+              <DocActions
+                doc={doc}
+                view={view}
+                onRefresh={onRefresh}
+                allTags={allTags}
+                onTagsChanged={onTagsChanged}
+              />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
@@ -718,6 +1014,36 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   const [activeTagId, setActiveTagId] = useState<string | null>(null)
   const [tagDocs, setTagDocs] = useState<DocDTO[]>([])
   const [showTagCreateForm, setShowTagCreateForm] = useState(false)
+
+  // Sort + view-mode state (hydrated from localStorage on mount)
+  const [sortKey, setSortKeyState] = useState<SortKey>('modified')
+  const [sortDir, setSortDirState] = useState<SortDir>('desc')
+  const [viewMode, setViewModeState] = useState<ViewMode>('list')
+
+  // Hydrate from localStorage on mount
+  useEffect(() => {
+    const sk = lsGet(LS_SORT_KEY)
+    const sd = lsGet(LS_SORT_DIR)
+    const vm = lsGet(LS_VIEW_MODE)
+    if (sk === 'name' || sk === 'modified' || sk === 'created' || sk === 'size') setSortKeyState(sk)
+    if (sd === 'asc' || sd === 'desc') setSortDirState(sd)
+    if (vm === 'list' || vm === 'grid' || vm === 'details') setViewModeState(vm)
+  }, [])
+
+  const setSortKey = (key: SortKey) => {
+    setSortKeyState(key)
+    lsSet(LS_SORT_KEY, key)
+  }
+
+  const setSortDir = (dir: SortDir) => {
+    setSortDirState(dir)
+    lsSet(LS_SORT_DIR, dir)
+  }
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode)
+    lsSet(LS_VIEW_MODE, mode)
+  }
 
   // Fetch docs for the All view (current folder)
   const fetchDocs = useCallback(async (folderId: string | null) => {
@@ -870,6 +1196,12 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
       fetchFlatDocs(view)
     }
   }, [view, fetchFlatDocs])
+
+  // Sorted doc lists
+  const sortedDocs = sortDocs(docs, sortKey, sortDir)
+  const sortedFlatDocs = sortDocs(flatDocs, sortKey, sortDir)
+  const sortedSmartDocs = sortDocs(smartDocs, sortKey, sortDir)
+  const sortedTagDocs = sortDocs(tagDocs, sortKey, sortDir)
 
   return (
     <div className="flex flex-col gap-4 h-full min-h-0">
@@ -1129,42 +1461,74 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 {subfolders.length === 0 && docs.length === 0 ? (
                   <p className="text-[var(--muted)]">This folder is empty.</p>
                 ) : (
-                  <ul className="divide-y divide-[var(--border)]">
-                    {/* Subfolder rows */}
-                    {subfolders.map((folder) => (
-                      <li key={folder.id}>
-                        <DropZone targetFolderId={folder.id} onDropped={onDropped}>
-                          {(over, handlers) => (
-                            <button
-                              type="button"
-                              draggable
-                              onDragStart={(e) => setDrag(e, { type: 'folder', id: folder.id })}
-                              onDragOver={handlers.onDragOver}
-                              onDragLeave={handlers.onDragLeave}
-                              onDrop={handlers.onDrop}
-                              onClick={() => navigateTo(folder.id)}
-                              className={[
-                                'flex w-full items-center gap-2 py-2 rounded font-medium text-left',
-                                over
-                                  ? 'bg-[var(--paper)] text-[var(--accent-contrast)]'
-                                  : 'hover:text-[var(--accent-contrast)]',
-                              ].join(' ')}
-                            >
-                              <span aria-hidden="true">📁</span>
-                              {folder.name}
-                            </button>
-                          )}
-                        </DropZone>
-                      </li>
-                    ))}
+                  <>
+                    {/* Sort/view toolbar — only shown when there are docs */}
+                    {docs.length > 0 && (
+                      <SortViewToolbar
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        viewMode={viewMode}
+                        onSortKey={setSortKey}
+                        onSortDir={setSortDir}
+                        onViewMode={setViewMode}
+                      />
+                    )}
+                    <ul className="divide-y divide-[var(--border)]">
+                      {/* Subfolder rows — always list, not affected by viewMode */}
+                      {subfolders.map((folder) => (
+                        <li key={folder.id}>
+                          <DropZone targetFolderId={folder.id} onDropped={onDropped}>
+                            {(over, handlers) => (
+                              <button
+                                type="button"
+                                draggable
+                                onDragStart={(e) => setDrag(e, { type: 'folder', id: folder.id })}
+                                onDragOver={handlers.onDragOver}
+                                onDragLeave={handlers.onDragLeave}
+                                onDrop={handlers.onDrop}
+                                onClick={() => navigateTo(folder.id)}
+                                className={[
+                                  'flex w-full items-center gap-2 py-2 rounded font-medium text-left',
+                                  over
+                                    ? 'bg-[var(--paper)] text-[var(--accent-contrast)]'
+                                    : 'hover:text-[var(--accent-contrast)]',
+                                ].join(' ')}
+                              >
+                                <span aria-hidden="true">📁</span>
+                                {folder.name}
+                              </button>
+                            )}
+                          </DropZone>
+                        </li>
+                      ))}
+                    </ul>
 
-                    {/* Document rows */}
-                    {docs.map((doc) => (
-                      <li key={doc.id}>
-                        <AllViewDocRow doc={doc} allTags={tags} />
-                      </li>
-                    ))}
-                  </ul>
+                    {/* Document list — sorted + view mode aware */}
+                    {docs.length > 0 &&
+                      (viewMode === 'list' ? (
+                        <ul className="divide-y divide-[var(--border)]">
+                          {sortedDocs.map((doc) => (
+                            <li key={doc.id}>
+                              <AllViewDocRow doc={doc} allTags={tags} />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="mt-2">
+                          <DocList
+                            docs={sortedDocs}
+                            viewMode={viewMode}
+                            sortKey={sortKey}
+                            sortDir={sortDir}
+                            onSortKey={setSortKey}
+                            onSortDir={setSortDir}
+                            view="all"
+                            onRefresh={() => fetchDocs(currentFolderId)}
+                            allTags={tags}
+                          />
+                        </div>
+                      ))}
+                  </>
                 )}
               </>
             )}
@@ -1187,20 +1551,30 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                     {smartDocs.length === 0 ? (
                       <p className="text-[var(--muted)]">No documents match this smart folder.</p>
                     ) : (
-                      <ul className="divide-y divide-[var(--border)]">
-                        {smartDocs.map((doc) => (
-                          <FlatDocRow
-                            key={doc.id}
-                            doc={doc}
-                            view="recents"
-                            onRefresh={() => {
-                              if (activeSmartId !== null) fetchSmartResults(activeSmartId)
-                            }}
-                            allTags={tags}
-                            onTagsChanged={fetchTags}
-                          />
-                        ))}
-                      </ul>
+                      <>
+                        <SortViewToolbar
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          viewMode={viewMode}
+                          onSortKey={setSortKey}
+                          onSortDir={setSortDir}
+                          onViewMode={setViewMode}
+                        />
+                        <DocList
+                          docs={sortedSmartDocs}
+                          viewMode={viewMode}
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSortKey={setSortKey}
+                          onSortDir={setSortDir}
+                          view="recents"
+                          onRefresh={() => {
+                            if (activeSmartId !== null) fetchSmartResults(activeSmartId)
+                          }}
+                          allTags={tags}
+                          onTagsChanged={fetchTags}
+                        />
+                      </>
                     )}
                   </>
                 )
@@ -1228,20 +1602,30 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         No documents tagged {activeTag?.name ?? ''}.
                       </p>
                     ) : (
-                      <ul className="divide-y divide-[var(--border)]">
-                        {tagDocs.map((doc) => (
-                          <FlatDocRow
-                            key={doc.id}
-                            doc={doc}
-                            view="tag"
-                            onRefresh={() => {
-                              if (activeTagId !== null) fetchTagResults(activeTagId)
-                            }}
-                            allTags={tags}
-                            onTagsChanged={fetchTags}
-                          />
-                        ))}
-                      </ul>
+                      <>
+                        <SortViewToolbar
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          viewMode={viewMode}
+                          onSortKey={setSortKey}
+                          onSortDir={setSortDir}
+                          onViewMode={setViewMode}
+                        />
+                        <DocList
+                          docs={sortedTagDocs}
+                          viewMode={viewMode}
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSortKey={setSortKey}
+                          onSortDir={setSortDir}
+                          view="tag"
+                          onRefresh={() => {
+                            if (activeTagId !== null) fetchTagResults(activeTagId)
+                          }}
+                          allTags={tags}
+                          onTagsChanged={fetchTags}
+                        />
+                      </>
                     )}
                   </>
                 )
@@ -1257,18 +1641,28 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               {view === 'trash' ? 'Trash is empty.' : 'Nothing here yet.'}
             </p>
           ) : (
-            <ul className="divide-y divide-[var(--border)]">
-              {flatDocs.map((doc) => (
-                <FlatDocRow
-                  key={doc.id}
-                  doc={doc}
-                  view={view}
-                  onRefresh={handleFlatRefresh}
-                  allTags={tags}
-                  onTagsChanged={fetchTags}
-                />
-              ))}
-            </ul>
+            <>
+              <SortViewToolbar
+                sortKey={sortKey}
+                sortDir={sortDir}
+                viewMode={viewMode}
+                onSortKey={setSortKey}
+                onSortDir={setSortDir}
+                onViewMode={setViewMode}
+              />
+              <DocList
+                docs={sortedFlatDocs}
+                viewMode={viewMode}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSortKey={setSortKey}
+                onSortDir={setSortDir}
+                view={view}
+                onRefresh={handleFlatRefresh}
+                allTags={tags}
+                onTagsChanged={fetchTags}
+              />
+            </>
           )}
         </main>
       )}

@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull } from 'drizzle-orm'
+import { and, desc, eq, ilike, isNull, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import type { DocRow } from '@/lib/docs/repo'
 import type { SmartCriteria } from '@/lib/docs/smart-folder-criteria'
@@ -77,6 +77,9 @@ export async function runSmartFolder(ownerId: string, criteria: SmartCriteria): 
       updatedAt: schema.documents.updatedAt,
       folderId: schema.documents.folderId,
       starred: schema.documents.starred,
+      createdAt: schema.documents.createdAt,
+      size: sql<number>`length(${schema.documents.markdown})`.as('size'),
+      preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
     })
     .from(schema.documents)
     .where(and(...conditions))

@@ -16,8 +16,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       id: d.id,
       title: d.title,
       updatedAt: d.updatedAt.toISOString(),
-      starred: d.starred,
+      createdAt: d.createdAt.toISOString(),
       folderId: d.folderId,
+      starred: d.starred,
+      size: Number(d.size),
+      preview: d.preview,
     })),
   )
 }

@@ -23,7 +23,11 @@ export async function GET(req: NextRequest) {
         id: d.id,
         title: d.title,
         updatedAt: d.updatedAt.toISOString(),
+        createdAt: d.createdAt.toISOString(),
+        folderId: d.folderId,
         starred: d.starred,
+        size: Number(d.size),
+        preview: d.preview,
       })),
     )
   }
@@ -35,7 +39,11 @@ export async function GET(req: NextRequest) {
         id: d.id,
         title: d.title,
         updatedAt: d.updatedAt.toISOString(),
+        createdAt: d.createdAt.toISOString(),
+        folderId: d.folderId,
         starred: d.starred,
+        size: Number(d.size),
+        preview: d.preview,
       })),
     )
   }
@@ -47,7 +55,11 @@ export async function GET(req: NextRequest) {
         id: d.id,
         title: d.title,
         updatedAt: d.updatedAt.toISOString(),
+        createdAt: d.createdAt.toISOString(),
+        folderId: d.folderId,
         starred: d.starred,
+        size: Number(d.size),
+        preview: d.preview,
       })),
     )
   }
@@ -62,7 +74,11 @@ export async function GET(req: NextRequest) {
       id: d.id,
       title: d.title,
       updatedAt: d.updatedAt.toISOString(),
+      createdAt: d.createdAt.toISOString(),
       folderId: d.folderId,
+      starred: d.starred,
+      size: Number(d.size),
+      preview: d.preview,
     })),
   )
 }

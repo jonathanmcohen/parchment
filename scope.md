@@ -54,7 +54,7 @@
 | B11 | Outline pane — collapsible rail, jump, drag-reorder subtree | DONE | ✓ | ✓ | left rail reads `collectHeadings` (live), collapsible pane + per-heading subtree collapse, click/Enter jump to `#id`, drag-reorder moves whole section (heading + descendants) via `moveSection`/`moveHeadingSection` (collect-then-adjust PM positions). 216 tests (19 reorder, subtree integrity); axe clean; browser-verified (lists heading, jump). |
 | B12 | Slash menu — `/`, categories BASIC/TEXT/LISTS/MEDIA/EMBED/ADVANCED, category rail | DONE | ✓ | ✓ | `@tiptap/suggestion` `/` trigger → ReactRenderer popup; left category rail (All/BASIC/TEXT/LISTS/MEDIA/EMBED/ADVANCED); `filterSlashItems` live filter; arrow/Enter/Esc keyboard; insert removes `/query` then runs command (Image→opens dialog). 234 tests; axe clean; browser-verified (/head→H1/2/3, Enter inserts H1 + clears query) |
 | B13 | Page primitives — page numbers, running headers/footers per-section, `/pagebreak`, section breaks | DONE | ✓ | ✓ | `pageBreak`+`sectionBreak` nodes (toolbar + slash ADVANCED); PageCanvas merges manual+auto breaks (`mergeBreaks`) → boundary overlays w/ page numbers (`formatPageNumber` 1/i/I/a/A) + running header/footer per resolved section. 272 tests; axe clean; browser-verified (break→boundary+page# "1"). **GAPs: section-break edit dialog (attrs set via command only — tracked); page-1 footer + true per-page = print H2** |
-| B14 | Margins + page setup dialog — in/cm, custom margins, orientation, Letter/A4/Legal/Tabloid/Custom | TODO | ☐ | ☐ | |
+| B14 | Margins + page setup dialog — in/cm, custom margins, orientation, Letter/A4/Legal/Tabloid/Custom | DONE | ✓ | ✓ | PageSetupDialog: size (Letter/A4/Legal/Tabloid/Custom W×H), orientation, in/cm unit toggle, 4 custom margins → `PageSetup`/`resolvePageDims` applied live to PageCanvas. 281 tests (conversions+resolve); axe clean; browser-verified (Letter→A4 resizes 816→794px). **GAP: per-section size/orientation deferred (doc-level full; section attrs don't carry page setup yet)** |
 
 ## Plan C — Code block (7)
 
@@ -198,7 +198,7 @@
 | Plan | Items | DONE | GAP | Open |
 |---|---|---|---|---|
 | A Foundations | 5 | 5 | 0 | 0 |
-| B Editor core | 14 | 13 | 0 | 1 |
+| B Editor core | 14 | 14 | 0 | 0 |
 | C Code block | 7 | 0 | 0 | 7 |
 | D Collab | 5 | 0 | 0 | 5 |
 | E File manager | 11 | 0 | 0 | 11 |
@@ -209,6 +209,6 @@
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **18** | **0** | **86** |
+| **Total** | **104** | **19** | **0** | **85** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

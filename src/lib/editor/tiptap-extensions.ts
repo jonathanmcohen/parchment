@@ -1,5 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import { blockExtensions } from '@/lib/editor/block-extensions'
+import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
 import { tableExtensions } from '@/lib/editor/extensions/table'
@@ -32,4 +33,8 @@ export const baseExtensions = [
   HeadingId,
   // B7: auto table of contents block.
   TocExtension,
+  // B8: footnotes + endnotes.
+  FootnoteRef,
+  FootnoteItem,
+  FootnotesBlock,
 ]

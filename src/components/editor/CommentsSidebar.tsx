@@ -2,7 +2,7 @@
 
 import type { Editor } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { parseMentions } from '@/lib/docs/comments-repo'
+import { parseMentions } from '@/lib/docs/comments-shared'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

@@ -2,21 +2,12 @@ import { asc, eq } from 'drizzle-orm'
 import { db, schema } from '@/db'
 
 // D1 comments data layer. No 'server-only' guard so the repo stays unit-testable.
+// Pure helpers + the JSON row type live in comments-shared.ts (client-safe).
 
 export type Comment = typeof schema.comments.$inferSelect
 
-// ─── parseMentions ────────────────────────────────────────────────────────────
-
-/**
- * Extract @mention tokens from a comment body.
- * Only matches `@word` preceded by start-of-string or whitespace so that
- * email addresses (a@b.com) are NOT captured.
- * Returns the usernames without the leading `@`.
- */
-export function parseMentions(body: string): string[] {
-  const matches = body.match(/(?:^|\s)@(\w+)/g) ?? []
-  return matches.map((m) => m.replace(/.*@/, ''))
-}
+// Re-export the pure mention parser so existing importers keep working.
+export { parseMentions } from '@/lib/docs/comments-shared'
 
 // ─── createThread ─────────────────────────────────────────────────────────────
 

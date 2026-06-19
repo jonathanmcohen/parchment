@@ -254,9 +254,12 @@ interface TagPopoverProps {
   docTitle: string
   allTags: TagDTO[]
   onClose: () => void
+  /** Called after a tag is added/removed so the parent can refresh sidebar
+   *  counts and the current view. */
+  onChanged?: () => void
 }
 
-function TagPopover({ docId, docTitle, allTags, onClose }: TagPopoverProps) {
+function TagPopover({ docId, docTitle, allTags, onClose, onChanged }: TagPopoverProps) {
   const [docTags, setDocTags] = useState<DocTagDTO[]>([])
   const [loading, setLoading] = useState(true)
   const ref = useRef<HTMLDivElement>(null)
@@ -299,6 +302,7 @@ function TagPopover({ docId, docTitle, allTags, onClose }: TagPopoverProps) {
           method: 'DELETE',
         })
         setDocTags((prev) => prev.filter((t) => t.id !== tagId))
+        onChanged?.()
       } catch {
         // leave state unchanged
       }
@@ -312,6 +316,7 @@ function TagPopover({ docId, docTitle, allTags, onClose }: TagPopoverProps) {
         if (res.ok) {
           const tag = allTags.find((t) => t.id === tagId)
           if (tag) setDocTags((prev) => [...prev, { id: tag.id, name: tag.name, color: tag.color }])
+          onChanged?.()
         }
       } catch {
         // leave state unchanged
@@ -527,9 +532,11 @@ interface FlatDocRowProps {
   view: 'recents' | 'starred' | 'trash' | 'tag'
   onRefresh: () => void
   allTags?: TagDTO[]
+  /** Refetch sidebar tag counts after a per-doc tag change. */
+  onTagsChanged?: () => void
 }
 
-function FlatDocRow({ doc, view, onRefresh, allTags = [] }: FlatDocRowProps) {
+function FlatDocRow({ doc, view, onRefresh, allTags = [], onTagsChanged }: FlatDocRowProps) {
   const [showTagPopover, setShowTagPopover] = useState(false)
   const handleStar = async () => {
     try {
@@ -602,6 +609,10 @@ function FlatDocRow({ doc, view, onRefresh, allTags = [] }: FlatDocRowProps) {
               docTitle={doc.title}
               allTags={allTags}
               onClose={() => setShowTagPopover(false)}
+              onChanged={() => {
+                onRefresh()
+                onTagsChanged?.()
+              }}
             />
           )}
         </div>
@@ -1186,6 +1197,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                               if (activeSmartId !== null) fetchSmartResults(activeSmartId)
                             }}
                             allTags={tags}
+                            onTagsChanged={fetchTags}
                           />
                         ))}
                       </ul>
@@ -1226,6 +1238,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                               if (activeTagId !== null) fetchTagResults(activeTagId)
                             }}
                             allTags={tags}
+                            onTagsChanged={fetchTags}
                           />
                         ))}
                       </ul>
@@ -1252,6 +1265,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                   view={view}
                   onRefresh={handleFlatRefresh}
                   allTags={tags}
+                  onTagsChanged={fetchTags}
                 />
               ))}
             </ul>

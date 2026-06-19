@@ -4,7 +4,7 @@ import { db, schema } from '@/db'
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
 // it touches `db` (pg) and is only imported by server routes/components in app code.
 
-export type DocSummary = { id: string; title: string; updatedAt: Date }
+export type DocSummary = { id: string; title: string; updatedAt: Date; folderId: string | null }
 export type Doc = typeof schema.documents.$inferSelect
 
 export async function createDocument(
@@ -66,6 +66,7 @@ export async function listDocuments(ownerId: string): Promise<DocSummary[]> {
       id: schema.documents.id,
       title: schema.documents.title,
       updatedAt: schema.documents.updatedAt,
+      folderId: schema.documents.folderId,
     })
     .from(schema.documents)
     .where(and(eq(schema.documents.ownerId, ownerId), isNull(schema.documents.trashedAt)))
@@ -91,9 +92,43 @@ export async function searchDocuments(
       id: schema.documents.id,
       title: schema.documents.title,
       updatedAt: schema.documents.updatedAt,
+      folderId: schema.documents.folderId,
     })
     .from(schema.documents)
     .where(where)
     .orderBy(desc(schema.documents.updatedAt))
     .limit(limit)
+}
+
+/** Docs directly inside `folderId` (null = root), newest-first, excludes trashed. */
+export async function listDocumentsInFolder(
+  ownerId: string,
+  folderId: string | null,
+): Promise<DocSummary[]> {
+  const folderCondition =
+    folderId === null ? isNull(schema.documents.folderId) : eq(schema.documents.folderId, folderId)
+  return db
+    .select({
+      id: schema.documents.id,
+      title: schema.documents.title,
+      updatedAt: schema.documents.updatedAt,
+      folderId: schema.documents.folderId,
+    })
+    .from(schema.documents)
+    .where(
+      and(
+        eq(schema.documents.ownerId, ownerId),
+        isNull(schema.documents.trashedAt),
+        folderCondition,
+      ),
+    )
+    .orderBy(desc(schema.documents.updatedAt))
+}
+
+/** Move a doc to a folder (null = root). Owner-scoped by id. */
+export async function moveDocument(id: string, folderId: string | null): Promise<void> {
+  await db
+    .update(schema.documents)
+    .set({ folderId, updatedAt: new Date() })
+    .where(eq(schema.documents.id, id))
 }

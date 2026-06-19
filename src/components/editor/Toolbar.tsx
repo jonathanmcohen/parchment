@@ -8,6 +8,7 @@ type Props = {
   editor: Editor
   docId: string
   onInsertImage: (prefillSrc?: string) => void
+  onOpenLink: () => void
 }
 
 const FONT_FAMILIES = [
@@ -71,7 +72,7 @@ function parseSize(raw: string | undefined): { value: number; unit: 'pt' | 'px' 
 // Prevent the toolbar from stealing the editor selection on click.
 const keepSelection = (e: React.MouseEvent) => e.preventDefault()
 
-export function Toolbar({ editor, docId: _docId, onInsertImage }: Props) {
+export function Toolbar({ editor, docId: _docId, onInsertImage, onOpenLink }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
   const s = useEditorState({
@@ -116,6 +117,8 @@ export function Toolbar({ editor, docId: _docId, onInsertImage }: Props) {
       codeLanguage: ed.getAttributes('codeBlock').language as string | undefined,
       // Table
       table: ed.isActive('table'),
+      // Link (B6)
+      link: ed.isActive('link'),
     }),
   })
 
@@ -540,6 +543,18 @@ export function Toolbar({ editor, docId: _docId, onInsertImage }: Props) {
         onClick={() => onInsertImage()}
       >
         🖼
+      </button>
+
+      {/* ── Link (B6) ────────────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Link"
+        aria-pressed={s.link}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={onOpenLink}
+      >
+        🔗
       </button>
 
       {/* ── Table context controls (visible when cursor is in a table) ── */}

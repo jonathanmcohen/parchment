@@ -37,4 +37,6 @@ export const baseExtensions = [
   FootnoteRef,
   FootnoteItem,
   FootnotesBlock,
+  // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
+  // onOpen callback that controls the React UI panel.
 ]

@@ -7,11 +7,13 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
+import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { Toolbar } from '@/components/editor/Toolbar'
+import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import type { PageSize } from '@/lib/editor/paginate'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
@@ -54,6 +56,15 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
   const openLinkPopover = useCallback(() => setLinkPopoverOpen(true), [])
   const closeLinkPopover = useCallback(() => setLinkPopoverOpen(false), [])
 
+  // B9: find + replace panel state
+  const [findOpen, setFindOpen] = useState(false)
+  const [findMode, setFindMode] = useState<'find' | 'replace'>('find')
+  const openFind = useCallback((mode: 'find' | 'replace') => {
+    setFindMode(mode)
+    setFindOpen(true)
+  }, [])
+  const closeFind = useCallback(() => setFindOpen(false), [])
+
   const openImageDialog = useCallback((prefillSrc?: string) => {
     setImageDialogPrefillSrc(prefillSrc)
     setImageDialogOpen(true)
@@ -95,7 +106,12 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [...baseExtensions, Collaboration.configure({ document: ydoc, field: FIELD })],
+    extensions: [
+      ...baseExtensions,
+      Collaboration.configure({ document: ydoc, field: FIELD }),
+      // B9: configured with onOpen so Cmd-F / Cmd-Shift-H open the React panel.
+      FindReplaceExtension.configure({ onOpen: openFind }),
+    ],
     editorProps: {
       attributes: { class: 'parchment-prose', 'aria-label': 'Document editor' },
       // B5: handle image paste and drop
@@ -175,9 +191,16 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
       <h1 className="mb-4 font-semibold text-2xl tracking-tight">{initialTitle}</h1>
 
-      <PageCanvas size={size} onPageCountChange={setPageCount}>
-        <EditorContent editor={editor} />
-      </PageCanvas>
+      {/* B9: find + replace panel — positioned relative to this wrapper */}
+      <div style={{ position: 'relative' }}>
+        <PageCanvas size={size} onPageCountChange={setPageCount}>
+          <EditorContent editor={editor} />
+        </PageCanvas>
+
+        {editor && findOpen && (
+          <FindReplace editor={editor} initialMode={findMode} onClose={closeFind} />
+        )}
+      </div>
 
       {/* Selection bubble menu (B2) */}
       {editor && <BubbleMenu editor={editor} />}

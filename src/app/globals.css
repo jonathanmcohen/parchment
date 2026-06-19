@@ -820,6 +820,173 @@ body {
   opacity: 0.5;
 }
 
+/* ── Outline rail (B11) ──────────────────────────────────────────────────── */
+
+.parchment-outline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--background) 90%, var(--paper));
+  flex-shrink: 0;
+  transition: width 0.15s ease, min-width 0.15s ease;
+  overflow: hidden;
+}
+
+.parchment-outline--collapsed {
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+}
+
+/* Toggle chevron button */
+.parchment-outline-toggle {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+  border-radius: 3px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.parchment-outline-toggle:hover {
+  background: var(--border);
+  color: var(--foreground);
+}
+
+.parchment-outline-toggle:focus-visible {
+  outline: 2px solid var(--accent-contrast);
+  outline-offset: 2px;
+}
+
+/* Header */
+.parchment-outline-header {
+  padding: 10px 32px 6px 10px;
+}
+
+.parchment-outline-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+/* Empty state */
+.parchment-outline-empty {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-style: italic;
+  padding: 4px 10px 10px;
+  margin: 0;
+}
+
+/* Heading list */
+.parchment-outline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+}
+
+.parchment-outline-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  border-radius: 3px;
+  transition: background 0.08s;
+}
+
+.parchment-outline-item:hover {
+  background: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.parchment-outline-item[data-drag-over='true'] {
+  background: color-mix(in srgb, var(--accent-contrast) 15%, transparent);
+  outline: 1px dashed var(--accent-contrast);
+}
+
+/* Subtree expander */
+.parchment-outline-expander {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.55rem;
+  border-radius: 2px;
+  transition: color 0.1s;
+}
+
+.parchment-outline-expander:hover {
+  color: var(--foreground);
+}
+
+.parchment-outline-expander:focus-visible {
+  outline: 2px solid var(--accent-contrast);
+  outline-offset: 1px;
+}
+
+/* Spacer when no expander (keeps indent consistent) */
+.parchment-outline-expander-spacer {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+}
+
+/* Jump link button */
+.parchment-outline-link {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  padding: 3px 8px 3px 2px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 2px;
+  transition: color 0.1s;
+}
+
+.parchment-outline-link:hover {
+  color: var(--accent);
+}
+
+.parchment-outline-link:focus-visible {
+  outline: 2px solid var(--accent-contrast);
+  outline-offset: 2px;
+}
+
 /* Editor content (B0 baseline; page canvas styling lands in B1). */
 .parchment-prose {
   min-height: 60vh;

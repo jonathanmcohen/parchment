@@ -10,6 +10,7 @@ import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
+import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { Toolbar } from '@/components/editor/Toolbar'
@@ -206,15 +207,21 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
       <h1 className="mb-4 font-semibold text-2xl tracking-tight">{initialTitle}</h1>
 
-      {/* B9: find + replace panel — positioned relative to this wrapper */}
-      <div style={{ position: 'relative' }}>
-        <PageCanvas size={size} onPageCountChange={setPageCount}>
-          <EditorContent editor={editor} />
-        </PageCanvas>
+      {/* B11: outline rail + canvas in a flex row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+        {/* B11: outline pane (left rail) */}
+        {editor && <OutlinePane editor={editor} />}
 
-        {editor && findOpen && (
-          <FindReplace editor={editor} initialMode={findMode} onClose={closeFind} />
-        )}
+        {/* B9: find + replace panel — positioned relative to this wrapper */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+          <PageCanvas size={size} onPageCountChange={setPageCount}>
+            <EditorContent editor={editor} />
+          </PageCanvas>
+
+          {editor && findOpen && (
+            <FindReplace editor={editor} initialMode={findMode} onClose={closeFind} />
+          )}
+        </div>
       </div>
 
       {/* Selection bubble menu (B2) */}

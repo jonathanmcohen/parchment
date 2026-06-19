@@ -5,6 +5,7 @@ import type { SortDir, SortKey } from '@/lib/docs/doc-sort'
 import { sortDocs } from '@/lib/docs/doc-sort'
 import type { FolderNode, TreeNode } from '@/lib/docs/folder-tree'
 import { buildTree, folderPath } from '@/lib/docs/folder-tree'
+import { rangeBetween, toggle as toggleSelection } from '@/lib/docs/selection'
 import { describeCriteria, parseCriteria } from '@/lib/docs/smart-folder-criteria'
 import { resolveTagColor, TAG_COLORS } from '@/lib/docs/tag-colors'
 
@@ -747,6 +748,149 @@ function DocActions({ doc, view, onRefresh, allTags, onTagsChanged }: DocActions
   )
 }
 
+// ─── Bulk action bar ──────────────────────────────────────────────────────────
+
+interface BulkActionBarProps {
+  selected: Set<string>
+  folders: FolderDTO[]
+  allTags: TagDTO[]
+  onClear: () => void
+  onRefresh: () => void
+  onTagsChanged?: () => void
+}
+
+function BulkActionBar({
+  selected,
+  folders,
+  allTags,
+  onClear,
+  onRefresh,
+  onTagsChanged,
+}: BulkActionBarProps) {
+  const count = selected.size
+  if (count === 0) return null
+
+  const bulkPost = async (body: Record<string, unknown>) => {
+    try {
+      const res = await fetch('/api/docs/bulk', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ids: [...selected], ...body }),
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  }
+
+  const handleMove = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value
+    if (!val) return
+    const folderId = val === '__root__' ? null : val
+    const ok = await bulkPost({ action: 'move', folderId })
+    if (ok) {
+      onClear()
+      onRefresh()
+    }
+    // reset the select
+    e.target.value = ''
+  }
+
+  const handleTag = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const tagId = e.target.value
+    if (!tagId) return
+    const ok = await bulkPost({ action: 'tag', tagId })
+    if (ok) {
+      onClear()
+      onRefresh()
+      onTagsChanged?.()
+    }
+    e.target.value = ''
+  }
+
+  const handleTrash = async () => {
+    const ok = await bulkPost({ action: 'trash' })
+    if (ok) {
+      onClear()
+      onRefresh()
+    }
+  }
+
+  return (
+    <section
+      aria-label="Bulk actions"
+      className="flex items-center gap-3 px-3 py-2 mb-3 rounded-md border border-[var(--accent-contrast)] bg-[var(--paper)] flex-wrap"
+    >
+      <span className="text-sm font-medium text-[var(--foreground)] shrink-0">
+        {count} selected
+      </span>
+
+      {/* Move to… */}
+      <label htmlFor="bulk-move-select" className="sr-only">
+        Move selected documents to folder
+      </label>
+      <select
+        id="bulk-move-select"
+        defaultValue=""
+        onChange={handleMove}
+        className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+      >
+        <option value="" disabled>
+          Move to…
+        </option>
+        <option value="__root__">Root</option>
+        {folders.map((f) => (
+          <option key={f.id} value={f.id}>
+            {f.name}
+          </option>
+        ))}
+      </select>
+
+      {/* Add tag… */}
+      {allTags.length > 0 && (
+        <>
+          <label htmlFor="bulk-tag-select" className="sr-only">
+            Add tag to selected documents
+          </label>
+          <select
+            id="bulk-tag-select"
+            defaultValue=""
+            onChange={handleTag}
+            className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+          >
+            <option value="" disabled>
+              Add tag…
+            </option>
+            {allTags.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+
+      {/* Delete */}
+      <button
+        type="button"
+        onClick={handleTrash}
+        className="px-2 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)] hover:text-red-600 hover:border-red-400"
+      >
+        🗑 Delete
+      </button>
+
+      {/* Clear */}
+      <button
+        type="button"
+        onClick={onClear}
+        className="px-2 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] ml-auto"
+      >
+        Clear
+      </button>
+    </section>
+  )
+}
+
 // ─── Shared doc renderer (list / grid / details) ──────────────────────────────
 
 interface DocListProps {
@@ -760,6 +904,11 @@ interface DocListProps {
   onRefresh: () => void
   allTags: TagDTO[]
   onTagsChanged?: () => void
+  /** Selection state — passed from parent */
+  selected: Set<string>
+  anchorId: string | null
+  onToggle: (docId: string, shiftKey: boolean, orderedIds: string[]) => void
+  onSelectAll: (allIds: string[]) => void
 }
 
 function DocList({
@@ -773,6 +922,10 @@ function DocList({
   onRefresh,
   allTags,
   onTagsChanged,
+  selected,
+  // anchorId is managed by the parent; we only use selected + orderedIds here
+  onToggle,
+  onSelectAll,
 }: DocListProps) {
   const fmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -789,63 +942,121 @@ function DocList({
     return sortDir === 'asc' ? 'ascending' : 'descending'
   }
 
+  const orderedIds = docs.map((d) => d.id)
+  const allDisplayedSelected = docs.length > 0 && docs.every((d) => selected.has(d.id))
+
   if (viewMode === 'list') {
     return (
-      <ul className="divide-y divide-[var(--border)]">
-        {docs.map((doc) => (
-          <li key={doc.id}>
-            <div className="flex items-center justify-between py-2 gap-2">
-              <a
-                href={`/d/${doc.id}`}
-                className="flex-1 font-medium hover:text-[var(--accent-contrast)] truncate"
-              >
-                📄 {doc.title}
-              </a>
-              <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0">
-                {fmt.format(new Date(doc.updatedAt))}
-              </time>
-              <DocActions
-                doc={doc}
-                view={view}
-                onRefresh={onRefresh}
-                allTags={allTags}
-                onTagsChanged={onTagsChanged}
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
+      <>
+        {/* Select-all row */}
+        <div className="flex items-center gap-2 py-1 border-b border-[var(--border)] mb-1">
+          <input
+            type="checkbox"
+            checked={allDisplayedSelected}
+            aria-label="Select all documents"
+            onChange={() => onSelectAll(orderedIds)}
+            className="rounded"
+          />
+          <span className="text-xs text-[var(--muted)]">Select all</span>
+        </div>
+        <ul className="divide-y divide-[var(--border)]">
+          {docs.map((doc) => (
+            <li key={doc.id}>
+              <div className="flex items-center justify-between py-2 gap-2">
+                <input
+                  type="checkbox"
+                  checked={selected.has(doc.id)}
+                  aria-label={`Select ${doc.title}`}
+                  onClick={(e) => onToggle(doc.id, e.shiftKey, orderedIds)}
+                  onChange={() => {
+                    // handled by onClick to capture shiftKey
+                  }}
+                  className="rounded shrink-0"
+                />
+                <a
+                  href={`/d/${doc.id}`}
+                  className="flex-1 font-medium hover:text-[var(--accent-contrast)] truncate"
+                >
+                  📄 {doc.title}
+                </a>
+                <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0">
+                  {fmt.format(new Date(doc.updatedAt))}
+                </time>
+                <DocActions
+                  doc={doc}
+                  view={view}
+                  onRefresh={onRefresh}
+                  allTags={allTags}
+                  onTagsChanged={onTagsChanged}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </>
     )
   }
 
   if (viewMode === 'grid') {
     return (
-      <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {docs.map((doc) => (
-          <li key={doc.id} className="relative">
-            <a
-              href={`/d/${doc.id}`}
-              aria-label={doc.title}
-              className="flex flex-col gap-1 p-3 border border-[var(--border)] rounded-lg bg-[var(--paper)] hover:border-[var(--accent-contrast)] transition-colors h-full"
-            >
-              <span className="text-2xl" aria-hidden="true">
-                📄
-              </span>
-              <span className="font-medium text-sm truncate text-[var(--foreground)]">
-                {doc.title}
-              </span>
-              {doc.preview.length > 0 && (
-                <span
-                  className="text-xs text-[var(--muted)] line-clamp-3 break-words"
-                  aria-hidden="true"
-                >
-                  {doc.preview}
+      <>
+        {/* Select-all row */}
+        <div className="flex items-center gap-2 py-1 mb-2">
+          <input
+            type="checkbox"
+            checked={allDisplayedSelected}
+            aria-label="Select all documents"
+            onChange={() => onSelectAll(orderedIds)}
+            className="rounded"
+          />
+          <span className="text-xs text-[var(--muted)]">Select all</span>
+        </div>
+        <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {docs.map((doc) => (
+            <li key={doc.id} className="relative">
+              {/* Checkbox overlay */}
+              <div className="absolute top-2 left-2 z-10">
+                <input
+                  type="checkbox"
+                  checked={selected.has(doc.id)}
+                  aria-label={`Select ${doc.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggle(doc.id, e.shiftKey, orderedIds)
+                  }}
+                  onChange={() => {
+                    // handled by onClick to capture shiftKey
+                  }}
+                  className="rounded"
+                />
+              </div>
+              <a
+                href={`/d/${doc.id}`}
+                aria-label={doc.title}
+                className={[
+                  'flex flex-col gap-1 p-3 pl-8 border border-[var(--border)] rounded-lg bg-[var(--paper)] hover:border-[var(--accent-contrast)] transition-colors h-full',
+                  selected.has(doc.id) ? 'border-[var(--accent-contrast)]' : '',
+                ].join(' ')}
+              >
+                <span className="text-2xl" aria-hidden="true">
+                  📄
                 </span>
-              )}
-            </a>
-          </li>
-        ))}
-      </ul>
+                <span className="font-medium text-sm truncate text-[var(--foreground)]">
+                  {doc.title}
+                </span>
+                {doc.preview.length > 0 && (
+                  <span
+                    className="text-xs text-[var(--muted)] line-clamp-3 break-words"
+                    aria-hidden="true"
+                  >
+                    {doc.preview}
+                  </span>
+                )}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </>
     )
   }
 
@@ -854,6 +1065,15 @@ function DocList({
     <table className="w-full text-sm border-collapse">
       <thead>
         <tr className="border-b border-[var(--border)] text-[var(--muted)] text-xs">
+          <th scope="col" className="text-left py-2 pr-2 w-6">
+            <input
+              type="checkbox"
+              checked={allDisplayedSelected}
+              aria-label="Select all documents"
+              onChange={() => onSelectAll(orderedIds)}
+              className="rounded"
+            />
+          </th>
           <th
             scope="col"
             aria-sort={thAriaSort('name')}
@@ -914,6 +1134,18 @@ function DocList({
       <tbody>
         {docs.map((doc) => (
           <tr key={doc.id} className="border-b border-[var(--border)] hover:bg-[var(--paper)]">
+            <td className="py-2 pr-2">
+              <input
+                type="checkbox"
+                checked={selected.has(doc.id)}
+                aria-label={`Select ${doc.title}`}
+                onClick={(e) => onToggle(doc.id, e.shiftKey, orderedIds)}
+                onChange={() => {
+                  // handled by onClick to capture shiftKey
+                }}
+                className="rounded"
+              />
+            </td>
             <td className="py-2 pr-3">
               <a
                 href={`/d/${doc.id}`}
@@ -947,18 +1179,30 @@ function DocList({
   )
 }
 
-// ─── All-view doc row (drag + tag button) ────────────────────────────────────
+// ─── All-view doc row (drag + tag button + checkbox) ─────────────────────────
 
 interface AllViewDocRowProps {
   doc: DocDTO
   allTags: TagDTO[]
+  selected: boolean
+  onToggle: (shiftKey: boolean) => void
 }
 
-function AllViewDocRow({ doc, allTags }: AllViewDocRowProps) {
+function AllViewDocRow({ doc, allTags, selected, onToggle }: AllViewDocRowProps) {
   const [showTagPopover, setShowTagPopover] = useState(false)
 
   return (
     <div className="flex items-center justify-between py-2 gap-2">
+      <input
+        type="checkbox"
+        checked={selected}
+        aria-label={`Select ${doc.title}`}
+        onClick={(e) => onToggle(e.shiftKey)}
+        onChange={() => {
+          // handled by onClick to capture shiftKey
+        }}
+        className="rounded shrink-0"
+      />
       <a
         href={`/d/${doc.id}`}
         draggable
@@ -1014,6 +1258,45 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   const [activeTagId, setActiveTagId] = useState<string | null>(null)
   const [tagDocs, setTagDocs] = useState<DocDTO[]>([])
   const [showTagCreateForm, setShowTagCreateForm] = useState(false)
+
+  // ─── Selection state ──────────────────────────────────────────────────────────
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [anchorId, setAnchorId] = useState<string | null>(null)
+
+  const clearSelection = useCallback(() => {
+    setSelected(new Set())
+    setAnchorId(null)
+  }, [])
+
+  const handleToggle = useCallback(
+    (docId: string, shiftKey: boolean, orderedIds: string[]) => {
+      if (shiftKey && anchorId !== null) {
+        const range = rangeBetween(orderedIds, anchorId, docId)
+        setSelected((prev) => {
+          const next = new Set(prev)
+          for (const id of range) next.add(id)
+          return next
+        })
+      } else {
+        setSelected((prev) => toggleSelection(prev, docId))
+        setAnchorId(docId)
+      }
+    },
+    [anchorId],
+  )
+
+  const handleSelectAll = useCallback(
+    (allIds: string[]) => {
+      const allSelected = allIds.every((id) => selected.has(id))
+      if (allSelected) {
+        setSelected(new Set())
+        setAnchorId(null)
+      } else {
+        setSelected(new Set(allIds))
+      }
+    },
+    [selected],
+  )
 
   // Sort + view-mode state (hydrated from localStorage on mount)
   const [sortKey, setSortKeyState] = useState<SortKey>('modified')
@@ -1148,8 +1431,9 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
     (folderId: string | null) => {
       setCurrentFolderId(folderId)
       fetchDocs(folderId)
+      clearSelection()
     },
-    [fetchDocs],
+    [fetchDocs, clearSelection],
   )
 
   // When switching to a flat view, fetch that view's docs
@@ -1215,6 +1499,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               setView(key)
               setActiveSmartId(null)
               setActiveTagId(null)
+              clearSelection()
             }}
             aria-current={view === key && view !== 'smart' && view !== 'tag' ? 'page' : undefined}
             className={[
@@ -1292,6 +1577,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         setView('smart')
                         setActiveSmartId(sf.id)
                         fetchSmartResults(sf.id)
+                        clearSelection()
                       }}
                       className={[
                         'flex-1 text-left px-2 py-1 text-sm rounded truncate',
@@ -1363,6 +1649,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           setActiveTagId(tag.id)
                           setActiveSmartId(null)
                           fetchTagResults(tag.id)
+                          clearSelection()
                         }}
                         className={[
                           'flex-1 text-left px-2 py-1 text-sm rounded truncate flex items-center gap-1.5',
@@ -1473,6 +1760,17 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         onViewMode={setViewMode}
                       />
                     )}
+                    {/* Bulk action bar */}
+                    {docs.length > 0 && (
+                      <BulkActionBar
+                        selected={selected}
+                        folders={folders}
+                        allTags={tags}
+                        onClear={clearSelection}
+                        onRefresh={() => fetchDocs(currentFolderId)}
+                        onTagsChanged={fetchTags}
+                      />
+                    )}
                     <ul className="divide-y divide-[var(--border)]">
                       {/* Subfolder rows — always list, not affected by viewMode */}
                       {subfolders.map((folder) => (
@@ -1506,13 +1804,39 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                     {/* Document list — sorted + view mode aware */}
                     {docs.length > 0 &&
                       (viewMode === 'list' ? (
-                        <ul className="divide-y divide-[var(--border)]">
-                          {sortedDocs.map((doc) => (
-                            <li key={doc.id}>
-                              <AllViewDocRow doc={doc} allTags={tags} />
-                            </li>
-                          ))}
-                        </ul>
+                        <>
+                          {/* Select-all for all-view list */}
+                          <div className="flex items-center gap-2 py-1 border-b border-[var(--border)] mb-1">
+                            <input
+                              type="checkbox"
+                              checked={
+                                sortedDocs.length > 0 && sortedDocs.every((d) => selected.has(d.id))
+                              }
+                              aria-label="Select all documents"
+                              onChange={() => handleSelectAll(sortedDocs.map((d) => d.id))}
+                              className="rounded"
+                            />
+                            <span className="text-xs text-[var(--muted)]">Select all</span>
+                          </div>
+                          <ul className="divide-y divide-[var(--border)]">
+                            {sortedDocs.map((doc) => (
+                              <li key={doc.id}>
+                                <AllViewDocRow
+                                  doc={doc}
+                                  allTags={tags}
+                                  selected={selected.has(doc.id)}
+                                  onToggle={(shiftKey) =>
+                                    handleToggle(
+                                      doc.id,
+                                      shiftKey,
+                                      sortedDocs.map((d) => d.id),
+                                    )
+                                  }
+                                />
+                              </li>
+                            ))}
+                          </ul>
+                        </>
                       ) : (
                         <div className="mt-2">
                           <DocList
@@ -1525,6 +1849,10 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                             view="all"
                             onRefresh={() => fetchDocs(currentFolderId)}
                             allTags={tags}
+                            selected={selected}
+                            anchorId={anchorId}
+                            onToggle={handleToggle}
+                            onSelectAll={handleSelectAll}
                           />
                         </div>
                       ))}
@@ -1560,6 +1888,16 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           onSortDir={setSortDir}
                           onViewMode={setViewMode}
                         />
+                        <BulkActionBar
+                          selected={selected}
+                          folders={folders}
+                          allTags={tags}
+                          onClear={clearSelection}
+                          onRefresh={() => {
+                            if (activeSmartId !== null) fetchSmartResults(activeSmartId)
+                          }}
+                          onTagsChanged={fetchTags}
+                        />
                         <DocList
                           docs={sortedSmartDocs}
                           viewMode={viewMode}
@@ -1573,6 +1911,10 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           }}
                           allTags={tags}
                           onTagsChanged={fetchTags}
+                          selected={selected}
+                          anchorId={anchorId}
+                          onToggle={handleToggle}
+                          onSelectAll={handleSelectAll}
                         />
                       </>
                     )}
@@ -1611,6 +1953,16 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           onSortDir={setSortDir}
                           onViewMode={setViewMode}
                         />
+                        <BulkActionBar
+                          selected={selected}
+                          folders={folders}
+                          allTags={tags}
+                          onClear={clearSelection}
+                          onRefresh={() => {
+                            if (activeTagId !== null) fetchTagResults(activeTagId)
+                          }}
+                          onTagsChanged={fetchTags}
+                        />
                         <DocList
                           docs={sortedTagDocs}
                           viewMode={viewMode}
@@ -1624,6 +1976,10 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           }}
                           allTags={tags}
                           onTagsChanged={fetchTags}
+                          selected={selected}
+                          anchorId={anchorId}
+                          onToggle={handleToggle}
+                          onSelectAll={handleSelectAll}
                         />
                       </>
                     )}
@@ -1650,6 +2006,14 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 onSortDir={setSortDir}
                 onViewMode={setViewMode}
               />
+              <BulkActionBar
+                selected={selected}
+                folders={folders}
+                allTags={tags}
+                onClear={clearSelection}
+                onRefresh={handleFlatRefresh}
+                onTagsChanged={fetchTags}
+              />
               <DocList
                 docs={sortedFlatDocs}
                 viewMode={viewMode}
@@ -1661,6 +2025,10 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 onRefresh={handleFlatRefresh}
                 allTags={tags}
                 onTagsChanged={fetchTags}
+                selected={selected}
+                anchorId={anchorId}
+                onToggle={handleToggle}
+                onSelectAll={handleSelectAll}
               />
             </>
           )}

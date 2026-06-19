@@ -39,4 +39,6 @@ export const baseExtensions = [
   FootnotesBlock,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
+  // B12: SlashMenuExtension is added in Editor.tsx so it can receive the
+  // onOpenImage callback that controls the image dialog.
 ]

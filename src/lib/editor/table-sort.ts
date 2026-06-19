@@ -8,6 +8,7 @@
  */
 
 import type { Editor } from '@tiptap/core'
+import { findSelectedTable } from '@/lib/editor/table-utils'
 
 /**
  * Sort a 2-D string array by a column index.
@@ -57,25 +58,14 @@ export function sortTableByColumn(
   direction: 'asc' | 'desc',
 ): void {
   const { state, view } = editor
-  const { doc, tr, schema } = state
+  const { tr, schema } = state
 
   // Find the table node that contains the current selection
-  let tablePos = -1
-  let tableNode = null as typeof doc.nodeAt extends (pos: number) => infer R ? R : never
-
-  doc.descendants((node, pos) => {
-    if (node.type.name === 'table' && tableNode === null) {
-      tableNode = node
-      tablePos = pos
-      return false
-    }
-    return true
-  })
-
-  if (!tableNode || tablePos < 0) return
-
+  const found = findSelectedTable(state)
+  if (!found) return
+  const tablePos = found.pos
   // biome-ignore lint/suspicious/noExplicitAny: ProseMirror node types
-  const tNode = tableNode as any
+  const tNode = found.node as any
   const rows: { node: typeof tNode; pos: number }[] = []
   const offset = tablePos + 1 // skip table open token
 

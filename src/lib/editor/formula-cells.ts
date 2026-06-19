@@ -16,6 +16,7 @@
 import type { Editor } from '@tiptap/core'
 import { cellRef } from '@/lib/editor/cell-refs'
 import { evalFormula } from '@/lib/editor/formula'
+import { findSelectedTable } from '@/lib/editor/table-utils'
 
 interface CellInfo {
   /** Absolute document position of the cell open token */
@@ -39,23 +40,14 @@ interface CellInfo {
  */
 export function recomputeFormulas(editor: Editor): void {
   const { state, view } = editor
-  const { doc, tr, schema } = state
+  const { tr, schema } = state
 
-  // ── 1. Find the table node ────────────────────────────────────────────
+  // ── 1. Find the table containing the selection ───────────────────────
+  const found = findSelectedTable(state)
+  if (!found) return
   // biome-ignore lint/suspicious/noExplicitAny: ProseMirror node
-  let tableNode: any = null
-  let tablePos = -1
-
-  doc.descendants((node, pos) => {
-    if (node.type.name === 'table' && tableNode === null) {
-      tableNode = node
-      tablePos = pos
-      return false
-    }
-    return true
-  })
-
-  if (!tableNode || tablePos < 0) return
+  const tableNode = found.node as any
+  const tablePos = found.pos
 
   // ── 2. Walk rows and cells, recording absolute positions ─────────────
   const cellInfos: CellInfo[] = []

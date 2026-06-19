@@ -2,7 +2,7 @@
 
 import { getSchema } from '@tiptap/core'
 import Collaboration from '@tiptap/extension-collaboration'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
@@ -13,6 +13,7 @@ import { LinkPopover } from '@/components/editor/LinkPopover'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { Toolbar } from '@/components/editor/Toolbar'
+import { type Counts, countText } from '@/lib/editor/counts'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import type { PageSize } from '@/lib/editor/paginate'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
@@ -45,7 +46,6 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
 
   const [size, setSize] = useState<PageSize>('Letter')
   const [pageCount, setPageCount] = useState(1)
-  const [wordCount, setWordCount] = useState(0)
 
   // B5: image dialog state — null = closed; string = prefill src for paste/drop flow
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
@@ -156,11 +156,26 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
     onUpdate: ({ editor: ed }) => {
       if (timer.current) clearTimeout(timer.current)
       timer.current = setTimeout(() => save(ed.getJSON() as Record<string, unknown>), 800)
-      // Count words from plain text (split on whitespace, filter empties)
-      const text = ed.getText()
-      setWordCount(text.trim() === '' ? 0 : text.trim().split(/\s+/).length)
     },
   })
+
+  // B10: derive full-document and selection counts reactively via useEditorState.
+  // The selector runs on every transaction so counts stay in sync with edits and
+  // selection changes without extra state variables.
+  const counts = useEditorState({
+    editor,
+    selector: (ctx): { full: Counts; selection: Counts | null } => {
+      if (!ctx.editor) return { full: { words: 0, chars: 0 }, selection: null }
+      const full = countText(ctx.editor.getText())
+      const { from, to } = ctx.editor.state.selection
+      const selectionText = from === to ? null : ctx.editor.state.doc.textBetween(from, to, ' ')
+      const selection = selectionText !== null ? countText(selectionText) : null
+      return { full, selection }
+    },
+  })
+
+  const full: Counts = counts?.full ?? { words: 0, chars: 0 }
+  const selection: Counts | null = counts?.selection ?? null
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -205,7 +220,7 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
       {/* Selection bubble menu (B2) */}
       {editor && <BubbleMenu editor={editor} />}
 
-      <StatusBar pageCount={pageCount} wordCount={wordCount} />
+      <StatusBar pageCount={pageCount} full={full} selection={selection} />
 
       {/* B5: Image insert dialog */}
       {editor && imageDialogOpen && (

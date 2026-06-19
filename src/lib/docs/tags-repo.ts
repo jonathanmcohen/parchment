@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull } from 'drizzle-orm'
+import { and, count, desc, eq, isNull, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import type { DocRow } from '@/lib/docs/repo'
 import { DEFAULT_TAG_COLOR, isValidTagColor } from '@/lib/docs/tag-colors'
@@ -126,6 +126,9 @@ export async function listDocsForTag(ownerId: string, tagId: string): Promise<Do
       updatedAt: schema.documents.updatedAt,
       folderId: schema.documents.folderId,
       starred: schema.documents.starred,
+      createdAt: schema.documents.createdAt,
+      size: sql<number>`length(${schema.documents.markdown})`.as('size'),
+      preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
     })
     .from(schema.documents)
     .innerJoin(schema.documentTags, eq(schema.documentTags.docId, schema.documents.id))

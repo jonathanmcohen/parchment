@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNotNull, isNull, or } from 'drizzle-orm'
+import { and, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
@@ -104,7 +104,7 @@ export async function searchDocuments(
 export async function listDocumentsInFolder(
   ownerId: string,
   folderId: string | null,
-): Promise<DocSummary[]> {
+): Promise<DocRow[]> {
   const folderCondition =
     folderId === null ? isNull(schema.documents.folderId) : eq(schema.documents.folderId, folderId)
   return db
@@ -113,6 +113,10 @@ export async function listDocumentsInFolder(
       title: schema.documents.title,
       updatedAt: schema.documents.updatedAt,
       folderId: schema.documents.folderId,
+      starred: schema.documents.starred,
+      createdAt: schema.documents.createdAt,
+      size: sql<number>`length(${schema.documents.markdown})`.as('size'),
+      preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
     })
     .from(schema.documents)
     .where(
@@ -125,8 +129,13 @@ export async function listDocumentsInFolder(
     .orderBy(desc(schema.documents.updatedAt))
 }
 
-/** DocRow extends DocSummary with the `starred` flag — returned by view queries. */
-export type DocRow = DocSummary & { starred: boolean }
+/** DocRow extends DocSummary with the `starred` flag, creation date, size, and preview. */
+export type DocRow = DocSummary & {
+  starred: boolean
+  createdAt: Date
+  size: number
+  preview: string
+}
 
 /** N most-recently-updated non-trashed docs across all folders (default 30). */
 export async function listRecents(ownerId: string, limit = 30): Promise<DocRow[]> {
@@ -137,6 +146,9 @@ export async function listRecents(ownerId: string, limit = 30): Promise<DocRow[]
       updatedAt: schema.documents.updatedAt,
       folderId: schema.documents.folderId,
       starred: schema.documents.starred,
+      createdAt: schema.documents.createdAt,
+      size: sql<number>`length(${schema.documents.markdown})`.as('size'),
+      preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
     })
     .from(schema.documents)
     .where(and(eq(schema.documents.ownerId, ownerId), isNull(schema.documents.trashedAt)))
@@ -153,6 +165,9 @@ export async function listStarred(ownerId: string): Promise<DocRow[]> {
       updatedAt: schema.documents.updatedAt,
       folderId: schema.documents.folderId,
       starred: schema.documents.starred,
+      createdAt: schema.documents.createdAt,
+      size: sql<number>`length(${schema.documents.markdown})`.as('size'),
+      preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
     })
     .from(schema.documents)
     .where(
@@ -174,6 +189,9 @@ export async function listTrashed(ownerId: string): Promise<DocRow[]> {
       updatedAt: schema.documents.updatedAt,
       folderId: schema.documents.folderId,
       starred: schema.documents.starred,
+      createdAt: schema.documents.createdAt,
+      size: sql<number>`length(${schema.documents.markdown})`.as('size'),
+      preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
     })
     .from(schema.documents)
     .where(and(eq(schema.documents.ownerId, ownerId), isNotNull(schema.documents.trashedAt)))

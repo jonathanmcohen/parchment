@@ -48,3 +48,4 @@ minimumReleaseAgeExclude:
   - '@tiptap/extension-text-align@3.27.1'
   - '@tiptap/extension-table@3.27.1'
   - '@tiptap/extension-image@3.27.1'
+  - '@tiptap/suggestion@3.27.1'

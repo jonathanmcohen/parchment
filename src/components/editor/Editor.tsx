@@ -16,6 +16,7 @@ import { StatusBar } from '@/components/editor/StatusBar'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
+import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import type { PageSize } from '@/lib/editor/paginate'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
@@ -112,6 +113,8 @@ export function Editor({ docId, initialTitle, initialJson }: Props) {
       Collaboration.configure({ document: ydoc, field: FIELD }),
       // B9: configured with onOpen so Cmd-F / Cmd-Shift-H open the React panel.
       FindReplaceExtension.configure({ onOpen: openFind }),
+      // B12: slash menu — onOpenImage delegates to the existing image dialog.
+      SlashMenuExtension.configure({ onOpenImage: openImageDialog }),
     ],
     editorProps: {
       attributes: { class: 'parchment-prose', 'aria-label': 'Document editor' },

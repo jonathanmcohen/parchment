@@ -991,6 +991,89 @@ body {
   outline-offset: 2px;
 }
 
+/* ── Image crop (B5 follow-up) ─────────────────────────────────────────── */
+
+.parchment-crop-stage {
+  display: flex;
+  justify-content: center;
+}
+
+.parchment-crop-frame {
+  position: relative;
+  line-height: 0;
+  user-select: none;
+  touch-action: none;
+  max-width: 100%;
+}
+
+.parchment-crop-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.parchment-crop-rect {
+  position: absolute;
+  border: 1px solid var(--accent-contrast);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.4);
+  cursor: move;
+  box-sizing: border-box;
+}
+
+.parchment-crop-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--accent-contrast);
+  border: 1px solid #fff;
+  border-radius: 2px;
+  z-index: 1;
+}
+
+.parchment-crop-handle--nw {
+  top: -6px;
+  left: -6px;
+  cursor: nw-resize;
+}
+.parchment-crop-handle--ne {
+  top: -6px;
+  right: -6px;
+  cursor: ne-resize;
+}
+.parchment-crop-handle--sw {
+  bottom: -6px;
+  left: -6px;
+  cursor: sw-resize;
+}
+.parchment-crop-handle--se {
+  bottom: -6px;
+  right: -6px;
+  cursor: se-resize;
+}
+
+/* Overlay "Crop" button on a selected image */
+.parchment-image-crop-btn {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 11;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #fff;
+  background: var(--accent-contrast);
+  border: 1px solid #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.parchment-image-selected .parchment-image-crop-btn {
+  opacity: 1;
+}
+
 /* Editor content (B0 baseline; page canvas styling lands in B1). */
 .parchment-prose {
   min-height: 60vh;

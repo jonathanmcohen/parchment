@@ -1,20 +1,15 @@
-// Next 16 runs register() once per server process (instrumentation is stable;
-// no experimental flag needed). We use it to start the F2 disk reverse-sync
-// watcher on the Node.js server runtime only — never on the Edge runtime, where
-// node:fs / chokidar are unavailable.
+// Next 16 runs register() once per server process. It USED to start the F2 disk
+// reverse-sync watcher here, but as of F2b the watcher (and the bridge from an
+// external .md edit into the live collab Y.Doc) is owned by the collab server
+// (collab/server.ts), which runs under tsx where the Tiptap editor graph loads.
 //
-// A relative import (not the '@/' alias) is used so resolution is unambiguous in
-// the instrumentation entrypoint.
-
+// The Next turbopack server runtime cannot load that editor graph
+// ("Class extends undefined"), so it could update documents.content but NOT the
+// collab Y.Doc — making external edits invisible to open editors and shadowed on
+// reopen (collab_state wins over documents.content). Running chokidar here too
+// would also double-watch the files root. So register() is now a no-op: the
+// collab process is the single owner of the watcher.
 export async function register(): Promise<void> {
+  // Guard kept harmless: nothing to start on any runtime.
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
-  // NEVER let instrumentation crash server startup: an error loading or starting
-  // the watcher must degrade to "reverse-sync disabled", not "Failed to prepare
-  // server". The await import is inside the try so a module-eval error is caught.
-  try {
-    const { startDiskWatcher } = await import('./src/lib/disk/watcher')
-    await startDiskWatcher()
-  } catch (err) {
-    console.error('[parchment-disk] reverse-sync watcher failed to start (disabled):', err)
-  }
 }

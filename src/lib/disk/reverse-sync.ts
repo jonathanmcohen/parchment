@@ -14,6 +14,29 @@ import { markdownToJson } from '@/lib/markdown/parse'
 import { sha256 } from './hash'
 import { type ChangeClass, classifyChange } from './sync-decision'
 
+// F2b: injectable seam to the collab Y.Doc. After a successful `apply`, the
+// freshly-parsed ProseMirror JSON must also reach the live collab `Y.Doc` so an
+// external .md edit shows up in OPEN editors and on reopen (per D4 seeding,
+// collab_state wins over documents.content when present). Mutating the Y.Doc
+// needs the ProseMirror schema + y-prosemirror — i.e. the editor extension
+// graph, which CRASHES the Next turbopack server runtime ("Class extends
+// undefined"). So this file stays editor-graph-free: the collab server (a tsx
+// process where the graph loads) injects the apply function via setApplyToYDoc.
+// The hook is the only coupling point; no editor-graph module is imported here.
+type ApplyToYDoc = (docId: string, json: Record<string, unknown>) => Promise<void>
+let applyToYDoc: ApplyToYDoc | null = null
+
+/**
+ * The collab server injects a function that applies the parsed content to the
+ * shared Y.Doc (it needs the editor graph, which only loads under the collab
+ * tsx runtime — never in the Next server bundle). Pass `null` to clear it
+ * (e.g. between tests). When unset, reverse-sync is DB-only (its prior F2
+ * behaviour), so the integration suite and the Next process are unaffected.
+ */
+export function setApplyToYDoc(fn: ApplyToYDoc | null): void {
+  applyToYDoc = fn
+}
+
 /** Read the files root at call time so tests can override PARCHMENT_FILES_ROOT. */
 function filesRoot(): string {
   return process.env.PARCHMENT_FILES_ROOT ?? `${process.env.HOME ?? '/data'}/parchment/files`
@@ -153,6 +176,19 @@ export async function handleExternalChange(absFilePath: string): Promise<ChangeC
         // (bounded recursion: each retry only happens on an interleaving write,
         // and best-effort try/catch guarantees we never throw).
         return handleExternalChange(absFilePath)
+      }
+
+      // F2b: the DB row is now updated. Best-effort push the same parsed JSON
+      // into the live collab Y.Doc so open editors update and a reopen reflects
+      // the external edit (collab_state otherwise shadows documents.content). A
+      // bridge failure must NOT undo the DB apply or throw out of the watcher —
+      // the DB is the source of truth and is already committed.
+      if (applyToYDoc) {
+        try {
+          await applyToYDoc(doc.id, json)
+        } catch {
+          // best-effort: DB already updated; the next editor open seeds from it.
+        }
       }
       return 'apply'
     }

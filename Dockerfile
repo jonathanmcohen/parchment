@@ -62,6 +62,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/collab ./collab
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/src/db/migrations ./src/db/migrations
+# F2b: the collab tsx process now imports src/lib/{disk,markdown,editor}/** (the
+# disk watcher + the Y.Doc bridge moved here). Ship the full src/ + tsconfig so
+# `tsx collab/server.ts` can resolve those modules at runtime.
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 # s6 service tree + scripts.
 COPY rootfs/ /
 

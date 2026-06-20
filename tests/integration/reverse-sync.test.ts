@@ -240,4 +240,59 @@ describe('F2 — reverse sync', () => {
     // disk_synced_hash now equals the file hash → a second event is an echo.
     expect(await handleExternalChange(abs)).toBe('echo')
   })
+
+  // The case above only proves the TRIVIAL same-bytes echo (re-running on the
+  // SAME external file). That is NOT how the real cross-process loop closes when
+  // an editor is open: handleExternalChange sets markdown = the EXTERNAL bytes,
+  // but the editor then serializes the Y-applied content and the autosave
+  // (saveDocument → syncDocToDisk) rewrites the file with the SERIALIZER's
+  // NORMALIZED bytes — which DIFFER from the external bytes for any non-canonical
+  // markdown ('* a' → '- a', '## H ##' → '## H', setext → ATX, etc.). The loop
+  // therefore settles in TWO writes: external apply → autosave rewrites normalized
+  // bytes + re-baselines disk_synced_hash to sha256(normalized) → the watcher event
+  // for that rewrite is an echo. This only terminates because the serializer is a
+  // FIXPOINT (serialize(parse(serialize(x))) === serialize(x)); if it were ever
+  // non-idempotent for some construct, production would loop forever while the
+  // trivial test above would still pass. This test exercises that real settle.
+  it('loop terminates after normalize: non-canonical external edit settles to echo in two writes', async () => {
+    const { getDocument, saveDocument } = await import('@/lib/docs/repo')
+    const { handleExternalChange } = await import('@/lib/disk/reverse-sync')
+    const { markdownToJson } = await import('@/lib/markdown/parse')
+    const { serializeMarkdown } = await import('@/lib/markdown/serialize')
+
+    const { id, abs } = await seedMirroredDoc('NormalizeLoop', '# Start\n\nbody')
+
+    // An external editor writes NON-canonical markdown (the file mirror would
+    // normalize this): '*' bullets and a closed-ATX heading.
+    const external = '## Heading ##\n\n* one\n* two\n'
+    await writeFile(abs, external, 'utf8')
+
+    // First write: reverse-sync applies the external bytes verbatim into the DB
+    // (markdown === external) and would push the parsed JSON to the Y.Doc.
+    expect(await handleExternalChange(abs)).toBe('apply')
+    expect((await getDocument(id))?.markdown).toBe(external)
+
+    // The serializer normalizes the parsed content (this is what the open editor
+    // would emit on its autosave). Confirm it actually DIFFERS from the external
+    // bytes — otherwise this test would degenerate into the trivial same-bytes case.
+    const parsed = markdownToJson(external)
+    const normalized = serializeMarkdown(parsed)
+    expect(normalized).not.toBe(external)
+
+    // Second write: simulate the editor's autosave. saveDocument → syncDocToDisk
+    // rewrites the FILE with the normalized bytes AND re-baselines disk_synced_hash
+    // to sha256(normalized). The file on disk now holds the normalized bytes.
+    await saveDocument(id, { contentJson: parsed, markdown: normalized })
+    expect(await readFile(abs, 'utf8')).toBe(normalized)
+
+    // The watcher event for that autosave rewrite must classify as ECHO — the
+    // file hash now equals disk_synced_hash. This is where the cross-process loop
+    // actually closes (NOT at the same-bytes step above).
+    expect(await handleExternalChange(abs)).toBe('echo')
+
+    // Serializer FIXPOINT — the property that GUARANTEES no third write: a second
+    // autosave produces byte-identical markdown, so no further file change is
+    // generated and the loop cannot diverge.
+    expect(serializeMarkdown(markdownToJson(normalized))).toBe(normalized)
+  })
 })

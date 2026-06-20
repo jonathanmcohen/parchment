@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { diffMarkdown, unifiedPatch } from '@/lib/docs/version-diff'
+import { diffMarkdown, parseUnifiedHunks, unifiedPatch } from '@/lib/docs/version-diff'
 
 describe('diffMarkdown', () => {
   it('identifies del, add, and ctx lines for a single-line change', () => {
@@ -68,5 +68,49 @@ describe('unifiedPatch', () => {
     expect(() => unifiedPatch('', '')).not.toThrow()
     expect(() => unifiedPatch('a', 'b')).not.toThrow()
     expect(() => unifiedPatch('', 'hello')).not.toThrow()
+  })
+})
+
+describe('parseUnifiedHunks', () => {
+  it('classifies added lines as "add"', () => {
+    const patch = unifiedPatch('a\nb', 'a\nc')
+    const hunks = parseUnifiedHunks(patch)
+    const addLines = hunks.filter((l) => l.kind === 'add')
+    expect(addLines.some((l) => l.text.startsWith('+c'))).toBe(true)
+  })
+
+  it('classifies removed lines as "del"', () => {
+    const patch = unifiedPatch('a\nb', 'a\nc')
+    const hunks = parseUnifiedHunks(patch)
+    const delLines = hunks.filter((l) => l.kind === 'del')
+    expect(delLines.some((l) => l.text.startsWith('-b'))).toBe(true)
+  })
+
+  it('classifies @@ lines as "hunk"', () => {
+    const patch = unifiedPatch('a\nb', 'a\nc')
+    const hunks = parseUnifiedHunks(patch)
+    expect(hunks.some((l) => l.kind === 'hunk')).toBe(true)
+  })
+
+  it('classifies --- and +++ header lines as "meta"', () => {
+    const patch = unifiedPatch('a', 'b', 'old', 'new')
+    const hunks = parseUnifiedHunks(patch)
+    const metaLines = hunks.filter((l) => l.kind === 'meta')
+    expect(metaLines.some((l) => l.text.startsWith('---'))).toBe(true)
+    expect(metaLines.some((l) => l.text.startsWith('+++'))).toBe(true)
+  })
+
+  it('classifies unchanged lines as "context"', () => {
+    const patch = unifiedPatch('a\nb\nc', 'a\nB\nc')
+    const hunks = parseUnifiedHunks(patch)
+    const ctxLines = hunks.filter((l) => l.kind === 'context')
+    // 'a' and 'c' are unchanged context lines
+    expect(ctxLines.some((l) => l.text.includes('a'))).toBe(true)
+  })
+
+  it('never throws on any input', () => {
+    expect(() => parseUnifiedHunks('')).not.toThrow()
+    expect(() => parseUnifiedHunks(unifiedPatch('', ''))).not.toThrow()
+    expect(() => parseUnifiedHunks(unifiedPatch('hello', 'world'))).not.toThrow()
   })
 })

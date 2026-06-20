@@ -190,7 +190,7 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
         }
         out.push({
           type: 'codeBlock',
-          attrs: { language: t.lang && t.lang.length ? t.lang : null },
+          attrs: { language: t.lang?.length ? t.lang : null },
           ...(code.length ? { content: [{ type: 'text', text: code }] } : {}),
         })
         break
@@ -223,7 +223,7 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
         // A loose list-item / stray text block: wrap its inline content (or raw
         // text) in a paragraph.
         out.push(
-          t.tokens && t.tokens.length
+          t.tokens?.length
             ? paragraph(t.tokens)
             : paragraph([{ type: 'text', text: t.text ?? '' }]),
         )

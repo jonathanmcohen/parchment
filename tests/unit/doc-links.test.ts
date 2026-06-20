@@ -136,3 +136,45 @@ describe('F6 — [[Label]] markdown round-trip', () => {
     expect(find(back, (n) => n.type === 'wikiLink')).toBeUndefined()
   })
 })
+
+describe('F6 — wiki-label invariant (no brackets in labels)', () => {
+  // A wikiLink label must never contain `[` or `]` so [[Label]] round-trips.
+  // serialize.ts strips brackets defensively; the parse recognizer then matches
+  // the clean label. Without stripping these labels silently degrade to text.
+  const cases: { name: string; label: string; expected: string }[] = [
+    { name: 'a single [ in the label', label: 'Doc [1]', expected: 'Doc 1' },
+    { name: 'a single trailing ]', label: 'a]b', expected: 'ab' },
+    { name: 'an embedded ]] sequence', label: 'a]]b', expected: 'ab' },
+    { name: 'an embedded [[ sequence', label: 'a[[b', expected: 'ab' },
+    { name: 'a bracketed title', label: 'Notes [draft]', expected: 'Notes draft' },
+  ]
+
+  for (const { name, label, expected } of cases) {
+    it(`round-trips a label with ${name}`, () => {
+      const original = doc(p(text('see '), wiki('id-1', label)))
+      const md = serializeMarkdown(original)
+      // Canonical markdown carries the sanitized label and nothing breaks it.
+      expect(md).toContain(`[[${expected}]]`)
+
+      const back = markdownToJson(md) as Node
+      const node = find(back, (n) => n.type === 'wikiLink')
+      expect(node).toBeDefined()
+      expect(node?.attrs?.label).toBe(expected)
+    })
+  }
+
+  it('emits an empty label as [[]] which the parser declines to match', () => {
+    const md = serializeMarkdown(doc(p(wiki('id-1', ''))))
+    expect(md).toContain('[[]]')
+    const back = markdownToJson(md) as Node
+    // An empty label cannot identify a target, so it stays literal text.
+    expect(find(back, (n) => n.type === 'wikiLink')).toBeUndefined()
+  })
+
+  it('collapses an all-bracket label to an empty (non-matching) [[]]', () => {
+    const md = serializeMarkdown(doc(p(wiki('id-1', '[[]]'))))
+    expect(md).toBe('[[]]\n')
+    const back = markdownToJson(md) as Node
+    expect(find(back, (n) => n.type === 'wikiLink')).toBeUndefined()
+  })
+})

@@ -1,5 +1,17 @@
 import { mergeAttributes, Node } from '@tiptap/core'
 
+/**
+ * F6 WIKI-LABEL INVARIANT: a wikiLink label must never contain `[` or `]` so the
+ * `[[Label]]` markdown form round-trips losslessly (see serialize.ts — the parse
+ * recognizer cannot match a label with brackets, and escaping does not survive
+ * `marked`). Doc titles are free text (db schema) and may contain brackets, so
+ * we strip them from the title before it becomes a label. Mirrored on the
+ * serialize side defensively.
+ */
+function sanitizeWikiLabel(label: string): string {
+  return label.replace(/[[\]]/g, '')
+}
+
 // ── Module augmentation ────────────────────────────────────────────────────
 
 declare module '@tiptap/core' {
@@ -93,7 +105,14 @@ export const WikiLink = Node.create({
       insertWikiLink:
         (attrs) =>
         ({ commands }) =>
-          commands.insertContent({ type: this.name, attrs }),
+          commands.insertContent({
+            type: this.name,
+            // Enforce the wiki-label invariant: a doc title used as the label may
+            // contain brackets (free-text titles), which would break the
+            // [[Label]] markdown round-trip — strip them here so the stored node
+            // is always round-trippable.
+            attrs: { ...attrs, label: sanitizeWikiLabel(attrs.label) },
+          }),
     }
   },
 })

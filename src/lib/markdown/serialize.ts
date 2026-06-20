@@ -45,6 +45,30 @@ function escapeText(t: string): string {
   return t.replace(/[\\`*_~[\]]/g, '\\$&')
 }
 
+/**
+ * F6 WIKI-LABEL INVARIANT: a `[[Label]]` round-trips losslessly ONLY when the
+ * label contains no `[` or `]`. The delimiters are themselves brackets, and the
+ * parse-side recognizer (parse.ts WIKI_LINK_RE = /\[\[([^[\]]+)\]\]/g) matches a
+ * label that cannot contain `[` or `]` — escaping does not help because `marked`
+ * splits `\[`/`\]` into separate tokens before the wiki-link regex ever runs.
+ *
+ * We therefore enforce the invariant at every boundary that produces a label:
+ *   - insert (wiki-link.ts insertWikiLink) — strips brackets from the doc title
+ *     used as the autocomplete label, so a doc titled e.g. `Notes [draft]`
+ *     yields a clean, round-trippable wikiLink.
+ *   - serialize (here) — strips defensively so any pre-existing/hand-built node
+ *     still emits canonical, parse-stable markdown rather than degrading to text.
+ *
+ * Stripping (not escaping) keeps the displayed label readable and guarantees the
+ * `[[…]]` survives the serialize → disk-mirror → parse cycle (and thus stays in
+ * doc_links on reverse-sync). An all-bracket / empty label collapses to '' and
+ * is emitted as `[[]]`, which the parser declines to match — correct, since an
+ * empty label cannot identify a target.
+ */
+function sanitizeWikiLabel(label: unknown): string {
+  return String(label ?? '').replace(/[[\]]/g, '')
+}
+
 function wrapMark(text: string, mark: Mark): string {
   switch (mark.type) {
     case 'code':
@@ -82,7 +106,7 @@ function serializeInline(content: PMNode[] | undefined): string {
       // F6: wiki link → [[Label]] (only the label is emitted; the targetId is
       // NOT stored in markdown — it is resolved on parse by title lookup, which
       // is a documented GAP in parse.ts since markdownToJson stays sync).
-      if (n.type === 'wikiLink') return `[[${String(n.attrs?.label ?? '')}]]`
+      if (n.type === 'wikiLink') return `[[${sanitizeWikiLabel(n.attrs?.label)}]]`
       return serializeInline(n.content)
     })
     .join('')

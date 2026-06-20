@@ -80,6 +80,20 @@ setApplyToYDoc(async (docId, json) => {
       // binds the 'default' XmlFragment (Editor.tsx FIELD = 'default').
       const fragment = document.getXmlFragment('default')
       const pmNode = schema.nodeFromJSON(json)
+      // VALIDATE BEFORE ANY Y MUTATION. `schema.nodeFromJSON` only checks that the
+      // node TYPE exists and its attrs are valid (it calls `create()` +
+      // `checkAttrs`, NOT `createChecked`) — it does NOT validate content-expression
+      // conformance. A type-known but structurally-invalid node (e.g. a malformed
+      // table/tableRow shape from parse.ts's hand-rolled reconstruction) builds
+      // without throwing, then `updateYFragment` can throw PARTWAY through its
+      // delete/insert loop. Yjs `transact` does NOT roll back on a throw (its
+      // `finally` runs cleanupTransactions regardless), so an exception mid-loop
+      // would leave a HALF-replaced, committed, broadcast Y.Doc. `pmNode.check()`
+      // runs `checkContent` recursively and throws here, in the pre-mutation phase,
+      // so the only possible throw precedes any Y op. reverse-sync's best-effort
+      // try/catch around the hook then swallows it: the DB row stays authoritative
+      // and the next editor open re-seeds from documents.content.
+      pmNode.check()
       // 4th arg is y-prosemirror's BindingMetadata (NOT a bare Map): verified
       // against y-prosemirror@1.3.7 sync-plugin.d.ts — `createEmptyMeta()` returns
       // `{ mapping, isOMark }`, and the function reads both. A bare `new Map()`

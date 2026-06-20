@@ -1,5 +1,26 @@
 // B0 baseline: one-way ProseMirror-JSON → canonical markdown (for disk-mirror +
-// full-text search). Bidirectional/lossless round-trip is Plan F.
+// full-text search).
+//
+// F3 — LOSSLESS CANONICAL FORM: Parchment's custom blocks that standard
+// markdown cannot represent are serialized as fenced `parchment:<kind>` code
+// blocks carrying their attrs (and, for tables, full content) as single-line
+// JSON. parse.ts reconstructs the exact node from those fences, so the
+// following now round-trip:
+//   - pageBreak    → ```parchment:pagebreak  (empty body)
+//   - sectionBreak → ```parchment:section    (attrs: headerText, footerText,
+//                                              pageNumberFormat, pageNumberPosition)
+//   - toc          → ```parchment:toc        (attrs: showPageNumbers)
+//   - table        → ```parchment:table      (full {type:'table',content:[…]}
+//                                              JSON; preserves cell `formula`,
+//                                              colspan/rowspan/colwidth)
+// Standard markdown (headings, paragraphs, lists, marks, blockquote, code
+// fences, links, hr, hard breaks) is emitted as plain markdown. Footnotes use
+// GFM `[^N]` / `[^N]:` definitions and round-trip via that GFM form, not a
+// parchment fence.
+//
+// CONSTRAINT: this module runs in the Next.js *server* runtime — it must NOT
+// import the editor extension graph, @tiptap/html, or any DOM. The parchment
+// fences are produced with plain JSON.stringify, no editor deps.
 
 type Mark = { type: string; attrs?: Record<string, unknown> }
 type PMNode = {
@@ -95,6 +116,22 @@ function serializeBlock(node: PMNode): string {
     // B8: footnotes block — emit GFM-style definitions [^N]: text
     case 'footnotes':
       return serializeFootnotesBlock(node)
+    // F3: custom blocks → fenced parchment:<kind> with single-line JSON body.
+    case 'pageBreak':
+      return parchmentFence('pagebreak', '')
+    case 'sectionBreak':
+      return parchmentFence('section', JSON.stringify(sectionAttrs(node.attrs)))
+    case 'toc':
+      return parchmentFence('toc', JSON.stringify(node.attrs ?? {}))
+    case 'table':
+      return parchmentFence(
+        'table',
+        JSON.stringify({
+          type: 'table',
+          ...(node.attrs ? { attrs: node.attrs } : {}),
+          content: node.content ?? [],
+        }),
+      )
     default:
       return serializeInline(node.content)
   }
@@ -120,6 +157,31 @@ function serializeFootnotesBlock(node: PMNode): string {
       return `[^${i + 1}]: ${body}`
     })
     .join('\n')
+}
+
+/**
+ * F3: wrap a custom block as a fenced `parchment:<kind>` code block. The body
+ * (when present) is a single line of JSON so the closing fence is never broken
+ * by an embedded newline.
+ */
+function parchmentFence(kind: string, body: string): string {
+  const inner = body.length ? `\n${body}` : ''
+  return `\`\`\`parchment:${kind}${inner}\n\`\`\``
+}
+
+/**
+ * F3: project a sectionBreak node's attrs onto the canonical key order so the
+ * serialized fence is deterministic regardless of object insertion order. The
+ * four attrs mirror SectionBreakExtension.addAttributes().
+ */
+function sectionAttrs(attrs: Record<string, unknown> | undefined): Record<string, unknown> {
+  const a = attrs ?? {}
+  return {
+    headerText: a.headerText ?? '',
+    footerText: a.footerText ?? '',
+    pageNumberFormat: a.pageNumberFormat ?? '1',
+    pageNumberPosition: a.pageNumberPosition ?? 'center',
+  }
 }
 
 function serializeBlocks(content: PMNode[] | undefined): string {

@@ -8,9 +8,17 @@
 //
 // FIDELITY BOUNDARY: standard markdown (headings, paragraphs, lists,
 // bold/italic/strike/code, blockquote, code fences, links, hr, hard breaks)
-// round-trips. Parchment's custom blocks (page/section breaks, footnotes, TOC,
-// formula tables) do NOT reverse-parse yet — that is F3 (lossless canonical
-// form). Acceptable for F2.
+// round-trips. F3 adds LOSSLESS round-trip of Parchment's custom blocks: they
+// are emitted by serialize.ts as fenced `parchment:<kind>` code blocks and
+// reconstructed here into the exact PM node:
+//   - parchment:pagebreak → { type: 'pageBreak' }
+//   - parchment:section   → { type: 'sectionBreak', attrs:{headerText,
+//                             footerText, pageNumberFormat, pageNumberPosition} }
+//   - parchment:toc       → { type: 'toc', attrs:{showPageNumbers} }
+//   - parchment:table     → the full { type:'table', content:[…] } node
+//                           (cell `formula`, colspan/rowspan/colwidth preserved)
+// A malformed/un-parseable parchment fence degrades to a plain codeBlock and
+// NEVER throws. Footnotes round-trip via GFM `[^N]` syntax, not a fence.
 
 import { marked } from 'marked'
 
@@ -61,9 +69,7 @@ function inline(tokens: Tok[] | undefined, marks: Mark[]): PMNode[] {
         break
       }
       case 'link':
-        out.push(
-          ...inline(t.tokens, [...marks, { type: 'link', attrs: { href: t.href ?? '' } }]),
-        )
+        out.push(...inline(t.tokens, [...marks, { type: 'link', attrs: { href: t.href ?? '' } }]))
         break
       case 'br':
         out.push({ type: 'hardBreak' })
@@ -88,6 +94,55 @@ function paragraph(tokens: Tok[] | undefined): PMNode {
   return content.length ? { type: 'paragraph', content } : { type: 'paragraph' }
 }
 
+/**
+ * F3: parse a `parchment:<kind>` fence body into the exact custom PM node.
+ * Returns `null` to signal "not a valid parchment fence" so the caller degrades
+ * to a plain codeBlock. NEVER throws — JSON parse failures return null.
+ */
+function reconstructParchment(kind: string, body: string): PMNode | null {
+  // pagebreak carries no body — it round-trips structurally.
+  if (kind === 'pagebreak') return { type: 'pageBreak' }
+
+  let payload: unknown
+  try {
+    payload = body.trim().length ? JSON.parse(body) : {}
+  } catch {
+    return null
+  }
+  if (typeof payload !== 'object' || payload === null) return null
+  const data = payload as Record<string, unknown>
+
+  switch (kind) {
+    case 'section':
+      return {
+        type: 'sectionBreak',
+        attrs: {
+          headerText: typeof data.headerText === 'string' ? data.headerText : '',
+          footerText: typeof data.footerText === 'string' ? data.footerText : '',
+          pageNumberFormat: typeof data.pageNumberFormat === 'string' ? data.pageNumberFormat : '1',
+          pageNumberPosition:
+            typeof data.pageNumberPosition === 'string' ? data.pageNumberPosition : 'center',
+        },
+      }
+    case 'toc':
+      return { type: 'toc', attrs: data }
+    case 'table': {
+      // The body is the full table node JSON; validate its shape before trusting
+      // it (so a stray `parchment:table` fence cannot inject a non-table node).
+      if (data.type !== 'table' || !Array.isArray(data.content)) return null
+      return {
+        type: 'table',
+        ...(data.attrs && typeof data.attrs === 'object'
+          ? { attrs: data.attrs as Record<string, unknown> }
+          : {}),
+        content: data.content as PMNode[],
+      }
+    }
+    default:
+      return null
+  }
+}
+
 /** Walk block tokens → block PM nodes. */
 function blocks(tokens: Tok[] | undefined): PMNode[] {
   const out: PMNode[] = []
@@ -105,6 +160,16 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
         break
       case 'code': {
         const code = t.text ?? ''
+        // F3: a `parchment:<kind>` fence reconstructs a custom PM node. On any
+        // failure we fall through to the plain codeBlock below (never throw).
+        const fenceMatch = /^parchment:(\S+)/.exec(t.lang ?? '')
+        if (fenceMatch) {
+          const node = reconstructParchment(fenceMatch[1] ?? '', code)
+          if (node) {
+            out.push(node)
+            break
+          }
+        }
         out.push({
           type: 'codeBlock',
           attrs: { language: t.lang && t.lang.length ? t.lang : null },
@@ -139,7 +204,11 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
       case 'text':
         // A loose list-item / stray text block: wrap its inline content (or raw
         // text) in a paragraph.
-        out.push(t.tokens && t.tokens.length ? paragraph(t.tokens) : paragraph([{ type: 'text', text: t.text ?? '' }]))
+        out.push(
+          t.tokens && t.tokens.length
+            ? paragraph(t.tokens)
+            : paragraph([{ type: 'text', text: t.text ?? '' }]),
+        )
         break
       default: {
         // Unknown block (e.g. html, table, custom): preserve its raw text as a

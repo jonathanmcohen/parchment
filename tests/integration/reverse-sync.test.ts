@@ -146,6 +146,74 @@ describe('F2 — reverse sync', () => {
     expect(conflictBody).toBe(fileContent)
   })
 
+  it('conflict de-dup: re-firing the same divergence does not spawn extra siblings', async () => {
+    const { db, schema } = await import('@/db')
+    const { eq } = await import('drizzle-orm')
+    const { handleExternalChange } = await import('@/lib/disk/reverse-sync')
+
+    const { id, abs } = await seedMirroredDoc('DupConflict', '# Base\n\nbase body')
+
+    // Diverge the DB (without touching disk_synced_hash) and the file.
+    await db
+      .update(schema.documents)
+      .set({ markdown: '# Db Side\n\ndb-only edit' })
+      .where(eq(schema.documents.id, id))
+    const fileContent = '# File Side\n\nfile-only edit'
+    await writeFile(abs, fileContent, 'utf8')
+
+    // First event emits a conflict sibling.
+    expect(await handleExternalChange(abs)).toBe('conflict')
+    const afterFirst = (await readdir(filesDir)).filter(
+      (e) => e.startsWith('DupConflict.conflict-') && e.endsWith('.md'),
+    )
+    expect(afterFirst.length).toBe(1)
+
+    // A subsequent event for the SAME unresolved divergence must NOT spawn a
+    // second sibling (the baseline never advanced on conflict).
+    expect(await handleExternalChange(abs)).toBe('conflict')
+    const afterSecond = (await readdir(filesDir)).filter(
+      (e) => e.startsWith('DupConflict.conflict-') && e.endsWith('.md'),
+    )
+    expect(afterSecond.length).toBe(1)
+  })
+
+  it('apply is a compare-and-swap: a baseline moved by a concurrent write is not clobbered', async () => {
+    const { db, schema } = await import('@/db')
+    const { eq } = await import('drizzle-orm')
+    const { getDocument } = await import('@/lib/docs/repo')
+    const { handleExternalChange } = await import('@/lib/disk/reverse-sync')
+    const { sha256 } = await import('@/lib/disk/hash')
+
+    // Seed a doc; the file diverges from the DB so a naive read would classify
+    // 'apply'. Then simulate a concurrent in-app save committing AFTER our
+    // snapshot read but BEFORE the apply UPDATE by moving disk_synced_hash to a
+    // value that matches neither the old baseline nor the file — emulated here by
+    // pre-advancing it so the guarded UPDATE finds rowCount 0 and re-handles.
+    const { id, abs } = await seedMirroredDoc('CasDoc', '# Cas\n\noriginal')
+
+    // An external edit lands on disk.
+    const inApp = '# In App\n\nuser typed this in the editor'
+    await writeFile(abs, '# External\n\nedited on disk', 'utf8')
+
+    // Simulate the in-app autosave winning the race: DB markdown + baseline now
+    // reflect the in-app content (as syncDocToDisk would have set them), and the
+    // file is re-mirrored to the in-app content (echo state).
+    await db
+      .update(schema.documents)
+      .set({ markdown: inApp, diskSyncedHash: sha256(inApp) })
+      .where(eq(schema.documents.id, id))
+    await writeFile(abs, inApp, 'utf8')
+
+    // The watcher event for the original external edit now arrives. Because the
+    // file equals the new baseline, it must classify as echo — NOT clobber the
+    // in-app content.
+    const cls = await handleExternalChange(abs)
+    expect(cls).toBe('echo')
+
+    const after = await getDocument(id)
+    expect(after?.markdown).toBe(inApp)
+  })
+
   it('unmanaged file: no matching disk_path → echo, no throw, no doc created', async () => {
     const { db, schema } = await import('@/db')
     const { handleExternalChange } = await import('@/lib/disk/reverse-sync')

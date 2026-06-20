@@ -69,9 +69,27 @@ export async function syncDocToDisk(docId: string): Promise<string | null> {
     const taken = new Set(others.map((r) => (r.diskPath as string).toLowerCase()))
     const relPath = disambiguate(desired, taken)
     const abs = absPath(relPath)
+    const markdown = doc.markdown ?? ''
+
+    // Update disk_path + sync baseline in the DB BEFORE writing the file.
+    //
+    // The reverse-sync watcher (F2) resolves a doc by disk_path and classifies
+    // the change against disk_synced_hash. If we wrote the file first and updated
+    // the baseline afterward, there is a window where the new file is on disk but
+    // the DB baseline still holds the OLD hash. chokidar's awaitWriteFinish fires
+    // the watcher after the file settles; if it ran inside that window it would
+    // see fileHash !== syncedHash, and — if the DB row was also touched
+    // concurrently — misclassify the app's OWN write as a 'conflict' and emit a
+    // spurious <name>.conflict-<ms>.md. Setting disk_synced_hash = sha256(markdown)
+    // first means the watcher never observes a new file against a stale baseline:
+    // worst case it reads the new baseline before the file lands and self-corrects
+    // as an echo on the next settled event.
+    await db
+      .update(schema.documents)
+      .set({ diskPath: relPath, diskSyncedHash: sha256(markdown) })
+      .where(eq(schema.documents.id, docId))
 
     // Write the file
-    const markdown = doc.markdown ?? ''
     await mkdir(dirname(abs), { recursive: true })
     await writeFile(abs, markdown, 'utf8')
 
@@ -97,15 +115,6 @@ export async function syncDocToDisk(docId: string): Promise<string | null> {
         }
       }
     }
-
-    // Update disk_path + sync baseline in db. Setting disk_synced_hash to the
-    // sha256 of exactly what we just wrote makes the reverse-sync watcher
-    // classify the resulting filesystem event as an 'echo' (our own write) — the
-    // key to a provably terminating doc→disk→doc loop (F2).
-    await db
-      .update(schema.documents)
-      .set({ diskPath: relPath, diskSyncedHash: sha256(markdown) })
-      .where(eq(schema.documents.id, docId))
 
     return relPath
   } catch {

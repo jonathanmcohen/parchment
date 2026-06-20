@@ -6,9 +6,9 @@
 // must NOT throw or crash the watcher / server. Every path returns a
 // ChangeClass; on any error it returns 'echo' (the do-nothing class).
 
-import { readFile, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, sep } from 'node:path'
-import { eq } from 'drizzle-orm'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
+import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { markdownToJson } from '@/lib/markdown/parse'
 import { sha256 } from './hash'
@@ -43,6 +43,41 @@ function relPathIfManaged(absFilePath: string): string | null {
 
   // disk_path is stored POSIX-style ('/'); normalize for the DB lookup.
   return segments.join('/')
+}
+
+/**
+ * Does a conflict sibling for `<stem>` already exist in `dir` whose content
+ * hashes to `fileHash`? Used to avoid re-emitting an identical conflict file on
+ * every watcher event for the same unresolved divergence. Best-effort: any fs
+ * error is swallowed and treated as "not found" (we'd rather risk one extra
+ * sibling than throw out of the watcher).
+ */
+async function conflictSiblingExists(
+  dir: string,
+  stem: string,
+  fileHash: string,
+): Promise<boolean> {
+  try {
+    const entries = await readdir(dir)
+    const re = new RegExp(`^${escapeRegExp(stem)}\\.conflict-\\d+\\.md$`)
+    for (const name of entries) {
+      if (!re.test(name)) continue
+      try {
+        const existing = await readFile(join(dir, name), 'utf8')
+        if (sha256(existing) === fileHash) return true
+      } catch {
+        // unreadable sibling — ignore it and keep scanning.
+      }
+    }
+  } catch {
+    // dir unreadable — treat as "no sibling".
+  }
+  return false
+}
+
+/** Escape a string for safe inclusion in a RegExp (stem may contain metachars). */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**
@@ -84,8 +119,23 @@ export async function handleExternalChange(absFilePath: string): Promise<ChangeC
       // saveDocument) so we don't re-trigger the mirror. We set
       // disk_synced_hash = fileHash so the eventual mirror write (if any) is an
       // echo — this is what makes the loop provably terminate.
+      //
+      // CRITICAL (TOCTOU): the classification above was made on a snapshot read
+      // outside any lock. An in-app autosave (saveDocument → syncDocToDisk) could
+      // commit between that read and this write, changing markdown +
+      // disk_synced_hash. A blind UPDATE keyed only on `id` would silently clobber
+      // that just-saved in-app edit with the external file's content (permanent
+      // data loss). Guard the UPDATE with an optimistic compare-and-swap on the
+      // baseline we classified against: it only applies while disk_synced_hash is
+      // still what we read. A concurrent write moves the baseline, rowCount === 0,
+      // and we re-handle from scratch (re-read + re-classify) so the now-current
+      // state decides echo / apply / conflict — never an unconditional overwrite.
       const json = markdownToJson(content)
-      await db
+      const baselineGuard =
+        doc.diskSyncedHash == null
+          ? isNull(schema.documents.diskSyncedHash)
+          : eq(schema.documents.diskSyncedHash, doc.diskSyncedHash)
+      const result = await db
         .update(schema.documents)
         .set({
           content: json,
@@ -93,20 +143,37 @@ export async function handleExternalChange(absFilePath: string): Promise<ChangeC
           diskSyncedHash: fileHash,
           updatedAt: new Date(),
         })
-        .where(eq(schema.documents.id, doc.id))
+        .where(and(eq(schema.documents.id, doc.id), baselineGuard))
+
+      if ((result.rowCount ?? 0) === 0) {
+        // A concurrent write advanced the baseline between our read and this
+        // write. Our classification is stale — re-handle against the new state
+        // (bounded recursion: each retry only happens on an interleaving write,
+        // and best-effort try/catch guarantees we never throw).
+        return handleExternalChange(absFilePath)
+      }
       return 'apply'
     }
 
     // conflict → do NOT clobber the doc. Write the external content to a sibling
     // `<name>.conflict-<unixms>.md` and leave the doc untouched. Best-effort.
     const dir = dirname(absFilePath)
-    const base = absFilePath.slice(dir.length + 1)
-    const stem = base.endsWith('.md') ? base.slice(0, -3) : base
-    const conflictPath = join(dir, `${stem}.conflict-${Date.now()}.md`)
-    try {
-      await writeFile(conflictPath, content, 'utf8')
-    } catch {
-      // best-effort — a failed conflict write must not throw.
+    const stem = basename(absFilePath).replace(/\.md$/, '')
+
+    // De-duplicate conflict siblings: an UNRESOLVED conflict re-fires a watcher
+    // event on every later touch of the still-divergent file (and the
+    // disk_synced_hash baseline does not advance on conflict), so without this
+    // guard a single divergence would spawn a fresh <name>.conflict-<ms>.md on
+    // EVERY event — unbounded conflict-file spam. Skip the write when a conflict
+    // sibling for this base already holds exactly this external content.
+    const alreadyEmitted = await conflictSiblingExists(dir, stem, fileHash)
+    if (!alreadyEmitted) {
+      const conflictPath = join(dir, `${stem}.conflict-${Date.now()}.md`)
+      try {
+        await writeFile(conflictPath, content, 'utf8')
+      } catch {
+        // best-effort — a failed conflict write must not throw.
+      }
     }
     console.warn(`[parchment-disk] conflict on ${relPath}`)
     return 'conflict'

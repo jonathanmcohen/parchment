@@ -131,6 +131,11 @@ export async function removeAndCommit(relPath: string, message: string): Promise
   return enqueue(async () => {
     try {
       const dir = gitDir()
+      // Guard against phantom deletes: editors that save atomically (write temp →
+      // unlink original → rename) emit a transient 'unlink' while the file still
+      // exists. Committing a deletion there churns history (delete then re-add).
+      // Only stage a removal when the file is genuinely gone from the work tree.
+      if (fs.existsSync(join(dir, relPath))) return null
       await git.remove({ fs, dir, filepath: relPath })
       if (!(await hasPendingChange(dir, relPath))) return null
       const oid = await git.commit({ fs, dir, message, author: AUTHOR })

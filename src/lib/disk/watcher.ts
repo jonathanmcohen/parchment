@@ -13,35 +13,16 @@
 // All git ops are best-effort and serialized inside the git module; the watcher
 // fires them and-forgets.
 
-import { isAbsolute, relative, sep } from 'node:path'
 import { watch } from 'chokidar'
 import { commitPath, ensureRepo, removeAndCommit } from '@/lib/git/repo'
-import { handleExternalChange } from './reverse-sync'
+// relPathIfManaged is the single source of truth for "is this a committable
+// managed .md path" — reused here (it's pure path math, pulls in no graph) so the
+// watcher's commit filter can never drift from reverse-sync's classification.
+import { handleExternalChange, relPathIfManaged } from './reverse-sync'
 
 /** Read the files root at call time so config/env changes are honored. */
 function filesRoot(): string {
   return process.env.PARCHMENT_FILES_ROOT ?? `${process.env.HOME ?? '/data'}/parchment/files`
-}
-
-/**
- * POSIX-style relPath under filesRoot when `absFilePath` is a committable managed
- * file (a real `.md`, no dotfiles/dot-dirs, no `.assets`, no `*.conflict-*.md`
- * sibling), else null. Mirrors reverse-sync's `relPathIfManaged` but kept local
- * so the watcher pulls in no extra graph. Pure path math — never throws.
- */
-function committableRelPath(absFilePath: string): string | null {
-  if (!isAbsolute(absFilePath)) return null
-  const root = filesRoot()
-  const rel = relative(root, absFilePath)
-  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null
-  const segments = rel.split(sep)
-  if (segments.some((s) => s.startsWith('.') || s === '.assets' || s.endsWith('.assets'))) {
-    return null
-  }
-  const base = segments[segments.length - 1] ?? ''
-  if (!base.endsWith('.md')) return null
-  if (/\.conflict-\d+\.md$/.test(base)) return null
-  return segments.join('/')
 }
 
 // Module-level idempotency guard: start at most once per process.
@@ -76,7 +57,7 @@ export async function startDiskWatcher(): Promise<void> {
     // Order between the two is irrelevant; both are best-effort. The git module's
     // queue serializes concurrent commits so the index can't race.
     const onAddOrChange = (absPath: string): void => {
-      const rel = committableRelPath(absPath)
+      const rel = relPathIfManaged(absPath)
       if (rel !== null) void commitPath(rel, `edit: ${rel}`)
       void handleExternalChange(absPath)
     }
@@ -85,7 +66,7 @@ export async function startDiskWatcher(): Promise<void> {
     // v0.1: do NOT delete docs when their file is removed (noted as a gap), but
     // DO record the deletion in git history (remove + commit, best-effort).
     watcher.on('unlink', (absPath) => {
-      const rel = committableRelPath(absPath)
+      const rel = relPathIfManaged(absPath)
       if (rel !== null) void removeAndCommit(rel, `delete: ${rel}`)
       console.warn(`[parchment-disk] file removed (not deleting doc): ${absPath}`)
     })

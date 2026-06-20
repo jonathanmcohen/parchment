@@ -1,7 +1,14 @@
 import { Extension } from '@tiptap/core'
+import { PluginKey } from '@tiptap/pm/state'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import type { WikiDoc, WikiSuggestionMenuRef } from '@/components/editor/WikiSuggestionMenu'
+
+// Distinct plugin key — @tiptap/suggestion defaults to a single shared key, so
+// without this the `[[` suggestion plugin collides with the slash-menu `/`
+// suggestion plugin and ProseMirror throws "adding two plugins with the same
+// key" at EditorState.create, breaking the whole editor.
+const wikiSuggestionPluginKey = new PluginKey('wikiSuggestion')
 
 // ── `[[` autocomplete extension ─────────────────────────────────────────────
 //
@@ -20,6 +27,7 @@ export const WikiSuggestionExtension = Extension.create({
     return [
       Suggestion<WikiDoc>({
         editor: this.editor,
+        pluginKey: wikiSuggestionPluginKey,
         char: '[[',
         startOfLine: false,
         // Allow the trigger after any prefix (start of line, space, newline, or

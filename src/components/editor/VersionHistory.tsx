@@ -26,6 +26,29 @@ function versionLabel(v: VersionSummary): string {
   return `Autosave • ${formatTime(v.createdAt)}`
 }
 
+// ── F4: per-doc disk/git history ────────────────────────────────────────────
+
+interface GitCommit {
+  oid: string
+  message: string
+  timestamp: number
+  author: string
+}
+
+/** Render a unix-seconds timestamp as a short local date-time. */
+function formatGitTime(seconds: number): string {
+  try {
+    return new Date(seconds * 1000).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return String(seconds)
+  }
+}
+
 // ── VersionHistory ─────────────────────────────────────────────────────────
 
 interface Props {
@@ -44,6 +67,13 @@ export function VersionHistory({ docId, editor }: Props) {
   const [restoring, setRestoring] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // F4: disk/git history (the .md mirror's commit log for this doc).
+  const [gitCommits, setGitCommits] = useState<GitCommit[]>([])
+  const [gitLoaded, setGitLoaded] = useState(false)
+  const [gitSelected, setGitSelected] = useState<string | null>(null)
+  const [gitPreview, setGitPreview] = useState<string | null>(null)
+  const [gitPreviewLoading, setGitPreviewLoading] = useState(false)
+
   // ── Load versions ────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
@@ -60,6 +90,58 @@ export function VersionHistory({ docId, editor }: Props) {
   useEffect(() => {
     void load()
   }, [load])
+
+  // ── F4: load disk/git history ────────────────────────────────────────
+
+  const loadGit = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/docs/${docId}/git-log`)
+      if (!res.ok) {
+        setGitLoaded(true)
+        return
+      }
+      const rows = (await res.json()) as GitCommit[]
+      setGitCommits(rows)
+    } catch {
+      // disk history is non-critical
+    } finally {
+      setGitLoaded(true)
+    }
+  }, [docId])
+
+  useEffect(() => {
+    void loadGit()
+  }, [loadGit])
+
+  // ── F4: preview a commit's file content (read-only) ──────────────────
+
+  const handleGitSelect = useCallback(
+    async (oid: string) => {
+      // Toggle off if re-clicking the open commit.
+      if (gitSelected === oid) {
+        setGitSelected(null)
+        setGitPreview(null)
+        return
+      }
+      setGitSelected(oid)
+      setGitPreview(null)
+      setGitPreviewLoading(true)
+      try {
+        const res = await fetch(`/api/docs/${docId}/git-show?oid=${encodeURIComponent(oid)}`)
+        if (!res.ok) {
+          setGitPreview(null)
+          return
+        }
+        const body = (await res.json()) as { content: string }
+        setGitPreview(body.content)
+      } catch {
+        setGitPreview(null)
+      } finally {
+        setGitPreviewLoading(false)
+      }
+    },
+    [docId, gitSelected],
+  )
 
   // ── Diff two versions ────────────────────────────────────────────────
 
@@ -360,6 +442,111 @@ export function VersionHistory({ docId, editor }: Props) {
           )
         })}
       </ol>
+
+      {/* F4: Disk history (git) */}
+      <section
+        aria-label="Disk history (git)"
+        style={{ borderTop: '1px solid var(--border, #e5e7eb)', padding: '8px 0' }}
+      >
+        <div style={{ padding: '0 12px 6px', fontSize: 13, fontWeight: 600 }}>
+          Disk history (git)
+        </div>
+        {!gitLoaded && (
+          <p style={{ fontSize: 12, color: 'var(--muted, #6b7280)', padding: '0 12px', margin: 0 }}>
+            Loading disk history…
+          </p>
+        )}
+        {gitLoaded && gitCommits.length === 0 && (
+          <p style={{ fontSize: 12, color: 'var(--muted, #6b7280)', padding: '0 12px', margin: 0 }}>
+            No disk history yet.
+          </p>
+        )}
+        {gitCommits.length > 0 && (
+          <ol aria-label="Disk commits" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {gitCommits.map((c) => {
+              const shortOid = c.oid.slice(0, 7)
+              const isOpen = gitSelected === c.oid
+              return (
+                <li
+                  key={c.oid}
+                  style={{
+                    borderBottom: '1px solid var(--border, #e5e7eb)',
+                    background: isOpen ? 'var(--surface-hover, #f9fafb)' : 'transparent',
+                  }}
+                >
+                  <button
+                    type="button"
+                    aria-label={`Preview commit ${shortOid}: ${c.message}`}
+                    aria-expanded={isOpen}
+                    onClick={() => void handleGitSelect(c.oid)}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      padding: '6px 12px',
+                      font: 'inherit',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: 'ui-monospace, monospace',
+                        fontSize: 11,
+                        color: 'var(--muted, #6b7280)',
+                      }}
+                    >
+                      {shortOid}
+                    </span>{' '}
+                    <span style={{ fontSize: 12 }}>{c.message}</span>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: 11,
+                        color: 'var(--muted, #6b7280)',
+                      }}
+                    >
+                      {formatGitTime(c.timestamp)} · {c.author}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div style={{ padding: '0 12px 8px' }}>
+                      {gitPreviewLoading && <p style={{ fontSize: 12, margin: 0 }}>Loading…</p>}
+                      {!gitPreviewLoading && gitPreview === null && (
+                        <p style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>
+                          Could not load this version.
+                        </p>
+                      )}
+                      {!gitPreviewLoading && gitPreview !== null && (
+                        <figure aria-label={`Content at commit ${shortOid}`} style={{ margin: 0 }}>
+                          <pre
+                            style={{
+                              margin: 0,
+                              padding: 8,
+                              fontSize: 11,
+                              fontFamily: 'ui-monospace, monospace',
+                              background: 'var(--surface-hover, #f9fafb)',
+                              border: '1px solid var(--border, #e5e7eb)',
+                              borderRadius: 4,
+                              maxHeight: 240,
+                              overflow: 'auto',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {gitPreview}
+                          </pre>
+                        </figure>
+                      )}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </section>
 
       {/* Diff view */}
       {(selectedA || selectedB) && (

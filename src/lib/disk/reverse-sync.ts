@@ -47,7 +47,7 @@ function filesRoot(): string {
  * a dotfile/dot-dir, an `.assets` sibling, or a generated `*.conflict-*.md`)?
  * Returns the POSIX-style relPath under root when it IS a candidate, else null.
  */
-function relPathIfManaged(absFilePath: string): string | null {
+export function relPathIfManaged(absFilePath: string): string | null {
   if (!isAbsolute(absFilePath)) return null
   const root = filesRoot()
   const rel = relative(root, absFilePath)

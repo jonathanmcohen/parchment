@@ -1,10 +1,12 @@
 'use client'
 
 import type { Editor } from '@tiptap/core'
+import type { ReactElement } from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import type { DiffLine } from '@/lib/docs/version-diff'
-import { diffMarkdown } from '@/lib/docs/version-diff'
+import type { DiffLine, UnifiedHunkLine } from '@/lib/docs/version-diff'
+import { diffMarkdown, parseUnifiedHunks, unifiedPatch } from '@/lib/docs/version-diff'
 import type { Version, VersionSummary } from '@/lib/docs/versions-shared'
+import { serializeMarkdown } from '@/lib/markdown/serialize'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -61,11 +63,16 @@ export function VersionHistory({ docId, editor }: Props) {
   const [selectedA, setSelectedA] = useState<string | null>(null)
   const [selectedB, setSelectedB] = useState<string | null>(null)
   const [diffLines, setDiffLines] = useState<DiffLine[] | null>(null)
+  // F5: unified diff for version A/B comparison
+  const [versionPatch, setVersionPatch] = useState<string | null>(null)
   const [diffLoading, setDiffLoading] = useState(false)
   const [namedLabel, setNamedLabel] = useState('')
   const [savingNamed, setSavingNamed] = useState(false)
   const [restoring, setRestoring] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // F5: diff-mode toggle — 'visual' (existing) or 'unified' (new)
+  const [diffMode, setDiffMode] = useState<'visual' | 'unified'>('visual')
 
   // F4: disk/git history (the .md mirror's commit log for this doc).
   const [gitCommits, setGitCommits] = useState<GitCommit[]>([])
@@ -73,6 +80,8 @@ export function VersionHistory({ docId, editor }: Props) {
   const [gitSelected, setGitSelected] = useState<string | null>(null)
   const [gitPreview, setGitPreview] = useState<string | null>(null)
   const [gitPreviewLoading, setGitPreviewLoading] = useState(false)
+  // F5: unified diff between the selected git commit and the current doc content
+  const [gitUnifiedPatch, setGitUnifiedPatch] = useState<string | null>(null)
 
   // ── Load versions ────────────────────────────────────────────────────
 
@@ -121,10 +130,12 @@ export function VersionHistory({ docId, editor }: Props) {
       if (gitSelected === oid) {
         setGitSelected(null)
         setGitPreview(null)
+        setGitUnifiedPatch(null)
         return
       }
       setGitSelected(oid)
       setGitPreview(null)
+      setGitUnifiedPatch(null)
       setGitPreviewLoading(true)
       try {
         const res = await fetch(`/api/docs/${docId}/git-show?oid=${encodeURIComponent(oid)}`)
@@ -134,13 +145,21 @@ export function VersionHistory({ docId, editor }: Props) {
         }
         const body = (await res.json()) as { content: string }
         setGitPreview(body.content)
+        // F5: compute unified diff between this commit and the current doc content.
+        // Canonical current markdown via the same serializer the autosave + disk
+        // mirror use, so the diff vs a commit's stored markdown is apples-to-apples
+        // (editor.getText() would be plain text and produce a noisy diff).
+        const currentMd: string = serializeMarkdown(editor.getJSON())
+        const shortOid = oid.slice(0, 7)
+        setGitUnifiedPatch(unifiedPatch(body.content, currentMd, `commit ${shortOid}`, 'current'))
       } catch {
         setGitPreview(null)
+        setGitUnifiedPatch(null)
       } finally {
         setGitPreviewLoading(false)
       }
     },
-    [docId, gitSelected],
+    [docId, gitSelected, editor],
   )
 
   // ── Diff two versions ────────────────────────────────────────────────
@@ -161,6 +180,10 @@ export function VersionHistory({ docId, editor }: Props) {
       const vA = (await resA.json()) as Version
       const vB = (await resB.json()) as Version
       setDiffLines(diffMarkdown(vA.markdown, vB.markdown))
+      // F5: also compute the unified patch for the unified-diff view
+      const labelA = vA.label ?? `v${vA.id.slice(0, 7)}`
+      const labelB = vB.label ?? `v${vB.id.slice(0, 7)}`
+      setVersionPatch(unifiedPatch(vA.markdown, vB.markdown, labelA, labelB))
     } catch {
       setError('Diff failed.')
     } finally {
@@ -173,6 +196,7 @@ export function VersionHistory({ docId, editor }: Props) {
       void computeDiff()
     } else {
       setDiffLines(null)
+      setVersionPatch(null)
     }
   }, [selectedA, selectedB, computeDiff])
 
@@ -443,6 +467,59 @@ export function VersionHistory({ docId, editor }: Props) {
         })}
       </ol>
 
+      {/* F5: Diff-mode toggle — shown whenever there is an active diff context */}
+      {(selectedA || selectedB || gitSelected) && (
+        <fieldset
+          style={{
+            display: 'flex',
+            gap: 4,
+            padding: '6px 12px',
+            borderTop: '1px solid var(--border, #e5e7eb)',
+            border: 'none',
+            borderTopWidth: 1,
+            borderTopStyle: 'solid',
+            borderTopColor: 'var(--border, #e5e7eb)',
+            margin: 0,
+          }}
+          aria-label="Diff display mode"
+        >
+          <button
+            type="button"
+            aria-pressed={diffMode === 'visual'}
+            onClick={() => setDiffMode('visual')}
+            style={{
+              fontSize: 11,
+              padding: '2px 8px',
+              borderRadius: 3,
+              border: '1px solid var(--border, #e5e7eb)',
+              background: diffMode === 'visual' ? 'var(--accent, #7c3aed)' : 'transparent',
+              color: diffMode === 'visual' ? 'var(--accent-contrast, #fff)' : 'inherit',
+              cursor: 'pointer',
+              fontWeight: diffMode === 'visual' ? 600 : 400,
+            }}
+          >
+            Visual
+          </button>
+          <button
+            type="button"
+            aria-pressed={diffMode === 'unified'}
+            onClick={() => setDiffMode('unified')}
+            style={{
+              fontSize: 11,
+              padding: '2px 8px',
+              borderRadius: 3,
+              border: '1px solid var(--border, #e5e7eb)',
+              background: diffMode === 'unified' ? 'var(--accent, #7c3aed)' : 'transparent',
+              color: diffMode === 'unified' ? 'var(--accent-contrast, #fff)' : 'inherit',
+              cursor: 'pointer',
+              fontWeight: diffMode === 'unified' ? 600 : 400,
+            }}
+          >
+            Unified
+          </button>
+        </fieldset>
+      )}
+
       {/* F4: Disk history (git) */}
       <section
         aria-label="Disk history (git)"
@@ -518,7 +595,7 @@ export function VersionHistory({ docId, editor }: Props) {
                           Could not load this version.
                         </p>
                       )}
-                      {!gitPreviewLoading && gitPreview !== null && (
+                      {!gitPreviewLoading && gitPreview !== null && diffMode === 'visual' && (
                         <figure aria-label={`Content at commit ${shortOid}`} style={{ margin: 0 }}>
                           <pre
                             style={{
@@ -539,6 +616,13 @@ export function VersionHistory({ docId, editor }: Props) {
                           </pre>
                         </figure>
                       )}
+                      {/* F5: unified diff — commit vs current */}
+                      {!gitPreviewLoading && gitPreview !== null && diffMode === 'unified' && (
+                        <UnifiedDiffBlock
+                          patch={gitUnifiedPatch}
+                          label={`Unified diff: commit ${shortOid} vs current`}
+                        />
+                      )}
                     </div>
                   )}
                 </li>
@@ -548,7 +632,7 @@ export function VersionHistory({ docId, editor }: Props) {
         )}
       </section>
 
-      {/* Diff view */}
+      {/* Diff view (version A vs B) */}
       {(selectedA || selectedB) && (
         <section
           aria-label="Version diff"
@@ -578,7 +662,8 @@ export function VersionHistory({ docId, editor }: Props) {
             <p style={{ fontSize: 12, padding: '0 12px', margin: 0 }}>Loading diff…</p>
           )}
 
-          {diffLines !== null && !diffLoading && (
+          {/* Visual diff */}
+          {diffLines !== null && !diffLoading && diffMode === 'visual' && (
             <section
               aria-label="Markdown diff"
               style={{
@@ -616,8 +701,78 @@ export function VersionHistory({ docId, editor }: Props) {
               ))}
             </section>
           )}
+
+          {/* F5: Unified diff */}
+          {versionPatch !== null && !diffLoading && diffMode === 'unified' && (
+            <div style={{ padding: '0 12px' }}>
+              <UnifiedDiffBlock patch={versionPatch} label="Unified diff (A vs B)" />
+            </div>
+          )}
         </section>
       )}
     </aside>
+  )
+}
+
+// ── F5: UnifiedDiffBlock ────────────────────────────────────────────────────
+
+/** Shared renderer for a unified-patch string with per-line colouring. */
+function UnifiedDiffBlock({ patch, label }: { patch: string | null; label: string }): ReactElement {
+  if (patch === null) {
+    return <p style={{ fontSize: 12, margin: 0, color: 'var(--muted, #6b7280)' }}>No diff yet.</p>
+  }
+
+  const lines: UnifiedHunkLine[] = parseUnifiedHunks(patch)
+
+  return (
+    <figure aria-label={label} style={{ margin: 0 }}>
+      <pre
+        style={{
+          margin: 0,
+          padding: 8,
+          fontSize: 11,
+          fontFamily: 'ui-monospace, monospace',
+          background: 'var(--surface-hover, #f9fafb)',
+          border: '1px solid var(--border, #e5e7eb)',
+          borderRadius: 4,
+          maxHeight: 300,
+          overflow: 'auto',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}
+      >
+        {lines.length === 0 && (
+          <span style={{ color: 'var(--muted, #6b7280)' }}>No differences.</span>
+        )}
+        {lines.map((line, i) => (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: unified patch lines have no stable id; index is safe here
+            key={i}
+            style={{
+              background:
+                line.kind === 'add'
+                  ? 'rgba(34, 197, 94, 0.15)'
+                  : line.kind === 'del'
+                    ? 'rgba(239, 68, 68, 0.15)'
+                    : line.kind === 'hunk'
+                      ? 'rgba(59, 130, 246, 0.08)'
+                      : 'transparent',
+              color:
+                line.kind === 'add'
+                  ? '#166534'
+                  : line.kind === 'del'
+                    ? '#991b1b'
+                    : line.kind === 'hunk'
+                      ? '#1d4ed8'
+                      : line.kind === 'meta'
+                        ? 'var(--muted, #6b7280)'
+                        : 'inherit',
+            }}
+          >
+            {line.text}
+          </div>
+        ))}
+      </pre>
+    </figure>
   )
 }

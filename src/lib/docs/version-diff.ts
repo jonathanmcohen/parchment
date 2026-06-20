@@ -9,6 +9,44 @@ export interface DiffLine {
 }
 
 /**
+ * A single line from a unified diff patch, classified by kind.
+ * - 'add'     lines beginning with '+'  (but not '+++')
+ * - 'del'     lines beginning with '-'  (but not '---')
+ * - 'hunk'    lines beginning with '@@'
+ * - 'meta'    '---' / '+++' header lines
+ * - 'context' anything else (unchanged lines, index lines, etc.)
+ */
+export interface UnifiedHunkLine {
+  kind: 'add' | 'del' | 'hunk' | 'meta' | 'context'
+  text: string
+}
+
+/**
+ * Split a unified-patch string into typed lines for per-line colouring.
+ * Pure function — safe to call anywhere.
+ */
+export function parseUnifiedHunks(patch: string): UnifiedHunkLine[] {
+  const lines = patch.split('\n')
+  // Drop trailing empty element produced by a trailing newline.
+  const trimmed = lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines
+  return trimmed.map((text): UnifiedHunkLine => {
+    if (text.startsWith('+++') || text.startsWith('---')) {
+      return { kind: 'meta', text }
+    }
+    if (text.startsWith('+')) {
+      return { kind: 'add', text }
+    }
+    if (text.startsWith('-')) {
+      return { kind: 'del', text }
+    }
+    if (text.startsWith('@@')) {
+      return { kind: 'hunk', text }
+    }
+    return { kind: 'context', text }
+  })
+}
+
+/**
  * Produce a flat array of DiffLine objects from two markdown strings.
  * Each line of each hunk is emitted as a separate DiffLine.
  */

@@ -9,6 +9,7 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
+import { BacklinksPanel } from '@/components/editor/BacklinksPanel'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { CommentsSidebar } from '@/components/editor/CommentsSidebar'
 import { CropDialog } from '@/components/editor/CropDialog'
@@ -27,6 +28,7 @@ import { VersionHistory } from '@/components/editor/VersionHistory'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
+import { WikiSuggestionExtension } from '@/lib/editor/extensions/wiki-suggestion'
 import { DEFAULT_PAGE_SETUP, type PageSetup } from '@/lib/editor/paginate'
 import { type Reader, throttle } from '@/lib/editor/reading-presence'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
@@ -275,6 +277,9 @@ export function Editor({
   // D2: suggestions panel toggle
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
 
+  // F6: backlinks panel toggle
+  const [backlinksOpen, setBacklinksOpen] = useState(false)
+
   // D5: reading presence readers list + canvas wrapper ref
   const [readers, setReaders] = useState<Reader[]>([])
   const canvasWrapRef = useRef<HTMLDivElement>(null)
@@ -331,6 +336,9 @@ export function Editor({
       FindReplaceExtension.configure({ onOpen: openFind }),
       // B12: slash menu — onOpenImage delegates to the existing image dialog.
       SlashMenuExtension.configure({ onOpenImage: openImageDialog }),
+      // F6: [[ autocomplete — drives the React WikiSuggestionMenu popup. Wired
+      // here (not baseExtensions) so its ReactRenderer popup only loads client-side.
+      WikiSuggestionExtension,
     ],
     editorProps: {
       attributes: { class: 'parchment-prose', 'aria-label': 'Document editor' },
@@ -527,6 +535,8 @@ export function Editor({
           versionHistoryOpen={versionHistoryOpen}
           onToggleSuggestions={() => setSuggestionsOpen((v) => !v)}
           suggestionsOpen={suggestionsOpen}
+          onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
+          backlinksOpen={backlinksOpen}
         />
       )}
 
@@ -565,6 +575,9 @@ export function Editor({
 
         {/* D2: suggestions panel (right rail) */}
         {editor && suggestionsOpen && <SuggestionsPanel editor={editor} />}
+
+        {/* F6: backlinks panel (right rail) */}
+        {editor && backlinksOpen && <BacklinksPanel docId={docId} />}
       </div>
 
       {/* Selection bubble menu (B2) */}

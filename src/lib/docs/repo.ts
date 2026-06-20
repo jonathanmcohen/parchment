@@ -1,6 +1,8 @@
 import { and, desc, eq, ilike, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { removeDocFromDisk, syncDocToDisk } from '@/lib/disk/mirror'
+import { extractTargetIds } from '@/lib/docs/doc-links'
+import { setDocLinks } from '@/lib/docs/doc-links-repo'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
@@ -38,6 +40,16 @@ export async function saveDocument(
       updatedAt: new Date(),
     })
     .where(eq(schema.documents.id, id))
+
+  // F6: best-effort wiki-link index — extract this doc's [[wiki]] targets from
+  // the PM JSON and replace its doc_links rows. A failure here must NEVER break
+  // the save (e.g. a target referencing a since-deleted doc), so it is wrapped.
+  try {
+    const targetIds = extractTargetIds(data.contentJson)
+    await setDocLinks(id, targetIds)
+  } catch {
+    // ignore — link indexing is best-effort
+  }
 
   // Best-effort embedding generation — never blocks or fails the save.
   if (isSemanticEnabled()) {

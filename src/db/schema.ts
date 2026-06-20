@@ -248,5 +248,26 @@ export const documentTags = pgTable(
   (t) => [primaryKey({ columns: [t.docId, t.tagId] }), index('document_tags_tag_idx').on(t.tagId)],
 )
 
+// ─── Doc links (F6) — wiki-link graph: source doc → target doc ───────────────
+// A row per directed [[wiki]] link from sourceDoc to targetDoc. The composite
+// PK dedupes multiple links to the same target. doc_links_target_idx powers the
+// backlinks query (who links to this doc?). Both FKs cascade on doc delete so
+// the link index never dangles.
+export const docLinks = pgTable(
+  'doc_links',
+  {
+    sourceDocId: uuid('source_doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    targetDocId: uuid('target_doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sourceDocId, t.targetDocId] }),
+    index('doc_links_target_idx').on(t.targetDocId),
+  ],
+)
+
 // Hint for the migration generator: ensure extensions exist.
 export const _extensions = sql`create extension if not exists vector;`

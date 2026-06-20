@@ -9,6 +9,7 @@ import { PageBreakExtension, SectionBreakExtension } from '@/lib/editor/extensio
 import { Suggesting } from '@/lib/editor/extensions/suggesting'
 import { tableExtensions } from '@/lib/editor/extensions/table'
 import { TocExtension } from '@/lib/editor/extensions/toc'
+import { WikiLink } from '@/lib/editor/extensions/wiki-link'
 import { inlineExtensions } from '@/lib/editor/inline-extensions'
 
 // Base node/mark set. History is disabled because Collaboration (Yjs) provides
@@ -52,6 +53,10 @@ export const baseExtensions = [
   CommentMark,
   // D2: suggesting mode — tracked insertions/deletions.
   Suggesting,
+  // F6: [[wiki]] link inline atom node (renders + serializes as [[Label]]).
+  // The `[[` autocomplete (WikiSuggestionExtension) is added in Editor.tsx so
+  // it can drive the React popup, matching the SlashMenu wiring below.
+  WikiLink,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

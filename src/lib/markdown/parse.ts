@@ -58,6 +58,44 @@ function textNode(s: string, marks: Mark[]): PMNode | null {
   return { type: 'text', text: s, ...(marks.length ? { marks } : {}) }
 }
 
+// F6: `[[Label]]` wiki-link recognition. A non-greedy capture of any chars
+// except `[` and `]` between double brackets so `[[A]] x [[B]]` yields two
+// distinct links and a stray `]]` cannot over-match.
+const WIKI_LINK_RE = /\[\[([^[\]]+)\]\]/g
+
+/**
+ * F6: split a literal text run into a mix of plain text nodes and wikiLink atom
+ * nodes wherever `[[Label]]` appears. Marks carry onto the surrounding text but
+ * NOT onto the wikiLink atom (its content is fixed). The targetId is left ''
+ * (unresolved) — markdownToJson is sync and must not hit @/db, so hand-typed
+ * `[[Label]]` from external markdown resolves its id only when the doc is
+ * reopened/relinked in the editor. This is the documented GAP.
+ */
+function splitWikiLinks(s: string, marks: Mark[]): PMNode[] {
+  if (!s.includes('[[')) {
+    const n = textNode(s, marks)
+    return n ? [n] : []
+  }
+  const out: PMNode[] = []
+  let last = 0
+  WIKI_LINK_RE.lastIndex = 0
+  let m: RegExpExecArray | null = WIKI_LINK_RE.exec(s)
+  while (m !== null) {
+    if (m.index > last) {
+      const before = textNode(s.slice(last, m.index), marks)
+      if (before) out.push(before)
+    }
+    out.push({ type: 'wikiLink', attrs: { targetId: '', label: m[1] ?? '' } })
+    last = m.index + m[0].length
+    m = WIKI_LINK_RE.exec(s)
+  }
+  if (last < s.length) {
+    const tail = textNode(s.slice(last), marks)
+    if (tail) out.push(tail)
+  }
+  return out
+}
+
 /** Walk inline tokens → text nodes (+ hardBreak), accumulating marks. */
 function inline(tokens: Tok[] | undefined, marks: Mark[]): PMNode[] {
   const out: PMNode[] = []
@@ -85,12 +123,12 @@ function inline(tokens: Tok[] | undefined, marks: Mark[]): PMNode[] {
         break
       default: {
         // text / escape / html / anything else: emit its nested inline tokens if
-        // present, else its literal text.
+        // present, else its literal text — splitting out any `[[Label]]` wiki
+        // links (F6) from the literal run.
         if (t.tokens && t.tokens.length > 0) {
           out.push(...inline(t.tokens, marks))
         } else {
-          const n = textNode(t.text ?? '', marks)
-          if (n) out.push(n)
+          out.push(...splitWikiLinks(t.text ?? '', marks))
         }
       }
     }

@@ -79,6 +79,10 @@ function serializeInline(content: PMNode[] | undefined): string {
       if (n.type === 'hardBreak') return '\n'
       // B8: footnote reference → [^N] in GFM style
       if (n.type === 'footnoteRef') return `[^${String(n.attrs?.number ?? 1)}]`
+      // F6: wiki link → [[Label]] (only the label is emitted; the targetId is
+      // NOT stored in markdown — it is resolved on parse by title lookup, which
+      // is a documented GAP in parse.ts since markdownToJson stays sync).
+      if (n.type === 'wikiLink') return `[[${String(n.attrs?.label ?? '')}]]`
       return serializeInline(n.content)
     })
     .join('')

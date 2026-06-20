@@ -2,8 +2,9 @@
 import { describe, expect, it } from 'vitest'
 import { markdownToJson } from '@/lib/markdown/parse'
 
-// F2: markdown → ProseMirror JSON via marked → HTML → @tiptap/html generateJSON.
-// Standard markdown round-trips; Parchment custom blocks are F3 (lossless form).
+// F2: markdown → ProseMirror JSON via a hand-rolled marked-token walk (no editor
+// graph / no @tiptap/html — must load in the Next server runtime). Standard
+// markdown round-trips; Parchment custom blocks are F3 (lossless form).
 
 type Node = {
   type?: string

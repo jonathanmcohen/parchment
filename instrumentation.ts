@@ -8,6 +8,13 @@
 
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
-  const { startDiskWatcher } = await import('./src/lib/disk/watcher')
-  await startDiskWatcher()
+  // NEVER let instrumentation crash server startup: an error loading or starting
+  // the watcher must degrade to "reverse-sync disabled", not "Failed to prepare
+  // server". The await import is inside the try so a module-eval error is caught.
+  try {
+    const { startDiskWatcher } = await import('./src/lib/disk/watcher')
+    await startDiskWatcher()
+  } catch (err) {
+    console.error('[parchment-disk] reverse-sync watcher failed to start (disabled):', err)
+  }
 }

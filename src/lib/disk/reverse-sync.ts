@@ -130,6 +130,8 @@ export async function handleExternalChange(absFilePath: string): Promise<ChangeC
       // still what we read. A concurrent write moves the baseline, rowCount === 0,
       // and we re-handle from scratch (re-read + re-classify) so the now-current
       // state decides echo / apply / conflict — never an unconditional overwrite.
+      // markdownToJson is a hand-rolled marked-token walk (no editor graph / no
+      // @tiptap/html) precisely so it loads + runs in the Next server runtime.
       const json = markdownToJson(content)
       const baselineGuard =
         doc.diskSyncedHash == null

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { DiffLine, UnifiedHunkLine } from '@/lib/docs/version-diff'
 import { diffMarkdown, parseUnifiedHunks, unifiedPatch } from '@/lib/docs/version-diff'
 import type { Version, VersionSummary } from '@/lib/docs/versions-shared'
+import { serializeMarkdown } from '@/lib/markdown/serialize'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -145,14 +146,10 @@ export function VersionHistory({ docId, editor }: Props) {
         const body = (await res.json()) as { content: string }
         setGitPreview(body.content)
         // F5: compute unified diff between this commit and the current doc content.
-        // editor.storage.markdown?.getMarkdown() gives the markdown if the markdown extension is loaded;
-        // fall back to a plain-text extraction from the editor content.
-        const currentMd: string =
-          // biome-ignore lint/suspicious/noExplicitAny: Tiptap extension storage shape is not typed
-          typeof (editor.storage as any)?.markdown?.getMarkdown === 'function'
-            ? // biome-ignore lint/suspicious/noExplicitAny: same reason
-              (editor.storage as any).markdown.getMarkdown()
-            : editor.getText()
+        // Canonical current markdown via the same serializer the autosave + disk
+        // mirror use, so the diff vs a commit's stored markdown is apples-to-apples
+        // (editor.getText() would be plain text and produce a noisy diff).
+        const currentMd: string = serializeMarkdown(editor.getJSON())
         const shortOid = oid.slice(0, 7)
         setGitUnifiedPatch(unifiedPatch(body.content, currentMd, `commit ${shortOid}`, 'current'))
       } catch {

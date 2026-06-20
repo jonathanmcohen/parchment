@@ -10,6 +10,7 @@ import { and, eq, isNotNull, isNull, ne } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { folderPath } from '@/lib/docs/folder-tree'
 import { listFolders } from '@/lib/docs/folders-repo'
+import { sha256 } from './hash'
 import { disambiguate, docRelPath } from './paths'
 
 /** Read the files root at call time so tests can override PARCHMENT_FILES_ROOT. */
@@ -70,8 +71,9 @@ export async function syncDocToDisk(docId: string): Promise<string | null> {
     const abs = absPath(relPath)
 
     // Write the file
+    const markdown = doc.markdown ?? ''
     await mkdir(dirname(abs), { recursive: true })
-    await writeFile(abs, doc.markdown ?? '', 'utf8')
+    await writeFile(abs, markdown, 'utf8')
 
     // Remove old file if path changed
     const oldRelPath = doc.diskPath
@@ -96,10 +98,13 @@ export async function syncDocToDisk(docId: string): Promise<string | null> {
       }
     }
 
-    // Update disk_path in db
+    // Update disk_path + sync baseline in db. Setting disk_synced_hash to the
+    // sha256 of exactly what we just wrote makes the reverse-sync watcher
+    // classify the resulting filesystem event as an 'echo' (our own write) — the
+    // key to a provably terminating doc→disk→doc loop (F2).
     await db
       .update(schema.documents)
-      .set({ diskPath: relPath })
+      .set({ diskPath: relPath, diskSyncedHash: sha256(markdown) })
       .where(eq(schema.documents.id, docId))
 
     return relPath

@@ -74,6 +74,10 @@ export const documents = pgTable(
     trashedAt: timestamp('trashed_at', { withTimezone: true }),
     starred: boolean('starred').notNull().default(false),
     diskPath: text('disk_path'),
+    // F2: sha256 of the markdown last known to be in-sync between DB and disk.
+    // The reverse-sync watcher uses it to classify external file changes
+    // (echo vs. external edit vs. conflict).
+    diskSyncedHash: text('disk_synced_hash'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

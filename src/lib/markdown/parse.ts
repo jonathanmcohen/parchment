@@ -19,6 +19,15 @@
 //                           (cell `formula`, colspan/rowspan/colwidth preserved)
 // A malformed/un-parseable parchment fence degrades to a plain codeBlock and
 // NEVER throws. Footnotes round-trip via GFM `[^N]` syntax, not a fence.
+//
+// RESERVED NAMESPACE — the `parchment:` code-fence language prefix is a
+// deliberate reconstruction sentinel (matched by /^parchment:(\S+)/ in the
+// `code` token handler). Users MUST NOT author an ordinary code block whose
+// language starts with `parchment:`; such a fence is interpreted as a custom
+// block, not preserved as code. Note in particular that `parchment:pagebreak`
+// is reconstructed to `{type:'pageBreak'}` UNCONDITIONALLY and its body is
+// discarded — a known, lossy edge for this reserved prefix. An unrecognized
+// kind or a malformed body falls through to a plain codeBlock (never throws).
 
 import { marked } from 'marked'
 
@@ -125,7 +134,16 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
         },
       }
     case 'toc':
-      return { type: 'toc', attrs: data }
+      // Mirror the sectionBreak treatment: project the known attr onto its
+      // schema default (toc.ts: showPageNumbers defaults to false) so an
+      // attr-less or partial body reconstructs to the exact editor node rather
+      // than trusting the raw JSON verbatim.
+      return {
+        type: 'toc',
+        attrs: {
+          showPageNumbers: typeof data.showPageNumbers === 'boolean' ? data.showPageNumbers : false,
+        },
+      }
     case 'table': {
       // The body is the full table node JSON; validate its shape before trusting
       // it (so a stray `parchment:table` fence cannot inject a non-table node).

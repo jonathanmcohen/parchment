@@ -18,6 +18,14 @@
 // GFM `[^N]` / `[^N]:` definitions and round-trip via that GFM form, not a
 // parchment fence.
 //
+// RESERVED NAMESPACE: the `parchment:` code-fence language prefix is a reserved
+// reconstruction sentinel (see parse.ts). A custom block emits `parchment:<kind>`
+// here and parse.ts reconstructs the exact node. A user-authored ordinary code
+// block whose language *also* begins with `parchment:` would collide with this
+// sentinel on the next parse (e.g. `parchment:pagebreak` reconstructs to a
+// pageBreak and DROPS the code body). This is a deliberate, documented edge —
+// users must not author a `parchment:`-prefixed code-block language.
+//
 // CONSTRAINT: this module runs in the Next.js *server* runtime — it must NOT
 // import the editor extension graph, @tiptap/html, or any DOM. The parchment
 // fences are produced with plain JSON.stringify, no editor deps.
@@ -122,7 +130,7 @@ function serializeBlock(node: PMNode): string {
     case 'sectionBreak':
       return parchmentFence('section', JSON.stringify(sectionAttrs(node.attrs)))
     case 'toc':
-      return parchmentFence('toc', JSON.stringify(node.attrs ?? {}))
+      return parchmentFence('toc', JSON.stringify(tocAttrs(node.attrs)))
     case 'table':
       return parchmentFence(
         'table',
@@ -181,6 +189,18 @@ function sectionAttrs(attrs: Record<string, unknown> | undefined): Record<string
     footerText: a.footerText ?? '',
     pageNumberFormat: a.pageNumberFormat ?? '1',
     pageNumberPosition: a.pageNumberPosition ?? 'center',
+  }
+}
+
+/**
+ * F3: project a toc node's attrs onto its schema default so `{type:'toc'}` and
+ * `{type:'toc',attrs:{showPageNumbers:false}}` serialize identically. Mirrors
+ * sectionAttrs() and TocExtension.addAttributes() (showPageNumbers default false).
+ */
+function tocAttrs(attrs: Record<string, unknown> | undefined): Record<string, unknown> {
+  const a = attrs ?? {}
+  return {
+    showPageNumbers: typeof a.showPageNumbers === 'boolean' ? a.showPageNumbers : false,
   }
 }
 

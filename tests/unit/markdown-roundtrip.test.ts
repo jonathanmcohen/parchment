@@ -69,7 +69,7 @@ describe('F3 — lossless custom-block round-trip', () => {
     expect(node?.attrs).toEqual(original.attrs)
   })
 
-  it('toc round-trips', () => {
+  it('toc round-trips (full node deep-equals, showPageNumbers:true)', () => {
     const original = { type: 'toc', attrs: { showPageNumbers: true } }
     const md = serializeMarkdown(doc(original))
     expect(md).toContain('```parchment:toc')
@@ -77,7 +77,34 @@ describe('F3 — lossless custom-block round-trip', () => {
     const back = roundTrip(doc(original))
     const node = find(back, (n) => n.type === 'toc')
     expect(node).toBeDefined()
-    expect(node?.attrs).toEqual({ showPageNumbers: true })
+    // Full-node deep equality, not just attrs.
+    expect(node).toEqual(original)
+  })
+
+  it('toc with default attrs (showPageNumbers:false) round-trips (full node deep-equals)', () => {
+    const original = { type: 'toc', attrs: { showPageNumbers: false } }
+    const md = serializeMarkdown(doc(original))
+    expect(md).toContain('```parchment:toc')
+
+    const back = roundTrip(doc(original))
+    const node = find(back, (n) => n.type === 'toc')
+    expect(node).toBeDefined()
+    expect(node).toEqual(original)
+  })
+
+  it('attr-less toc {type:toc} reconstructs to the schema default (showPageNumbers:false)', () => {
+    // An attr-less toc must backfill the schema default on parse, so it ends up
+    // deep-equal to a real editor toc node (which always carries showPageNumbers).
+    const attrLess = { type: 'toc' }
+    const defaulted = { type: 'toc', attrs: { showPageNumbers: false } }
+
+    // serialize is symmetric: {type:'toc'} and the defaulted node emit identically.
+    expect(serializeMarkdown(doc(attrLess))).toBe(serializeMarkdown(doc(defaulted)))
+
+    const back = roundTrip(doc(attrLess))
+    const node = find(back, (n) => n.type === 'toc')
+    expect(node).toBeDefined()
+    expect(node).toEqual(defaulted)
   })
 
   it('a table WITH a formula cell round-trips via parchment:table (formula preserved)', () => {

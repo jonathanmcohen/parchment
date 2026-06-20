@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -110,6 +110,10 @@ describe('F4 — git repo module', () => {
     await commitPath('gone.md', 'add gone.md')
     expect((await logForPath('gone.md')).length).toBe(1)
 
+    // Delete the file from disk first — removeAndCommit only stages a deletion
+    // when the file is genuinely gone from the work tree (it guards against the
+    // phantom unlink emitted by atomic-rename saves while the file still exists).
+    await rm(join(filesDir, 'gone.md'))
     const delOid = await removeAndCommit('gone.md', 'delete: gone.md')
     expect(delOid).toBeTypeOf('string')
 

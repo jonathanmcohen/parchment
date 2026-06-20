@@ -19,6 +19,8 @@ type Props = {
   versionHistoryOpen: boolean
   onToggleSuggestions: () => void
   suggestionsOpen: boolean
+  onToggleBacklinks: () => void
+  backlinksOpen: boolean
 }
 
 const FONT_FAMILIES = [
@@ -119,6 +121,8 @@ export function Toolbar({
   versionHistoryOpen,
   onToggleSuggestions,
   suggestionsOpen,
+  onToggleBacklinks,
+  backlinksOpen,
 }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
@@ -723,6 +727,18 @@ export function Toolbar({
         onClick={onToggleVersionHistory}
       >
         🕐
+      </button>
+
+      {/* ── F6: Toggle backlinks panel ───────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Backlinks"
+        aria-pressed={backlinksOpen}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={onToggleBacklinks}
+      >
+        🔙
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />

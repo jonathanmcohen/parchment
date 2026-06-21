@@ -172,6 +172,27 @@ describe('G1 — shares repo', () => {
     expect(await verifySharePassword(openShare, 'anything')).toBe(true)
   })
 
+  it('trashing a shared doc revokes its shares → resolveShare returns null', async () => {
+    const { createShare, resolveShare } = await import('@/lib/docs/shares-repo')
+    const { trashDocument } = await import('@/lib/docs/repo')
+    const c = new Client({ connectionString: container.getConnectionUri() })
+    await c.connect()
+    const { rows } = await c.query<{ id: string }>(
+      `INSERT INTO documents (title, owner_id, markdown) VALUES ('Trash Me', $1, 'secret\n') RETURNING id`,
+      [ownerId],
+    )
+    const trashDocId = rows[0]?.id ?? ''
+    await c.end()
+
+    const { token } = await createShare(ownerId, trashDocId, { permission: 'view' })
+    expect(await resolveShare(token)).not.toBeNull()
+
+    // The owner's "take it down" gesture must revoke the link (soft delete does
+    // NOT fire the FK cascade, so trashDocument deletes the shares directly).
+    await trashDocument(ownerId, trashDocId)
+    expect(await resolveShare(token)).toBeNull()
+  })
+
   it('FK cascade: deleting the doc removes its shares', async () => {
     const { createShare, resolveShare } = await import('@/lib/docs/shares-repo')
     const c = new Client({ connectionString: container.getConnectionUri() })

@@ -36,9 +36,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   }
 
   const doc = await getDocument(share.docId)
-  // Defensive: the FK cascades on doc delete, so a resolved share implies the doc
-  // exists; treat a missing doc as an invalid link rather than leaking anything.
-  if (!doc) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  // Defensive: the FK cascades on doc HARD-delete, so a resolved share implies the
+  // doc row exists; treat a missing doc as an invalid link rather than leaking.
+  //
+  // SECURITY: a SOFT-deleted (trashed) doc must also be treated as gone. Trashing
+  // is the owner's natural "take it down" gesture, but it only sets trashedAt and
+  // does not fire the FK cascade — so the share row (and this anonymous path) would
+  // otherwise keep serving the full title + content. getDocument has no trashedAt
+  // filter, so we gate here. Return the SAME 404 as a missing/expired link so this
+  // path never becomes an existence oracle. (trashDocument also deletes the doc's
+  // shares for defense-in-depth, so a resolved-but-trashed share is the rare race.)
+  if (!doc || doc.trashedAt !== null)
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   // Return ONLY the public viewer shape — no ownerId, no passwordHash, no
   // disk/sync/embedding internals.

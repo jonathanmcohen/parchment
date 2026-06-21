@@ -248,6 +248,34 @@ export const documentTags = pgTable(
   (t) => [primaryKey({ columns: [t.docId, t.tagId] }), index('document_tags_tag_idx').on(t.tagId)],
 )
 
+// ─── Shares (G1) — capability-link sharing for a doc ─────────────────────────
+// A row is a shareable link to a single doc. `token` is the capability carried
+// in the public URL (32 random bytes, base64url — see shares-repo). The link
+// existing == "anyone with the link" on; revoking deletes the row. `permission`
+// stores the owner's intent (view|comment|edit|suggest) but v0.1 only RENDERS
+// read-only on the public route — anonymous writes are an explicit v0.2 GAP.
+// `passwordHash` (argon2, null = no password) and `expiresAt` (null = never) are
+// enforced SERVER-SIDE in resolveShare / verifySharePassword and the API; the
+// public data path NEVER returns the hash or any owner/other-doc data.
+export const shares = pgTable(
+  'shares',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    token: text('token').notNull().unique(), // 32-byte base64url; the URL capability
+    permission: text('permission').notNull().default('view'), // view|comment|edit|suggest
+    passwordHash: text('password_hash'), // argon2, null = no password
+    expiresAt: timestamp('expires_at', { withTimezone: true }), // null = never
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('shares_doc_idx').on(t.docId), index('shares_token_idx').on(t.token)],
+)
+
 // ─── Doc links (F6) — wiki-link graph: source doc → target doc ───────────────
 // A row per directed [[wiki]] link from sourceDoc to targetDoc. The composite
 // PK dedupes multiple links to the same target. doc_links_target_idx powers the

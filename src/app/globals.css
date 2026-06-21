@@ -2312,3 +2312,122 @@ body {
 .collaboration-carets__selection {
   background-color: rgba(0, 0, 0, 0.08);
 }
+
+/* ─── G1: Share dialog list + public share viewer ─────────────────────────── */
+.parchment-share-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.parchment-share-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.parchment-share-list-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.parchment-share-list-url {
+  font-size: 0.78rem;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+.parchment-share-list-tags {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.parchment-share-list-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.parchment-share-error {
+  color: #b91c1c;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* Public viewer (/share/[token]) — no app chrome. */
+.parchment-share-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 16px;
+  background: var(--background);
+}
+
+.parchment-share-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.parchment-share-card {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.12);
+  width: min(380px, 96vw);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.parchment-share-heading {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--foreground);
+}
+
+.parchment-share-doc {
+  width: min(820px, 100%);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 48px 56px;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.06);
+}
+
+.parchment-share-title {
+  font-size: 1.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px;
+  color: var(--foreground);
+}
+
+.parchment-share-note {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 8px 12px;
+  margin: 0 0 20px;
+}
+
+.parchment-share-empty {
+  color: var(--muted);
+  font-style: italic;
+}

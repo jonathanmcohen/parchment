@@ -21,6 +21,7 @@ type Props = {
   suggestionsOpen: boolean
   onToggleBacklinks: () => void
   backlinksOpen: boolean
+  onOpenShare: () => void
 }
 
 const FONT_FAMILIES = [
@@ -123,6 +124,7 @@ export function Toolbar({
   suggestionsOpen,
   onToggleBacklinks,
   backlinksOpen,
+  onOpenShare,
 }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
@@ -761,6 +763,19 @@ export function Toolbar({
             ON
           </span>
         )}
+      </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── G1: Share document ────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Share"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={onOpenShare}
+      >
+        🔗
       </button>
     </div>
   )

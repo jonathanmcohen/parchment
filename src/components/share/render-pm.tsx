@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from 'react'
+import { plantumlImageUrl } from '@/lib/editor/plantuml'
 
 // G1: a small, XSS-safe ProseMirror-JSON → React renderer for the PUBLIC share
 // viewer. Renders the common StarterKit node/mark set used by the editor as
@@ -130,6 +131,90 @@ function renderNode(node: PMNode, key: number): ReactNode {
           alt="Drawing"
           style={{ maxWidth: '100%', display: 'block' }}
         />
+      )
+    }
+    case 'drawio': {
+      // G6c: render the stored SVG snapshot as a data-URI <img> (XSS-safe:
+      // SVG-in-img cannot execute scripts). Empty svg → a muted placeholder.
+      const svg = str(node.attrs?.svg)
+      if (!svg) {
+        return (
+          <p key={key} style={{ color: '#999', fontStyle: 'italic' }}>
+            Diagram
+          </p>
+        )
+      }
+      return (
+        // biome-ignore lint/performance/noImgElement: SVG data-URI cannot use next/image (no src optimization applies to inline data URIs); this is the XSS-safe rendering path for owner-authored SVG
+        <img
+          key={key}
+          src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
+          alt="Diagram"
+          style={{ maxWidth: '100%', display: 'block' }}
+        />
+      )
+    }
+    case 'mermaid': {
+      // G6a: the share viewer cannot run mermaid (client-only lib). Render the
+      // source in a <pre> with a muted label. v0.1 documented choice: mermaid
+      // is a client-only renderer; the public read-only viewer is server-rendered
+      // and must not import mermaid. A prerendered SVG is not stored in the node
+      // (unlike drawing), so the only viable fallback is the source in a code block.
+      const src = str(node.attrs?.source)
+      return (
+        <div key={key} style={{ margin: '1em 0' }}>
+          <p
+            style={{ color: '#999', fontStyle: 'italic', fontSize: '0.85em', margin: '0 0 0.25em' }}
+          >
+            Mermaid diagram
+          </p>
+          <pre
+            style={{
+              background: '#f5f5f5',
+              padding: '0.75em',
+              borderRadius: '4px',
+              overflow: 'auto',
+              fontSize: '0.85em',
+            }}
+          >
+            <code>{src ?? ''}</code>
+          </pre>
+        </div>
+      )
+    }
+    case 'plantuml': {
+      // G6b: render via the configured PlantUML server when enabled; otherwise
+      // fall back to the source in a <pre>. The public viewer respects the same
+      // NEXT_PUBLIC_PLANTUML_SERVER_URL env gate as the editor.
+      const src = str(node.attrs?.source)
+      const url = src ? plantumlImageUrl(src) : null
+      return url !== null ? (
+        // biome-ignore lint/performance/noImgElement: external PlantUML server URL cannot use next/image (dynamic src from user-configured endpoint)
+        <img
+          key={key}
+          src={url}
+          alt="PlantUML diagram"
+          style={{ maxWidth: '100%', display: 'block' }}
+        />
+      ) : (
+        <div key={key} style={{ margin: '1em 0' }}>
+          <p
+            style={{ color: '#999', fontStyle: 'italic', fontSize: '0.85em', margin: '0 0 0.25em' }}
+          >
+            PlantUML diagram
+          </p>
+          <pre
+            style={{
+              background: '#f5f5f5',
+              padding: '0.75em',
+              borderRadius: '4px',
+              overflow: 'auto',
+              fontSize: '0.85em',
+            }}
+          >
+            <code>{src ?? ''}</code>
+          </pre>
+        </div>
       )
     }
     case 'hardBreak':

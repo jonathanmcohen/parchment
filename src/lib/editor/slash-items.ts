@@ -104,6 +104,27 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'MEDIA',
     keywords: ['drawing', 'sketch', 'excalidraw', 'diagram', 'whiteboard', 'canvas', 'draw'],
   },
+  // G6a: Mermaid diagram embed.
+  {
+    id: 'mermaid',
+    title: 'Mermaid',
+    category: 'MEDIA',
+    keywords: ['mermaid', 'diagram', 'flowchart', 'sequence', 'gantt'],
+  },
+  // G6b: PlantUML diagram embed.
+  {
+    id: 'plantuml',
+    title: 'PlantUML',
+    category: 'MEDIA',
+    keywords: ['plantuml', 'uml', 'diagram', 'sequence', 'class', 'component'],
+  },
+  // G6c: Drawio diagram embed.
+  {
+    id: 'drawio',
+    title: 'Drawio',
+    category: 'MEDIA',
+    keywords: ['drawio', 'diagrams.net', 'diagram', 'flowchart', 'uml', 'draw', 'embed'],
+  },
 
   // ── EMBED ────────────────────────────────────────────────────────────────
   {

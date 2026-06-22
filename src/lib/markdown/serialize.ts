@@ -194,6 +194,34 @@ function serializeBlock(node: PMNode): string {
           attrs: { scene: node.attrs?.scene ?? null, svg: node.attrs?.svg ?? '' },
         }),
       )
+    // G6a: mermaid — emit as a standard ```mermaid code fence (NOT a
+    // parchment: fence) so it is portable and disk-mirror friendly. No mermaid
+    // import — source is a plain string stored in the node attr.
+    case 'mermaid': {
+      const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
+      return `\`\`\`\`mermaid\n${src}\n\`\`\`\``
+    }
+    // G6b: plantuml — emit as a standard ```plantuml code fence (NOT a
+    // parchment: fence) so it is portable and disk-mirror friendly. No
+    // plantuml import — source is a plain string stored in the node attr.
+    case 'plantuml': {
+      const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
+      return `\`\`\`\`plantuml\n${src}\n\`\`\`\``
+    }
+    // G6c: drawio — emit the full node JSON (xml + svg) as a parchment:drawio
+    // fence so parse.ts can reconstruct it losslessly. NO drawio import — xml
+    // and svg are plain strings already stored in the node attrs.
+    case 'drawio':
+      return parchmentFence(
+        'drawio',
+        JSON.stringify({
+          type: 'drawio',
+          attrs: {
+            xml: typeof node.attrs?.xml === 'string' ? node.attrs.xml : '',
+            svg: typeof node.attrs?.svg === 'string' ? node.attrs.svg : '',
+          },
+        }),
+      )
     default:
       return serializeInline(node.content)
   }

@@ -14,13 +14,16 @@ import { BacklinksPanel } from '@/components/editor/BacklinksPanel'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { CommentsSidebar } from '@/components/editor/CommentsSidebar'
 import { CropDialog } from '@/components/editor/CropDialog'
+import { DrawioModal } from '@/components/editor/DrawioModal'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { MathPopover } from '@/components/editor/MathPopover'
+import { MermaidPopover } from '@/components/editor/MermaidPopover'
 import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
+import { PlantumlPopover } from '@/components/editor/PlantumlPopover'
 import { ReadingPresence } from '@/components/editor/ReadingPresence'
 import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
 import { ShareDialog } from '@/components/editor/ShareDialog'
@@ -288,6 +291,25 @@ export function Editor({
   // node being edited (null = closed). Opened via parchment:edit-drawing event
   // dispatched by DrawingView (click) and insertDrawing command (new node).
   const [drawingEdit, setDrawingEdit] = useState<{ pos: number; scene: object | null } | null>(null)
+
+  // G6a: mermaid editor popover — holds the doc position + current source of
+  // the mermaid node being edited (null = closed). Opened via
+  // parchment:edit-mermaid event dispatched by MermaidView (click) and from
+  // the slash-menu handler after insertMermaid().run().
+  const [mermaidEdit, setMermaidEdit] = useState<{ pos: number; source: string } | null>(null)
+
+  // G6b: plantuml editor popover — holds the doc position + current source of
+  // the plantuml node being edited (null = closed). Opened via
+  // parchment:edit-plantuml event dispatched by PlantumlView (click) and from
+  // the slash-menu handler after insertPlantuml().run().
+  const [plantumlEdit, setPlantumlEdit] = useState<{ pos: number; source: string } | null>(null)
+
+  // G6c: drawio editor modal — holds the doc position + current xml of the
+  // drawio node being edited (null = closed). Opened via parchment:edit-drawio
+  // event dispatched by DrawioView (click) and from the slash-menu handler
+  // after insertDrawio().run().
+  const [drawioEdit, setDrawioEdit] = useState<{ pos: number; xml: string } | null>(null)
+
   const openMathEditor = useCallback((pos: number) => {
     setMathEdit({ pos, latex: '' })
   }, [])
@@ -536,6 +558,51 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-drawing', handler)
   }, [editor])
 
+  // G6a: mermaid NodeViews dispatch parchment:edit-mermaid {pos, source} on
+  // click — open the mermaid popover seeded with the clicked node's source.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; source: string }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        setMermaidEdit({ pos: detail.pos, source: detail.source ?? '' })
+      }
+    }
+    dom.addEventListener('parchment:edit-mermaid', handler)
+    return () => dom.removeEventListener('parchment:edit-mermaid', handler)
+  }, [editor])
+
+  // G6b: plantuml NodeViews dispatch parchment:edit-plantuml {pos, source} on
+  // click — open the plantuml popover seeded with the clicked node's source.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; source: string }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        setPlantumlEdit({ pos: detail.pos, source: detail.source ?? '' })
+      }
+    }
+    dom.addEventListener('parchment:edit-plantuml', handler)
+    return () => dom.removeEventListener('parchment:edit-plantuml', handler)
+  }, [editor])
+
+  // G6c: drawio NodeViews dispatch parchment:edit-drawio {pos, xml} on click
+  // — open the drawio modal seeded with the clicked node's current XML.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; xml: string }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        setDrawioEdit({ pos: detail.pos, xml: detail.xml ?? '' })
+      }
+    }
+    dom.addEventListener('parchment:edit-drawio', handler)
+    return () => dom.removeEventListener('parchment:edit-drawio', handler)
+  }, [editor])
+
   // D5: publish own awareness presence + reading position
   useEffect(() => {
     if (!editor || !provider) return
@@ -679,6 +746,36 @@ export function Editor({
           pos={drawingEdit.pos}
           initialScene={drawingEdit.scene}
           onClose={() => setDrawingEdit(null)}
+        />
+      )}
+
+      {/* G6a: Mermaid diagram editor popover */}
+      {editor && mermaidEdit !== null && (
+        <MermaidPopover
+          editor={editor}
+          pos={mermaidEdit.pos}
+          initialSource={mermaidEdit.source}
+          onClose={() => setMermaidEdit(null)}
+        />
+      )}
+
+      {/* G6b: PlantUML diagram editor popover */}
+      {editor && plantumlEdit !== null && (
+        <PlantumlPopover
+          editor={editor}
+          pos={plantumlEdit.pos}
+          initialSource={plantumlEdit.source}
+          onClose={() => setPlantumlEdit(null)}
+        />
+      )}
+
+      {/* G6c: Drawio diagram editor modal */}
+      {editor && drawioEdit !== null && (
+        <DrawioModal
+          editor={editor}
+          pos={drawioEdit.pos}
+          initialXml={drawioEdit.xml}
+          onClose={() => setDrawioEdit(null)}
         />
       )}
 

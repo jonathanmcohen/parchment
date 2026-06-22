@@ -146,19 +146,144 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       break
     }
 
+    // G6a: mermaid — insert the empty node, then open the mermaid popover at
+    // the new node's position. The dispatch must happen AFTER .run() so
+    // editor.state reflects the inserted node (inside the chain, view.state is
+    // pre-insertion). Mirrors the corrected 'drawing' case exactly.
+    case 'mermaid': {
+      editor.chain().focus().insertMermaid().run()
+      const { state } = editor
+      const selFrom = state.selection.from
+      let mermaidPos: number | null = null
+      // After inserting the block atom the selection node-selects it, so the
+      // mermaid node sits exactly at selFrom. Fall back to a small window scan
+      // in case the cursor landed beside the node rather than on it.
+      const selectedNode = state.doc.nodeAt(selFrom)
+      if (selectedNode?.type.name === 'mermaid') {
+        mermaidPos = selFrom
+      } else {
+        const lo = Math.max(0, selFrom - 2)
+        const hi = Math.min(state.doc.content.size, selFrom + 2)
+        state.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'mermaid') mermaidPos = nodePos
+        })
+      }
+      if (mermaidPos !== null) {
+        editor.view.dom.dispatchEvent(
+          new CustomEvent('parchment:edit-mermaid', {
+            bubbles: true,
+            detail: { pos: mermaidPos, source: '' },
+          }),
+        )
+      }
+      break
+    }
+
+    // G6b: plantuml — insert the empty node, then open the plantuml popover at
+    // the new node's position. The dispatch must happen AFTER .run() so
+    // editor.state reflects the inserted node (inside the chain, view.state is
+    // pre-insertion). Mirrors the mermaid case exactly.
+    case 'plantuml': {
+      editor.chain().focus().insertPlantuml().run()
+      const { state } = editor
+      const selFrom = state.selection.from
+      let plantumlPos: number | null = null
+      // After inserting the block atom the selection node-selects it, so the
+      // plantuml node sits exactly at selFrom. Fall back to a small window scan
+      // in case the cursor landed beside the node rather than on it.
+      const selectedPlantumlNode = state.doc.nodeAt(selFrom)
+      if (selectedPlantumlNode?.type.name === 'plantuml') {
+        plantumlPos = selFrom
+      } else {
+        const lo = Math.max(0, selFrom - 2)
+        const hi = Math.min(state.doc.content.size, selFrom + 2)
+        state.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'plantuml') plantumlPos = nodePos
+        })
+      }
+      if (plantumlPos !== null) {
+        editor.view.dom.dispatchEvent(
+          new CustomEvent('parchment:edit-plantuml', {
+            bubbles: true,
+            detail: { pos: plantumlPos, source: '' },
+          }),
+        )
+      }
+      break
+    }
+
+    // G6c: drawio — insert the empty node, then open the drawio modal at the
+    // new node's position. The dispatch must happen AFTER .run() so
+    // editor.state reflects the inserted node (inside the chain, view.state is
+    // pre-insertion). Mirrors the mermaid/plantuml case exactly.
+    case 'drawio': {
+      editor.chain().focus().insertDrawio().run()
+      const { state } = editor
+      const selFrom = state.selection.from
+      let drawioPos: number | null = null
+      // After inserting the block atom the selection node-selects it, so the
+      // drawio node sits exactly at selFrom. Fall back to a small window scan
+      // in case the cursor landed beside the node rather than on it.
+      const selectedDrawioNode = state.doc.nodeAt(selFrom)
+      if (selectedDrawioNode?.type.name === 'drawio') {
+        drawioPos = selFrom
+      } else {
+        const lo = Math.max(0, selFrom - 2)
+        const hi = Math.min(state.doc.content.size, selFrom + 2)
+        state.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'drawio') drawioPos = nodePos
+        })
+      }
+      if (drawioPos !== null) {
+        editor.view.dom.dispatchEvent(
+          new CustomEvent('parchment:edit-drawio', {
+            bubbles: true,
+            detail: { pos: drawioPos, xml: '' },
+          }),
+        )
+      }
+      break
+    }
+
     // G4: equations. Insert with empty LaTeX, then open the editor popover at
     // the new node's position so the user types the formula immediately.
+    // Read editor.state AFTER .run() so the position reflects the post-insertion
+    // state — the same pattern used by the G6 mermaid/plantuml/drawio cases.
     case 'mathBlock': {
-      const insertAt = editor.state.selection.from
       editor.chain().focus().insertMathBlock('').run()
-      onEditMath?.(insertAt)
+      const { state: mathBlockState } = editor
+      const mathBlockSelFrom = mathBlockState.selection.from
+      let mathBlockPos: number | null = null
+      const mathBlockNode = mathBlockState.doc.nodeAt(mathBlockSelFrom)
+      if (mathBlockNode?.type.name === 'mathBlock') {
+        mathBlockPos = mathBlockSelFrom
+      } else {
+        const lo = Math.max(0, mathBlockSelFrom - 2)
+        const hi = Math.min(mathBlockState.doc.content.size, mathBlockSelFrom + 2)
+        mathBlockState.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'mathBlock') mathBlockPos = nodePos
+        })
+      }
+      if (mathBlockPos !== null) onEditMath?.(mathBlockPos)
       break
     }
 
     case 'mathInline': {
-      const insertAt = editor.state.selection.from
       editor.chain().focus().insertMathInline('').run()
-      onEditMath?.(insertAt)
+      const { state: mathInlineState } = editor
+      const mathInlineSelFrom = mathInlineState.selection.from
+      let mathInlinePos: number | null = null
+      const mathInlineNode = mathInlineState.doc.nodeAt(mathInlineSelFrom)
+      if (mathInlineNode?.type.name === 'mathInline') {
+        mathInlinePos = mathInlineSelFrom
+      } else {
+        const lo = Math.max(0, mathInlineSelFrom - 2)
+        const hi = Math.min(mathInlineState.doc.content.size, mathInlineSelFrom + 2)
+        mathInlineState.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'mathInline') mathInlinePos = nodePos
+        })
+      }
+      if (mathInlinePos !== null) onEditMath?.(mathInlinePos)
       break
     }
 

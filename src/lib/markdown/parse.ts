@@ -269,6 +269,21 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
         },
       }
     }
+    case 'drawio': {
+      // The body is { type:'drawio', attrs:{ xml, svg } }. Validate type guard
+      // before trusting (mirrors the drawing guard above). NO drawio import.
+      if (data.type !== 'drawio') return null
+      const attrsRaw = data.attrs
+      if (typeof attrsRaw !== 'object' || attrsRaw === null) return null
+      const attrs = attrsRaw as Record<string, unknown>
+      return {
+        type: 'drawio',
+        attrs: {
+          xml: typeof attrs.xml === 'string' ? attrs.xml : '',
+          svg: typeof attrs.svg === 'string' ? attrs.svg : '',
+        },
+      }
+    }
     default:
       return null
   }
@@ -298,9 +313,24 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
       }
       case 'code': {
         const code = t.text ?? ''
+        const lang = t.lang ?? ''
+        // G6a: a `mermaid` fence reconstructs a mermaid node (wins over shiki
+        // code-block path). Standard language fence, NOT a parchment: fence.
+        // NO mermaid import — source is stored as a plain string. Never throws.
+        if (lang === 'mermaid') {
+          out.push({ type: 'mermaid', attrs: { source: code } })
+          break
+        }
+        // G6b: a `plantuml` fence reconstructs a plantuml node. Standard
+        // language fence, NOT a parchment: fence. NO plantuml import — source
+        // is stored as a plain string. Never throws.
+        if (lang === 'plantuml') {
+          out.push({ type: 'plantuml', attrs: { source: code } })
+          break
+        }
         // F3: a `parchment:<kind>` fence reconstructs a custom PM node. On any
         // failure we fall through to the plain codeBlock below (never throw).
-        const fenceMatch = /^parchment:(\S+)/.exec(t.lang ?? '')
+        const fenceMatch = /^parchment:(\S+)/.exec(lang)
         if (fenceMatch) {
           const node = reconstructParchment(fenceMatch[1] ?? '', code)
           if (node) {
@@ -310,7 +340,7 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
         }
         out.push({
           type: 'codeBlock',
-          attrs: { language: t.lang?.length ? t.lang : null },
+          attrs: { language: lang.length ? lang : null },
           ...(code.length ? { content: [{ type: 'text', text: code }] } : {}),
         })
         break

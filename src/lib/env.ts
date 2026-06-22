@@ -13,4 +13,10 @@ export const env = {
   // Disk-mirror root (Plan F). Configurable; defaults under the user's home.
   filesRoot: process.env.PARCHMENT_FILES_ROOT ?? `${process.env.HOME ?? '/data'}/parchment/files`,
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  // WebAuthn (I7). Optional explicit overrides for the Relying Party ID and
+  // origin. When unset, both are derived per-request from the Host/Origin
+  // headers so a self-hoster needs no config on any domain. RP_ID must be a bare
+  // domain (no scheme/port); RP_ORIGIN is the full scheme://host[:port].
+  webauthnRpId: process.env.PARCHMENT_RP_ID,
+  webauthnOrigin: process.env.PARCHMENT_RP_ORIGIN,
 }

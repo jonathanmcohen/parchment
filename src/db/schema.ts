@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  bigint,
   boolean,
   customType,
   index,
@@ -117,9 +118,51 @@ export const sessions = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     tokenHash: text('token_hash').notNull().unique(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    // I7: a session minted after the password step but BEFORE a second factor is
+    // 'mfaPending'. The auth guard treats such a session as unauthenticated for
+    // app/API routes; ONLY the 2FA-verify / passkey-auth routes accept it, and
+    // they clear the flag on success to promote it to a full session.
+    mfaPending: boolean('mfa_pending').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('sessions_user_idx').on(t.userId)],
+)
+
+// ─── MFA / TOTP (I7) — one row per user once they begin/complete TOTP enroll ──
+// `totpSecret` (base32) is set provisionally at /init and remains until disabled;
+// `totpEnabledAt` is null until a valid code confirms enrollment at /enable.
+// `recoveryCodes` is a jsonb array of argon2-HASHED single-use codes — a consumed
+// code is removed from the array. The plaintext codes are shown to the user
+// exactly once at enrollment and never persisted or returned again.
+export const userMfa = pgTable('user_mfa', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  totpSecret: text('totp_secret'), // base32; null until TOTP enrollment begins
+  totpEnabledAt: timestamp('totp_enabled_at', { withTimezone: true }), // null until confirmed
+  recoveryCodes: jsonb('recovery_codes').notNull().default([]), // string[] of argon2 hashes
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ─── Passkeys (I7) — WebAuthn credentials, one row per registered authenticator ─
+// `id` is the credential ID (base64url). `publicKey` is the COSE public key
+// (base64url). `counter` is the signature counter (bigint; some authenticators
+// exceed 2^31). `transports` is the hint array from registration. Cascades on
+// user delete so a removed user leaves no orphaned credentials.
+export const passkeys = pgTable(
+  'passkeys',
+  {
+    id: text('id').primaryKey(), // credential ID, base64url
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    publicKey: text('public_key').notNull(), // COSE public key, base64url
+    counter: bigint('counter', { mode: 'number' }).notNull().default(0),
+    transports: jsonb('transports'), // AuthenticatorTransport[] | null
+    label: text('label').notNull().default('Passkey'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('passkeys_user_idx').on(t.userId)],
 )
 
 // ─── Personal access tokens (A2) — Bearer auth for the API ───

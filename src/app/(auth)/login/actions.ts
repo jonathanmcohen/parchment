@@ -3,10 +3,16 @@
 import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { db, schema } from '@/db'
+import { userHasSecondFactor } from '@/lib/auth/mfa-repo'
 import { verifyPassword } from '@/lib/auth/password'
-import { createSession } from '@/lib/auth/session'
+import { createPendingSession, createSession } from '@/lib/auth/session'
 
-export type LoginState = { error: string } | null
+// `mfaRequired` drives the form to the second-factor step instead of completing.
+// `hasPasskey` lets that step offer the passkey button (vs. only TOTP/recovery).
+export type LoginState =
+  | { error: string }
+  | { mfaRequired: true; hasPasskey: boolean; hasTotp: boolean }
+  | null
 
 export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get('email') ?? '')
@@ -24,6 +30,32 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
   if (!user || !ok) {
     return { error: 'Invalid email or password.' }
+  }
+
+  // SECOND-FACTOR GATE: when the user has an enabled TOTP and/or a passkey, the
+  // password step does NOT issue a full session. We mint a short-lived PENDING
+  // session (mfaPending=true) — which requireUser()/getCurrentUser() reject for
+  // app routes — and return mfaRequired so the form advances to the 2FA step.
+  // The session is promoted to a full one only by /api/auth/mfa/verify or the
+  // passkey-auth verify route. Existing password-only login is unchanged.
+  if (await userHasSecondFactor(user.id)) {
+    const [mfa] = await db
+      .select({ enabledAt: schema.userMfa.totpEnabledAt })
+      .from(schema.userMfa)
+      .where(eq(schema.userMfa.userId, user.id))
+      .limit(1)
+    const passkeys = await db
+      .select({ id: schema.passkeys.id })
+      .from(schema.passkeys)
+      .where(eq(schema.passkeys.userId, user.id))
+      .limit(1)
+
+    await createPendingSession(user.id)
+    return {
+      mfaRequired: true,
+      hasTotp: mfa?.enabledAt != null,
+      hasPasskey: passkeys.length > 0,
+    }
   }
 
   await db.insert(schema.auditLog).values({

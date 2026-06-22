@@ -1,3 +1,5 @@
+import { MfaSection } from './mfa-section'
+
 export default function SecuritySettingsPage() {
   return (
     <section className="max-w-2xl">
@@ -46,8 +48,9 @@ export default function SecuritySettingsPage() {
           Two-factor authentication
         </h2>
         <p className="mt-1 text-[var(--muted)] text-sm">
-          Add an authenticator app or a passkey for a second layer of protection (Plan I7).
+          Add an authenticator app or a passkey for a second layer of protection.
         </p>
+        <MfaSection />
       </section>
 
       <section aria-labelledby="security-sessions" className="mt-8">

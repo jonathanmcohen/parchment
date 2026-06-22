@@ -254,6 +254,21 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
         content: data.content as PMNode[],
       }
     }
+    case 'drawing': {
+      // The body is { type:'drawing', attrs:{ scene, svg } }. Validate type
+      // guard before trusting (mirrors the table guard above). NO excalidraw.
+      if (data.type !== 'drawing') return null
+      const attrsRaw = data.attrs
+      if (typeof attrsRaw !== 'object' || attrsRaw === null) return null
+      const attrs = attrsRaw as Record<string, unknown>
+      return {
+        type: 'drawing',
+        attrs: {
+          scene: attrs.scene ?? null,
+          svg: typeof attrs.svg === 'string' ? attrs.svg : '',
+        },
+      }
+    }
     default:
       return null
   }

@@ -2,6 +2,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { blockExtensions } from '@/lib/editor/block-extensions'
 import { CodeBlockShiki } from '@/lib/editor/extensions/code-block-shiki'
 import { CommentMark } from '@/lib/editor/extensions/comment'
+import { DrawingExtension } from '@/lib/editor/extensions/drawing'
 import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
@@ -67,6 +68,11 @@ export const baseExtensions = [
   MathBlock,
   EquationRef,
   MathCommands,
+  // G5: Excalidraw drawing embed. DrawingExtension does NOT import excalidraw
+  // at module load (the NodeView lazy-requires DrawingView, which in turn uses
+  // next/dynamic ssr:false for Excalidraw). getSchema(baseExtensions) builds
+  // in the server runtime without ever touching excalidraw.
+  DrawingExtension,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

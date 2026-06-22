@@ -111,6 +111,27 @@ function renderNode(node: PMNode, key: number): ReactNode {
     case 'horizontalRule':
     case 'pageBreak':
       return <hr key={key} />
+    case 'drawing': {
+      // G5: render the stored SVG snapshot as a data-URI <img> (XSS-safe:
+      // SVG-in-img cannot execute scripts). Empty svg → a muted placeholder.
+      const svg = str(node.attrs?.svg)
+      if (!svg) {
+        return (
+          <p key={key} style={{ color: '#999', fontStyle: 'italic' }}>
+            Drawing
+          </p>
+        )
+      }
+      return (
+        // biome-ignore lint/performance/noImgElement: SVG data-URI cannot use next/image (no src optimization applies to inline data URIs); this is the XSS-safe rendering path for owner-authored SVG
+        <img
+          key={key}
+          src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
+          alt="Drawing"
+          style={{ maxWidth: '100%', display: 'block' }}
+        />
+      )
+    }
     case 'hardBreak':
       return <br key={key} />
     case 'image': {

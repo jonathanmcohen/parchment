@@ -6,6 +6,7 @@ import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import { NodeSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
+import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
@@ -36,6 +37,14 @@ import { type Reader, throttle } from '@/lib/editor/reading-presence'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { authorColor } from '@/lib/editor/track-changes'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
+
+// G5: DrawingModal is dynamic-imported so the Excalidraw CSS (imported at the
+// top of DrawingModal.tsx) is NOT pulled into the Editor chunk on every page
+// load — it is only fetched when a drawing modal is first opened.
+const DrawingModal = dynamic(
+  () => import('@/components/editor/DrawingModal').then((m) => m.DrawingModal),
+  { ssr: false },
+)
 
 // Public collab URL — falls back to localhost in dev when env var is absent.
 const COLLAB_URL =
@@ -274,6 +283,11 @@ export function Editor({
   // node being edited (null = closed). Opened from the slash menu (new empty
   // node) and from clicking an existing math node (parchment:edit-math event).
   const [mathEdit, setMathEdit] = useState<{ pos: number; latex: string } | null>(null)
+
+  // G5: drawing modal — holds the doc position + current scene of the drawing
+  // node being edited (null = closed). Opened via parchment:edit-drawing event
+  // dispatched by DrawingView (click) and insertDrawing command (new node).
+  const [drawingEdit, setDrawingEdit] = useState<{ pos: number; scene: object | null } | null>(null)
   const openMathEditor = useCallback((pos: number) => {
     setMathEdit({ pos, latex: '' })
   }, [])
@@ -507,6 +521,21 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-math', handler)
   }, [editor])
 
+  // G5: drawing NodeViews dispatch parchment:edit-drawing {pos, scene} on click
+  // — open the Excalidraw modal seeded with the clicked node's current scene.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; scene: object | null }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        setDrawingEdit({ pos: detail.pos, scene: detail.scene ?? null })
+      }
+    }
+    dom.addEventListener('parchment:edit-drawing', handler)
+    return () => dom.removeEventListener('parchment:edit-drawing', handler)
+  }, [editor])
+
   // D5: publish own awareness presence + reading position
   useEffect(() => {
     if (!editor || !provider) return
@@ -640,6 +669,16 @@ export function Editor({
           pos={mathEdit.pos}
           initialLatex={mathEdit.latex}
           onClose={() => setMathEdit(null)}
+        />
+      )}
+
+      {/* G5: Drawing editor modal */}
+      {editor && drawingEdit !== null && (
+        <DrawingModal
+          editor={editor}
+          pos={drawingEdit.pos}
+          initialScene={drawingEdit.scene}
+          onClose={() => setDrawingEdit(null)}
         />
       )}
 

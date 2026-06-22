@@ -7,6 +7,7 @@ import {
   DEFAULT_THEME,
   FONT_PAIRS,
   PAGE_BG_PRESETS,
+  resolvePageBg,
   type WorkspaceTheme,
 } from '@/lib/editor/theme'
 
@@ -208,13 +209,17 @@ export function AppearanceSettings() {
             <input
               type="color"
               aria-label="Custom page background color"
-              value={customPageBg || '#ffffff'}
+              value={customPageBg || resolvePageBg(theme.pageBg)}
               disabled={saving}
               onChange={(e) => {
                 setCustomPageBg(e.target.value)
               }}
               onBlur={(e) => {
-                if (e.target.value !== theme.pageBg) {
+                // Only save when a custom (non-preset) value has been chosen and
+                // it differs from what is already stored — compare resolved hex so
+                // preset keywords ('white', 'sepia') are not overwritten by their
+                // hex equivalents on accidental focus+blur.
+                if (customPageBg && resolvePageBg(e.target.value) !== resolvePageBg(theme.pageBg)) {
                   void save({ ...theme, pageBg: e.target.value })
                 }
               }}

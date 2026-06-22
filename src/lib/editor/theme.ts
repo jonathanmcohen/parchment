@@ -127,7 +127,7 @@ export function parseTheme(raw: unknown): WorkspaceTheme {
 }
 
 /** Resolve a pageBg value to the CSS color it represents. */
-function resolvePageBg(pageBg: string): string {
+export function resolvePageBg(pageBg: string): string {
   if (pageBg === 'white') return '#ffffff'
   if (pageBg === 'sepia') return '#f5efe0'
   // Already a hex color.

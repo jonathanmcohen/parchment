@@ -37,13 +37,23 @@
   --foreground: #ececec;
   --muted: #9a9aa0;
   --accent: #9a82ff;
+  --accent-contrast: #9a82ff;
   --paper: #1f1e25;
   --border: #2c2b33;
   --page-bg: var(--paper);
 }
 
+/* I1: When forced-dark is applied to a wrapper div, propagate dark vars to
+ * :root so html/body { background: var(--background) } resolves correctly.
+ * This prevents overscroll gutters and page chrome from showing the light bg.
+ * Uses :has() (baseline 2023, supported by all modern browsers). */
+:root:has([data-color-scheme="dark"]) {
+  --background: #16151a;
+  --foreground: #ececec;
+  color-scheme: dark;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root,
   [data-color-scheme="system"] {
     --background: #16151a;
     --foreground: #ececec;
@@ -1323,7 +1333,6 @@ body {
   color: inherit;
 }
 @media (prefers-color-scheme: dark) {
-  :root .parchment-prose pre,
   [data-color-scheme="system"] .parchment-prose pre {
     background: #1e2030;
   }
@@ -1465,7 +1474,6 @@ body {
   color: inherit;
 }
 @media (prefers-color-scheme: dark) {
-  :root .parchment-cb-pre,
   [data-color-scheme="system"] .parchment-cb-pre {
     background: #1e2030;
   }

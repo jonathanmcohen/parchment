@@ -302,6 +302,17 @@ function serializeBlock(node: PMNode): string {
           style: typeof node.attrs?.style === 'string' ? node.attrs.style : 'apa',
         }),
       )
+    // G16: speakerNote — lossless round-trip as parchment:speakernote fence
+    // carrying the inline content array as JSON (like table/drawing/bibliography
+    // do for their complex content). Storing serializeInline() text was lossy
+    // because parse.ts reconstructed a plain text node containing the raw
+    // markdown string — losing all mark information (bold, italic, links, etc.)
+    // after one serialize→parse cycle. Storing the content array is fully lossless.
+    case 'speakerNote':
+      return parchmentFence(
+        'speakernote',
+        JSON.stringify({ content: Array.isArray(node.content) ? node.content : [] }),
+      )
     default:
       return serializeInline(node.content)
   }

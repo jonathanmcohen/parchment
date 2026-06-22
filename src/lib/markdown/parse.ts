@@ -421,6 +421,18 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
         },
       }
     }
+    case 'speakernote': {
+      // G16: lossless speakerNote round-trip.
+      // The body is { content: PMNode[] } — the raw inline content array stored
+      // by serialize.ts. This preserves all marks (bold, italic, links, etc.)
+      // across serialize→parse cycles. A missing or empty array produces an
+      // empty speakerNote (valid schema: content:'inline*').
+      const content = Array.isArray(data.content) ? data.content : []
+      return {
+        type: 'speakerNote',
+        ...(content.length > 0 ? { content } : {}),
+      }
+    }
     default:
       return null
   }

@@ -117,6 +117,10 @@ function renderNode(node: PMNode, key: number): ReactNode {
     case 'horizontalRule':
     case 'pageBreak':
       return <hr key={key} />
+    // G16: speakerNote — NEVER rendered in the public/reading/share view.
+    // Notes are author-only; this null ensures they never leak to readers.
+    case 'speakerNote':
+      return null
     case 'drawing': {
       // G5: render the stored SVG snapshot as a data-URI <img> (XSS-safe:
       // SVG-in-img cannot execute scripts). Empty svg → a muted placeholder.
@@ -402,6 +406,10 @@ function renderNodeWithCites(
           <code>{children}</code>
         </pre>
       )
+    // G16: speakerNote — NEVER rendered in the public/reading/share view.
+    // Notes are author-only; returning null here ensures they never leak.
+    case 'speakerNote':
+      return null
     default:
       // Delegate to the cite-unaware renderer for specialised block types
       // (drawing, mermaid, plantuml, etc.) that cannot contain citation nodes.

@@ -197,6 +197,13 @@ export const SLASH_ITEMS: SlashItem[] = [
       'reference',
     ],
   },
+  // G16: Speaker note — author-only block, hidden from reading/share view.
+  {
+    id: 'speakerNote',
+    title: 'Speaker note',
+    category: 'ADVANCED',
+    keywords: ['speaker', 'note', 'presenter', 'notes', 'private'],
+  },
 ]
 
 /**

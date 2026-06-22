@@ -2823,3 +2823,200 @@ body {
 .parchment-reading--wide {
   max-width: 38rem;
 }
+
+/* ── G16: Presenter mode ─────────────────────────────────────────────────── */
+
+/*
+ * Full-screen fixed dark backdrop — sits above everything (z-index 10001,
+ * one above the reading overlay at 10000). Presenter is dark by default;
+ * prefers-color-scheme is respected minimally (dark always for the stage).
+ */
+.parchment-presenter-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  background: #0d0d0f;
+  color: #ececec;
+}
+
+/* Slim control bar at top. */
+.parchment-presenter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #1a1a1f;
+  border-bottom: 1px solid #2c2b33;
+  flex-shrink: 0;
+}
+
+/* Prev/Next nav buttons. */
+.parchment-presenter-nav {
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #3a3a44;
+  background: transparent;
+  color: #ececec;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.parchment-presenter-nav:hover:not(:disabled) {
+  background: rgba(255 255 255 / 0.08);
+}
+
+.parchment-presenter-nav:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Slide counter — centred between nav buttons. */
+.parchment-presenter-counter {
+  font-size: 0.9rem;
+  color: #9a9aa0;
+  min-width: 5rem;
+  text-align: center;
+}
+
+/* Notes toggle button. */
+.parchment-presenter-notes-toggle {
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #3a3a44;
+  background: transparent;
+  color: #ececec;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.parchment-presenter-notes-toggle:hover {
+  background: rgba(255 255 255 / 0.08);
+}
+
+.parchment-presenter-notes-toggle[aria-pressed="true"] {
+  background: #4a4a5a;
+  border-color: #6d6d80;
+}
+
+/* Close button — pushed to the right via margin-left: auto. */
+.parchment-presenter-close {
+  margin-left: auto;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #3a3a44;
+  background: transparent;
+  color: #ececec;
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.parchment-presenter-close:hover {
+  background: rgba(255 255 255 / 0.08);
+}
+
+/*
+ * Stage — the large centred area that shows slide content.
+ * Clicking the stage advances to the next slide (cursor pointer signals this).
+ * Takes all available space above the notes strip.
+ */
+.parchment-presenter-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 2rem;
+  min-height: 0;
+}
+
+/* The rendered slide content card. */
+.parchment-presenter-slide {
+  background: #1a1a22;
+  border-radius: 8px;
+  padding: 3rem 4rem;
+  max-width: 900px;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  font-size: 1.6rem;
+  line-height: 1.6;
+  color: #f0f0f0;
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.5);
+  pointer-events: none; /* stage click passes through to the parent */
+}
+
+.parchment-presenter-slide h1,
+.parchment-presenter-slide h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.parchment-presenter-slide h3,
+.parchment-presenter-slide h4 {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Speaker notes strip — muted, collapsible. */
+.parchment-presenter-notes-strip {
+  flex-shrink: 0;
+  max-height: 28%;
+  overflow-y: auto;
+  background: #111115;
+  border-top: 1px solid #2c2b33;
+  padding: 0.75rem 2rem 1rem;
+  font-size: 0.95rem;
+  color: #9a9aa0;
+}
+
+/* Notes content rendered via renderReadOnlyDoc. */
+.parchment-presenter-notes-content {
+  max-width: 900px;
+  margin-inline: auto;
+}
+
+/* "No notes" placeholder. */
+.parchment-presenter-notes-empty {
+  max-width: 900px;
+  margin-inline: auto;
+  font-style: italic;
+  opacity: 0.6;
+}
+
+/*
+ * speakerNote node — visible in the editor as a muted aside with a label.
+ * Uses ::before to prepend a "Speaker note" affordance so authors can see
+ * these blocks without them appearing to be body content.
+ * In the read-only / share renderer this node returns null (render-pm.tsx).
+ */
+.parchment-speaker-note {
+  display: block;
+  margin: 0.75em 0;
+  padding: 0.5em 0.75em 0.5em 1em;
+  border-left: 3px solid #9a82ff;
+  background: color-mix(in srgb, #9a82ff 8%, transparent);
+  color: var(--muted);
+  font-size: 0.9em;
+  font-style: italic;
+  border-radius: 0 4px 4px 0;
+}
+
+.parchment-speaker-note::before {
+  content: "Speaker note\00a0\2014\00a0";
+  font-weight: 600;
+  font-style: normal;
+  color: #9a82ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .parchment-speaker-note {
+    background: color-mix(in srgb, #9a82ff 10%, transparent);
+  }
+}

@@ -27,6 +27,8 @@ type Props = {
   onOpenShare: () => void
   onToggleReading: () => void
   readingOpen: boolean
+  onTogglePresenter: () => void
+  presenterOpen: boolean
 }
 
 const FONT_FAMILIES = [
@@ -133,6 +135,8 @@ export function Toolbar({
   onOpenShare,
   onToggleReading,
   readingOpen,
+  onTogglePresenter,
+  presenterOpen,
 }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
@@ -817,6 +821,18 @@ export function Toolbar({
         onClick={onToggleReading}
       >
         📖
+      </button>
+
+      {/* ── G16: Presenter mode toggle (F5 fallback) ─────────────────── */}
+      <button
+        type="button"
+        aria-label="Presenter mode"
+        aria-pressed={presenterOpen}
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={onTogglePresenter}
+      >
+        ▶
       </button>
 
       {/* ── G10: Voice typing ─────────────────────────────────────────── */}

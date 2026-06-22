@@ -421,6 +421,24 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
         },
       }
     }
+    case 'embed': {
+      // J2/J3: lossless embed round-trip. The body is { provider, url, title }.
+      // We store the raw url verbatim — the allowlist (resolveProvider) is
+      // re-applied at RENDER time (EmbedView), NOT here, so a url that is no
+      // longer allowlisted still round-trips losslessly and degrades to a link
+      // card on render rather than being dropped. NO iframe / provider logic in
+      // the server parse path.
+      const url = typeof data.url === 'string' ? data.url : ''
+      if (!url) return null
+      return {
+        type: 'embed',
+        attrs: {
+          provider: typeof data.provider === 'string' ? data.provider : '',
+          url,
+          title: typeof data.title === 'string' ? data.title : '',
+        },
+      }
+    }
     case 'speakernote': {
       // G16: lossless speakerNote round-trip.
       // The body is { content: PMNode[] } — the raw inline content array stored

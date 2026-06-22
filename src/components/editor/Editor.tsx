@@ -19,6 +19,7 @@ import { CrossRefPicker } from '@/components/editor/CrossRefPicker'
 import { CustomCssDialog } from '@/components/editor/CustomCssDialog'
 import { CustomCssStyle } from '@/components/editor/CustomCssStyle'
 import { DrawioModal } from '@/components/editor/DrawioModal'
+import { EmbedDialog } from '@/components/editor/EmbedDialog'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
@@ -48,6 +49,7 @@ import {
 import { clampAutosaveMs } from '@/lib/docs/autosave-config'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
+import { resolveProvider } from '@/lib/editor/embed-providers'
 import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
@@ -504,6 +506,20 @@ export function Editor({
   const [crossRefPickerOpen, setCrossRefPickerOpen] = useState(false)
   const openCrossRefPicker = useCallback(() => setCrossRefPickerOpen(true), [])
 
+  // J2/J3: embed dialog — holds the doc position + kind + current url/title of
+  // the embed node being edited (null = closed). Opened from the slash menu
+  // (new empty node, after insertEmbed().run()) and from clicking an existing
+  // embed node (parchment:edit-embed event dispatched by EmbedView).
+  const [embedEdit, setEmbedEdit] = useState<{
+    pos: number
+    kind: 'calendar' | 'spreadsheet'
+    url: string
+    title: string
+  } | null>(null)
+  const openEmbedDialog = useCallback((pos: number, kind: 'calendar' | 'spreadsheet') => {
+    setEmbedEdit({ pos, kind, url: '', title: '' })
+  }, [])
+
   const openMathEditor = useCallback((pos: number) => {
     setMathEdit({ pos, latex: '' })
   }, [])
@@ -805,6 +821,8 @@ export function Editor({
         onOpenImage: openImageDialog,
         onEditMath: openMathEditor,
         onOpenCrossRefPicker: openCrossRefPicker,
+        // J2/J3: onEditEmbed opens the EmbedDialog for a freshly-inserted embed node.
+        onEditEmbed: openEmbedDialog,
       }),
       // F6: [[ autocomplete — drives the React WikiSuggestionMenu popup. Wired
       // here (not baseExtensions) so its ReactRenderer popup only loads client-side.
@@ -1135,6 +1153,27 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-drawio', handler)
   }, [editor])
 
+  // J2/J3: embed NodeViews dispatch parchment:edit-embed {pos, provider, url,
+  // title} on click — open the EmbedDialog seeded with the clicked node's
+  // current values. The dialog kind defaults from the stored provider's kind
+  // (calendar vs spreadsheet); when unknown it defaults to spreadsheet (the
+  // wider input set). The user can paste any URL regardless of the kind label.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; url: string; title: string }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        const url = detail.url ?? ''
+        const resolved = url ? resolveProvider(url) : null
+        const kind = resolved?.provider.kind === 'calendar' ? 'calendar' : 'spreadsheet'
+        setEmbedEdit({ pos: detail.pos, kind, url, title: detail.title ?? '' })
+      }
+    }
+    dom.addEventListener('parchment:edit-embed', handler)
+    return () => dom.removeEventListener('parchment:edit-embed', handler)
+  }, [editor])
+
   // G8b: crossRef NodeViews dispatch parchment:goto-ref {targetId} on click —
   // scroll the target node into view. We find the target in the doc by querying
   // the PM dom for [data-ref-id="..."] (for figures/tables/equations) or #id
@@ -1431,6 +1470,18 @@ export function Editor({
           pos={drawioEdit.pos}
           initialXml={drawioEdit.xml}
           onClose={() => setDrawioEdit(null)}
+        />
+      )}
+
+      {/* J2/J3: Embed (calendar / spreadsheet) URL dialog */}
+      {editor && embedEdit !== null && (
+        <EmbedDialog
+          editor={editor}
+          pos={embedEdit.pos}
+          kind={embedEdit.kind}
+          initialUrl={embedEdit.url}
+          initialTitle={embedEdit.title}
+          onClose={() => setEmbedEdit(null)}
         />
       )}
 

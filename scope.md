@@ -162,8 +162,8 @@
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
 | J1 | Cairn cross-link — `[[cairn://page-id]]`, preview card, bidirectional | TODO | ☐ | ☐ | |
-| J2 | Calendar embed — read-only iCal iframe | TODO | ☐ | ☐ | |
-| J3 | Spreadsheet embed — GSheets/Cairn-db/Airtable iframe | TODO | ☐ | ☐ | |
+| J2 | Calendar embed — read-only iCal iframe | DONE | ☑ | ☑ | Shared embed node (J2+J3, PR pending). One `embed` Tiptap node {provider,url,title}; allowlist decision RE-MADE at render from url (embed-providers.ts resolveProvider/toEmbedUrl, PURE) so a tampered stored url still can't iframe. CRUX: iframe src is ALWAYS an allowlisted https provider URL or NO iframe. EmbedView NodeView sandboxed iframe (allow-scripts allow-same-origin allow-popups, referrerpolicy=no-referrer, loading=lazy) for allowlisted; non-allowlisted→link card (https? only, rel=noopener); non-http scheme→inert text. Calendar provider = Google Calendar embed (bare webcal/.ics→link card, no script-free viewer). parchment:embed md fence round-trip. embed.ts schema has ZERO heavy/client/embed-providers imports (getSchema server-safe — the diagram lesson). **Browser-verified live: allowlisted GSheets→1 iframe host docs.google.com + sandbox attrs; evil.example→link card no iframe; data:XSS→inert "Unsupported link" no iframe.** 1050 unit (15 embed-providers, adversarial), build compiles. Review fixed 2 BLOCKING (link-card raw href allowed data:/exotic→gated https? only; Office test-host typo masked viewer branch). GAP: external content/auth not headless-verifiable; public share viewer renders embeds as link not iframe (deliberate). |
+| J3 | Spreadsheet embed — GSheets/Cairn-db/Airtable iframe | DONE | ☑ | ☑ | Same shared embed node as J2 (one impl). Spreadsheet providers: Google Sheets (/edit→pubhtml/widget embed form), Airtable (/embed), Office (view.officeapps.live.com/op/embed). Allowlist host-exact (no substring bypass — lookalike/userinfo-@ rejected). Browser-verified above (GSheets URL→sandboxed iframe on docs.google.com). See J2 notes. |
 | J4 | Slack / Discord — share to channel, notify on comment | TODO | ☐ | ☐ | |
 | J5 | Email-in — per-doc address, SMTP relay replies → comments | TODO | ☐ | ☐ | |
 | J6 | GitHub — embed PR/issue with live status | TODO | ☐ | ☐ | |
@@ -207,9 +207,9 @@
 | G Tiers 2–8 | 17 | 17 | 0 | 0 |
 | H Export/import | 9 | 9 | 0 | 0 |
 | I Settings/ops | 10 | 10 | 0 | 0 |
-| J Integrations | 7 | 0 | 0 | 7 |
+| J Integrations | 7 | 2 | 0 | 5 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **84** | **0** | **20** |
+| **Total** | **104** | **86** | **0** | **18** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

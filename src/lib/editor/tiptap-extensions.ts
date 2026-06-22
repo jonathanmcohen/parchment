@@ -7,6 +7,7 @@ import { CrossRefExtension } from '@/lib/editor/extensions/cross-ref'
 import { CrossRefNumberingExtension } from '@/lib/editor/extensions/cross-ref-numbering'
 import { DrawingExtension } from '@/lib/editor/extensions/drawing'
 import { DrawioExtension } from '@/lib/editor/extensions/drawio'
+import { EmbedExtension } from '@/lib/editor/extensions/embed'
 import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
@@ -96,6 +97,13 @@ export const baseExtensions = [
   // renders the stored SVG; the modal uses an iframe). getSchema(baseExtensions)
   // builds in the server runtime without touching any window-dependent lib.
   DrawioExtension,
+  // J2/J3: Embed (read-only calendar + spreadsheet). EmbedExtension imports NO
+  // iframe / allowlist / React code at module load — the NodeView (EmbedView)
+  // is lazy-required inside addNodeView (same boundary as drawio/mermaid), and
+  // it is the ONLY place an iframe is created, only for an allowlisted https
+  // provider URL (else a link card). getSchema(baseExtensions) builds in the
+  // server runtime. Serializes as a parchment:embed fence.
+  EmbedExtension,
   // G7b: Citation node + bibliography block. Neither imports any heavy lib at
   // module load — CitationView / BibliographyView are lazy-required inside
   // addNodeView (same pattern as drawing/mermaid). getSchema(baseExtensions)

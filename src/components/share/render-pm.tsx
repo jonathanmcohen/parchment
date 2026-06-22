@@ -4,6 +4,7 @@ import type { CiteStyle, CslEntry } from '@/lib/citations/types'
 import { parseCslEntries } from '@/lib/citations/types'
 import type { CrossRefTarget } from '@/lib/editor/cross-ref'
 import { collectCrossRefTargets, indexTargets } from '@/lib/editor/cross-ref'
+import { resolveProvider } from '@/lib/editor/embed-providers'
 import { plantumlImageUrl } from '@/lib/editor/plantuml'
 
 // G1: a small, XSS-safe ProseMirror-JSON → React renderer for the PUBLIC share
@@ -224,6 +225,29 @@ function renderNode(node: PMNode, key: number): ReactNode {
             <code>{src ?? ''}</code>
           </pre>
         </div>
+      )
+    }
+    case 'embed': {
+      // J2/J3: in the UNAUTHENTICATED public viewer we deliberately render an
+      // embed as a safe click-to-open link card — NEVER a sandboxed iframe.
+      // Mirrors the conservative image treatment below: the public read-only
+      // page must not load arbitrary third-party frames into an unauthenticated
+      // context. resolveProvider is still applied so only an allowlisted https
+      // URL is surfaced as the canonical link; anything else shows the raw url.
+      const rawUrl = str(node.attrs?.url) ?? ''
+      if (!rawUrl) return null
+      const resolved = resolveProvider(rawUrl)
+      const href = resolved ? resolved.embedUrl : rawUrl
+      // Only ever emit an http(s) href; never data:/javascript:.
+      if (!/^https?:/i.test(href)) return null
+      const title = str(node.attrs?.title) ?? ''
+      const label = title || resolved?.provider.label || 'Embedded content'
+      return (
+        <p key={key}>
+          <a href={href} rel="nofollow noopener noreferrer" target="_blank">
+            {`[${label}]`}
+          </a>
+        </p>
       )
     }
     case 'hardBreak':

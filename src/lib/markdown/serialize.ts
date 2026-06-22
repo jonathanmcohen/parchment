@@ -302,6 +302,22 @@ function serializeBlock(node: PMNode): string {
           style: typeof node.attrs?.style === 'string' ? node.attrs.style : 'apa',
         }),
       )
+    // J2/J3: embed (calendar / spreadsheet) — emit a parchment:embed fence
+    // carrying { provider, url, title } as JSON so parse.ts reconstructs the
+    // exact node losslessly. NO iframe / provider-allowlist logic on the
+    // serialize path — provider/url/title are plain strings already stored in
+    // the node attrs. The allowlist is re-applied at RENDER time (EmbedView),
+    // so a stored url that is no longer allowlisted simply renders as a link
+    // card; the round-trip itself stays lossless.
+    case 'embed':
+      return parchmentFence(
+        'embed',
+        JSON.stringify({
+          provider: typeof node.attrs?.provider === 'string' ? node.attrs.provider : '',
+          url: typeof node.attrs?.url === 'string' ? node.attrs.url : '',
+          title: typeof node.attrs?.title === 'string' ? node.attrs.title : '',
+        }),
+      )
     // G16: speakerNote — lossless round-trip as parchment:speakernote fence
     // carrying the inline content array as JSON (like table/drawing/bibliography
     // do for their complex content). Storing serializeInline() text was lossy

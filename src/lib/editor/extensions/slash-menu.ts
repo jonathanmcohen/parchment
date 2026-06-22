@@ -212,6 +212,39 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       break
     }
 
+    // G6c: drawio — insert the empty node, then open the drawio modal at the
+    // new node's position. The dispatch must happen AFTER .run() so
+    // editor.state reflects the inserted node (inside the chain, view.state is
+    // pre-insertion). Mirrors the mermaid/plantuml case exactly.
+    case 'drawio': {
+      editor.chain().focus().insertDrawio().run()
+      const { state } = editor
+      const selFrom = state.selection.from
+      let drawioPos: number | null = null
+      // After inserting the block atom the selection node-selects it, so the
+      // drawio node sits exactly at selFrom. Fall back to a small window scan
+      // in case the cursor landed beside the node rather than on it.
+      const selectedDrawioNode = state.doc.nodeAt(selFrom)
+      if (selectedDrawioNode?.type.name === 'drawio') {
+        drawioPos = selFrom
+      } else {
+        const lo = Math.max(0, selFrom - 2)
+        const hi = Math.min(state.doc.content.size, selFrom + 2)
+        state.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'drawio') drawioPos = nodePos
+        })
+      }
+      if (drawioPos !== null) {
+        editor.view.dom.dispatchEvent(
+          new CustomEvent('parchment:edit-drawio', {
+            bubbles: true,
+            detail: { pos: drawioPos, xml: '' },
+          }),
+        )
+      }
+      break
+    }
+
     // G4: equations. Insert with empty LaTeX, then open the editor popover at
     // the new node's position so the user types the formula immediately.
     case 'mathBlock': {

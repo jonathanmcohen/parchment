@@ -3,6 +3,7 @@ import { blockExtensions } from '@/lib/editor/block-extensions'
 import { CodeBlockShiki } from '@/lib/editor/extensions/code-block-shiki'
 import { CommentMark } from '@/lib/editor/extensions/comment'
 import { DrawingExtension } from '@/lib/editor/extensions/drawing'
+import { DrawioExtension } from '@/lib/editor/extensions/drawio'
 import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
@@ -85,6 +86,11 @@ export const baseExtensions = [
   // which uses plantuml.ts at render time). getSchema(baseExtensions) builds
   // in the server runtime without ever touching plantuml-encoder.
   PlantumlExtension,
+  // G6c: Drawio diagram embed. DrawioExtension does NOT import any drawio
+  // library at module load (the NodeView lazy-requires DrawioView, which only
+  // renders the stored SVG; the modal uses an iframe). getSchema(baseExtensions)
+  // builds in the server runtime without touching any window-dependent lib.
+  DrawioExtension,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

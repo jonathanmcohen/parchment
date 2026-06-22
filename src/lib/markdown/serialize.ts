@@ -208,6 +208,20 @@ function serializeBlock(node: PMNode): string {
       const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
       return `\`\`\`\`plantuml\n${src}\n\`\`\`\``
     }
+    // G6c: drawio — emit the full node JSON (xml + svg) as a parchment:drawio
+    // fence so parse.ts can reconstruct it losslessly. NO drawio import — xml
+    // and svg are plain strings already stored in the node attrs.
+    case 'drawio':
+      return parchmentFence(
+        'drawio',
+        JSON.stringify({
+          type: 'drawio',
+          attrs: {
+            xml: typeof node.attrs?.xml === 'string' ? node.attrs.xml : '',
+            svg: typeof node.attrs?.svg === 'string' ? node.attrs.svg : '',
+          },
+        }),
+      )
     default:
       return serializeInline(node.content)
   }

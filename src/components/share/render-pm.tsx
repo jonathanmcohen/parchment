@@ -133,6 +133,27 @@ function renderNode(node: PMNode, key: number): ReactNode {
         />
       )
     }
+    case 'drawio': {
+      // G6c: render the stored SVG snapshot as a data-URI <img> (XSS-safe:
+      // SVG-in-img cannot execute scripts). Empty svg → a muted placeholder.
+      const svg = str(node.attrs?.svg)
+      if (!svg) {
+        return (
+          <p key={key} style={{ color: '#999', fontStyle: 'italic' }}>
+            Diagram
+          </p>
+        )
+      }
+      return (
+        // biome-ignore lint/performance/noImgElement: SVG data-URI cannot use next/image (no src optimization applies to inline data URIs); this is the XSS-safe rendering path for owner-authored SVG
+        <img
+          key={key}
+          src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
+          alt="Diagram"
+          style={{ maxWidth: '100%', display: 'block' }}
+        />
+      )
+    }
     case 'mermaid': {
       // G6a: the share viewer cannot run mermaid (client-only lib). Render the
       // source in a <pre> with a muted label. v0.1 documented choice: mermaid

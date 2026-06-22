@@ -14,6 +14,7 @@ import { BacklinksPanel } from '@/components/editor/BacklinksPanel'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { CommentsSidebar } from '@/components/editor/CommentsSidebar'
 import { CropDialog } from '@/components/editor/CropDialog'
+import { DrawioModal } from '@/components/editor/DrawioModal'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
@@ -302,6 +303,13 @@ export function Editor({
   // parchment:edit-plantuml event dispatched by PlantumlView (click) and from
   // the slash-menu handler after insertPlantuml().run().
   const [plantumlEdit, setPlantumlEdit] = useState<{ pos: number; source: string } | null>(null)
+
+  // G6c: drawio editor modal — holds the doc position + current xml of the
+  // drawio node being edited (null = closed). Opened via parchment:edit-drawio
+  // event dispatched by DrawioView (click) and from the slash-menu handler
+  // after insertDrawio().run().
+  const [drawioEdit, setDrawioEdit] = useState<{ pos: number; xml: string } | null>(null)
+
   const openMathEditor = useCallback((pos: number) => {
     setMathEdit({ pos, latex: '' })
   }, [])
@@ -580,6 +588,21 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-plantuml', handler)
   }, [editor])
 
+  // G6c: drawio NodeViews dispatch parchment:edit-drawio {pos, xml} on click
+  // — open the drawio modal seeded with the clicked node's current XML.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; xml: string }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        setDrawioEdit({ pos: detail.pos, xml: detail.xml ?? '' })
+      }
+    }
+    dom.addEventListener('parchment:edit-drawio', handler)
+    return () => dom.removeEventListener('parchment:edit-drawio', handler)
+  }, [editor])
+
   // D5: publish own awareness presence + reading position
   useEffect(() => {
     if (!editor || !provider) return
@@ -743,6 +766,16 @@ export function Editor({
           pos={plantumlEdit.pos}
           initialSource={plantumlEdit.source}
           onClose={() => setPlantumlEdit(null)}
+        />
+      )}
+
+      {/* G6c: Drawio diagram editor modal */}
+      {editor && drawioEdit !== null && (
+        <DrawioModal
+          editor={editor}
+          pos={drawioEdit.pos}
+          initialXml={drawioEdit.xml}
+          onClose={() => setDrawioEdit(null)}
         />
       )}
 

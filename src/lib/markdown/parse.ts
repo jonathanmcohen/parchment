@@ -269,6 +269,21 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
         },
       }
     }
+    case 'drawio': {
+      // The body is { type:'drawio', attrs:{ xml, svg } }. Validate type guard
+      // before trusting (mirrors the drawing guard above). NO drawio import.
+      if (data.type !== 'drawio') return null
+      const attrsRaw = data.attrs
+      if (typeof attrsRaw !== 'object' || attrsRaw === null) return null
+      const attrs = attrsRaw as Record<string, unknown>
+      return {
+        type: 'drawio',
+        attrs: {
+          xml: typeof attrs.xml === 'string' ? attrs.xml : '',
+          svg: typeof attrs.svg === 'string' ? attrs.svg : '',
+        },
+      }
+    }
     default:
       return null
   }

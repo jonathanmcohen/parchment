@@ -118,6 +118,13 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'MEDIA',
     keywords: ['plantuml', 'uml', 'diagram', 'sequence', 'class', 'component'],
   },
+  // G6c: Drawio diagram embed.
+  {
+    id: 'drawio',
+    title: 'Drawio',
+    category: 'MEDIA',
+    keywords: ['drawio', 'diagrams.net', 'diagram', 'flowchart', 'uml', 'draw', 'embed'],
+  },
 
   // ── EMBED ────────────────────────────────────────────────────────────────
   {

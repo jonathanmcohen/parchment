@@ -23,6 +23,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1074.0",
     "@excalidraw/excalidraw": "0.18.1",
     "@hocuspocus/extension-database": "4.3.0",
     "@hocuspocus/provider": "4.3.0",

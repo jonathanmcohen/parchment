@@ -5,6 +5,7 @@ import { extractTargetIds } from '@/lib/docs/doc-links'
 import { setDocLinks } from '@/lib/docs/doc-links-repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
 import type { WatermarkConfig } from '@/lib/editor/watermark'
+import { serializeMarkdown } from '@/lib/markdown/serialize'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
@@ -17,6 +18,21 @@ export async function createDocument(
   ownerId: string,
   opts: { title?: string; folderId?: string; content?: unknown } = {},
 ): Promise<{ id: string }> {
+  // When content is provided (template instantiation, import, restore), re-derive
+  // the markdown projection from the PM JSON. documents.markdown is NOT NULL
+  // default '' and search_vector is GENERATED from (title || markdown), so a doc
+  // created without this would be body-unsearchable and (see syncDocToDisk below)
+  // absent from the disk mirror until the user opened + re-saved it. A blank doc
+  // (no content) keeps the schema default ''.
+  const hasContent = opts.content !== undefined
+  // serializeMarkdown reads `.content` off its argument, so only feed it a real
+  // PM object; a null/primitive content (a degenerate backup entry) projects to
+  // empty markdown rather than throwing.
+  const markdown = hasContent
+    ? typeof opts.content === 'object' && opts.content !== null
+      ? serializeMarkdown(opts.content)
+      : ''
+    : undefined
   const [row] = await db
     .insert(schema.documents)
     .values({
@@ -24,10 +40,18 @@ export async function createDocument(
       title: opts.title ?? 'Untitled',
       ...(opts.folderId ? { folderId: opts.folderId } : {}),
       // G2: instantiate from a template's ProseMirror JSON when provided.
-      ...(opts.content !== undefined ? { content: opts.content } : {}),
+      ...(hasContent ? { content: opts.content } : {}),
+      ...(markdown !== undefined ? { markdown } : {}),
     })
     .returning({ id: schema.documents.id })
   if (!row) throw new Error('createDocument: insert returned no row')
+
+  // Best-effort disk mirror — a doc created with content must land on disk
+  // immediately (Parchment's disk-mirror differentiator), exactly as saveDocument
+  // does. syncDocToDisk never throws. A blank doc has empty markdown; mirroring it
+  // is harmless and keeps creation uniform with every other write path.
+  if (hasContent) await syncDocToDisk(row.id)
+
   return { id: row.id }
 }
 

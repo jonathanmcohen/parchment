@@ -58,11 +58,16 @@ export default function AdminSettingsPage() {
               </span>
             </Link>
           </li>
-          <li className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3">
-            <span className="font-medium text-sm">Backup</span>
-            <span className="mt-0.5 block text-[var(--muted)] text-sm">
-              Configure scheduled backups and restore points (Plan I4).
-            </span>
+          <li>
+            <Link
+              href="/settings/admin/backup"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Backup</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Download, restore, and configure scheduled off-site backups (Plan I4).
+              </span>
+            </Link>
           </li>
         </ul>
       </section>

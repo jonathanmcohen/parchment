@@ -1,4 +1,6 @@
 import { db, schema } from '@/db'
+import { isS3Configured, uploadToS3 } from '@/lib/backup/s3'
+import { createWorkspaceBackup } from '@/lib/backup/service'
 import { purgeExpiredTrash } from '@/lib/docs/repo'
 import { getTrashRetentionDays } from '@/lib/docs/settings-repo'
 import { type JobState, Scheduler } from '@/lib/schedules/jobs'
@@ -119,6 +121,19 @@ class SchedulerSingleton {
       intervalMs: 5 * 60_000, // 5 min
       run: heartbeatJob,
     })
+
+    // OFF-UNLESS-CONFIGURED (E9 / Cairn CFG-2): the scheduled S3 backup job is
+    // registered ONLY when S3 is configured via env. An unconfigured install has
+    // no 's3-backup' job at all — its getState() shows only trash-purge and
+    // db-heartbeat, and the @aws-sdk SDK is never loaded. There is deliberately
+    // NO env flag toggling an already-registered job (that would be CFG-3).
+    if (isS3Configured()) {
+      this.core.register({
+        name: 's3-backup',
+        intervalMs: DAY_MS, // 24h
+        run: s3BackupJob,
+      })
+    }
   }
 }
 
@@ -139,6 +154,33 @@ async function trashPurgeJob(): Promise<void> {
 /** Cheap liveness check: confirm the DB answers a trivial query. */
 async function heartbeatJob(): Promise<void> {
   await db.select({ id: schema.users.id }).from(schema.users).limit(1)
+}
+
+/**
+ * Scheduled S3 backup: for every owner, build a lossless workspace backup and
+ * upload it to the configured S3-compatible bucket. Per-owner failures are
+ * collected and re-thrown as a single error so the job's lastStatus is 'error'
+ * (the core records it and never crashes the scheduler). The secret is never
+ * logged — only the owner id + a sanitized message.
+ */
+async function s3BackupJob(): Promise<void> {
+  const owners = await db.select({ id: schema.users.id }).from(schema.users)
+  const failures: string[] = []
+  for (const owner of owners) {
+    try {
+      const createdAt = new Date().toISOString()
+      const bytes = await createWorkspaceBackup(owner.id, createdAt)
+      const key = `parchment-backup-${owner.id}-${createdAt}.zip`
+      await uploadToS3(key, bytes)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[scheduler] s3-backup failed for owner ${owner.id}:`, msg)
+      failures.push(`${owner.id}: ${msg}`)
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(`s3-backup failed for ${failures.length} owner(s): ${failures.join('; ')}`)
+  }
 }
 
 /** The process-wide scheduler singleton (cached on globalThis for HMR safety). */

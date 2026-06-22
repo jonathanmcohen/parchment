@@ -111,6 +111,13 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'MEDIA',
     keywords: ['mermaid', 'diagram', 'flowchart', 'sequence', 'gantt'],
   },
+  // G6b: PlantUML diagram embed.
+  {
+    id: 'plantuml',
+    title: 'PlantUML',
+    category: 'MEDIA',
+    keywords: ['plantuml', 'uml', 'diagram', 'sequence', 'class', 'component'],
+  },
 
   // ── EMBED ────────────────────────────────────────────────────────────────
   {

@@ -9,6 +9,7 @@ import { imageExtensions } from '@/lib/editor/extensions/image'
 import { EquationRef, MathBlock, MathCommands, MathInline } from '@/lib/editor/extensions/math'
 import { MermaidExtension } from '@/lib/editor/extensions/mermaid'
 import { PageBreakExtension, SectionBreakExtension } from '@/lib/editor/extensions/page-primitives'
+import { PlantumlExtension } from '@/lib/editor/extensions/plantuml'
 import { Suggesting } from '@/lib/editor/extensions/suggesting'
 import { tableExtensions } from '@/lib/editor/extensions/table'
 import { TocExtension } from '@/lib/editor/extensions/toc'
@@ -79,6 +80,11 @@ export const baseExtensions = [
   // mermaid inside the browser render). getSchema(baseExtensions) builds in
   // the server runtime without ever touching mermaid.
   MermaidExtension,
+  // G6b: PlantUML diagram embed. PlantumlExtension does NOT import any
+  // rendering code at module load (the NodeView lazy-requires PlantumlView,
+  // which uses plantuml.ts at render time). getSchema(baseExtensions) builds
+  // in the server runtime without ever touching plantuml-encoder.
+  PlantumlExtension,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

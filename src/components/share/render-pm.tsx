@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from 'react'
+import { plantumlImageUrl } from '@/lib/editor/plantuml'
 
 // G1: a small, XSS-safe ProseMirror-JSON → React renderer for the PUBLIC share
 // viewer. Renders the common StarterKit node/mark set used by the editor as
@@ -145,6 +146,41 @@ function renderNode(node: PMNode, key: number): ReactNode {
             style={{ color: '#999', fontStyle: 'italic', fontSize: '0.85em', margin: '0 0 0.25em' }}
           >
             Mermaid diagram
+          </p>
+          <pre
+            style={{
+              background: '#f5f5f5',
+              padding: '0.75em',
+              borderRadius: '4px',
+              overflow: 'auto',
+              fontSize: '0.85em',
+            }}
+          >
+            <code>{src ?? ''}</code>
+          </pre>
+        </div>
+      )
+    }
+    case 'plantuml': {
+      // G6b: render via the configured PlantUML server when enabled; otherwise
+      // fall back to the source in a <pre>. The public viewer respects the same
+      // NEXT_PUBLIC_PLANTUML_SERVER_URL env gate as the editor.
+      const src = str(node.attrs?.source)
+      const url = src ? plantumlImageUrl(src) : null
+      return url !== null ? (
+        // biome-ignore lint/performance/noImgElement: external PlantUML server URL cannot use next/image (dynamic src from user-configured endpoint)
+        <img
+          key={key}
+          src={url}
+          alt="PlantUML diagram"
+          style={{ maxWidth: '100%', display: 'block' }}
+        />
+      ) : (
+        <div key={key} style={{ margin: '1em 0' }}>
+          <p
+            style={{ color: '#999', fontStyle: 'italic', fontSize: '0.85em', margin: '0 0 0.25em' }}
+          >
+            PlantUML diagram
           </p>
           <pre
             style={{

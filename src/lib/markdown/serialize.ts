@@ -201,6 +201,13 @@ function serializeBlock(node: PMNode): string {
       const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
       return `\`\`\`\`mermaid\n${src}\n\`\`\`\``
     }
+    // G6b: plantuml — emit as a standard ```plantuml code fence (NOT a
+    // parchment: fence) so it is portable and disk-mirror friendly. No
+    // plantuml import — source is a plain string stored in the node attr.
+    case 'plantuml': {
+      const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
+      return `\`\`\`plantuml\n${src}\n\`\`\``
+    }
     default:
       return serializeInline(node.content)
   }

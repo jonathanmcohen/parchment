@@ -22,6 +22,7 @@ import { MermaidPopover } from '@/components/editor/MermaidPopover'
 import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
+import { PlantumlPopover } from '@/components/editor/PlantumlPopover'
 import { ReadingPresence } from '@/components/editor/ReadingPresence'
 import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
 import { ShareDialog } from '@/components/editor/ShareDialog'
@@ -295,6 +296,12 @@ export function Editor({
   // parchment:edit-mermaid event dispatched by MermaidView (click) and from
   // the slash-menu handler after insertMermaid().run().
   const [mermaidEdit, setMermaidEdit] = useState<{ pos: number; source: string } | null>(null)
+
+  // G6b: plantuml editor popover — holds the doc position + current source of
+  // the plantuml node being edited (null = closed). Opened via
+  // parchment:edit-plantuml event dispatched by PlantumlView (click) and from
+  // the slash-menu handler after insertPlantuml().run().
+  const [plantumlEdit, setPlantumlEdit] = useState<{ pos: number; source: string } | null>(null)
   const openMathEditor = useCallback((pos: number) => {
     setMathEdit({ pos, latex: '' })
   }, [])
@@ -558,6 +565,21 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-mermaid', handler)
   }, [editor])
 
+  // G6b: plantuml NodeViews dispatch parchment:edit-plantuml {pos, source} on
+  // click — open the plantuml popover seeded with the clicked node's source.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; source: string }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        setPlantumlEdit({ pos: detail.pos, source: detail.source ?? '' })
+      }
+    }
+    dom.addEventListener('parchment:edit-plantuml', handler)
+    return () => dom.removeEventListener('parchment:edit-plantuml', handler)
+  }, [editor])
+
   // D5: publish own awareness presence + reading position
   useEffect(() => {
     if (!editor || !provider) return
@@ -711,6 +733,16 @@ export function Editor({
           pos={mermaidEdit.pos}
           initialSource={mermaidEdit.source}
           onClose={() => setMermaidEdit(null)}
+        />
+      )}
+
+      {/* G6b: PlantUML diagram editor popover */}
+      {editor && plantumlEdit !== null && (
+        <PlantumlPopover
+          editor={editor}
+          pos={plantumlEdit.pos}
+          initialSource={plantumlEdit.source}
+          onClose={() => setPlantumlEdit(null)}
         />
       )}
 

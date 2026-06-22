@@ -306,6 +306,13 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
           out.push({ type: 'mermaid', attrs: { source: code } })
           break
         }
+        // G6b: a `plantuml` fence reconstructs a plantuml node. Standard
+        // language fence, NOT a parchment: fence. NO plantuml import — source
+        // is stored as a plain string. Never throws.
+        if (lang === 'plantuml') {
+          out.push({ type: 'plantuml', attrs: { source: code } })
+          break
+        }
         // F3: a `parchment:<kind>` fence reconstructs a custom PM node. On any
         // failure we fall through to the plain codeBlock below (never throw).
         const fenceMatch = /^parchment:(\S+)/.exec(lang)

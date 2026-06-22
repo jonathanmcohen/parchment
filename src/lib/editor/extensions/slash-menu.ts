@@ -179,6 +179,39 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       break
     }
 
+    // G6b: plantuml — insert the empty node, then open the plantuml popover at
+    // the new node's position. The dispatch must happen AFTER .run() so
+    // editor.state reflects the inserted node (inside the chain, view.state is
+    // pre-insertion). Mirrors the mermaid case exactly.
+    case 'plantuml': {
+      editor.chain().focus().insertPlantuml().run()
+      const { state } = editor
+      const selFrom = state.selection.from
+      let plantumlPos: number | null = null
+      // After inserting the block atom the selection node-selects it, so the
+      // plantuml node sits exactly at selFrom. Fall back to a small window scan
+      // in case the cursor landed beside the node rather than on it.
+      const selectedPlantumlNode = state.doc.nodeAt(selFrom)
+      if (selectedPlantumlNode?.type.name === 'plantuml') {
+        plantumlPos = selFrom
+      } else {
+        const lo = Math.max(0, selFrom - 2)
+        const hi = Math.min(state.doc.content.size, selFrom + 2)
+        state.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'plantuml') plantumlPos = nodePos
+        })
+      }
+      if (plantumlPos !== null) {
+        editor.view.dom.dispatchEvent(
+          new CustomEvent('parchment:edit-plantuml', {
+            bubbles: true,
+            detail: { pos: plantumlPos, source: '' },
+          }),
+        )
+      }
+      break
+    }
+
     // G4: equations. Insert with empty LaTeX, then open the editor popover at
     // the new node's position so the user types the formula immediately.
     case 'mathBlock': {

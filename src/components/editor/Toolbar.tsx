@@ -30,6 +30,8 @@ type Props = {
   readingOpen: boolean
   onTogglePresenter: () => void
   presenterOpen: boolean
+  /** H2: open the print / PDF view. */
+  onExportPdf: () => void
 }
 
 const FONT_FAMILIES = [
@@ -139,6 +141,7 @@ export function Toolbar({
   readingOpen,
   onTogglePresenter,
   presenterOpen,
+  onExportPdf,
 }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
@@ -876,6 +879,16 @@ export function Toolbar({
             {label}
           </a>
         ))}
+        {/* H2: PDF — client-side via paged.js + window.print(); not a download link. */}
+        <button
+          type="button"
+          className="parchment-toolbar-btn"
+          aria-label="Export as PDF"
+          onMouseDown={keepSelection}
+          onClick={onExportPdf}
+        >
+          PDF
+        </button>
       </fieldset>
 
       {/* ── G10: Voice typing ─────────────────────────────────────────── */}

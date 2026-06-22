@@ -30,6 +30,7 @@ import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
 import { PlantumlPopover } from '@/components/editor/PlantumlPopover'
 import { PresenterView } from '@/components/editor/PresenterView'
+import { PrintView } from '@/components/editor/PrintView'
 import { ReadingPresence } from '@/components/editor/ReadingPresence'
 import { ReadingView } from '@/components/editor/ReadingView'
 import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
@@ -510,6 +511,9 @@ export function Editor({
 
   // G15: Reading mode overlay — full-bleed read-only view.
   const [readingOpen, setReadingOpen] = useState(false)
+
+  // H2: Print / PDF view — client-side via paged.js + window.print().
+  const [printOpen, setPrintOpen] = useState(false)
 
   // G16: Presenter mode — full-screen slideshow.
   const [presenterOpen, setPresenterOpen] = useState(false)
@@ -1108,6 +1112,7 @@ export function Editor({
           readingOpen={readingOpen}
           onTogglePresenter={() => setPresenterOpen((v) => !v)}
           presenterOpen={presenterOpen}
+          onExportPdf={() => setPrintOpen(true)}
         />
       )}
 
@@ -1325,6 +1330,17 @@ export function Editor({
           own keyboard handler and fullscreen lifecycle. */}
       {presenterOpen && editor && (
         <PresenterView docJson={editor.getJSON()} onClose={() => setPresenterOpen(false)} />
+      )}
+
+      {/* H2: Print / PDF overlay — paged.js paginates a read-only snapshot of the
+          doc with @page rules matching the editor canvas, then window.print()
+          sends it to the browser print dialog for "Save as PDF". */}
+      {printOpen && editor && (
+        <PrintView
+          content={editor.getJSON()}
+          pageSetup={pageSetup}
+          onClose={() => setPrintOpen(false)}
+        />
       )}
     </div>
   )

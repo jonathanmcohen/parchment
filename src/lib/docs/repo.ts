@@ -244,6 +244,15 @@ export async function trashDocument(ownerId: string, id: string): Promise<void> 
     .set({ trashedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
 
+  // SECURITY (G1): revoke any share links on trash. Trashing is the owner's
+  // "take it down" gesture; it only soft-deletes (sets trashedAt) so the share
+  // FK cascade — which fires only on HARD delete — does not run. Without this,
+  // an active share link would keep serving the trashed doc's title + content to
+  // anonymous visitors. Owner-scoped: only the owner's shares for their own doc.
+  await db
+    .delete(schema.shares)
+    .where(and(eq(schema.shares.docId, id), eq(schema.shares.ownerId, ownerId)))
+
   // Best-effort disk mirror — remove the mirrored file.
   await removeDocFromDisk(id)
 }

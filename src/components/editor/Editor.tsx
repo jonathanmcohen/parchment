@@ -21,6 +21,7 @@ import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
 import { ReadingPresence } from '@/components/editor/ReadingPresence'
 import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
+import { ShareDialog } from '@/components/editor/ShareDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
 import { Toolbar } from '@/components/editor/Toolbar'
@@ -280,6 +281,9 @@ export function Editor({
   // F6: backlinks panel toggle
   const [backlinksOpen, setBacklinksOpen] = useState(false)
 
+  // G1: share-management dialog toggle
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+
   // D5: reading presence readers list + canvas wrapper ref
   const [readers, setReaders] = useState<Reader[]>([])
   const canvasWrapRef = useRef<HTMLDivElement>(null)
@@ -537,6 +541,7 @@ export function Editor({
           suggestionsOpen={suggestionsOpen}
           onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
           backlinksOpen={backlinksOpen}
+          onOpenShare={() => setShareDialogOpen(true)}
         />
       )}
 
@@ -631,6 +636,9 @@ export function Editor({
           onClose={() => setPageSetupOpen(false)}
         />
       )}
+
+      {/* G1: Share dialog */}
+      {shareDialogOpen && <ShareDialog docId={docId} onClose={() => setShareDialogOpen(false)} />}
     </div>
   )
 }

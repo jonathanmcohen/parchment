@@ -110,7 +110,7 @@
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
-| G1 | Sharing — link share (view/comment/edit/suggest), per-email (stub), password, expiry, anyone-toggle | TODO | ☐ | ☐ | v0.2 grants stubbed |
+| G1 | Sharing — link share (view/comment/edit/suggest), per-email (stub), password, expiry, anyone-toggle | DONE | ✓ | ✓ | `shares` table (token 256-bit base64url, argon2id passwordHash, expiresAt; migration 0013, cascade FKs). `shares-repo` (owner-scoped CRUD; `resolveShare` server-side expiry; `verifySharePassword` argon2; pure `isExpired`). API `/api/docs/[id]/shares` (GET safe-shape `hasPassword` not hash / POST), `/api/shares/[id]` DELETE, public `/api/share/[token]` (resolve+password→content; 401 required/wrong; 404 invalid/expired/**trashed**). Public `/share/[token]` OUTSIDE auth gate; `ShareViewer` = static PM-JSON→React renderer (**no editor, no dangerouslySetInnerHTML, no contenteditable**; restricted hrefs → structurally read-only). Share dialog (perm/password/expiry/copy/revoke; per-email v0.2 stub). Built via Workflow (2 security lenses→caught trashed-doc leak, fixed: trash revokes shares). 533 unit + 14 integration. axe clean. Browser-verified prod build: plain→read-only render; password required/wrong(401)/correct(200); expired/revoke/trash→404; no hash leak; token 43-char. **GAP: write perms stored but render read-only (anon writes=v0.2); no password-attempt rate-limit.** |
 | G2 | Templates — bundled gallery + save-as-template | TODO | ☐ | ☐ | |
 | G3 | Styles system — named para/char styles, inherit chain, workspace CSS theme, accent, font pairs | TODO | ☐ | ☐ | |
 | G4 | Equation editor — KaTeX inline/display, numbering, eq refs | TODO | ☐ | ☐ | |

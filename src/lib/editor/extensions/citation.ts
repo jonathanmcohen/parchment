@@ -103,7 +103,12 @@ function makeCitationResolutionPlugin(): Plugin<CitationResolution> {
         return buildResolution(state.doc)
       },
       apply(tr, old, _oldState, newState) {
-        if (!tr.docChanged && !tr.getMeta(CITE_REPAINT_META)) return old
+        // Rebuild ONLY on a real doc change. The CITE_REPAINT_META transaction
+        // (dispatched by requestCiteRepaint to force NodeView repaint) must NOT
+        // rebuild — rebuilding returns a fresh Map, which view() sees as a changed
+        // reference and re-dispatches the repaint meta, looping forever. Mirror
+        // math's numbering apply, which only rebuilds on tr.docChanged.
+        if (!tr.docChanged) return old
         return buildResolution(newState.doc)
       },
     },

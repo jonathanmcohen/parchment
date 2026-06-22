@@ -40,6 +40,7 @@ import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import { WikiSuggestionExtension } from '@/lib/editor/extensions/wiki-suggestion'
+import { classifySwipe, isMobileWidth, pageFitScale } from '@/lib/editor/page-fit'
 import { DEFAULT_PAGE_SETUP, type PageSetup } from '@/lib/editor/paginate'
 import { type Reader, throttle } from '@/lib/editor/reading-presence'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
@@ -493,6 +494,124 @@ export function Editor({
   const [readers, setReaders] = useState<Reader[]>([])
   const canvasWrapRef = useRef<HTMLDivElement>(null)
 
+  // G12: page-fit — scaled host ref and page natural height tracking.
+  // The ResizeObserver watches the canvas wrapper to detect available width
+  // changes; the page-natural-height is read from the .parchment-page element
+  // (its offsetHeight on the UNSCALED DOM — transform:scale is visual only and
+  // does not affect offsetHeight, so pagination metrics are never corrupted).
+  const scaledHostRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const host = scaledHostRef.current
+    if (!host) return
+
+    // Letter page width in px (816). We read the actual page element width
+    // on first measure to handle any page-setup changes.
+    const applyScale = () => {
+      const wrap = host.parentElement
+      if (!wrap) return
+      const availableWidth = wrap.offsetWidth
+
+      // Find the unscaled .parchment-page child to get its natural width/height.
+      // We must read these BEFORE setting the scale so we get layout dimensions.
+      const pageEl = host.querySelector<HTMLElement>('.parchment-page')
+      const pageWidth = pageEl ? pageEl.offsetWidth : 816
+      const pageHeight = pageEl ? pageEl.offsetHeight : 1056
+
+      const isMobile = isMobileWidth(availableWidth)
+      if (!isMobile) {
+        // Desktop: clear any mobile overrides.
+        host.style.removeProperty('--page-scale')
+        host.style.removeProperty('--page-natural-height')
+        host.style.height = ''
+        return
+      }
+
+      const scale = pageFitScale(availableWidth, pageWidth)
+      host.style.setProperty('--page-scale', String(scale))
+      host.style.setProperty('--page-natural-height', `${pageHeight}px`)
+    }
+
+    applyScale()
+
+    // Watch the host (and therefore its page child) for size changes.
+    const ro = new ResizeObserver(applyScale)
+    ro.observe(host)
+
+    // Also listen to window resize for viewport width changes.
+    const onResize = () => applyScale()
+    window.addEventListener('resize', onResize, { passive: true })
+
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', onResize)
+    }
+  }, [])
+
+  // G12: swipe-to-page — horizontal touch gesture on the canvas scroll wrapper.
+  // Only acts on single-touch predominantly-horizontal swipes; ignores pinch
+  // and vertical scrolling. Scrolls to the nearest page boundary.
+  const swipeTouchRef = useRef<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    const wrap = canvasWrapRef.current
+    if (!wrap) return
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) {
+        // Multi-touch (pinch) — do not interfere.
+        swipeTouchRef.current = null
+        return
+      }
+      const t = e.touches[0]
+      if (t) swipeTouchRef.current = { x: t.clientX, y: t.clientY }
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      const start = swipeTouchRef.current
+      swipeTouchRef.current = null
+      if (!start || e.changedTouches.length === 0) return
+      // Ignore multi-touch end events.
+      if (e.touches.length > 0) return
+
+      const t = e.changedTouches[0]
+      if (!t) return
+      const dx = t.clientX - start.x
+      const dy = t.clientY - start.y
+      const direction = classifySwipe(dx, dy)
+      if (direction === 'none') return
+
+      // Find the page canvas element to read its break positions.
+      // The page element height corresponds to the page content height; we use
+      // the scroll container's current scrollTop to find which page we're on.
+      const pageEl = wrap.querySelector<HTMLElement>('.parchment-page')
+      if (!pageEl) return
+
+      // The scroll container is the nearest scrollable ancestor of wrap.
+      // For this app that's the window (the page is one long scroll).
+      const currentScroll = window.scrollY
+      const pageHeight = pageEl.scrollHeight
+      if (pageHeight <= 0) return
+
+      const currentPage = Math.floor(currentScroll / pageHeight)
+      const targetPage =
+        direction === 'next'
+          ? Math.min(currentPage + 1, Math.floor(pageEl.scrollHeight / pageHeight))
+          : Math.max(currentPage - 1, 0)
+
+      const targetY = targetPage * pageHeight
+      window.scrollTo({ top: targetY, behavior: 'smooth' })
+    }
+
+    wrap.addEventListener('touchstart', onTouchStart, { passive: true })
+    wrap.addEventListener('touchend', onTouchEnd, { passive: true })
+
+    return () => {
+      wrap.removeEventListener('touchstart', onTouchStart)
+      wrap.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [])
+
   const save = useCallback(
     (json: Record<string, unknown>) => {
       const markdown = serializeMarkdown(json)
@@ -868,14 +987,23 @@ export function Editor({
 
         {/* B9: find + replace panel — positioned relative to this wrapper */}
         <div ref={canvasWrapRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-          <PageCanvas
-            pageSetup={pageSetup}
-            onPageCountChange={setPageCount}
-            editor={editor}
-            watermark={watermark}
-          >
-            <EditorContent editor={editor} />
-          </PageCanvas>
+          {/* G12: scaled host — CSS var --page-scale is set by the page-fit hook
+              above. On desktop the var is absent / 1 so transform:scale(1) is a
+              no-op. On mobile the host height collapses to pageHeight×scale so
+              no empty gap appears below the shrunken page.
+              CRITICAL: ResizeObserver in PageCanvas watches .parchment-page-content
+              (the INNER unscaled content div), so pagination metrics are computed
+              on un-transformed dimensions and are never corrupted by the scale. */}
+          <div ref={scaledHostRef} className="parchment-canvas-scaled-host">
+            <PageCanvas
+              pageSetup={pageSetup}
+              onPageCountChange={setPageCount}
+              editor={editor}
+              watermark={watermark}
+            >
+              <EditorContent editor={editor} />
+            </PageCanvas>
+          </div>
 
           {editor && findOpen && (
             <FindReplace editor={editor} initialMode={findMode} onClose={closeFind} />

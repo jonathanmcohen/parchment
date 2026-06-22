@@ -2604,3 +2604,99 @@ body {
   color: var(--accent);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
 }
+
+/* ── G12: Mobile responsive editor (≤ 768px) ────────────────────────────────
+ *
+ * ALL rules in this block are scoped to max-width: 768px so the desktop
+ * experience is byte-for-byte unchanged above the breakpoint.
+ *
+ * Page-fit scaling
+ * ────────────────
+ * .parchment-page receives `transform: scale(var(--page-scale, 1))` with
+ * `transform-origin: top center`.  The scale value is set as an inline CSS
+ * custom property on `.parchment-canvas-wrap` by the usePageFit hook in
+ * Editor.tsx; the property cascades into the page child.
+ *
+ * Pagination correctness under scale
+ * ────────────────────────────────────
+ * transform:scale is purely visual — it does NOT affect layout dimensions.
+ * The ResizeObserver in PageCanvas.tsx watches `.parchment-page-content`
+ * (the UN-scaled inner content div), so scrollHeight measurements are always
+ * on unscaled pixels.  To prevent the scaled-down page from leaving a large
+ * empty gap, the canvas wrapper sets `--page-natural-height` and this CSS
+ * applies `height: calc(var(--page-natural-height, auto) * var(--page-scale, 1))`
+ * to the page element wrapper (.parchment-canvas-scaled-host), collapsing the
+ * empty space that transform would otherwise leave.
+ *
+ * Touch toolbar
+ * ─────────────
+ * Choice: scrollable top toolbar with 44px tap targets (WCAG 2.5.5/2.5.8).
+ * This is the simplest robust approach — keeps toolbar always visible and
+ * reachable without hiding any controls.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/* Page-fit: visual scale wrapper — compensates height so no empty gap appears.
+   The JS hook sets --page-scale and --page-natural-height on this element. */
+@media (max-width: 768px) {
+  .parchment-canvas-scaled-host {
+    /* Collapse the visual height to match the scaled page height so scroll
+       content does not have a gap below the shrunken page. */
+    height: calc(var(--page-natural-height, auto) * var(--page-scale, 1));
+    overflow: visible;
+  }
+
+  /* Apply the visual scale to the page element; transform-origin top-center
+     keeps the page aligned to the left edge of the reading area. */
+  .parchment-canvas-scaled-host .parchment-page {
+    transform: scale(var(--page-scale, 1));
+    transform-origin: top center;
+  }
+
+  /* ── Touch toolbar ── */
+
+  /* Make the toolbar horizontally scrollable with 44px touch targets. */
+  .parchment-toolbar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    /* Momentum scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+    /* Hide scrollbar visually (still scrollable) */
+    scrollbar-width: none;
+    /* Keep toolbar sticky at the top so it stays reachable while scrolling */
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  /* Hide the webkit scrollbar track in the toolbar */
+  .parchment-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Increase all toolbar buttons to WCAG 2.5.5 / 2.5.8 minimum 44×44px */
+  .parchment-toolbar-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Increase toolbar selects/inputs to be large enough to tap reliably */
+  .parchment-toolbar-select {
+    height: 44px;
+    font-size: 1rem;
+  }
+
+  .parchment-color-input {
+    width: 44px;
+    height: 44px;
+  }
+
+  .parchment-size-input {
+    height: 44px;
+    font-size: 1rem;
+  }
+
+  .parchment-unit-btn {
+    height: 44px;
+    padding: 0 10px;
+  }
+}

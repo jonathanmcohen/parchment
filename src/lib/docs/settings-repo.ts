@@ -1,5 +1,10 @@
 import { and, eq } from 'drizzle-orm'
 import { db, schema } from '@/db'
+import {
+  AUTOSAVE_INTERVAL_KEY,
+  clampAutosaveMs,
+  DEFAULT_AUTOSAVE_MS,
+} from '@/lib/docs/autosave-config'
 import { DEFAULT_STYLES, type NamedStyle, parseStyles } from '@/lib/editor/styles'
 import { DEFAULT_THEME, parseTheme, type WorkspaceTheme } from '@/lib/editor/theme'
 
@@ -56,6 +61,29 @@ export async function setWorkspaceTheme(ownerId: string, theme: unknown): Promis
   const normalized = parseTheme(theme)
   await setSetting(ownerId, WORKSPACE_THEME_KEY, normalized)
   return normalized
+}
+
+// I3: autosave cadence setting (5s–5min).
+// Re-export from the client-safe split so server code and client code share one source.
+export {
+  AUTOSAVE_INTERVAL_KEY,
+  clampAutosaveMs,
+  DEFAULT_AUTOSAVE_MS,
+  MAX_AUTOSAVE_MS,
+  MIN_AUTOSAVE_MS,
+} from '@/lib/docs/autosave-config'
+
+/** Read the owner's autosave interval in ms (default 30000). */
+export async function getAutosaveInterval(ownerId: string): Promise<number> {
+  const raw = await getSetting<unknown>(ownerId, AUTOSAVE_INTERVAL_KEY, DEFAULT_AUTOSAVE_MS)
+  const n = typeof raw === 'number' ? raw : DEFAULT_AUTOSAVE_MS
+  return clampAutosaveMs(n)
+}
+
+/** Persist the owner's autosave interval (clamped to [MIN, MAX]). */
+export async function setAutosaveInterval(ownerId: string, ms: number): Promise<void> {
+  const clamped = clampAutosaveMs(ms)
+  await setSetting(ownerId, AUTOSAVE_INTERVAL_KEY, clamped)
 }
 
 /** Read the owner's named styles, or the built-in defaults if unset. */

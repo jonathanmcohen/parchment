@@ -110,6 +110,9 @@ importers:
       marked:
         specifier: ^18.0.5
         version: 18.0.5
+      mermaid:
+        specifier: 11.15.0
+        version: 11.15.0
       next:
         specifier: 16.2.9
         version: 16.2.9(@playwright/test@1.61.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

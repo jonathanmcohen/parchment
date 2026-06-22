@@ -7,6 +7,7 @@ import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensio
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
 import { EquationRef, MathBlock, MathCommands, MathInline } from '@/lib/editor/extensions/math'
+import { MermaidExtension } from '@/lib/editor/extensions/mermaid'
 import { PageBreakExtension, SectionBreakExtension } from '@/lib/editor/extensions/page-primitives'
 import { Suggesting } from '@/lib/editor/extensions/suggesting'
 import { tableExtensions } from '@/lib/editor/extensions/table'
@@ -73,6 +74,11 @@ export const baseExtensions = [
   // next/dynamic ssr:false for Excalidraw). getSchema(baseExtensions) builds
   // in the server runtime without ever touching excalidraw.
   DrawingExtension,
+  // G6a: Mermaid diagram embed. MermaidExtension does NOT import mermaid at
+  // module load (the NodeView lazy-requires MermaidView, which lazy-imports
+  // mermaid inside the browser render). getSchema(baseExtensions) builds in
+  // the server runtime without ever touching mermaid.
+  MermaidExtension,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

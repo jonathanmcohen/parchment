@@ -18,6 +18,7 @@ import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { MathPopover } from '@/components/editor/MathPopover'
+import { MermaidPopover } from '@/components/editor/MermaidPopover'
 import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
@@ -288,6 +289,12 @@ export function Editor({
   // node being edited (null = closed). Opened via parchment:edit-drawing event
   // dispatched by DrawingView (click) and insertDrawing command (new node).
   const [drawingEdit, setDrawingEdit] = useState<{ pos: number; scene: object | null } | null>(null)
+
+  // G6a: mermaid editor popover — holds the doc position + current source of
+  // the mermaid node being edited (null = closed). Opened via
+  // parchment:edit-mermaid event dispatched by MermaidView (click) and from
+  // the slash-menu handler after insertMermaid().run().
+  const [mermaidEdit, setMermaidEdit] = useState<{ pos: number; source: string } | null>(null)
   const openMathEditor = useCallback((pos: number) => {
     setMathEdit({ pos, latex: '' })
   }, [])
@@ -536,6 +543,21 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-drawing', handler)
   }, [editor])
 
+  // G6a: mermaid NodeViews dispatch parchment:edit-mermaid {pos, source} on
+  // click — open the mermaid popover seeded with the clicked node's source.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; source: string }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        setMermaidEdit({ pos: detail.pos, source: detail.source ?? '' })
+      }
+    }
+    dom.addEventListener('parchment:edit-mermaid', handler)
+    return () => dom.removeEventListener('parchment:edit-mermaid', handler)
+  }, [editor])
+
   // D5: publish own awareness presence + reading position
   useEffect(() => {
     if (!editor || !provider) return
@@ -679,6 +701,16 @@ export function Editor({
           pos={drawingEdit.pos}
           initialScene={drawingEdit.scene}
           onClose={() => setDrawingEdit(null)}
+        />
+      )}
+
+      {/* G6a: Mermaid diagram editor popover */}
+      {editor && mermaidEdit !== null && (
+        <MermaidPopover
+          editor={editor}
+          pos={mermaidEdit.pos}
+          initialSource={mermaidEdit.source}
+          onClose={() => setMermaidEdit(null)}
         />
       )}
 

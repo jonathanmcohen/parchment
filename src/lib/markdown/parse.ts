@@ -298,9 +298,17 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
       }
       case 'code': {
         const code = t.text ?? ''
+        const lang = t.lang ?? ''
+        // G6a: a `mermaid` fence reconstructs a mermaid node (wins over shiki
+        // code-block path). Standard language fence, NOT a parchment: fence.
+        // NO mermaid import — source is stored as a plain string. Never throws.
+        if (lang === 'mermaid') {
+          out.push({ type: 'mermaid', attrs: { source: code } })
+          break
+        }
         // F3: a `parchment:<kind>` fence reconstructs a custom PM node. On any
         // failure we fall through to the plain codeBlock below (never throw).
-        const fenceMatch = /^parchment:(\S+)/.exec(t.lang ?? '')
+        const fenceMatch = /^parchment:(\S+)/.exec(lang)
         if (fenceMatch) {
           const node = reconstructParchment(fenceMatch[1] ?? '', code)
           if (node) {
@@ -310,7 +318,7 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
         }
         out.push({
           type: 'codeBlock',
-          attrs: { language: t.lang?.length ? t.lang : null },
+          attrs: { language: lang.length ? lang : null },
           ...(code.length ? { content: [{ type: 'text', text: code }] } : {}),
         })
         break

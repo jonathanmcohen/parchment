@@ -194,6 +194,13 @@ function serializeBlock(node: PMNode): string {
           attrs: { scene: node.attrs?.scene ?? null, svg: node.attrs?.svg ?? '' },
         }),
       )
+    // G6a: mermaid — emit as a standard ```mermaid code fence (NOT a
+    // parchment: fence) so it is portable and disk-mirror friendly. No mermaid
+    // import — source is a plain string stored in the node attr.
+    case 'mermaid': {
+      const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
+      return `\`\`\`mermaid\n${src}\n\`\`\``
+    }
     default:
       return serializeInline(node.content)
   }

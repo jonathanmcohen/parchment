@@ -104,6 +104,13 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'MEDIA',
     keywords: ['drawing', 'sketch', 'excalidraw', 'diagram', 'whiteboard', 'canvas', 'draw'],
   },
+  // G6a: Mermaid diagram embed.
+  {
+    id: 'mermaid',
+    title: 'Mermaid',
+    category: 'MEDIA',
+    keywords: ['mermaid', 'diagram', 'flowchart', 'sequence', 'gantt'],
+  },
 
   // ── EMBED ────────────────────────────────────────────────────────────────
   {

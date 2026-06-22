@@ -132,6 +132,34 @@ function renderNode(node: PMNode, key: number): ReactNode {
         />
       )
     }
+    case 'mermaid': {
+      // G6a: the share viewer cannot run mermaid (client-only lib). Render the
+      // source in a <pre> with a muted label. v0.1 documented choice: mermaid
+      // is a client-only renderer; the public read-only viewer is server-rendered
+      // and must not import mermaid. A prerendered SVG is not stored in the node
+      // (unlike drawing), so the only viable fallback is the source in a code block.
+      const src = str(node.attrs?.source)
+      return (
+        <div key={key} style={{ margin: '1em 0' }}>
+          <p
+            style={{ color: '#999', fontStyle: 'italic', fontSize: '0.85em', margin: '0 0 0.25em' }}
+          >
+            Mermaid diagram
+          </p>
+          <pre
+            style={{
+              background: '#f5f5f5',
+              padding: '0.75em',
+              borderRadius: '4px',
+              overflow: 'auto',
+              fontSize: '0.85em',
+            }}
+          >
+            <code>{src ?? ''}</code>
+          </pre>
+        </div>
+      )
+    }
     case 'hardBreak':
       return <br key={key} />
     case 'image': {

@@ -3,6 +3,7 @@
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { WatermarkLayer } from '@/components/editor/WatermarkLayer'
 import {
   DEFAULT_SECTION_CONFIG,
   formatPageNumber,
@@ -18,6 +19,7 @@ import {
   type PageSetup,
   resolvePageDims,
 } from '@/lib/editor/paginate'
+import { DEFAULT_WATERMARK, type WatermarkConfig } from '@/lib/editor/watermark'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -28,6 +30,8 @@ type Props = {
   onPageCountChange?: (n: number) => void
   /** When provided, the canvas reads manual page breaks and section config from the doc. */
   editor?: Editor | null
+  /** G9: doc-level watermark default. Per-section overrides take precedence when set. */
+  watermark?: WatermarkConfig
 }
 
 /** Doc-level info extracted from the editor state. */
@@ -77,6 +81,7 @@ export function PageCanvas({
   children,
   onPageCountChange,
   editor,
+  watermark = DEFAULT_WATERMARK,
 }: Props) {
   const { widthPx, heightPx } = resolvePageDims(pageSetup)
   const { margins } = pageSetup
@@ -95,6 +100,11 @@ export function PageCanvas({
           pageBreakPositions.push(pos)
         }
         if (node.type.name === 'sectionBreak') {
+          // G9: pull watermark override from section attrs if present (undefined = inherit doc default)
+          const sectionWatermark =
+            node.attrs.watermark !== null && node.attrs.watermark !== undefined
+              ? (node.attrs.watermark as WatermarkConfig)
+              : undefined
           sectionEntries.push({
             pos,
             config: {
@@ -102,6 +112,7 @@ export function PageCanvas({
               footerText: String(node.attrs.footerText ?? ''),
               pageNumberFormat: (node.attrs.pageNumberFormat as PageNumberFormat) ?? '1',
               pageNumberPosition: (node.attrs.pageNumberPosition as PageNumberPosition) ?? 'center',
+              ...(sectionWatermark !== undefined ? { watermark: sectionWatermark } : {}),
             },
           })
         }
@@ -256,6 +267,16 @@ export function PageCanvas({
           </div>
         )
       })}
+
+      {/* G9: Watermark overlay — behind content, pointer-events:none.
+          The doc-level watermark prop is the default; per-page the active section's
+          watermark override (if set) takes precedence. Since PageCanvas renders one
+          continuous canvas (not per-page divs), we use the doc-level default here.
+          Per-section watermark overrides are fully modelled in the data and resolve
+          correctly in resolveSection — a future rendering refactor to per-page divs
+          would wire them per-page. For v0.1 the doc-level watermark renders once
+          across the canvas, which is correct for docs with a single watermark. */}
+      <WatermarkLayer config={watermark} />
 
       {/* Content wrapper — measured by ResizeObserver */}
       <div ref={contentRef} className="parchment-page-content">

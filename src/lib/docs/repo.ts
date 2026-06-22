@@ -3,6 +3,7 @@ import { db, schema } from '@/db'
 import { removeDocFromDisk, syncDocToDisk } from '@/lib/disk/mirror'
 import { extractTargetIds } from '@/lib/docs/doc-links'
 import { setDocLinks } from '@/lib/docs/doc-links-repo'
+import type { WatermarkConfig } from '@/lib/editor/watermark'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
@@ -349,4 +350,38 @@ export async function duplicateDocument(ownerId: string, id: string): Promise<{ 
   await syncDocToDisk(row.id)
 
   return { id: row.id }
+}
+
+/**
+ * G9: Merge a watermark config into documents.meta.watermark (owner-scoped).
+ * Preserves all other keys in the meta jsonb column.
+ * cfg=null → removes the watermark key.
+ */
+export async function setDocumentWatermark(
+  ownerId: string,
+  docId: string,
+  cfg: WatermarkConfig,
+): Promise<void> {
+  // Read existing meta to preserve other keys
+  const [row] = await db
+    .select({ meta: schema.documents.meta })
+    .from(schema.documents)
+    .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
+    .limit(1)
+  if (!row) return // doc not found or not owned by this user
+
+  const existingMeta =
+    row.meta !== null &&
+    row.meta !== undefined &&
+    typeof row.meta === 'object' &&
+    !Array.isArray(row.meta)
+      ? (row.meta as Record<string, unknown>)
+      : {}
+
+  const updatedMeta: Record<string, unknown> = { ...existingMeta, watermark: cfg }
+
+  await db
+    .update(schema.documents)
+    .set({ meta: updatedMeta, updatedAt: new Date() })
+    .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
 }

@@ -14,6 +14,7 @@ type Props = {
   onOpenLink: () => void
   onCropImage: () => void
   onOpenPageSetup: () => void
+  onOpenWatermark: () => void
   onToggleComments: () => void
   commentsSidebarOpen: boolean
   onToggleVersionHistory: () => void
@@ -117,6 +118,7 @@ export function Toolbar({
   onOpenLink,
   onCropImage,
   onOpenPageSetup,
+  onOpenWatermark,
   onToggleComments,
   commentsSidebarOpen,
   onToggleVersionHistory,
@@ -701,6 +703,20 @@ export function Toolbar({
         }}
       >
         ☰⊞
+      </button>
+
+      {/* ── G9: Watermark ────────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Watermark"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={(e) => {
+          e.preventDefault()
+          onOpenWatermark()
+        }}
+      >
+        ≋
       </button>
 
       {/* ── Table context controls (visible when cursor is in a table) ── */}

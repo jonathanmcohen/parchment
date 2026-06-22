@@ -134,11 +134,11 @@
 |---|---|---|---|---|---|
 | H1 | `.docx` round-trip via Mammoth | TODO | ☐ | ☐ | |
 | H2 | `.pdf` via paged.js (page fidelity) | TODO | ☐ | ☐ | |
-| H3 | `.html` standalone, embedded CSS, no JS | TODO | ☐ | ☐ | |
-| H4 | `.md` canonical lossless round-trip | TODO | ☐ | ☐ | |
+| H3 | `.html` standalone, embedded CSS, no JS | DONE | ☑ | ☑ | docToStandaloneHtml = renderToStaticMarkup(renderReadOnlyDoc) wrapped in <!doctype> + embedded EXPORT_STYLESHEET, NO <script>/external (plantuml stripped to <pre> source). Browser-verified: GET /export?format=html → standalone, content-type text/html, download filename, content rendered. |
+| H4 | `.md` canonical lossless round-trip | DONE | ☑ | ☑ | reuses serializeMarkdown (F3 lossless). Browser-verified: export?format=md → # heading, **bold**, - list; text/markdown; download filename. |
 | H5 | `.epub` long-form | TODO | ☐ | ☐ | |
 | H6 | LaTeX — equation + bibliography preserved | TODO | ☐ | ☐ | |
-| H7 | plain `.txt` | TODO | ☐ | ☐ | |
+| H7 | plain `.txt` | DONE | ☑ | ☑ | docToPlainText walk (headings/paras→lines, lists→prefixed, tables→tab, marks stripped). Browser-verified: export?format=txt → plain (no md syntax), text/plain. |
 | H8 | Bulk export — multi-select → ZIP in chosen format | TODO | ☐ | ☐ | |
 | H9 | Import — docx/md/html/Notion-zip/Google-Docs-paste | TODO | ☐ | ☐ | |
 

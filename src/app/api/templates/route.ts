@@ -1,6 +1,11 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
-import { createTemplate, createTemplateFromDoc, listTemplates } from '@/lib/docs/templates-repo'
+import {
+  createTemplate,
+  createTemplateFromDoc,
+  isProseMirrorDoc,
+  listTemplates,
+} from '@/lib/docs/templates-repo'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,15 +40,24 @@ export async function POST(req: NextRequest) {
       const result = await createTemplateFromDoc(user.id, body.fromDocId, name)
       return NextResponse.json(result, { status: 201 })
     }
+    // A directly-supplied template body must be valid ProseMirror `doc` JSON:
+    // `{}` / missing content would be persisted and then throw in the editor's
+    // seed path (prosemirrorJSONToYDoc → Node.fromJSON) when instantiated.
+    if (!isProseMirrorDoc(body.content)) {
+      return NextResponse.json({ error: 'content must be a ProseMirror doc' }, { status: 400 })
+    }
     const result = await createTemplate(user.id, {
       name,
       ...(typeof body.description === 'string' ? { description: body.description } : {}),
-      content: body.content ?? {},
+      content: body.content,
     })
     return NextResponse.json(result, { status: 201 })
   } catch (err) {
     if (err instanceof Error && err.message === 'empty name') {
       return NextResponse.json({ error: 'name is required' }, { status: 400 })
+    }
+    if (err instanceof Error && err.message === 'invalid content') {
+      return NextResponse.json({ error: 'content must be a ProseMirror doc' }, { status: 400 })
     }
     if (err instanceof Error && err.message === 'not found') {
       return NextResponse.json({ error: 'not found' }, { status: 404 })

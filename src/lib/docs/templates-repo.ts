@@ -9,12 +9,23 @@ import { getDocument } from '@/lib/docs/repo'
 
 export type Template = typeof schema.templates.$inferSelect
 
+/** True if `value` is valid ProseMirror `doc` JSON: an object with
+ *  `type === 'doc'` and an array `content`. An empty `content` array is valid
+ *  (Node.fromJSON accepts it); `{}`, missing `type`, or a non-array `content`
+ *  are not — seeding them via prosemirrorJSONToYDoc would throw. */
+export function isProseMirrorDoc(value: unknown): value is { type: 'doc'; content: unknown[] } {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return v.type === 'doc' && Array.isArray(v.content)
+}
+
 export async function createTemplate(
   ownerId: string,
   opts: { name: string; description?: string; content: unknown },
 ): Promise<{ id: string }> {
   const name = opts.name.trim()
   if (name.length === 0) throw new Error('empty name')
+  if (!isProseMirrorDoc(opts.content)) throw new Error('invalid content')
   const [row] = await db
     .insert(schema.templates)
     .values({

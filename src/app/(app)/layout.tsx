@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const themeStyle = themeCssVars(theme) as CSSProperties
 
   return (
-    <div className="flex min-h-screen" style={themeStyle}>
+    <div className="flex min-h-screen" style={themeStyle} data-color-scheme={theme.colorScheme}>
       <CommandPaletteMount />
       <aside className="flex w-56 shrink-0 flex-col gap-1 border-[var(--border)] border-r bg-[var(--paper)] p-4">
         <Link href="/" className="mb-4 px-2 font-semibold text-lg tracking-tight">

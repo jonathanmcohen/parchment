@@ -1,6 +1,18 @@
 @import "tailwindcss";
 
-:root {
+/* ── I1: Color-scheme strategy ───────────────────────────────────────────────
+ *
+ *  :root / [data-color-scheme="light"]  → light vars (always light)
+ *  [data-color-scheme="dark"]           → dark vars  (always dark)
+ *  @media dark + [data-color-scheme="system"] → dark vars (follows OS)
+ *
+ *  The app layout sets data-color-scheme={theme.colorScheme} on the wrapper.
+ *  When the attribute is absent or "system" the @media rule applies; light
+ *  and dark are forced regardless of the OS preference.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-color-scheme="light"] {
   --background: #f7f6f3;
   --foreground: #1a1a17;
   --muted: #6b6b63;
@@ -16,16 +28,30 @@
   /* Page canvas (B1) */
   --page-pad: 96px;
   --page-shadow: 0 2px 8px 0 rgb(0 0 0 / 0.1);
+  /* I1: page/paper background — overridden by theme's pageBg via themeCssVars. */
+  --page-bg: var(--paper);
+}
+
+[data-color-scheme="dark"] {
+  --background: #16151a;
+  --foreground: #ececec;
+  --muted: #9a9aa0;
+  --accent: #9a82ff;
+  --paper: #1f1e25;
+  --border: #2c2b33;
+  --page-bg: var(--paper);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root,
+  [data-color-scheme="system"] {
     --background: #16151a;
     --foreground: #ececec;
     --muted: #9a9aa0;
     --accent: #9a82ff;
     --paper: #1f1e25;
     --border: #2c2b33;
+    --page-bg: var(--paper);
   }
 }
 
@@ -50,7 +76,8 @@ body {
 /* Page canvas (B1) */
 .parchment-page {
   position: relative;
-  background: var(--paper);
+  /* I1: --page-bg is set by the theme (themeCssVars); falls back to --paper. */
+  background: var(--page-bg, var(--paper));
   border: 1px solid var(--border);
   box-shadow: var(--page-shadow);
   min-height: 1056px; /* one Letter page — overridden by inline style via margins */
@@ -1296,9 +1323,13 @@ body {
   color: inherit;
 }
 @media (prefers-color-scheme: dark) {
-  .parchment-prose pre {
+  :root .parchment-prose pre,
+  [data-color-scheme="system"] .parchment-prose pre {
     background: #1e2030;
   }
+}
+[data-color-scheme="dark"] .parchment-prose pre {
+  background: #1e2030;
 }
 .parchment-prose p.is-editor-empty:first-child::before {
   content: "Start writing…";
@@ -1434,9 +1465,13 @@ body {
   color: inherit;
 }
 @media (prefers-color-scheme: dark) {
-  .parchment-cb-pre {
+  :root .parchment-cb-pre,
+  [data-color-scheme="system"] .parchment-cb-pre {
     background: #1e2030;
   }
+}
+[data-color-scheme="dark"] .parchment-cb-pre {
+  background: #1e2030;
 }
 
 /* Collapsed state — hide the pre, keep header */

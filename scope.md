@@ -146,11 +146,11 @@
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
-| I1 | Theme — light/dark/system, accent picker, page bg, font-pair gallery | TODO | ☐ | ☐ | |
+| I1 | Theme — light/dark/system, accent picker, page bg, font-pair gallery | DONE | ☑ | ☑ | Extended G3 WorkspaceTheme + colorScheme(light/dark/system) + pageBg(white/sepia/hex); parseTheme legacy-compat, themeCssVars emits --page-bg, ACCENT_SWATCHES(8)+PAGE_BG_PRESETS. globals.css scheme refactor ([data-color-scheme] forces over @media prefers; propagate to :root for html/body bg). AppearanceSettings: scheme radios + 8 swatches + hex + page-bg + font gallery. Browser-verified prod (preview colorScheme emulation): FORCED-LIGHT on OS-dark → body rgb(247,246,243) LIGHT (crux bug fixed); FORCED-DARK on OS-light → body rgb(22,21,26) DARK; accent #0099ff + sepia page-bg #f5efe0 apply + persist across reload. 932 unit. Workflow review fixed 6 BLOCKING (forced-scheme @media :root bleed → data-color-scheme propagate; code-block pre :root selector; page-bg onBlur preset-clobber). |
 | I2 | Keyboard shortcuts — ⌘⇧/ cheat sheet, customizable, Vim source mode | TODO | ☐ | ☐ | |
 | I3 | Autosave cadence slider 5s–5min | TODO | ☐ | ☐ | |
 | I4 | Backup — workspace .zip, scheduled S3 (Cairn CFG-2 pattern), restore | TODO | ☐ | ☐ | |
-| I5 | Audit log (= A4) | TODO | ☐ | ☐ | shared with A4 |
+| I5 | Audit log (= A4) | DONE | ☑ | ☑ | Single impl = A4 (append-only logAudit, filterable viewer, testcontainers + browser-verified, axe clean). No separate work — shared. |
 | I6 | Health page (= A5) + Ollama + S3 pills | TODO | ☐ | ☐ | shared with A5 |
 | I7 | MFA + passkeys (reuse Cairn lib) | TODO | ☐ | ☐ | |
 | I8 | SSO / SCIM route stubs (v0.2) | TODO | ☐ | ☐ | |

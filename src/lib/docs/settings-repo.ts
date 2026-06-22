@@ -58,6 +58,31 @@ export async function setWorkspaceTheme(ownerId: string, theme: unknown): Promis
   return normalized
 }
 
+// I3: autosave cadence setting (5s–5min).
+export const AUTOSAVE_INTERVAL_KEY = 'autosaveIntervalMs'
+export const DEFAULT_AUTOSAVE_MS = 30_000
+export const MIN_AUTOSAVE_MS = 5_000
+export const MAX_AUTOSAVE_MS = 300_000
+
+/** Clamp ms to the valid autosave range [MIN, MAX]. Non-finite → default. */
+export function clampAutosaveMs(ms: number): number {
+  if (!Number.isFinite(ms)) return DEFAULT_AUTOSAVE_MS
+  return Math.min(MAX_AUTOSAVE_MS, Math.max(MIN_AUTOSAVE_MS, ms))
+}
+
+/** Read the owner's autosave interval in ms (default 30000). */
+export async function getAutosaveInterval(ownerId: string): Promise<number> {
+  const raw = await getSetting<unknown>(ownerId, AUTOSAVE_INTERVAL_KEY, DEFAULT_AUTOSAVE_MS)
+  const n = typeof raw === 'number' ? raw : DEFAULT_AUTOSAVE_MS
+  return clampAutosaveMs(n)
+}
+
+/** Persist the owner's autosave interval (clamped to [MIN, MAX]). */
+export async function setAutosaveInterval(ownerId: string, ms: number): Promise<void> {
+  const clamped = clampAutosaveMs(ms)
+  await setSetting(ownerId, AUTOSAVE_INTERVAL_KEY, clamped)
+}
+
 /** Read the owner's named styles, or the built-in defaults if unset. */
 export async function getDocStyles(ownerId: string): Promise<NamedStyle[]> {
   const raw = await getSetting<unknown>(ownerId, DOC_STYLES_KEY, undefined)

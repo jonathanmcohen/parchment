@@ -86,6 +86,8 @@ type Props = {
   initialCustomCss?: string
   /** G13: true when AI_BASE_URL is configured server-side. Never derived client-side. */
   aiEnabled?: boolean
+  /** I3: autosave version-snapshot interval in ms (clamped to 5s–5min, default 30s). */
+  autosaveIntervalMs?: number
 }
 
 const FIELD = 'default'
@@ -104,6 +106,7 @@ export function Editor({
   initialWatermark,
   initialCustomCss,
   aiEnabled = false,
+  autosaveIntervalMs = 30_000,
 }: Props) {
   // The Y.Doc is created empty — we do NOT eagerly seed it here (D4). Seeding is
   // gated on `hasCollabState` (a server-rendered fact, not a live fragment check)
@@ -836,9 +839,11 @@ export function Editor({
 
   // D3: autosave snapshot — tracks the last-snapshotted markdown to avoid spamming.
   // Only fires a version snapshot when the content has changed since last snapshot.
-  // Declared after useEditor so `editor` is in scope.
+  // I3: interval driven by autosaveIntervalMs prop (clamped defensively to 5s–5min).
+  // Re-creates the interval when docId, editor, or the interval duration changes.
   const lastSnapshotMd = useRef<string | null>(null)
   useEffect(() => {
+    const clampedMs = Math.min(300_000, Math.max(5_000, autosaveIntervalMs))
     const interval = setInterval(() => {
       if (!editor) return
       const json = editor.getJSON() as Record<string, unknown>
@@ -851,9 +856,9 @@ export function Editor({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ kind: 'auto' }),
       })
-    }, 30_000)
+    }, clampedMs)
     return () => clearInterval(interval)
-  }, [docId, editor])
+  }, [docId, editor, autosaveIntervalMs])
 
   // B10: derive full-document and selection counts reactively via useEditorState.
   // The selector runs on every transaction so counts stay in sync with edits and

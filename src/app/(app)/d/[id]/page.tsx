@@ -3,6 +3,7 @@ import { Editor } from '@/components/editor/Editor'
 import { isAiEnabled } from '@/lib/ai/compose'
 import { requireUser } from '@/lib/auth/guard'
 import { getDocument, hasCollabState } from '@/lib/docs/repo'
+import { getAutosaveInterval } from '@/lib/docs/settings-repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
 import { parseWatermark } from '@/lib/editor/watermark'
 
@@ -29,6 +30,9 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
   // Computed server-side so the client never reads process.env directly.
   const aiEnabled = isAiEnabled()
 
+  // I3: fetch the owner's autosave cadence; falls back to 30s when unset.
+  const autosaveIntervalMs = await getAutosaveInterval(user.id)
+
   return (
     <Editor
       docId={doc.id}
@@ -40,6 +44,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
       initialWatermark={initialWatermark}
       initialCustomCss={initialCustomCss}
       aiEnabled={aiEnabled}
+      autosaveIntervalMs={autosaveIntervalMs}
     />
   )
 }

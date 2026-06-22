@@ -87,6 +87,57 @@ export async function probeDisk(): Promise<Pill> {
   }
 }
 
+const PROBE_TIMEOUT_MS = 3000
+
+// Ollama/AI endpoint — configured-only: returns null when AI_BASE_URL is unset.
+// I6: probeOllama is resilient — never throws; a fetch failure → 'down' pill.
+export async function probeOllama(): Promise<Pill | null> {
+  const base = process.env.AI_BASE_URL
+  if (!base) return null
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
+  try {
+    // Try the /models endpoint (OpenAI-compatible / Ollama list-models).
+    // Any HTTP response (even 4xx) means the server is reachable.
+    await fetch(`${base}/models`, { signal: controller.signal })
+    return { name: 'ollama', status: 'up', detail: base }
+  } catch (e) {
+    return { name: 'ollama', status: 'down', detail: `${base} — ${message(e)}` }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// S3 backup endpoint — configured-only: returns null when BACKUP_S3_ENDPOINT is unset.
+// I6: probeS3 is resilient — never throws; a fetch failure → 'down' pill.
+export async function probeS3(): Promise<Pill | null> {
+  const endpoint = process.env.BACKUP_S3_ENDPOINT
+  if (!endpoint) return null
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
+  try {
+    // Lightweight reachability check — HEAD the endpoint root.
+    // Any HTTP response (even 4xx/5xx) means the host is reachable.
+    await fetch(endpoint, { method: 'HEAD', signal: controller.signal })
+    return { name: 's3', status: 'up', detail: endpoint }
+  } catch (e) {
+    return { name: 's3', status: 'down', detail: `${endpoint} — ${message(e)}` }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function probeAll(): Promise<Pill[]> {
-  return Promise.all([probeDatabase(), probeCollab(), probeSearchIndex(), probeDisk()])
+  const results = await Promise.all([
+    probeDatabase(),
+    probeCollab(),
+    probeSearchIndex(),
+    probeDisk(),
+    probeOllama(),
+    probeS3(),
+  ])
+  // Filter out nulls from configured-only probes (Ollama, S3 when env is unset).
+  return results.filter((p): p is Pill => p !== null)
 }

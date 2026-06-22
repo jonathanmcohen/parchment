@@ -1,4 +1,5 @@
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
+import { AutosaveSlider } from '@/components/settings/AutosaveSlider'
 import { StylesManager } from '@/components/settings/StylesManager'
 
 export default function WorkspaceSettingsPage() {
@@ -48,6 +49,16 @@ export default function WorkspaceSettingsPage() {
             <option value="a4">A4</option>
           </select>
         </div>
+      </section>
+
+      <section aria-labelledby="workspace-autosave" className="mt-8">
+        <h2 id="workspace-autosave" className="font-medium text-lg">
+          Autosave
+        </h2>
+        <p className="mt-1 text-[var(--muted)] text-sm">
+          How often a version snapshot is saved while you are editing.
+        </p>
+        <AutosaveSlider />
       </section>
 
       <section aria-labelledby="workspace-storage" className="mt-8">

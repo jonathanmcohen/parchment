@@ -503,6 +503,10 @@ export function Editor({
 
   // G16: Presenter mode — full-screen slideshow.
   const [presenterOpen, setPresenterOpen] = useState(false)
+  // Ref so the F5 keydown handler ([] deps) can read the current value without
+  // staling. This avoids a double-setState race with PresenterView's F5 handler.
+  const presenterOpenRef = useRef(false)
+  presenterOpenRef.current = presenterOpen
 
   const canvasWrapRef = useRef<HTMLDivElement>(null)
 
@@ -1004,14 +1008,24 @@ export function Editor({
     return () => dom.removeEventListener('parchment:goto-ref', handler)
   }, [editor])
 
-  // G16: F5 keydown → toggle presenter mode. preventDefault stops the browser's
-  // default page-refresh behaviour (note: some browser/OS combinations may still
-  // refresh before the JS handler fires — the toolbar button is the safe fallback).
+  // G16: F5 keydown → open presenter mode (only when closed).
+  // When the presenter is already open, PresenterView owns F5 and closes it.
+  // Guarding with presenterOpenRef prevents a double-setState race: without the
+  // guard, both this handler and PresenterView's handler fire in the same event,
+  // and React 18's functional-update batching can chain false → !false = true,
+  // leaving the presenter stuck open. With the guard this handler is a no-op
+  // when the overlay is active, so F5 ownership is exclusive.
+  // preventDefault stops the browser's default page-refresh behaviour (note:
+  // some browser/OS combinations may still refresh before the JS handler fires
+  // — the toolbar button is the safe fallback).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'F5') {
         e.preventDefault()
-        setPresenterOpen((v) => !v)
+        if (!presenterOpenRef.current) {
+          setPresenterOpen(true)
+        }
+        // When the presenter IS open, PresenterView's keydown handler closes it.
       }
     }
     window.addEventListener('keydown', handler)

@@ -71,20 +71,15 @@ export function PresenterView({ docJson, onClose }: Props) {
   }, [])
 
   // Request fullscreen on mount; exit on unmount.
+  // requestFullscreen returns a Promise (Chrome 71+, Firefox 64+, Safari 16.4+).
+  // Failure is reported as a rejected Promise — not a synchronous throw — so we
+  // attach a no-op .catch() instead of relying on try/catch or void.
   useEffect(() => {
     const el = document.documentElement
-    try {
-      void el.requestFullscreen?.()
-    } catch {
-      // Ignore — some browsers / iframe sandboxes block fullscreen.
-    }
+    el.requestFullscreen?.().catch(() => {})
     return () => {
-      try {
-        if (document.fullscreenElement) {
-          void document.exitFullscreen?.()
-        }
-      } catch {
-        // Ignore
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => {})
       }
     }
   }, [])
@@ -92,6 +87,12 @@ export function PresenterView({ docJson, onClose }: Props) {
   // Keyboard handler attached to window while the overlay is open.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Guard: if focus has somehow escaped the overlay (e.g. OS accessibility
+      // tool, browser chrome), do not intercept Space/Backspace/etc. globally.
+      // Escape and F5 are always handled so the presenter can always be closed.
+      const focusInOverlay = overlayRef.current?.contains(document.activeElement) ?? false
+      if (!focusInOverlay && e.key !== 'Escape' && e.key !== 'F5') return
+
       switch (e.key) {
         case 'ArrowRight':
         case 'ArrowDown':
@@ -121,8 +122,9 @@ export function PresenterView({ docJson, onClose }: Props) {
           handleClose()
           break
         case 'F5':
-          // F5 toggles presenter mode off (the Editor.tsx F5 handler also fires,
-          // but this prevents default browser refresh in the overlay context).
+          // F5 closes the presenter. The Editor.tsx handler is guarded to only
+          // open (not toggle) when the presenter is already closed, so this is
+          // the sole owner of F5 while the overlay is active.
           e.preventDefault()
           handleClose()
           break
@@ -140,9 +142,20 @@ export function PresenterView({ docJson, onClose }: Props) {
     content: slide?.content ?? [],
   }
 
+  // Unwrap speakerNote wrapper nodes: each speakerNote has inline* content.
+  // We must not pass raw speakerNote nodes to renderReadOnlyDoc because
+  // renderReadOnlyDoc → renderNodeWithCites hits `case 'speakerNote': return null`
+  // (the public/share suppression), causing the notes panel to render blank.
+  // Instead we extract the inner content arrays and present each as a paragraph
+  // so the author's text is visible in the notes strip.
+  const notesParagraphs = (slide?.notes ?? []).flatMap((noteNode) => {
+    const inlineContent = (noteNode as { content?: Record<string, unknown>[] }).content ?? []
+    return inlineContent.length > 0 ? [{ type: 'paragraph', content: inlineContent }] : []
+  })
+
   const notesContent = {
     type: 'doc' as const,
-    content: slide?.notes ?? [],
+    content: notesParagraphs,
   }
 
   const hasNotes = (slide?.notes.length ?? 0) > 0

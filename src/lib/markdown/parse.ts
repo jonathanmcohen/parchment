@@ -423,14 +423,14 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
     }
     case 'speakernote': {
       // G16: lossless speakerNote round-trip.
-      // The body is { text: "<inline markdown>" }.
-      // We reconstruct a speakerNote node with the text as a plain text child.
-      // A missing or empty text produces an empty speakerNote (valid schema).
-      const text = typeof data.text === 'string' ? data.text : ''
-      const child = text.trim().length > 0 ? [{ type: 'text', text }] : []
+      // The body is { content: PMNode[] } — the raw inline content array stored
+      // by serialize.ts. This preserves all marks (bold, italic, links, etc.)
+      // across serialize→parse cycles. A missing or empty array produces an
+      // empty speakerNote (valid schema: content:'inline*').
+      const content = Array.isArray(data.content) ? data.content : []
       return {
         type: 'speakerNote',
-        ...(child.length ? { content: child } : {}),
+        ...(content.length > 0 ? { content } : {}),
       }
     }
     default:

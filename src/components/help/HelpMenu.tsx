@@ -12,7 +12,7 @@
 //   - Esc closes the open dialog
 //   - Tab/Shift-Tab cycle is trapped within each dialog
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { RELEASE_NOTES, SHORTCUTS, TOUR_STEPS } from '@/lib/help/content'
 
 // ── localStorage helpers (guarded + try/catch) ───────────────────────────────
@@ -38,40 +38,35 @@ function setTourSeen(): void {
 }
 
 // ── Focus-trap hook ───────────────────────────────────────────────────────────
+//
+// Uses the G15 mount/unmount pattern (mirrors ReadingView.tsx lines 107-113):
+//   - On mount: save activeElement, focus first focusable inside container.
+//   - On unmount cleanup: restore focus to saved element (WCAG 2.4.3).
+// Esc and Tab-trap run for the lifetime of the mounted dialog (no isOpen toggle).
 
-function useFocusTrap(
-  containerRef: React.RefObject<HTMLElement | null>,
-  isOpen: boolean,
-  onClose: () => void,
-) {
-  const previousFocusRef = useRef<HTMLElement | null>(null)
+function useFocusTrap(containerRef: React.RefObject<HTMLElement | null>, onClose: () => void) {
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
-  // Capture previous focus on open; move focus into container.
+  // On mount: save previous focus + move focus into dialog.
+  // On unmount: restore focus to saved element (WCAG 2.4.3).
   useLayoutEffect(() => {
-    if (!isOpen) return
-    previousFocusRef.current = document.activeElement as HTMLElement | null
-    // Focus the first focusable element inside the container.
+    const previous = document.activeElement as HTMLElement | null
     const first = containerRef.current?.querySelector<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     )
     first?.focus()
-  }, [isOpen, containerRef])
+    return () => {
+      previous?.focus()
+    }
+  }, [containerRef])
 
-  // Restore focus on close.
+  // Esc to close + Tab focus trap — active for the lifetime of the dialog.
   useEffect(() => {
-    if (isOpen) return
-    previousFocusRef.current?.focus()
-    previousFocusRef.current = null
-  }, [isOpen])
-
-  // Esc to close + Tab focus trap.
-  useEffect(() => {
-    if (!isOpen) return
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        onClose()
+        onCloseRef.current()
         return
       }
 
@@ -106,7 +101,7 @@ function useFocusTrap(
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose, containerRef])
+  }, [containerRef])
 }
 
 // ── Shared Backdrop — wraps each dialog ──────────────────────────────────────
@@ -133,10 +128,7 @@ function Backdrop({ onClose, children }: { onClose: () => void; children: React.
 
 function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
-  const stableClose = useCallback(() => onCloseRef.current(), [])
-  useFocusTrap(containerRef, true, stableClose)
+  useFocusTrap(containerRef, onClose)
 
   return (
     <Backdrop onClose={onClose}>
@@ -181,10 +173,7 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }) {
 
 function WhatsNewDialog({ onClose }: { onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
-  const stableClose = useCallback(() => onCloseRef.current(), [])
-  useFocusTrap(containerRef, true, stableClose)
+  useFocusTrap(containerRef, onClose)
 
   return (
     <Backdrop onClose={onClose}>
@@ -227,20 +216,22 @@ function WhatsNewDialog({ onClose }: { onClose: () => void }) {
 function TourModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
-  const stableClose = useCallback(() => onCloseRef.current(), [])
-  useFocusTrap(containerRef, true, stableClose)
 
   const total = TOUR_STEPS.length
   const current = TOUR_STEPS[step]
   const isFirst = step === 0
   const isLast = step === total - 1
 
+  // handleDone is the single exit path for ALL close actions (X, Done, Esc,
+  // click-outside) so that parchment:tour-seen is always written.
+  // useFocusTrap receives handleDone (not onClose) so the Esc path also writes
+  // the seen flag before closing.
   function handleDone() {
     setTourSeen()
     onClose()
   }
+
+  useFocusTrap(containerRef, handleDone)
 
   return (
     <Backdrop onClose={handleDone}>
@@ -361,7 +352,7 @@ export function HelpMenu() {
         <button
           ref={toggleRef}
           type="button"
-          aria-haspopup="menu"
+          aria-haspopup="true"
           aria-expanded={menuOpen}
           aria-label="Help menu"
           className="rounded-md px-2 py-1.5 text-left text-[var(--foreground)] text-sm hover:bg-[var(--background)]"
@@ -371,10 +362,9 @@ export function HelpMenu() {
         </button>
 
         {menuOpen && (
-          <div role="menu" aria-label="Help options" className="parchment-help-dropdown">
+          <div className="parchment-help-dropdown">
             <button
               type="button"
-              role="menuitem"
               className="parchment-help-menuitem"
               onClick={() => openDialog('shortcuts')}
             >
@@ -382,7 +372,6 @@ export function HelpMenu() {
             </button>
             <button
               type="button"
-              role="menuitem"
               className="parchment-help-menuitem"
               onClick={() => openDialog('whats-new')}
             >
@@ -390,7 +379,6 @@ export function HelpMenu() {
             </button>
             <button
               type="button"
-              role="menuitem"
               className="parchment-help-menuitem"
               onClick={() => openDialog('tour')}
             >

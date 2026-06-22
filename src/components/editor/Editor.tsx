@@ -141,6 +141,12 @@ export function Editor({
   // Tracks whether the IDB-loaded fragment had content when 'synced' fired.
   // If true, the IDB already has content → do NOT seed from initialJson.
   const idbHadContentRef = useRef(false)
+  // Latches a force=true intent across an IDB deferral. If goOffline (offline
+  // fallback) calls seedFromInitial({force:true}) BEFORE IDB has synced, the call
+  // defers; the IDB 'synced' handler must then resolve it with force=true (not the
+  // plain force=false call, which would hit the hasCollabState early-return and
+  // never seed — leaving a doc-with-collab-state empty when the server is down).
+  const deferredForceRef = useRef(false)
 
   // `hasCollabState` captured in a ref so the provider's (mount-stable) callbacks
   // read it without re-creating the provider.
@@ -190,8 +196,15 @@ export function Editor({
   const seedFromInitial = useCallback((opts?: { force?: boolean }) => {
     if (seededRef.current || !initialJson) return
     // Online path: server holds an authoritative snapshot — never seed on top.
+    // Do NOT set seededRef here: if the collab server turns out to be UNREACHABLE,
+    // goOffline() must still be able to force-seed the last mirrored content.
+    // (G11 regression: the IDB 'synced' handler calls seedFromInitial(force=false)
+    // ~100ms after mount, BEFORE the 4s offline fallback. Marking seeded in this
+    // branch pre-empted goOffline's force-seed, leaving a doc-with-collab-state
+    // empty whenever the collab server was down. force-seed ignores hasCollabState,
+    // so leaving seededRef false here is safe — settled/seededRef still guard against
+    // double-seeding once either onSynced or goOffline wins.)
     if (!opts?.force && hasCollabStateRef.current) {
-      seededRef.current = true
       return
     }
     // G11: IDB sync-completion guard — if IDB exists but has not yet finished
@@ -204,6 +217,10 @@ export function Editor({
     // both refs, so deferring here is safe and the seed is never skipped entirely.
     if (idb !== null && !idbSyncedRef.current) {
       // Deferred — IDB 'synced' handler will call us once loading is complete.
+      // Latch a force=true intent so the IDB handler resolves it as a force-seed
+      // (an offline fallback that deferred here must not be downgraded to a plain
+      // seed that the hasCollabState branch would refuse).
+      if (opts?.force) deferredForceRef.current = true
       return
     }
     // G11: IDB had-content guard — if IDB has already loaded content into this
@@ -238,8 +255,9 @@ export function Editor({
       idbSyncedRef.current = true
       idbHadContentRef.current = ydoc.get(FIELD, Y.XmlFragment).length > 0
       // IDB already done — resolve any deferred seedFromInitial call (e.g. from
-      // onSynced or goOffline that fired before this effect registered).
-      seedFromInitial()
+      // onSynced or goOffline that fired before this effect registered). Pass the
+      // latched force so a deferred OFFLINE fallback still force-seeds.
+      seedFromInitial({ force: deferredForceRef.current })
       return
     }
     const handleSynced = () => {
@@ -247,10 +265,11 @@ export function Editor({
       idbHadContentRef.current = ydoc.get(FIELD, Y.XmlFragment).length > 0
       // IDB has finished loading. If seedFromInitial was called by onSynced or
       // goOffline before IDB completed, it deferred without setting seededRef.
-      // Now that IDB state is known, attempt the seed — the guards inside
+      // Now that IDB state is known, attempt the seed — passing the latched force
+      // so a deferred OFFLINE fallback still force-seeds. The guards inside
       // seedFromInitial will correctly skip if IDB had content or the server
       // already seeded.
-      seedFromInitial()
+      seedFromInitial({ force: deferredForceRef.current })
     }
     idb.on('synced', handleSynced)
     return () => {

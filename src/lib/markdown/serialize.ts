@@ -183,6 +183,17 @@ function serializeBlock(node: PMNode): string {
           content: node.content ?? [],
         }),
       )
+    // G5: drawing — emit the full node JSON (scene + svg) so parse.ts can
+    // reconstruct it losslessly. NO excalidraw import — scene + svg are plain
+    // JSON/string values already stored in the node attrs.
+    case 'drawing':
+      return parchmentFence(
+        'drawing',
+        JSON.stringify({
+          type: 'drawing',
+          attrs: { scene: node.attrs?.scene ?? null, svg: node.attrs?.svg ?? '' },
+        }),
+      )
     default:
       return serializeInline(node.content)
   }

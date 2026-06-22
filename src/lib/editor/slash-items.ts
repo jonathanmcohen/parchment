@@ -97,6 +97,13 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'MEDIA',
     keywords: ['table', 'grid', 'spreadsheet', 'tab'],
   },
+  // G5: Excalidraw drawing embed.
+  {
+    id: 'drawing',
+    title: 'Drawing',
+    category: 'MEDIA',
+    keywords: ['drawing', 'sketch', 'excalidraw', 'diagram', 'whiteboard', 'canvas', 'draw'],
+  },
 
   // ── EMBED ────────────────────────────────────────────────────────────────
   {

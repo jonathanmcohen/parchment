@@ -13,6 +13,7 @@ import { BacklinksPanel } from '@/components/editor/BacklinksPanel'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { CommentsSidebar } from '@/components/editor/CommentsSidebar'
 import { CropDialog } from '@/components/editor/CropDialog'
+import { DrawingModal } from '@/components/editor/DrawingModal'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
@@ -274,6 +275,11 @@ export function Editor({
   // node being edited (null = closed). Opened from the slash menu (new empty
   // node) and from clicking an existing math node (parchment:edit-math event).
   const [mathEdit, setMathEdit] = useState<{ pos: number; latex: string } | null>(null)
+
+  // G5: drawing modal — holds the doc position + current scene of the drawing
+  // node being edited (null = closed). Opened via parchment:edit-drawing event
+  // dispatched by DrawingView (click) and insertDrawing command (new node).
+  const [drawingEdit, setDrawingEdit] = useState<{ pos: number; scene: object | null } | null>(null)
   const openMathEditor = useCallback((pos: number) => {
     setMathEdit({ pos, latex: '' })
   }, [])
@@ -507,6 +513,21 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-math', handler)
   }, [editor])
 
+  // G5: drawing NodeViews dispatch parchment:edit-drawing {pos, scene} on click
+  // — open the Excalidraw modal seeded with the clicked node's current scene.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; scene: object | null }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        setDrawingEdit({ pos: detail.pos, scene: detail.scene ?? null })
+      }
+    }
+    dom.addEventListener('parchment:edit-drawing', handler)
+    return () => dom.removeEventListener('parchment:edit-drawing', handler)
+  }, [editor])
+
   // D5: publish own awareness presence + reading position
   useEffect(() => {
     if (!editor || !provider) return
@@ -640,6 +661,16 @@ export function Editor({
           pos={mathEdit.pos}
           initialLatex={mathEdit.latex}
           onClose={() => setMathEdit(null)}
+        />
+      )}
+
+      {/* G5: Drawing editor modal */}
+      {editor && drawingEdit !== null && (
+        <DrawingModal
+          editor={editor}
+          pos={drawingEdit.pos}
+          initialScene={drawingEdit.scene}
+          onClose={() => setDrawingEdit(null)}
         />
       )}
 

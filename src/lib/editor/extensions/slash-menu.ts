@@ -114,6 +114,12 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       editor.chain().focus().insertSectionBreak().run()
       break
 
+    // G5: drawing — insertDrawing also dispatches parchment:edit-drawing so the
+    // modal opens immediately after the empty node is inserted.
+    case 'drawing':
+      editor.chain().focus().insertDrawing().run()
+      break
+
     // G4: equations. Insert with empty LaTeX, then open the editor popover at
     // the new node's position so the user types the formula immediately.
     case 'mathBlock': {

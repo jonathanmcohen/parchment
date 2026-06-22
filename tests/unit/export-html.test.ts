@@ -12,6 +12,16 @@ const simpleDoc = {
   ],
 }
 
+const plantumlDoc = {
+  type: 'doc',
+  content: [
+    {
+      type: 'plantuml',
+      attrs: { source: '@startuml\nAlice -> Bob: Hello\n@enduml' },
+    },
+  ],
+}
+
 describe('docToStandaloneHtml', () => {
   it('output starts with <!doctype html', () => {
     const html = docToStandaloneHtml(simpleDoc, 'Test Doc')
@@ -42,5 +52,15 @@ describe('docToStandaloneHtml', () => {
   it('contains the rendered content text', () => {
     const html = docToStandaloneHtml(simpleDoc, 'Doc')
     expect(html).toContain('Hello, export world!')
+  })
+
+  it('plantuml node is rendered as <pre> source — no external URL', () => {
+    // Simulate NEXT_PUBLIC_PLANTUML_SERVER_URL being set by checking that the
+    // output never contains an http(s):// src attribute regardless.
+    const html = docToStandaloneHtml(plantumlDoc, 'Diagram Doc')
+    // Must not contain any external URL as an img src
+    expect(html).not.toMatch(/src=["']https?:\/\//i)
+    // The plantuml source text must appear (rendered as <pre> fallback)
+    expect(html).toContain('@startuml')
   })
 })

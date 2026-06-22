@@ -24,7 +24,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'not found' }, { status: 404 })
   }
 
-  const { body, contentType, ext } = exportDoc(doc.content, doc.title, format)
+  // Normalize null content (newly created / unset docs) to an empty doc so
+  // serializeMarkdown and other exporters never receive null and throw.
+  const content = doc.content ?? { type: 'doc', content: [] }
+  const { body, contentType, ext } = exportDoc(content, doc.title, format)
   const filename = exportFilename(doc.title, ext)
 
   return new Response(body, {

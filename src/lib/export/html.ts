@@ -13,6 +13,34 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
+type PMNode = {
+  type?: string
+  attrs?: Record<string, unknown>
+  content?: PMNode[]
+  text?: string
+  marks?: unknown[]
+}
+
+/**
+ * Walk a ProseMirror doc JSON and rewrite 'plantuml' nodes to a safe
+ * source-in-pre representation so the exported HTML never contains an
+ * external resource URL (the plantumlImageUrl() path is gated by
+ * NEXT_PUBLIC_PLANTUML_SERVER_URL; we must not emit that URL in a
+ * self-contained file regardless of server configuration).
+ */
+function stripPlantumlToSource(node: PMNode): PMNode {
+  if (node.type === 'plantuml') {
+    const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
+    return {
+      type: 'codeBlock',
+      attrs: { language: 'plantuml' },
+      content: src ? [{ type: 'text', text: src }] : [],
+    }
+  }
+  if (!node.content) return node
+  return { ...node, content: node.content.map(stripPlantumlToSource) }
+}
+
 export const EXPORT_STYLESHEET = `
 /* Parchment export stylesheet — standalone, no external resources */
 *, *::before, *::after { box-sizing: border-box; }
@@ -146,7 +174,11 @@ sub { vertical-align: sub;   font-size: 0.75em; }
 
 export function docToStandaloneHtml(doc: unknown, title: string): string {
   try {
-    const bodyNode = renderReadOnlyDoc(doc)
+    // Strip plantuml nodes to their source-in-pre fallback before rendering
+    // so the exported file never contains an external resource URL, regardless
+    // of whether NEXT_PUBLIC_PLANTUML_SERVER_URL is configured on the server.
+    const safeDoc = doc && typeof doc === 'object' ? stripPlantumlToSource(doc as PMNode) : doc
+    const bodyNode = renderReadOnlyDoc(safeDoc)
     const bodyHtml = renderToStaticMarkup(bodyNode as React.ReactElement)
     const safeTitle = escapeHtml(title || 'Untitled')
     return [

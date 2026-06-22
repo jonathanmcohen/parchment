@@ -50,6 +50,30 @@ describe('parseExportFormat', () => {
   })
 })
 
+describe('exportDoc with null-equivalent content', () => {
+  // Mirrors the null-content guard in the export route:
+  // doc.content ?? { type: 'doc', content: [] }
+  const emptyDoc = { type: 'doc', content: [] }
+
+  it('md export of empty doc returns empty string without throwing', () => {
+    const result = exportDoc(emptyDoc, 'Empty', 'md')
+    expect(result.body).toBe('')
+    expect(result.ext).toBe('md')
+  })
+
+  it('txt export of empty doc returns empty string without throwing', () => {
+    const result = exportDoc(emptyDoc, 'Empty', 'txt')
+    expect(result.body).toBe('')
+    expect(result.ext).toBe('txt')
+  })
+
+  it('html export of empty doc produces valid standalone html without throwing', () => {
+    const result = exportDoc(emptyDoc, 'Empty', 'html')
+    expect(result.body.toLowerCase()).toMatch(/^<!doctype html/)
+    expect(result.ext).toBe('html')
+  })
+})
+
 describe('exportFilename', () => {
   it('appends the extension', () => {
     expect(exportFilename('My Doc', 'md')).toBe('My-Doc.md')

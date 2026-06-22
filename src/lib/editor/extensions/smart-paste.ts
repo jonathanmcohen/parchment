@@ -24,23 +24,31 @@ export const smartPasteKey = new PluginKey('smartPaste')
 export const SmartPasteExtension = Extension.create({
   name: 'smartPaste',
 
+  /**
+   * Normalize foreign HTML before ProseMirror parses it.
+   * Internal Parchment copy-paste is detected as 'plain' → pass through unchanged.
+   *
+   * CRITICAL: this MUST be declared as a Tiptap extension-level field, NOT as a
+   * ProseMirror plugin prop. Tiptap COMPOSES every extension's transformPastedHTML
+   * into one editor-level function (extensionManager.transformPastedHTML), and
+   * ProseMirror's view.someProp('transformPastedHTML', …) checks the editor-level
+   * prop BEFORE any plugin prop. Tiptap's composed default is identity (`e => e`),
+   * so a plugin-prop transformPastedHTML is silently shadowed by it and never runs
+   * (this exact bug shipped first — Word/GDocs paste was not normalized live even
+   * though the unit tests of the pure normalizer passed).
+   */
+  transformPastedHTML(html: string): string {
+    const src = sniffPasteSource(html, '')
+    if (src === 'plain') return html
+    return normalizePastedHtml(html, src)
+  },
+
   addProseMirrorPlugins() {
     return [
       new Plugin({
         key: smartPasteKey,
 
         props: {
-          /**
-           * Normalize foreign HTML before ProseMirror parses it.
-           * Called by ProseMirror for every paste that has an HTML clipboard type.
-           * Internal Parchment copy-paste is detected as 'plain' → pass through unchanged.
-           */
-          transformPastedHTML(html: string): string {
-            const src = sniffPasteSource(html, '')
-            if (src === 'plain') return html
-            return normalizePastedHtml(html, src)
-          },
-
           /**
            * Handle paste events. We intercept only the markdown-as-plaintext case.
            * Returns false in all other cases so:

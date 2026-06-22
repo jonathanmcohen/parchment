@@ -103,7 +103,12 @@ function normalizeDom(html: string, source: PasteSource): string {
 
 function removeComments(node: Node): void {
   const toRemove: Node[] = []
-  const walker = document.createTreeWalker(node, NodeFilter.SHOW_COMMENT)
+  // CRITICAL: use the node's OWN document, not the global `document`. `node` belongs
+  // to the DOMParser document; a real browser throws WrongDocumentError when the
+  // global document's createTreeWalker is rooted at a node from another document
+  // (jsdom tolerates it, which is why unit tests passed but live paste did not strip).
+  const ownerDoc = (node.nodeType === 9 ? (node as Document) : node.ownerDocument) ?? document
+  const walker = ownerDoc.createTreeWalker(node, NodeFilter.SHOW_COMMENT)
   let current = walker.nextNode()
   while (current) {
     toRemove.push(current)
@@ -118,7 +123,7 @@ function normalizeWord(doc: Document): void {
   // Remove Word-specific elements: <o:p>, <xml>, conditional comments already stripped
   for (const el of Array.from(doc.querySelectorAll('o\\:p, xml'))) {
     // Replace with its text content to not lose inline text
-    el.replaceWith(document.createTextNode(el.textContent ?? ''))
+    el.replaceWith((el.ownerDocument ?? document).createTextNode(el.textContent ?? ''))
   }
 
   // Walk all elements and strip mso-*/Mso styles and class attributes

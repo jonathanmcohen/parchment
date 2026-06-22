@@ -133,6 +133,20 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'EMBED',
     keywords: ['toc', 'contents', 'outline', 'index', 'navigation'],
   },
+  // J2: read-only calendar embed (Google Calendar / public iCal).
+  {
+    id: 'embedCalendar',
+    title: 'Embed calendar',
+    category: 'EMBED',
+    keywords: ['embed', 'calendar', 'google', 'ical', 'ics', 'schedule', 'events'],
+  },
+  // J3: read-only spreadsheet embed (Google Sheets / Airtable / Office).
+  {
+    id: 'embedSpreadsheet',
+    title: 'Embed spreadsheet',
+    category: 'EMBED',
+    keywords: ['embed', 'spreadsheet', 'sheets', 'google', 'airtable', 'office', 'excel', 'grid'],
+  },
 
   // ── ADVANCED ─────────────────────────────────────────────────────────────
   {

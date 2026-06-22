@@ -24,6 +24,13 @@ export type SlashMenuOptions = {
    * a no-op.
    */
   onOpenCrossRefPicker?: () => void
+  /**
+   * J2/J3: called after an empty embed node is inserted, with the doc position
+   * of the new node and the chosen kind, so the editor can open the EmbedDialog
+   * to collect the URL. If not provided, the embed node is inserted empty (still
+   * editable on click via its NodeView).
+   */
+  onEditEmbed?: (pos: number, kind: 'calendar' | 'spreadsheet') => void
 }
 
 // ── Item → editor action map ───────────────────────────────────────────────
@@ -34,6 +41,7 @@ type ActionContext = {
   onOpenImage: (() => void) | undefined
   onEditMath: ((pos: number) => void) | undefined
   onOpenCrossRefPicker: (() => void) | undefined
+  onEditEmbed: ((pos: number, kind: 'calendar' | 'spreadsheet') => void) | undefined
 }
 
 /**
@@ -50,7 +58,7 @@ function countMathBlocks(editor: import('@tiptap/core').Editor): number {
 }
 
 function runAction(item: SlashItem, ctx: ActionContext): void {
-  const { editor, range, onOpenImage, onEditMath, onOpenCrossRefPicker } = ctx
+  const { editor, range, onOpenImage, onEditMath, onOpenCrossRefPicker, onEditEmbed } = ctx
 
   // Delete the slash + query text first
   editor.chain().focus().deleteRange(range).run()
@@ -252,6 +260,31 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       break
     }
 
+    // J2/J3: embed — insert the empty embed node, then open the EmbedDialog at
+    // the new node's position to collect a URL. The dispatch must happen AFTER
+    // .run() so editor.state reflects the inserted node (inside the chain,
+    // view.state is pre-insertion). Mirrors the mermaid/drawio cases exactly.
+    case 'embedCalendar':
+    case 'embedSpreadsheet': {
+      const kind = item.id === 'embedCalendar' ? 'calendar' : 'spreadsheet'
+      editor.chain().focus().insertEmbed().run()
+      const { state } = editor
+      const selFrom = state.selection.from
+      let embedPos: number | null = null
+      const selectedEmbedNode = state.doc.nodeAt(selFrom)
+      if (selectedEmbedNode?.type.name === 'embed') {
+        embedPos = selFrom
+      } else {
+        const lo = Math.max(0, selFrom - 2)
+        const hi = Math.min(state.doc.content.size, selFrom + 2)
+        state.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'embed') embedPos = nodePos
+        })
+      }
+      if (embedPos !== null) onEditEmbed?.(embedPos, kind)
+      break
+    }
+
     // G4: equations. Insert with empty LaTeX, then open the editor popover at
     // the new node's position so the user types the formula immediately.
     // Read editor.state AFTER .run() so the position reflects the post-insertion
@@ -370,6 +403,7 @@ export const SlashMenuExtension = Extension.create<SlashMenuOptions>({
             onOpenImage: extensionOptions.onOpenImage,
             onEditMath: extensionOptions.onEditMath,
             onOpenCrossRefPicker: extensionOptions.onOpenCrossRefPicker,
+            onEditEmbed: extensionOptions.onEditEmbed,
           })
         },
 

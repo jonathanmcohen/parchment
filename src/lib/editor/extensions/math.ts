@@ -350,6 +350,17 @@ export const MathBlock = Node.create({
         parseHTML: (el) => el.getAttribute('data-latex') ?? '',
         renderHTML: (attrs) => ({ 'data-latex': String(attrs.latex ?? '') }),
       },
+      // G8a: stable refId (assigned by crossRefNumbering appendTransaction).
+      // Equations are numbered already by mathNumberingKey; refId adds stable
+      // identity so a cross-ref pinned to a specific equation survives reorder.
+      refId: {
+        default: '',
+        parseHTML: (el) => el.getAttribute('data-ref-id') ?? '',
+        renderHTML: (attrs) => {
+          const rid = String(attrs.refId ?? '')
+          return rid ? { 'data-ref-id': rid } : {}
+        },
+      },
     }
   },
 

@@ -3,6 +3,7 @@ import Image from '@tiptap/extension-image'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { NodeSelection } from '@tiptap/pm/state'
 import type { NodeView as ProseMirrorNodeView } from '@tiptap/pm/view'
+import { crossRefNumberingKey } from '@/lib/editor/extensions/cross-ref-numbering'
 
 // ── Attribute types ────────────────────────────────────────────────────────
 
@@ -15,6 +16,8 @@ export interface ImageAttrs {
   height?: number | null
   position?: ImagePosition
   lockAspect?: boolean
+  caption?: string
+  refId?: string
 }
 
 // ── Guard ─────────────────────────────────────────────────────────────────
@@ -69,6 +72,28 @@ function buildImageNodeView(
   if (node.attrs.width) img.style.width = `${node.attrs.width as number}px`
   if (node.attrs.height) img.style.height = `${node.attrs.height as number}px`
   img.dataset.position = pos ?? 'inline'
+
+  // G8a: caption element shown below the image as "Figure N: <caption>".
+  const captionEl = document.createElement('span')
+  captionEl.className = 'parchment-image-caption'
+  captionEl.contentEditable = 'false'
+
+  const paintCaption = (): void => {
+    const refId = _editor.view ? (node.attrs.refId as string | undefined) : undefined
+    const numbering = _editor.view ? crossRefNumberingKey.getState(_editor.view.state) : undefined
+    const target = refId ? numbering?.get(refId) : undefined
+    const n = target?.number
+    const caption = node.attrs.caption as string | undefined
+    if (n !== undefined || caption) {
+      const prefix = n !== undefined ? `Figure ${n}` : 'Figure'
+      captionEl.textContent = caption ? `${prefix}: ${caption}` : prefix
+      captionEl.style.display = ''
+    } else {
+      captionEl.textContent = ''
+      captionEl.style.display = 'none'
+    }
+  }
+  paintCaption()
 
   // ── Resize handles ──────────────────────────────────────────────────────
   const handles = ['nw', 'ne', 'sw', 'se'] as const
@@ -168,6 +193,7 @@ function buildImageNodeView(
   wrapper.appendChild(cropBtn)
 
   wrapper.appendChild(img)
+  wrapper.appendChild(captionEl)
 
   return {
     dom: wrapper,
@@ -183,6 +209,9 @@ function buildImageNodeView(
       else img.style.width = ''
       if (updatedNode.attrs.height) img.style.height = `${updatedNode.attrs.height as number}px`
       else img.style.height = ''
+      // G8a: repaint caption/number — may change if a sibling figure moved
+      // (LESSON 2: always repaint on NodeView.update(), not once at render).
+      paintCaption()
       return true
     },
     selectNode() {
@@ -241,6 +270,24 @@ export const imageExtensions = Image.extend({
         parseHTML: (element) => element.dataset.lockAspect !== 'false',
         renderHTML: (attributes) => ({ 'data-lock-aspect': String(attributes.lockAspect) }),
       },
+      // G8a: stable refId (assigned by crossRefNumbering appendTransaction).
+      refId: {
+        default: '',
+        parseHTML: (element) => element.getAttribute('data-ref-id') ?? '',
+        renderHTML: (attributes) => {
+          const rid = attributes.refId as string | null
+          return rid ? { 'data-ref-id': rid } : {}
+        },
+      },
+      // G8a: optional caption shown as "Figure N: <caption>" under the image.
+      caption: {
+        default: '',
+        parseHTML: (element) => element.getAttribute('data-caption') ?? '',
+        renderHTML: (attributes) => {
+          const cap = attributes.caption as string | null
+          return cap ? { 'data-caption': cap } : {}
+        },
+      },
     }
   },
 
@@ -256,6 +303,10 @@ export const imageExtensions = Image.extend({
       'data-lock-aspect': String(HTMLAttributes.lockAspect),
     }
     if (style.length > 0) attrs.style = style.join(';')
+    const rid = HTMLAttributes.refId as string | undefined
+    if (rid) attrs['data-ref-id'] = rid
+    const cap = HTMLAttributes.caption as string | undefined
+    if (cap) attrs['data-caption'] = cap
     return ['img', attrs]
   },
 
@@ -278,6 +329,8 @@ export const imageExtensions = Image.extend({
               height: attrs.height ?? null,
               position: attrs.position ?? 'inline',
               lockAspect: attrs.lockAspect ?? true,
+              caption: attrs.caption ?? '',
+              refId: attrs.refId ?? '',
             },
           })
         },

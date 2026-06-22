@@ -340,6 +340,38 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
         attrs: { refs, style: safeStyle },
       }
     }
+    case 'figure': {
+      // G8a: lossless figure (image with caption + refId) round-trip.
+      // The body is { src, alt, caption, refId, position, width, height, lockAspect }.
+      const src = typeof data.src === 'string' ? data.src : ''
+      if (!src) return null
+      return {
+        type: 'image',
+        attrs: {
+          src,
+          alt: typeof data.alt === 'string' ? data.alt : '',
+          caption: typeof data.caption === 'string' ? data.caption : '',
+          refId: typeof data.refId === 'string' ? data.refId : '',
+          position: typeof data.position === 'string' ? data.position : 'inline',
+          width: typeof data.width === 'number' ? data.width : null,
+          height: typeof data.height === 'number' ? data.height : null,
+          lockAspect: typeof data.lockAspect === 'boolean' ? data.lockAspect : true,
+        },
+      }
+    }
+    case 'equation': {
+      // G8a: lossless mathBlock + refId round-trip.
+      // The body is { latex, refId }.
+      const latex = typeof data.latex === 'string' ? data.latex : ''
+      if (!latex) return null
+      return {
+        type: 'mathBlock',
+        attrs: {
+          latex,
+          refId: typeof data.refId === 'string' ? data.refId : '',
+        },
+      }
+    }
     default:
       return null
   }

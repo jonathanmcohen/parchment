@@ -3,6 +3,7 @@ import { blockExtensions } from '@/lib/editor/block-extensions'
 import { BibliographyExtension, CitationExtension } from '@/lib/editor/extensions/citation'
 import { CodeBlockShiki } from '@/lib/editor/extensions/code-block-shiki'
 import { CommentMark } from '@/lib/editor/extensions/comment'
+import { CrossRefNumberingExtension } from '@/lib/editor/extensions/cross-ref-numbering'
 import { DrawingExtension } from '@/lib/editor/extensions/drawing'
 import { DrawioExtension } from '@/lib/editor/extensions/drawio'
 import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
@@ -101,6 +102,11 @@ export const baseExtensions = [
   // so its ReactRenderer popup only loads client-side.
   CitationExtension,
   BibliographyExtension,
+  // G8a: cross-reference targets — captions + stable refIds + unified numbering.
+  // Adds two ProseMirror plugins: the crossRefNumbering state plugin (rebuild
+  // ONLY on tr.docChanged — G7 loop lesson) + the appendTransaction that
+  // assigns stable refIds to figures/tables/equations missing one.
+  CrossRefNumberingExtension,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

@@ -1,3 +1,6 @@
+import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
+import { StylesManager } from '@/components/settings/StylesManager'
+
 export default function WorkspaceSettingsPage() {
   return (
     <section className="max-w-2xl">
@@ -70,6 +73,10 @@ export default function WorkspaceSettingsPage() {
           </p>
         </div>
       </section>
+
+      <AppearanceSettings />
+
+      <StylesManager />
     </section>
   )
 }

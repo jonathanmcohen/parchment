@@ -2,6 +2,7 @@
 
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
+import { StylesMenu } from '@/components/editor/StylesMenu'
 import { TableControls } from '@/components/editor/TableControls'
 import { detectLanguage, getActiveCodeBlockText } from '@/lib/editor/shiki/auto-detect'
 import { TOP_LANGUAGES } from '@/lib/editor/shiki/languages'
@@ -251,6 +252,11 @@ export function Toolbar({
           ))}
         </select>
       </label>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── G3: Named styles dropdown ─────────────────────────────────── */}
+      <StylesMenu editor={editor} />
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 

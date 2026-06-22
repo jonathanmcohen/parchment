@@ -15,6 +15,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#7c5cff',
+  width: 'device-width',
+  initialScale: 1,
+  // G12: pinch-zoom is intentionally NOT disabled — maximumScale and
+  // userScalable are omitted to preserve accessibility zooming.
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

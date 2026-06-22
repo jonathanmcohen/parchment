@@ -1810,6 +1810,11 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   const [tagDocs, setTagDocs] = useState<DocDTO[]>([])
   const [showTagCreateForm, setShowTagCreateForm] = useState(false)
 
+  // H9: Import state
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
+  const [importWarnings, setImportWarnings] = useState<string[]>([])
+
   // ─── Selection state ──────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [anchorId, setAnchorId] = useState<string | null>(null)
@@ -2004,6 +2009,44 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
     fetchTags()
   }, [fetchTags])
 
+  // H9: handle file import via /api/docs/import
+  const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // Reset input so the same file can be re-imported
+    e.target.value = ''
+    setImporting(true)
+    setImportWarnings([])
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const res = await fetch('/api/docs/import', { method: 'POST', body })
+      if (res.status === 415) {
+        window.alert('Unsupported file type. Please upload a .docx, .md, .html, or Notion .zip.')
+        return
+      }
+      if (res.status === 413) {
+        window.alert('File is too large (max 25 MB).')
+        return
+      }
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string }
+        window.alert(`Import failed: ${data.error ?? res.statusText}`)
+        return
+      }
+      const data = (await res.json()) as { id: string; warnings: string[] }
+      if (data.warnings.length > 0) {
+        setImportWarnings(data.warnings)
+      }
+      // Navigate to the new document
+      window.location.href = `/d/${data.id}`
+    } catch {
+      window.alert('Import failed: network error.')
+    } finally {
+      setImporting(false)
+    }
+  }, [])
+
   const handleNewFolder = async () => {
     const name = window.prompt('Folder name')
     if (!name?.trim()) return
@@ -2077,6 +2120,53 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
             >
               + New folder
             </button>
+
+            {/* H9: Import button + hidden file input */}
+            <label
+              className={[
+                'rounded-md border border-[var(--border)] px-3 py-1.5 font-medium text-sm text-[var(--foreground)] cursor-pointer text-center',
+                importing
+                  ? 'opacity-50 cursor-wait'
+                  : 'hover:border-[var(--accent-contrast)] hover:text-[var(--accent-contrast)]',
+              ].join(' ')}
+              aria-label="Import document"
+              aria-busy={importing}
+            >
+              {importing ? 'Importing…' : '↑ Import'}
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".docx,.md,.markdown,.html,.htm,.zip"
+                className="sr-only"
+                onChange={handleImportFile}
+              />
+            </label>
+
+            {/* Import warnings (surface after redirect fallback — shown briefly) */}
+            {importWarnings.length > 0 && (
+              <div
+                role="alert"
+                className="text-xs text-amber-700 bg-amber-50 border border-amber-300 rounded p-2 flex flex-col gap-1"
+              >
+                <p className="font-medium">
+                  Imported with {importWarnings.length} warning
+                  {importWarnings.length === 1 ? '' : 's'}:
+                </p>
+                <ul className="list-disc list-inside">
+                  {importWarnings.map((w, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: static warning list
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setImportWarnings([])}
+                  className="self-end text-xs text-amber-600 hover:underline mt-1"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
 
             {/* Root drop zone */}
             <DropZone targetFolderId={null} onDropped={onDropped}>

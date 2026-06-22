@@ -328,6 +328,13 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       onOpenCrossRefPicker?.()
       break
     }
+
+    // G16: speaker note — insert an empty speakerNote block. No popup needed;
+    // the block is inline-editable via contenteditable. Plain insert pattern.
+    case 'speakerNote': {
+      editor.chain().focus().insertSpeakerNote().run()
+      break
+    }
   }
 }
 

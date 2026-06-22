@@ -27,6 +27,7 @@ import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
 import { PlantumlPopover } from '@/components/editor/PlantumlPopover'
+import { PresenterView } from '@/components/editor/PresenterView'
 import { ReadingPresence } from '@/components/editor/ReadingPresence'
 import { ReadingView } from '@/components/editor/ReadingView'
 import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
@@ -499,6 +500,10 @@ export function Editor({
 
   // G15: Reading mode overlay — full-bleed read-only view.
   const [readingOpen, setReadingOpen] = useState(false)
+
+  // G16: Presenter mode — full-screen slideshow.
+  const [presenterOpen, setPresenterOpen] = useState(false)
+
   const canvasWrapRef = useRef<HTMLDivElement>(null)
 
   // G12: page-fit — scaled host ref and page natural height tracking.
@@ -999,6 +1004,20 @@ export function Editor({
     return () => dom.removeEventListener('parchment:goto-ref', handler)
   }, [editor])
 
+  // G16: F5 keydown → toggle presenter mode. preventDefault stops the browser's
+  // default page-refresh behaviour (note: some browser/OS combinations may still
+  // refresh before the JS handler fires — the toolbar button is the safe fallback).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'F5') {
+        e.preventDefault()
+        setPresenterOpen((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   // D5: publish own awareness presence + reading position
   useEffect(() => {
     if (!editor || !provider) return
@@ -1062,6 +1081,8 @@ export function Editor({
           onOpenShare={() => setShareDialogOpen(true)}
           onToggleReading={() => setReadingOpen((v) => !v)}
           readingOpen={readingOpen}
+          onTogglePresenter={() => setPresenterOpen((v) => !v)}
+          presenterOpen={presenterOpen}
         />
       )}
 
@@ -1258,6 +1279,13 @@ export function Editor({
           docId={docId}
           onClose={() => setReadingOpen(false)}
         />
+      )}
+
+      {/* G16: Presenter mode overlay — full-screen slideshow. Content is a
+          snapshot of editor.getJSON() at open time. PresenterView manages its
+          own keyboard handler and fullscreen lifecycle. */}
+      {presenterOpen && editor && (
+        <PresenterView docJson={editor.getJSON()} onClose={() => setPresenterOpen(false)} />
       )}
     </div>
   )

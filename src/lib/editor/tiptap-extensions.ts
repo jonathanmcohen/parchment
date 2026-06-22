@@ -15,6 +15,7 @@ import { MermaidExtension } from '@/lib/editor/extensions/mermaid'
 import { PageBreakExtension, SectionBreakExtension } from '@/lib/editor/extensions/page-primitives'
 import { PlantumlExtension } from '@/lib/editor/extensions/plantuml'
 import { SmartPasteExtension } from '@/lib/editor/extensions/smart-paste'
+import { SpeakerNoteExtension } from '@/lib/editor/extensions/speaker-note'
 import { Suggesting } from '@/lib/editor/extensions/suggesting'
 import { tableExtensions } from '@/lib/editor/extensions/table'
 import { TocExtension } from '@/lib/editor/extensions/toc'
@@ -125,4 +126,9 @@ export const baseExtensions = [
   // markdown-as-plaintext. Internal/plain paste passes through UNCHANGED.
   // Image paste returns false so the B5 editorProps handler still runs.
   SmartPasteExtension,
+  // G16: speakerNote block — author-visible presenter notes that are NEVER
+  // shown in the public read/share view (render-pm.tsx returns null for them).
+  // No DOM/React imported at module load; getSchema(baseExtensions) builds in
+  // the Next.js server runtime. Serializes as parchment:speakernote fence.
+  SpeakerNoteExtension,
 ]

@@ -302,6 +302,11 @@ function serializeBlock(node: PMNode): string {
           style: typeof node.attrs?.style === 'string' ? node.attrs.style : 'apa',
         }),
       )
+    // G16: speakerNote — lossless round-trip as parchment:speakernote fence
+    // carrying the inline text content as a single-line JSON string.
+    // parse.ts reconstructs a speakerNote node from this fence.
+    case 'speakerNote':
+      return parchmentFence('speakernote', JSON.stringify({ text: serializeInline(node.content) }))
     default:
       return serializeInline(node.content)
   }

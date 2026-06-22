@@ -421,6 +421,18 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
         },
       }
     }
+    case 'speakernote': {
+      // G16: lossless speakerNote round-trip.
+      // The body is { text: "<inline markdown>" }.
+      // We reconstruct a speakerNote node with the text as a plain text child.
+      // A missing or empty text produces an empty speakerNote (valid schema).
+      const text = typeof data.text === 'string' ? data.text : ''
+      const child = text.trim().length > 0 ? [{ type: 'text', text }] : []
+      return {
+        type: 'speakerNote',
+        ...(child.length ? { content: child } : {}),
+      }
+    }
     default:
       return null
   }

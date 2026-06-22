@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { CSSProperties } from 'react'
 import { CommandPaletteMount } from '@/components/CommandPaletteMount'
+import { HelpMenu } from '@/components/help/HelpMenu'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
 import { getWorkspaceTheme } from '@/lib/docs/settings-repo'
@@ -41,6 +42,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ))}
         <div className="mt-auto flex flex-col gap-1 border-[var(--border)] border-t pt-4">
           <span className="px-2 text-[var(--muted)] text-xs">{user.name}</span>
+          <HelpMenu />
           <SignOutButton />
         </div>
       </aside>

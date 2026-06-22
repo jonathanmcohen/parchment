@@ -42,6 +42,15 @@ describe('themeCssVars', () => {
     expect(vars['--font-body']).toBe(serif?.body)
   })
 
+  it('emits both accent tokens so links + accent surfaces track the picker', () => {
+    const theme: WorkspaceTheme = { accent: '#abcdef', fontPair: 'serif' }
+    const vars = themeCssVars(theme)
+    // The bare --accent powers links, selections and color-mix surfaces; it must
+    // track the chosen accent alongside --accent-contrast (buttons/focus rings).
+    expect(vars['--accent']).toBe(theme.accent)
+    expect(vars['--accent-contrast']).toBe(theme.accent)
+  })
+
   it('falls back to the first pair fonts for an unresolved key', () => {
     // parseTheme would normalize, but themeCssVars must itself be robust.
     const vars = themeCssVars({ accent: '#000000', fontPair: 'does-not-exist' })

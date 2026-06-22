@@ -77,6 +77,11 @@ export function parseTheme(raw: unknown): WorkspaceTheme {
 export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
   const pair = findPair(theme.fontPair)
   return {
+    // Both accent tokens track the picker: `--accent-contrast` drives buttons,
+    // focus rings and primary fills, while the bare `--accent` recolors links,
+    // selections, code-block highlights and the many color-mix accent surfaces.
+    // Emitting only one leaves a large share of the accent UI on the default.
+    '--accent': theme.accent,
     '--accent-contrast': theme.accent,
     '--font-heading': pair.heading,
     '--font-body': pair.body,

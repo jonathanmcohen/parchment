@@ -71,6 +71,10 @@ function buildImageNodeView(
   wrapper.classList.add('parchment-image-wrapper')
   const pos = node.attrs.position as ImagePosition | null
   if (pos) wrapper.dataset.imagePosition = pos
+  // G8b-fix: set data-ref-id on the NodeView DOM from the start so
+  // parchment:goto-ref can find this figure by [data-ref-id="..."].
+  const initialRefId = node.attrs.refId as string | undefined
+  if (initialRefId) wrapper.dataset.refId = initialRefId
 
   const img = document.createElement('img')
   img.src = node.attrs.src as string
@@ -214,6 +218,15 @@ function buildImageNodeView(
       const newPos = updatedNode.attrs.position as ImagePosition | null
       img.dataset.position = newPos ?? 'inline'
       wrapper.dataset.imagePosition = newPos ?? 'inline'
+      // G8b-fix: keep data-ref-id on the wrapper DOM so parchment:goto-ref can
+      // find the node by [data-ref-id="..."] (renderHTML is not used when a
+      // NodeView is active — the NodeView owns the DOM).
+      const rid = updatedNode.attrs.refId as string | undefined
+      if (rid) {
+        wrapper.dataset.refId = rid
+      } else {
+        delete wrapper.dataset.refId
+      }
       if (updatedNode.attrs.width) img.style.width = `${updatedNode.attrs.width as number}px`
       else img.style.width = ''
       if (updatedNode.attrs.height) img.style.height = `${updatedNode.attrs.height as number}px`

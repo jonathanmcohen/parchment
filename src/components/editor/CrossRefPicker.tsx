@@ -49,13 +49,17 @@ export function CrossRefPicker({ editor, onPick, onClose }: Props) {
   }
 
   // Position: try to place the picker below the selection caret.
+  // coordsAtPos returns viewport-relative coords. We use position:'fixed' so
+  // we can apply them directly without adding scroll offsets or subtracting any
+  // positioned ancestor's offset (G8b-fix: previous 'absolute' + scrollY/scrollX
+  // overshot whenever a positioned ancestor was present in the tree).
   const { from } = editor.state.selection
   let top = 100
   let left = 100
   try {
     const coords = editor.view.coordsAtPos(from)
-    top = coords.bottom + window.scrollY + 4
-    left = coords.left + window.scrollX
+    top = coords.bottom + 4
+    left = coords.left
   } catch {
     // fallback to defaults
   }
@@ -97,7 +101,7 @@ export function CrossRefPicker({ editor, onPick, onClose }: Props) {
       aria-label="Cross-reference picker"
       className="parchment-crossref-picker"
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top,
         left,
         zIndex: 9999,

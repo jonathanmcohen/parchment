@@ -2,10 +2,12 @@ import Link from 'next/link'
 import type { CSSProperties } from 'react'
 import { CommandPaletteMount } from '@/components/CommandPaletteMount'
 import { HelpMenu } from '@/components/help/HelpMenu'
+import { GlobalShortcuts } from '@/components/shortcuts/GlobalShortcuts'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
 import { getWorkspaceTheme } from '@/lib/docs/settings-repo'
 import { themeCssVars } from '@/lib/editor/theme'
+import { getShortcutOverrides } from '@/lib/help/keymap-repo'
 
 const nav = [
   { href: '/files', label: 'Files' },
@@ -24,8 +26,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const theme = await getWorkspaceTheme(user.id)
   const themeStyle = themeCssVars(theme) as CSSProperties
 
+  // I2: the owner's persisted shortcut overrides, merged with DEFAULT_BINDINGS by
+  // the GlobalShortcuts dispatcher (key routing) and the HelpMenu (cheat sheet).
+  const shortcutOverrides = await getShortcutOverrides(user.id)
+
   return (
     <div className="flex min-h-screen" style={themeStyle} data-color-scheme={theme.colorScheme}>
+      <GlobalShortcuts overrides={shortcutOverrides} />
       <CommandPaletteMount />
       <aside className="flex w-56 shrink-0 flex-col gap-1 border-[var(--border)] border-r bg-[var(--paper)] p-4">
         <Link href="/" className="mb-4 px-2 font-semibold text-lg tracking-tight">
@@ -42,7 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ))}
         <div className="mt-auto flex flex-col gap-1 border-[var(--border)] border-t pt-4">
           <span className="px-2 text-[var(--muted)] text-xs">{user.name}</span>
-          <HelpMenu />
+          <HelpMenu shortcutOverrides={shortcutOverrides} />
           <SignOutButton />
         </div>
       </aside>

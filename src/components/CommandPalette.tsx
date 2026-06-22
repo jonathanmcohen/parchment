@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { SHORTCUT_EVENT, type ShortcutEventDetail } from '@/components/shortcuts/GlobalShortcuts'
 
 interface SearchResult {
   id: string
@@ -27,16 +28,18 @@ export function CommandPalette() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
 
-  // Open/close via Cmd+K / Ctrl+K
+  // I2: open/close is driven by the central GlobalShortcuts dispatcher, which
+  // owns the (remappable) command-palette binding and fires parchment:shortcut.
+  // This replaces the hard-coded Cmd-K listener so a user remap takes effect.
   useEffect(() => {
-    function handleKeydown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
+    function handleShortcut(e: Event) {
+      const detail = (e as CustomEvent<ShortcutEventDetail>).detail
+      if (detail?.action === 'command-palette') {
         setOpen((prev) => !prev)
       }
     }
-    window.addEventListener('keydown', handleKeydown)
-    return () => window.removeEventListener('keydown', handleKeydown)
+    window.addEventListener(SHORTCUT_EVENT, handleShortcut)
+    return () => window.removeEventListener(SHORTCUT_EVENT, handleShortcut)
   }, [])
 
   // Focus input when opened; reset state when closed

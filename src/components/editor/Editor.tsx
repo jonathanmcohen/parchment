@@ -40,6 +40,7 @@ import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { WatermarkDialog } from '@/components/editor/WatermarkDialog'
+import { SHORTCUT_EVENT, type ShortcutEventDetail } from '@/components/shortcuts/GlobalShortcuts'
 import { clampAutosaveMs } from '@/lib/docs/autosave-config'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
@@ -60,6 +61,14 @@ import { serializeMarkdown } from '@/lib/markdown/serialize'
 // load — it is only fetched when a drawing modal is first opened.
 const DrawingModal = dynamic(
   () => import('@/components/editor/DrawingModal').then((m) => m.DrawingModal),
+  { ssr: false },
+)
+
+// I2 Part 3: SourceMode is dynamic-imported so the CodeMirror 6 + @replit vim
+// modules it loads are split OUT of the main editor chunk — they are fetched
+// only when the user first toggles into Vim source mode.
+const SourceMode = dynamic(
+  () => import('@/components/editor/SourceMode').then((m) => m.SourceMode),
   { ssr: false },
 )
 
@@ -526,6 +535,17 @@ export function Editor({
   const presenterOpenRef = useRef(false)
   presenterOpenRef.current = presenterOpen
 
+  // I2 Part 3: Vim source-mode toggle. While open we hide the WYSIWYG editor so
+  // the user cannot make concurrent local edits to the Y.Doc; the snapshot is
+  // taken at open time and applied as a single transaction on exit.
+  const [sourceModeOpen, setSourceModeOpen] = useState(false)
+  // I2 Part 3 — COLLAB SAFETY: source mode replaces the whole document, which
+  // would clobber concurrent remote edits. We therefore disable it whenever
+  // another peer is present in the Y.Doc awareness (a live collaboration). When
+  // solo, the wholesale replace is safe. This is the explicit GAP-logged
+  // restriction: source mode is not offered during active multi-user editing.
+  const [collabActive, setCollabActive] = useState(false)
+
   const canvasWrapRef = useRef<HTMLDivElement>(null)
 
   // G12: page-fit — scaled host ref and page natural height tracking.
@@ -910,6 +930,30 @@ export function Editor({
     [editor, cropState],
   )
 
+  // I2 Part 3 — snapshot the current doc as PM-JSON when entering source mode.
+  const [sourceSnapshot, setSourceSnapshot] = useState<Record<string, unknown> | null>(null)
+
+  const openSourceMode = useCallback(() => {
+    if (!editor || collabActive) return
+    setSourceSnapshot(editor.getJSON() as Record<string, unknown>)
+    setSourceModeOpen(true)
+  }, [editor, collabActive])
+
+  // Exit source mode: replace the editor content with the re-parsed markdown as a
+  // SINGLE transaction. Because Collaboration is bound to the Y.Doc, this one
+  // setContent writes one CRDT update — never a character-by-character replay.
+  // emitUpdate:true so onUpdate fires and the disk-mirror/markdown is saved.
+  const exitSourceMode = useCallback(
+    (updatedJson: Record<string, unknown>) => {
+      if (editor) {
+        editor.commands.setContent(updatedJson, { emitUpdate: true })
+      }
+      setSourceModeOpen(false)
+      setSourceSnapshot(null)
+    },
+    [editor],
+  )
+
   // Overlay crop button (image NodeView) dispatches this DOM event.
   useEffect(() => {
     if (!editor) return
@@ -1028,29 +1072,51 @@ export function Editor({
     return () => dom.removeEventListener('parchment:goto-ref', handler)
   }, [editor])
 
-  // G16: F5 keydown → open presenter mode (only when closed).
-  // When the presenter is already open, PresenterView owns F5 and closes it.
-  // Guarding with presenterOpenRef prevents a double-setState race: without the
-  // guard, both this handler and PresenterView's handler fire in the same event,
-  // and React 18's functional-update batching can chain false → !false = true,
+  // G16 / I2: open presenter mode (only when closed). The presenter binding is
+  // now owned by the central GlobalShortcuts dispatcher (default F5, remappable),
+  // which preventDefault()s the combo and fires parchment:shortcut. This handler
+  // listens for the 'presenter' action.
+  // When the presenter is already open, PresenterView owns the close key and
+  // closes it. Guarding with presenterOpenRef prevents a double-setState race:
+  // without the guard, both this handler and PresenterView's handler fire in the
+  // same event, and functional-update batching can chain false → !false = true,
   // leaving the presenter stuck open. With the guard this handler is a no-op
-  // when the overlay is active, so F5 ownership is exclusive.
-  // preventDefault stops the browser's default page-refresh behaviour (note:
-  // some browser/OS combinations may still refresh before the JS handler fires
-  // — the toolbar button is the safe fallback).
+  // when the overlay is active, so open/close ownership is exclusive.
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'F5') {
-        e.preventDefault()
-        if (!presenterOpenRef.current) {
-          setPresenterOpen(true)
-        }
-        // When the presenter IS open, PresenterView's keydown handler closes it.
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<ShortcutEventDetail>).detail
+      if (detail?.action !== 'presenter') return
+      if (!presenterOpenRef.current) {
+        setPresenterOpen(true)
       }
+      // When the presenter IS open, PresenterView's keydown handler closes it.
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    window.addEventListener(SHORTCUT_EVENT, handler)
+    return () => window.removeEventListener(SHORTCUT_EVENT, handler)
   }, [])
+
+  // I2 Part 3 — track whether another peer is actively present in the Y.Doc.
+  // Source mode (a wholesale content replace) is gated on this being false so we
+  // never clobber a live collaborator's concurrent edits. When the provider is
+  // absent (offline) the doc is effectively solo, so collab is never "active".
+  useEffect(() => {
+    if (!provider) {
+      setCollabActive(false)
+      return
+    }
+    const awareness = provider.awareness
+    if (!awareness) {
+      setCollabActive(false)
+      return
+    }
+    const update = () => {
+      // >1 awareness state means at least one OTHER client besides us.
+      setCollabActive(awareness.getStates().size > 1)
+    }
+    update()
+    awareness.on('change', update)
+    return () => awareness.off('change', update)
+  }, [provider])
 
   // D5: publish own awareness presence + reading position
   useEffect(() => {
@@ -1119,13 +1185,32 @@ export function Editor({
           onTogglePresenter={() => setPresenterOpen((v) => !v)}
           presenterOpen={presenterOpen}
           onExportPdf={() => setPrintOpen(true)}
+          onToggleSourceMode={openSourceMode}
+          sourceModeOpen={sourceModeOpen}
+          sourceModeDisabled={collabActive}
         />
       )}
 
       <h1 className="mb-4 font-semibold text-2xl tracking-tight">{initialTitle}</h1>
 
+      {/* I2 Part 3: Vim source-mode editor. Rendered in place of the WYSIWYG
+          canvas. The editor instance stays mounted (display:none below) so the
+          Y.Doc/collab binding is never torn down; on exit we apply the parsed
+          markdown back into it as a single transaction. */}
+      {sourceModeOpen && sourceSnapshot && (
+        <div className="mb-4 rounded-md border border-[var(--border)] overflow-hidden">
+          <SourceMode json={sourceSnapshot} onExit={exitSourceMode} />
+        </div>
+      )}
+
       {/* B11: outline rail + canvas in a flex row; D1: comments sidebar on the right */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0 }}>
+      <div
+        style={{
+          display: sourceModeOpen ? 'none' : 'flex',
+          alignItems: 'flex-start',
+          gap: 0,
+        }}
+      >
         {/* B11: outline pane (left rail) */}
         {editor && <OutlinePane editor={editor} />}
 

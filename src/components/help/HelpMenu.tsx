@@ -12,8 +12,35 @@
 //   - Esc closes the open dialog
 //   - Tab/Shift-Tab cycle is trapped within each dialog
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { RELEASE_NOTES, SHORTCUTS, TOUR_STEPS } from '@/lib/help/content'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { SHORTCUT_EVENT, type ShortcutEventDetail } from '@/components/shortcuts/GlobalShortcuts'
+import { RELEASE_NOTES, TOUR_STEPS } from '@/lib/help/content'
+import { type Binding, DEFAULT_BINDINGS, mergeBindings } from '@/lib/help/keymap'
+
+// ── Cheat-sheet key formatting ────────────────────────────────────────────────
+//
+// The persisted keymap stores normalized combos (e.g. `Mod-Shift-/`, `f5`). The
+// cheat sheet renders a pretty form. On macOS `Mod` shows as ⌘, elsewhere Ctrl.
+
+function isMac(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent)
+}
+
+/** Turn a normalized combo (e.g. `Mod-Shift-/`) into a display string. */
+export function formatCombo(combo: string, mac: boolean): string {
+  const parts = combo.split('-')
+  const key = parts[parts.length - 1] ?? ''
+  const mods = parts.slice(0, -1)
+  const pretty: string[] = []
+  for (const m of mods) {
+    if (m === 'Mod') pretty.push(mac ? '⌘' : 'Ctrl')
+    else if (m === 'Shift') pretty.push(mac ? '⇧' : 'Shift')
+    else if (m === 'Alt') pretty.push(mac ? '⌥' : 'Alt')
+  }
+  const sep = mac ? '' : '+'
+  return [...pretty, key.toUpperCase()].join(sep)
+}
 
 // ── localStorage helpers (guarded + try/catch) ───────────────────────────────
 
@@ -126,9 +153,22 @@ function Backdrop({ onClose, children }: { onClose: () => void; children: React.
 
 // ── Shortcuts dialog ──────────────────────────────────────────────────────────
 
-function ShortcutsDialog({ onClose }: { onClose: () => void }) {
+// Reference rows that are NOT part of the remappable keymap (editor-context
+// triggers and Tiptap list/save keys) but belong on the cheat sheet so it stays
+// a complete reference. Display strings only; not customizable.
+const STATIC_REFERENCE: { keys: string; label: string }[] = [
+  { keys: '⌘S', label: 'Note (autosaves continuously)' },
+  { keys: '/', label: 'Open slash-command menu (at line start)' },
+  { keys: '[[', label: 'Insert wiki link' },
+  { keys: '@', label: 'Insert citation / @-mention' },
+  { keys: 'Tab', label: 'Indent list item' },
+  { keys: '⇧Tab', label: 'Outdent list item' },
+]
+
+function ShortcutsDialog({ bindings, onClose }: { bindings: Binding[]; onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
   useFocusTrap(containerRef, onClose)
+  const mac = useMemo(() => isMac(), [])
 
   return (
     <Backdrop onClose={onClose}>
@@ -153,7 +193,15 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }) {
         <div className="parchment-help-dialog-body">
           <table className="parchment-shortcuts-table">
             <tbody>
-              {SHORTCUTS.map((s) => (
+              {bindings.map((b) => (
+                <tr key={b.action}>
+                  <td className="parchment-shortcut-keys">
+                    <kbd>{formatCombo(b.defaultKeys, mac)}</kbd>
+                  </td>
+                  <td className="parchment-shortcut-label">{b.label}</td>
+                </tr>
+              ))}
+              {STATIC_REFERENCE.map((s) => (
                 <tr key={s.keys}>
                   <td className="parchment-shortcut-keys">
                     <kbd>{s.keys}</kbd>
@@ -298,17 +346,42 @@ function TourModal({ onClose }: { onClose: () => void }) {
 
 type Dialog = 'shortcuts' | 'whats-new' | 'tour' | null
 
-export function HelpMenu() {
+type HelpMenuProps = {
+  /** I2: server-provided shortcut overrides; merged into the cheat sheet. */
+  shortcutOverrides?: Record<string, string>
+}
+
+export function HelpMenu({ shortcutOverrides = {} }: HelpMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dialog, setDialog] = useState<Dialog>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
+
+  // I2: cheat-sheet bindings reflect the user's custom keys.
+  const bindings = useMemo(
+    () => mergeBindings(DEFAULT_BINDINGS, shortcutOverrides),
+    [shortcutOverrides],
+  )
 
   // Auto-show tour once on first visit (after mount, client-side only).
   useEffect(() => {
     if (!getTourSeen()) {
       setDialog('tour')
     }
+  }, [])
+
+  // I2 Part 1: the global ⌘⇧/ chord (owned by the GlobalShortcuts dispatcher,
+  // remappable) opens the shortcuts cheat sheet from anywhere in the app.
+  useEffect(() => {
+    function handleShortcut(e: Event) {
+      const detail = (e as CustomEvent<ShortcutEventDetail>).detail
+      if (detail?.action === 'shortcuts-help') {
+        setMenuOpen(false)
+        setDialog('shortcuts')
+      }
+    }
+    window.addEventListener(SHORTCUT_EVENT, handleShortcut)
+    return () => window.removeEventListener(SHORTCUT_EVENT, handleShortcut)
   }, [])
 
   // Close dropdown menu when clicking outside.
@@ -388,7 +461,7 @@ export function HelpMenu() {
         )}
       </div>
 
-      {dialog === 'shortcuts' && <ShortcutsDialog onClose={closeDialog} />}
+      {dialog === 'shortcuts' && <ShortcutsDialog bindings={bindings} onClose={closeDialog} />}
       {dialog === 'whats-new' && <WhatsNewDialog onClose={closeDialog} />}
       {dialog === 'tour' && <TourModal onClose={closeDialog} />}
     </>

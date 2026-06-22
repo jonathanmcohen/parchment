@@ -16,6 +16,8 @@ import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { CommentsSidebar } from '@/components/editor/CommentsSidebar'
 import { CropDialog } from '@/components/editor/CropDialog'
 import { CrossRefPicker } from '@/components/editor/CrossRefPicker'
+import { CustomCssDialog } from '@/components/editor/CustomCssDialog'
+import { CustomCssStyle } from '@/components/editor/CustomCssStyle'
 import { DrawioModal } from '@/components/editor/DrawioModal'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
@@ -38,6 +40,7 @@ import { Toolbar } from '@/components/editor/Toolbar'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { WatermarkDialog } from '@/components/editor/WatermarkDialog'
 import { type Counts, countText } from '@/lib/editor/counts'
+import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
 import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
@@ -78,6 +81,8 @@ type Props = {
   hasCollabState: boolean
   /** G9: doc-level watermark parsed from documents.meta.watermark on the server. */
   initialWatermark?: WatermarkConfig
+  /** G17: raw custom CSS from documents.meta.customCss; sanitize+scope at render. */
+  initialCustomCss?: string
   /** G13: true when AI_BASE_URL is configured server-side. Never derived client-side. */
   aiEnabled?: boolean
 }
@@ -96,6 +101,7 @@ export function Editor({
   currentUserId,
   hasCollabState,
   initialWatermark,
+  initialCustomCss,
   aiEnabled = false,
 }: Props) {
   // The Y.Doc is created empty — we do NOT eagerly seed it here (D4). Seeding is
@@ -402,6 +408,10 @@ export function Editor({
   // G9: watermark state — seeded from server-rendered initialWatermark
   const [watermark, setWatermark] = useState<WatermarkConfig>(initialWatermark ?? DEFAULT_WATERMARK)
   const [watermarkOpen, setWatermarkOpen] = useState(false)
+
+  // G17: custom CSS state — seeded from server-rendered initialCustomCss
+  const [customCss, setCustomCss] = useState(initialCustomCss ?? '')
+  const [customCssOpen, setCustomCssOpen] = useState(false)
 
   // B5: image dialog state — null = closed; string = prefill src for paste/drop flow
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
@@ -1084,6 +1094,7 @@ export function Editor({
           onCropImage={openCropForSelection}
           onOpenPageSetup={() => setPageSetupOpen(true)}
           onOpenWatermark={() => setWatermarkOpen(true)}
+          onOpenCustomCss={() => setCustomCssOpen(true)}
           onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
           commentsSidebarOpen={commentsSidebarOpen}
           onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
@@ -1116,7 +1127,10 @@ export function Editor({
               CRITICAL: ResizeObserver in PageCanvas watches .parchment-page-content
               (the INNER unscaled content div), so pagination metrics are computed
               on un-transformed dimensions and are never corrupted by the scale. */}
-          <div ref={scaledHostRef} className="parchment-canvas-scaled-host">
+          {/* G17: scope class wraps doc content ONLY (not toolbar/chrome).
+              CustomCssStyle injects the sanitized+scoped <style> here. */}
+          <div ref={scaledHostRef} className={`parchment-canvas-scaled-host ${CUSTOM_CSS_SCOPE}`}>
+            <CustomCssStyle css={customCss} />
             <PageCanvas
               pageSetup={pageSetup}
               onPageCountChange={setPageCount}
@@ -1281,6 +1295,16 @@ export function Editor({
         />
       )}
 
+      {/* G17: Custom CSS dialog */}
+      {customCssOpen && (
+        <CustomCssDialog
+          initial={customCss}
+          docId={docId}
+          onApply={setCustomCss}
+          onClose={() => setCustomCssOpen(false)}
+        />
+      )}
+
       {/* G1: Share dialog */}
       {shareDialogOpen && <ShareDialog docId={docId} onClose={() => setShareDialogOpen(false)} />}
 
@@ -1291,6 +1315,7 @@ export function Editor({
         <ReadingView
           content={editor.getJSON()}
           docId={docId}
+          customCss={customCss}
           onClose={() => setReadingOpen(false)}
         />
       )}

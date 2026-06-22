@@ -3,6 +3,7 @@ import { Editor } from '@/components/editor/Editor'
 import { isAiEnabled } from '@/lib/ai/compose'
 import { requireUser } from '@/lib/auth/guard'
 import { getDocument, hasCollabState } from '@/lib/docs/repo'
+import { parseCustomCss } from '@/lib/editor/custom-css'
 import { parseWatermark } from '@/lib/editor/watermark'
 
 export default async function DocPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,6 +21,10 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
   const docMeta = doc.meta as Record<string, unknown> | null
   const initialWatermark = parseWatermark(docMeta?.watermark)
 
+  // G17: parse the stored custom CSS from documents.meta.customCss (empty string
+  // when absent — never throws). Raw CSS; sanitize+scope happen at render time.
+  const initialCustomCss = parseCustomCss(docMeta?.customCss)
+
   // G13: AI is off by default — only enabled when AI_BASE_URL is configured.
   // Computed server-side so the client never reads process.env directly.
   const aiEnabled = isAiEnabled()
@@ -33,6 +38,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
       currentUserId={user.id}
       hasCollabState={collabStateExists}
       initialWatermark={initialWatermark}
+      initialCustomCss={initialCustomCss}
       aiEnabled={aiEnabled}
     />
   )

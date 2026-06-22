@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getDocument } from '@/lib/docs/repo'
 import { resolveShare, verifySharePassword } from '@/lib/docs/shares-repo'
+import { parseCustomCss } from '@/lib/editor/custom-css'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,6 +50,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   if (!doc || doc.trashedAt !== null)
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
+  // G17: include owner's custom CSS (raw-but-parsed) — sanitize+scope at render.
+  // The viewer's browser never receives un-sanitized CSS; prepareCustomCss runs
+  // inside CustomCssStyle on the client. We parse here to normalize/cap the value.
+  const docMeta = doc.meta as Record<string, unknown> | null
+  const customCss = parseCustomCss(docMeta?.customCss)
+
   // Return ONLY the public viewer shape — no ownerId, no passwordHash, no
   // disk/sync/embedding internals.
   return NextResponse.json({
@@ -56,5 +63,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
     title: doc.title,
     contentJson: doc.content,
     permission: share.permission,
+    customCss,
   })
 }

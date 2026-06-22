@@ -16,6 +16,7 @@ type Props = {
   onCropImage: () => void
   onOpenPageSetup: () => void
   onOpenWatermark: () => void
+  onOpenCustomCss: () => void
   onToggleComments: () => void
   commentsSidebarOpen: boolean
   onToggleVersionHistory: () => void
@@ -124,6 +125,7 @@ export function Toolbar({
   onCropImage,
   onOpenPageSetup,
   onOpenWatermark,
+  onOpenCustomCss,
   onToggleComments,
   commentsSidebarOpen,
   onToggleVersionHistory,
@@ -726,6 +728,20 @@ export function Toolbar({
         }}
       >
         ≋
+      </button>
+
+      {/* ── G17: Custom CSS ─────────────────────────────────────────── */}
+      <button
+        type="button"
+        aria-label="Custom CSS"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={(e) => {
+          e.preventDefault()
+          onOpenCustomCss()
+        }}
+      >
+        {'</>'}
       </button>
 
       {/* ── Table context controls (visible when cursor is in a table) ── */}

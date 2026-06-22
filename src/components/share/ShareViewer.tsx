@@ -1,7 +1,9 @@
 'use client'
 
 import { type ReactNode, useCallback, useEffect, useId, useState } from 'react'
+import { CustomCssStyle } from '@/components/editor/CustomCssStyle'
 import { renderReadOnlyDoc } from '@/components/share/render-pm'
+import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
 
 // G1 public share viewer (client). Unauthenticated. On mount it POSTs the token
 // (no password) to the public data path; if a password is required it shows a
@@ -15,13 +17,15 @@ type ViewerState =
   | { kind: 'loading' }
   | { kind: 'password'; wrong: boolean }
   | { kind: 'invalid' }
-  | { kind: 'ok'; title: string; body: ReactNode; permission: string }
+  | { kind: 'ok'; title: string; body: ReactNode; permission: string; customCss: string }
 
 type ShareResponse = {
   docId: string
   title: string
   contentJson: unknown
   permission: string
+  /** G17: owner's raw custom CSS — sanitized+scoped at render. */
+  customCss?: unknown
 }
 
 function isWritePermission(permission: string): boolean {
@@ -63,6 +67,7 @@ export function ShareViewer({ token }: { token: string }) {
           title: data.title,
           body: renderReadOnlyDoc(data.contentJson),
           permission: data.permission,
+          customCss: typeof data.customCss === 'string' ? data.customCss : '',
         })
       } catch {
         setState({ kind: 'invalid' })
@@ -148,7 +153,11 @@ export function ShareViewer({ token }: { token: string }) {
             later release.
           </p>
         )}
-        <div className="parchment-prose">{state.body}</div>
+        {/* G17: scope class wraps doc content; CustomCssStyle injects sanitized+scoped style. */}
+        <div className={`parchment-prose ${CUSTOM_CSS_SCOPE}`}>
+          <CustomCssStyle css={state.customCss} />
+          {state.body}
+        </div>
       </article>
     </main>
   )

@@ -155,7 +155,7 @@
 | I7 | MFA + passkeys (reuse Cairn lib) | TODO | ☐ | ☐ | |
 | I8 | SSO / SCIM route stubs (v0.2) | DONE | ☑ | ☑ | /api/auth/sso (501 sso_not_available) + /api/scim/v2/Users + /Groups (501 SCIM-shaped error body, schemas array). v0.2 scaffold. Browser-verified: sso 501, scim 501 + SCIM-shaped. |
 | I9 | Help menu — replay tour / shortcuts / what's new drawer | DONE | ☑ | ☑ | help/content.ts (SHORTCUTS, RELEASE_NOTES v0.1.0, TOUR_STEPS), HelpMenu in sidebar footer → Keyboard shortcuts dialog + What's new drawer + multi-step Replay tour (auto-once via parchment:tour-seen localStorage, replayable). Browser-verified: Help menu → [Keyboard shortcuts, What's new, Replay tour]; shortcuts dialog shows ⌘K/slash/etc. 952 unit. Review fixed 4 BLOCKING a11y (Esc not writing tour-seen→re-shows; focus-restore unreachable isOpen=true; role=menu without arrow-nav). |
-| I10 | Schedules — in-process scheduler **on-by-default, NO env flag** (avoid Cairn CFG-3) | TODO | ☐ | ☐ | |
+| I10 | Schedules — in-process scheduler **on-by-default, NO env flag** (avoid Cairn CFG-3) | DONE | ☑ | ☑ | jobs.ts PURE timer-free tick(nowMs) core (per-job in-flight lock → no pile-up/re-entry) + scheduler.ts singleton (idempotent start, globalThis HMR cache, unref'd 60s setInterval). Default jobs trash-purge(24h, per-owner resilient via getTrashRetentionDays) + db-heartbeat(5min). instrumentation.register() boots scheduler.start() UNCONDITIONALLY (NEXT_RUNTIME nodejs guard + try/catch + dynamic import; no editor graph; **NO env flag** — Cairn CFG-3 avoided). GET/POST /api/schedules admin-gated (new requireAdmin, owner role); admin/schedules page + RunNowButton island. Browser-verified prod build (:3210, ZERO config): GET /api/schedules→[trash-purge,db-heartbeat] on-by-default; run-now db-heartbeat→runCount 1/status ok/dur 1ms (wall-clock fix proven); unknown job→404; no-cookie→401; admin page 200 renders jobs+Run now. 962 unit. Review fixed 4 BLOCKING (tick pile-up/re-entry→in-flight lock+per-tick guard; runNow race; lastDurationMs injected-vs-wall clock; cross-tenant trash-purge→requireAdmin). MINOR logged: in-memory state resets on restart (job re-runs on boot — idempotent, OK v0.1); scheduler.ts @/db lacks server-only import (comment only). |
 
 ## Plan J — Integrations / TIER 7 (7)
 
@@ -201,15 +201,15 @@
 | A Foundations | 5 | 5 | 0 | 0 |
 | B Editor core | 14 | 14 | 0 | 0 |
 | C Code block | 7 | 7 | 0 | 0 |
-| D Collab | 5 | 3 | 0 | 2 |
-| E File manager | 11 | 0 | 0 | 11 |
-| F Disk mirror | 6 | 0 | 0 | 6 |
-| G Tiers 2–8 | 17 | 0 | 0 | 17 |
-| H Export/import | 9 | 0 | 0 | 9 |
-| I Settings/ops | 10 | 0 | 0 | 10 |
+| D Collab | 5 | 5 | 0 | 0 |
+| E File manager | 11 | 11 | 0 | 0 |
+| F Disk mirror | 6 | 6 | 0 | 0 |
+| G Tiers 2–8 | 17 | 17 | 0 | 0 |
+| H Export/import | 9 | 9 | 0 | 0 |
+| I Settings/ops | 10 | 7 | 0 | 3 |
 | J Integrations | 7 | 0 | 0 | 7 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **29** | **0** | **75** |
+| **Total** | **104** | **81** | **0** | **23** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

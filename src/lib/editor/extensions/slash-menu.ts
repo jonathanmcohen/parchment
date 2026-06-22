@@ -18,6 +18,12 @@ export type SlashMenuOptions = {
    * provided, the math node is inserted empty (still editable on click).
    */
   onEditMath?: (pos: number) => void
+  /**
+   * G8b: called when the "Cross-reference" slash item is selected — opens the
+   * CrossRefPicker so the user can pick a target. If not provided, the item is
+   * a no-op.
+   */
+  onOpenCrossRefPicker?: () => void
 }
 
 // ── Item → editor action map ───────────────────────────────────────────────
@@ -27,6 +33,7 @@ type ActionContext = {
   range: import('@tiptap/core').Range
   onOpenImage: (() => void) | undefined
   onEditMath: ((pos: number) => void) | undefined
+  onOpenCrossRefPicker: (() => void) | undefined
 }
 
 /**
@@ -43,7 +50,7 @@ function countMathBlocks(editor: import('@tiptap/core').Editor): number {
 }
 
 function runAction(item: SlashItem, ctx: ActionContext): void {
-  const { editor, range, onOpenImage, onEditMath } = ctx
+  const { editor, range, onOpenImage, onEditMath, onOpenCrossRefPicker } = ctx
 
   // Delete the slash + query text first
   editor.chain().focus().deleteRange(range).run()
@@ -312,6 +319,15 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       }
       break
     }
+
+    // G8b: cross-reference — open the CrossRefPicker so the user picks a target.
+    // The picker calls insertCrossRef on selection. The slash range is already
+    // deleted above (before the switch), so the picker inserts at the current
+    // cursor position (which is where the range was).
+    case 'crossRef': {
+      onOpenCrossRefPicker?.()
+      break
+    }
   }
 }
 
@@ -346,6 +362,7 @@ export const SlashMenuExtension = Extension.create<SlashMenuOptions>({
             range,
             onOpenImage: extensionOptions.onOpenImage,
             onEditMath: extensionOptions.onEditMath,
+            onOpenCrossRefPicker: extensionOptions.onOpenCrossRefPicker,
           })
         },
 

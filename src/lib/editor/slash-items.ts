@@ -180,6 +180,23 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'ADVANCED',
     keywords: ['equation', 'reference', 'ref', 'eqref', 'cite', 'math'],
   },
+  // G8b: cross-reference — insert an inline [→target] node that auto-resolves
+  // its label (Figure N / Table N / Section N / Equation N) via the numbering plugin.
+  {
+    id: 'crossRef',
+    title: 'Cross-reference',
+    category: 'ADVANCED',
+    keywords: [
+      'ref',
+      'figure',
+      'table',
+      'equation',
+      'section',
+      'cross-reference',
+      'crossref',
+      'reference',
+    ],
+  },
 ]
 
 /**

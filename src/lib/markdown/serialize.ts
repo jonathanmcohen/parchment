@@ -125,6 +125,15 @@ function serializeInline(content: PMNode[] | undefined): string {
         if (!key) return ''
         return page ? `[@${key}, p. ${page}]` : `[@${key}]`
       }
+      // G8b: cross-reference inline → `[#targetId]` (full format, default) or
+      // `[#targetId|number]` (number-only format). Lossless round-trip: parse.ts
+      // reconstructs the crossRef node from this syntax via CROSSREF_RE.
+      if (n.type === 'crossRef') {
+        const targetId = String(n.attrs?.targetId ?? '')
+        if (!targetId) return ''
+        const format = n.attrs?.format === 'number' ? 'number' : 'full'
+        return format === 'number' ? `[#${targetId}|number]` : `[#${targetId}]`
+      }
       // G8a: image — plain ![alt](src) (no caption/refId metadata to preserve).
       // Images WITH caption or refId are serialized as blocks (serializeBlock).
       if (n.type === 'image') {

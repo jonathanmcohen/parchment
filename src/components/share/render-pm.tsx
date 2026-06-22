@@ -2,6 +2,8 @@ import { Fragment, type ReactNode } from 'react'
 import { formatBibliography, formatInText } from '@/lib/citations/format'
 import type { CiteStyle, CslEntry } from '@/lib/citations/types'
 import { parseCslEntries } from '@/lib/citations/types'
+import type { CrossRefTarget } from '@/lib/editor/cross-ref'
+import { collectCrossRefTargets, indexTargets } from '@/lib/editor/cross-ref'
 import { plantumlImageUrl } from '@/lib/editor/plantuml'
 
 // G1: a small, XSS-safe ProseMirror-JSON → React renderer for the PUBLIC share
@@ -245,6 +247,18 @@ function renderNode(node: PMNode, key: number): ReactNode {
   }
 }
 
+// ── Cross-reference pre-pass ─────────────────────────────────────────────────
+
+/**
+ * G8b: pre-pass over the doc JSON to collect all cross-ref targets and build a
+ * refId → CrossRefTarget map. Used by the static share viewer to resolve inline
+ * crossRef nodes without running the editor or the numbering PM plugin.
+ * Delegates to the pure collectCrossRefTargets + indexTargets from cross-ref.ts.
+ */
+function buildCrossRefMap(doc: PMNode): Map<string, CrossRefTarget> {
+  return indexTargets(collectCrossRefTargets(doc))
+}
+
 // ── Citation + bibliography pre-pass ─────────────────────────────────────────
 
 /**
@@ -285,7 +299,12 @@ function buildCiteMap(doc: PMNode): Map<string, string> {
  * renderChildrenWithCites so that citation atoms inside paragraphs/headings/
  * list items are never silently dropped regardless of nesting depth.
  */
-function renderNodeWithCites(node: PMNode, key: number, citeMap: Map<string, string>): ReactNode {
+function renderNodeWithCites(
+  node: PMNode,
+  key: number,
+  citeMap: Map<string, string>,
+  crossRefMap: Map<string, CrossRefTarget>,
+): ReactNode {
   if (node.type === 'text') {
     return applyMarks(node.text ?? '', node.marks, key)
   }
@@ -299,6 +318,19 @@ function renderNodeWithCites(node: PMNode, key: number, citeMap: Map<string, str
     const display = resolved ?? (k ? `[missing: ${k}]` : '(?)')
     return (
       <span key={key} className="parchment-citation">
+        {display}
+      </span>
+    )
+  }
+
+  // G8b: crossRef inline — resolve via the pre-built target map.
+  if (node.type === 'crossRef') {
+    const targetId = str(node.attrs?.targetId)
+    const format = node.attrs?.format === 'number' ? 'number' : 'full'
+    const target = targetId ? crossRefMap.get(targetId) : undefined
+    const display = target ? (format === 'number' ? String(target.number) : target.label) : '(?)'
+    return (
+      <span key={key} className="parchment-cross-ref">
         {display}
       </span>
     )
@@ -331,11 +363,9 @@ function renderNodeWithCites(node: PMNode, key: number, citeMap: Map<string, str
   }
 
   // For all other node types re-use renderNode's layout logic but thread
-  // renderNodeWithCites through child rendering so citations at any depth are
-  // handled correctly (fixes: inline citations inside paragraphs/headings/lists
-  // being silently dropped because renderNode called renderChildren which called
-  // renderNode recursively — missing the citation case).
-  const children = renderChildrenWithCites(node.content, citeMap)
+  // renderNodeWithCites through child rendering so citations/crossRefs at any
+  // depth are handled correctly.
+  const children = renderChildrenWithCites(node.content, citeMap, crossRefMap)
 
   switch (node.type) {
     case 'paragraph':
@@ -380,15 +410,16 @@ function renderNodeWithCites(node: PMNode, key: number, citeMap: Map<string, str
 }
 
 /**
- * Citation-aware child renderer: calls renderNodeWithCites for each child so
- * citation atoms at any nesting depth (inside paragraphs, headings, list items)
- * are rendered rather than silently dropped.
+ * Citation+crossRef-aware child renderer: calls renderNodeWithCites for each
+ * child so citation/crossRef atoms at any nesting depth are rendered rather
+ * than silently dropped.
  */
 function renderChildrenWithCites(
   nodes: PMNode[] | undefined,
   citeMap: Map<string, string>,
+  crossRefMap: Map<string, CrossRefTarget>,
 ): ReactNode[] {
-  return (nodes ?? []).map((n, i) => renderNodeWithCites(n, i, citeMap))
+  return (nodes ?? []).map((n, i) => renderNodeWithCites(n, i, citeMap, crossRefMap))
 }
 
 /** Render a ProseMirror `doc` JSON value to read-only React nodes. Accepts the
@@ -407,7 +438,12 @@ export function renderReadOnlyDoc(content: unknown): ReactNode {
   // produce their '[missing: key]' placeholder even when no bibliography exists.
   const citeMap = buildCiteMap(doc)
 
-  const children = (top ?? []).map((n, i) => renderNodeWithCites(n, i, citeMap))
+  // G8b: build the cross-reference target map from the whole doc before
+  // rendering. crossRef nodes resolve their label via this map (no editor/PM
+  // plugin needed in the static share viewer).
+  const crossRefMap = buildCrossRefMap(doc)
+
+  const children = (top ?? []).map((n, i) => renderNodeWithCites(n, i, citeMap, crossRefMap))
 
   if (children.length === 0) {
     return <p className="parchment-share-empty">This document is empty.</p>

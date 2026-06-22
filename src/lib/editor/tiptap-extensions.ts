@@ -3,6 +3,7 @@ import { blockExtensions } from '@/lib/editor/block-extensions'
 import { BibliographyExtension, CitationExtension } from '@/lib/editor/extensions/citation'
 import { CodeBlockShiki } from '@/lib/editor/extensions/code-block-shiki'
 import { CommentMark } from '@/lib/editor/extensions/comment'
+import { CrossRefExtension } from '@/lib/editor/extensions/cross-ref'
 import { CrossRefNumberingExtension } from '@/lib/editor/extensions/cross-ref-numbering'
 import { DrawingExtension } from '@/lib/editor/extensions/drawing'
 import { DrawioExtension } from '@/lib/editor/extensions/drawio'
@@ -107,6 +108,10 @@ export const baseExtensions = [
   // ONLY on tr.docChanged — G7 loop lesson) + the appendTransaction that
   // assigns stable refIds to figures/tables/equations missing one.
   CrossRefNumberingExtension,
+  // G8b: cross-reference inline node. The NodeView (CrossRefView) is lazy-
+  // required inside addNodeView (drawing.ts pattern) — no React/DOM at module
+  // load so getSchema(baseExtensions) builds in the server runtime.
+  CrossRefExtension,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

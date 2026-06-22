@@ -99,6 +99,41 @@ const INLINE_MATH_RE = /(?<![\d$])\$([^$\s][^$]*?[^$\s]|[^$\s])\$(?![\d$])/g
  */
 const CITE_RE = /\[@([\w:./-]+)(?:,\s*([^\]]+))?\]/g
 
+/**
+ * G8b: CONSERVATIVE inline cross-reference recognition.
+ * Matches `[#refId]` (full format) and `[#refId|number]` (number format).
+ * Pattern: \[#([\w:-]+)(?:\|(number|full))?\]
+ *   - refId: word chars, colon, hyphen (e.g. "fig-abc123", "tbl:xyz")
+ *   - format: optional `|number` or `|full` suffix
+ * A stray `[#` followed by anything not matching stays plain text (conservative).
+ * NEVER throws. The kind attr defaults to 'figure' as a fallback — the live
+ * numbering plugin in the editor determines the real kind from the target.
+ */
+const CROSSREF_RE = /\[#([\w:-]+)(?:\|(number|full))?\]/g
+
+function splitCrossRefs(s: string, marks: Mark[]): PMNode[] {
+  if (!s.includes('[#')) return splitCitations(s, marks)
+  const out: PMNode[] = []
+  let last = 0
+  CROSSREF_RE.lastIndex = 0
+  let m: RegExpExecArray | null = CROSSREF_RE.exec(s)
+  while (m !== null) {
+    if (m.index > last) out.push(...splitCitations(s.slice(last, m.index), marks))
+    const targetId = m[1] ?? ''
+    const format = m[2] === 'number' ? 'number' : 'full'
+    if (targetId) {
+      out.push({
+        type: 'crossRef',
+        attrs: { targetId, kind: 'figure', format },
+      })
+    }
+    last = m.index + m[0].length
+    m = CROSSREF_RE.exec(s)
+  }
+  if (last < s.length) out.push(...splitCitations(s.slice(last), marks))
+  return out
+}
+
 function splitCitations(s: string, marks: Mark[]): PMNode[] {
   if (!s.includes('[@')) return splitWikiLinks(s, marks)
   const out: PMNode[] = []
@@ -165,18 +200,18 @@ function splitWikiLinks(s: string, marks: Mark[]): PMNode[] {
  * throws — on no match it degrades to plain wiki-split text.
  */
 function splitInlineMath(s: string, marks: Mark[]): PMNode[] {
-  if (!s.includes('$')) return splitCitations(s, marks)
+  if (!s.includes('$')) return splitCrossRefs(s, marks)
   const out: PMNode[] = []
   let last = 0
   INLINE_MATH_RE.lastIndex = 0
   let m: RegExpExecArray | null = INLINE_MATH_RE.exec(s)
   while (m !== null) {
-    if (m.index > last) out.push(...splitCitations(s.slice(last, m.index), marks))
+    if (m.index > last) out.push(...splitCrossRefs(s.slice(last, m.index), marks))
     out.push({ type: 'mathInline', attrs: { latex: m[1] ?? '' } })
     last = m.index + m[0].length
     m = INLINE_MATH_RE.exec(s)
   }
-  if (last < s.length) out.push(...splitCitations(s.slice(last), marks))
+  if (last < s.length) out.push(...splitCrossRefs(s.slice(last), marks))
   return out
 }
 

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { Editor } from '@/components/editor/Editor'
+import { isAiEnabled } from '@/lib/ai/compose'
 import { requireUser } from '@/lib/auth/guard'
 import { getDocument, hasCollabState } from '@/lib/docs/repo'
 import { parseWatermark } from '@/lib/editor/watermark'
@@ -19,6 +20,10 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
   const docMeta = doc.meta as Record<string, unknown> | null
   const initialWatermark = parseWatermark(docMeta?.watermark)
 
+  // G13: AI is off by default — only enabled when AI_BASE_URL is configured.
+  // Computed server-side so the client never reads process.env directly.
+  const aiEnabled = isAiEnabled()
+
   return (
     <Editor
       docId={doc.id}
@@ -28,6 +33,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
       currentUserId={user.id}
       hasCollabState={collabStateExists}
       initialWatermark={initialWatermark}
+      aiEnabled={aiEnabled}
     />
   )
 }

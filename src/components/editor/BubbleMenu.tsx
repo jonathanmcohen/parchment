@@ -3,14 +3,16 @@
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
 import { BubbleMenu as TiptapBubbleMenu } from '@tiptap/react/menus'
+import { AiMenu } from '@/components/editor/AiMenu'
 
 type Props = {
   editor: Editor
+  aiEnabled?: boolean
 }
 
 const keepSelection = (e: React.MouseEvent) => e.preventDefault()
 
-export function BubbleMenu({ editor }: Props) {
+export function BubbleMenu({ editor, aiEnabled = false }: Props) {
   const s = useEditorState({
     editor,
     selector: ({ editor }) => ({
@@ -74,6 +76,7 @@ export function BubbleMenu({ editor }: Props) {
       >
         <span style={{ background: '#fef08a', padding: '0 2px' }}>H</span>
       </button>
+      {aiEnabled && <AiMenu editor={editor} aiEnabled={aiEnabled} />}
     </TiptapBubbleMenu>
   )
 }

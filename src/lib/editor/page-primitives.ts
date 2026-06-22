@@ -102,12 +102,17 @@ export type PageNumberPosition = 'left' | 'center' | 'right'
 /**
  * Per-section page configuration.  Stored in sectionBreak node attrs and as a
  * doc-level default in the PageCanvas context.
+ *
+ * G9: `watermark` is optional — when present it overrides the doc-level default
+ * for all pages governed by this section. When absent, the doc-level default is used.
  */
 export interface SectionConfig {
   headerText: string
   footerText: string
   pageNumberFormat: PageNumberFormat
   pageNumberPosition: PageNumberPosition
+  /** G9: optional per-section watermark override. Undefined = inherit doc default. */
+  watermark?: import('./watermark').WatermarkConfig
 }
 
 /** Document-level default section config (applied before the first section break). */
@@ -116,4 +121,5 @@ export const DEFAULT_SECTION_CONFIG: SectionConfig = {
   footerText: '',
   pageNumberFormat: '1',
   pageNumberPosition: 'center',
+  // watermark is intentionally omitted → undefined → inherit doc default
 }

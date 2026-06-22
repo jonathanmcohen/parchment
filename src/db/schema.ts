@@ -78,6 +78,9 @@ export const documents = pgTable(
     // The reverse-sync watcher uses it to classify external file changes
     // (echo vs. external edit vs. conflict).
     diskSyncedHash: text('disk_synced_hash'),
+    // G9: arbitrary doc-level metadata (watermark config, etc.) stored as jsonb.
+    // Added in migration 0015 (the column did not previously exist).
+    meta: jsonb('meta'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { Editor } from '@/components/editor/Editor'
 import { requireUser } from '@/lib/auth/guard'
 import { getDocument, hasCollabState } from '@/lib/docs/repo'
+import { parseWatermark } from '@/lib/editor/watermark'
 
 export default async function DocPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -13,6 +14,11 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
   // seeding so the client never seeds on top of authoritative server state.
   const collabStateExists = await hasCollabState(doc.id)
 
+  // G9: parse the stored watermark from documents.meta.watermark (falls back to
+  // DEFAULT_WATERMARK when absent or malformed — never throws).
+  const docMeta = doc.meta as Record<string, unknown> | null
+  const initialWatermark = parseWatermark(docMeta?.watermark)
+
   return (
     <Editor
       docId={doc.id}
@@ -21,6 +27,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
       currentUserName={user.name}
       currentUserId={user.id}
       hasCollabState={collabStateExists}
+      initialWatermark={initialWatermark}
     />
   )
 }

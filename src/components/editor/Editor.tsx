@@ -32,6 +32,7 @@ import { StatusBar } from '@/components/editor/StatusBar'
 import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { VersionHistory } from '@/components/editor/VersionHistory'
+import { WatermarkDialog } from '@/components/editor/WatermarkDialog'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
@@ -41,6 +42,7 @@ import { DEFAULT_PAGE_SETUP, type PageSetup } from '@/lib/editor/paginate'
 import { type Reader, throttle } from '@/lib/editor/reading-presence'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { authorColor } from '@/lib/editor/track-changes'
+import { DEFAULT_WATERMARK, type WatermarkConfig } from '@/lib/editor/watermark'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
 
 // G5: DrawingModal is dynamic-imported so the Excalidraw CSS (imported at the
@@ -69,6 +71,8 @@ type Props = {
    * onSynced-timing race that duplicated content.
    */
   hasCollabState: boolean
+  /** G9: doc-level watermark parsed from documents.meta.watermark on the server. */
+  initialWatermark?: WatermarkConfig
 }
 
 const FIELD = 'default'
@@ -84,6 +88,7 @@ export function Editor({
   currentUserName,
   currentUserId,
   hasCollabState,
+  initialWatermark,
 }: Props) {
   // The Y.Doc is created empty — we do NOT eagerly seed it here (D4). Seeding is
   // gated on `hasCollabState` (a server-rendered fact, not a live fragment check)
@@ -244,6 +249,10 @@ export function Editor({
   const [pageSetup, setPageSetup] = useState<PageSetup>(DEFAULT_PAGE_SETUP)
   const [pageSetupOpen, setPageSetupOpen] = useState(false)
   const [pageCount, setPageCount] = useState(1)
+
+  // G9: watermark state — seeded from server-rendered initialWatermark
+  const [watermark, setWatermark] = useState<WatermarkConfig>(initialWatermark ?? DEFAULT_WATERMARK)
+  const [watermarkOpen, setWatermarkOpen] = useState(false)
 
   // B5: image dialog state — null = closed; string = prefill src for paste/drop flow
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
@@ -694,6 +703,7 @@ export function Editor({
           onOpenLink={openLinkPopover}
           onCropImage={openCropForSelection}
           onOpenPageSetup={() => setPageSetupOpen(true)}
+          onOpenWatermark={() => setWatermarkOpen(true)}
           onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
           commentsSidebarOpen={commentsSidebarOpen}
           onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
@@ -715,7 +725,12 @@ export function Editor({
 
         {/* B9: find + replace panel — positioned relative to this wrapper */}
         <div ref={canvasWrapRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-          <PageCanvas pageSetup={pageSetup} onPageCountChange={setPageCount} editor={editor}>
+          <PageCanvas
+            pageSetup={pageSetup}
+            onPageCountChange={setPageCount}
+            editor={editor}
+            watermark={watermark}
+          >
             <EditorContent editor={editor} />
           </PageCanvas>
 
@@ -857,6 +872,16 @@ export function Editor({
           initial={pageSetup}
           onApply={setPageSetup}
           onClose={() => setPageSetupOpen(false)}
+        />
+      )}
+
+      {/* G9: Watermark dialog */}
+      {watermarkOpen && (
+        <WatermarkDialog
+          initial={watermark}
+          docId={docId}
+          onApply={setWatermark}
+          onClose={() => setWatermarkOpen(false)}
         />
       )}
 

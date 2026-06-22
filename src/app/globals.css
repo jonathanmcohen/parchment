@@ -59,7 +59,23 @@ body {
 
 .parchment-page-content {
   position: relative;
+  z-index: 1; /* sit above the watermark layer (z-index 0) */
+}
+
+/* ── G9: Watermark layer ────────────────────────────────────────────── */
+.parchment-watermark-layer {
+  /* Layer sits behind content (z-index 1) but above the page background */
   z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+@media print {
+  /* Ensure watermark prints: force colour/opacity rendering and keep it visible */
+  .parchment-watermark-layer {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }
 
 .parchment-page-break {
@@ -2523,4 +2539,37 @@ body {
   border-radius: 6px;
   background: var(--paper);
   overflow-x: auto;
+}
+
+/* ── G9: Watermark dialog ────────────────────────────────────────────── */
+
+.parchment-watermark-dialog {
+  width: 420px;
+  max-width: 95vw;
+}
+
+/* Opacity/rotation slider */
+.parchment-watermark-slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* Mini live preview box */
+.parchment-watermark-preview {
+  position: relative;
+  height: 120px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--paper);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.parchment-watermark-preview-label {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 0.7rem;
+  color: var(--muted-foreground, #888);
+  pointer-events: none;
 }

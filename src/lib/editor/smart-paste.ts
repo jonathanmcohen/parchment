@@ -17,6 +17,9 @@ export function sniffPasteSource(html: string, text: string): PasteSource {
   if (/<w:|mso-|class=.?Mso|<o:p|urn:schemas-microsoft/i.test(html)) return 'word'
   if (/docs-internal-guid-|id=.?docs-internal/i.test(html)) return 'gdocs'
   if (/notion\.so|data-block-id|class=.?notion-/i.test(html)) return 'notion'
+  // ProseMirror's own clipboard HTML contains data-pm-slice on the first element.
+  // Treat it as 'plain' so we never mangle internal copy-paste or strip textStyle marks.
+  if (/data-pm-slice=/.test(html)) return 'plain'
   // Markdown: plain text only (no HTML) that looks like markdown
   if ((!html || html.trim().length === 0) && looksLikeMarkdown(text)) return 'markdown'
   // If HTML is present but no foreign markers → generic web
@@ -161,11 +164,13 @@ function normalizeGdocs(doc: Document): void {
     el.replaceWith(...Array.from(el.childNodes))
   }
 
-  // Map inline styles: font-weight:700/bold → <strong>, font-style:italic → <em>
+  // Map inline styles: font-weight:700/bold → <strong>, font-style:italic → <em>,
+  // text-decoration:underline → <u> (Tiptap's Underline extension parses this).
   for (const el of Array.from(doc.body.querySelectorAll('span[style]'))) {
     const style = el.getAttribute('style') ?? ''
     const isBold = /font-weight\s*:\s*(700|bold)/i.test(style)
     const isItalic = /font-style\s*:\s*italic/i.test(style)
+    const isUnderline = /text-decoration\s*:\s*underline/i.test(style)
 
     if (isBold && isItalic) {
       const strong = doc.createElement('strong')
@@ -181,8 +186,12 @@ function normalizeGdocs(doc: Document): void {
       const em = doc.createElement('em')
       em.append(...Array.from(el.childNodes))
       el.replaceWith(em)
+    } else if (isUnderline) {
+      const u = doc.createElement('u')
+      u.append(...Array.from(el.childNodes))
+      el.replaceWith(u)
     } else {
-      // Not bold or italic — strip the span wrapper (keep children)
+      // Not bold, italic, or underline — strip the span wrapper (keep children)
       el.replaceWith(...Array.from(el.childNodes))
     }
   }

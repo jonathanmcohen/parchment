@@ -89,6 +89,16 @@ describe('sniffPasteSource', () => {
   it('returns plain for empty html and empty text', () => {
     expect(sniffPasteSource('', '')).toBe('plain')
   })
+
+  it('returns plain for ProseMirror internal clipboard HTML (data-pm-slice)', () => {
+    const pmHtml = '<p data-pm-slice="1 1 []">Hello <span style="color:red">world</span></p>'
+    expect(sniffPasteSource(pmHtml, '')).toBe('plain')
+  })
+
+  it('returns plain for PM HTML with meta charset prefix', () => {
+    const pmHtml = '<meta charset="utf-8"><p data-pm-slice="0 0 []">text</p>'
+    expect(sniffPasteSource(pmHtml, '')).toBe('plain')
+  })
 })
 
 // ── looksLikeMarkdown ────────────────────────────────────────────────────────
@@ -177,6 +187,13 @@ describe('normalizePastedHtml — GDocs', () => {
     expect(result).toContain('<em>')
     expect(result).toContain('italic text')
   })
+
+  it('converts text-decoration:underline span to <u>', () => {
+    const html = `<html><body><p><span style="text-decoration: underline">underlined</span></p></body></html>`
+    const result = normalizePastedHtml(html, 'gdocs')
+    expect(result).toContain('<u>')
+    expect(result).toContain('underlined')
+  })
 })
 
 describe('normalizePastedHtml — web', () => {
@@ -214,5 +231,12 @@ describe('normalizePastedHtml — plain pass-through', () => {
   it('returns html unchanged for markdown source', () => {
     const html = '<p>some text</p>'
     expect(normalizePastedHtml(html, 'markdown')).toBe(html)
+  })
+
+  it('PM clipboard HTML (data-pm-slice) is classified plain and passed through unchanged', () => {
+    const pmHtml = '<p data-pm-slice="1 1 []">Hello <span style="color:red">world</span></p>'
+    // sniffPasteSource returns 'plain', so normalizePastedHtml must not touch it
+    expect(sniffPasteSource(pmHtml, '')).toBe('plain')
+    expect(normalizePastedHtml(pmHtml, 'plain')).toBe(pmHtml)
   })
 })

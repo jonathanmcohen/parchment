@@ -53,7 +53,12 @@ export const SmartPasteExtension = Extension.create({
             if (!cd) return false
 
             // If the clipboard has files/images, let the existing image-paste handler run.
+            // Mirror the B5 handler in Editor.tsx which checks cd.items for image/* types.
+            // Browser-copied images (right-click → copy image) appear in cd.items with type
+            // 'image/png' but cd.files.length is 0, so we must check items too.
             if (cd.files && cd.files.length > 0) return false
+            if (cd.items && Array.from(cd.items).some((item) => item.type.startsWith('image/')))
+              return false
 
             // If there is HTML content (non-empty), let transformPastedHTML handle it.
             const htmlContent = cd.getData('text/html')

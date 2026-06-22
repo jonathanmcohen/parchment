@@ -12,22 +12,22 @@ const simpleDoc = {
 }
 
 describe('exportDoc', () => {
-  it('md → text/markdown contentType and md ext', () => {
-    const result = exportDoc(simpleDoc, 'My Doc', 'md')
+  it('md → text/markdown contentType and md ext', async () => {
+    const result = await exportDoc(simpleDoc, 'My Doc', 'md')
     expect(result.contentType).toBe('text/markdown; charset=utf-8')
     expect(result.ext).toBe('md')
     expect(result.body).toContain('Hello')
   })
 
-  it('txt → text/plain contentType and txt ext', () => {
-    const result = exportDoc(simpleDoc, 'My Doc', 'txt')
+  it('txt → text/plain contentType and txt ext', async () => {
+    const result = await exportDoc(simpleDoc, 'My Doc', 'txt')
     expect(result.contentType).toBe('text/plain; charset=utf-8')
     expect(result.ext).toBe('txt')
     expect(result.body).toContain('Hello')
   })
 
-  it('html → text/html contentType and html ext', () => {
-    const result = exportDoc(simpleDoc, 'My Doc', 'html')
+  it('html → text/html contentType and html ext', async () => {
+    const result = await exportDoc(simpleDoc, 'My Doc', 'html')
     expect(result.contentType).toBe('text/html; charset=utf-8')
     expect(result.ext).toBe('html')
     expect(result.body).toContain('Hello')
@@ -55,20 +55,20 @@ describe('exportDoc with null-equivalent content', () => {
   // doc.content ?? { type: 'doc', content: [] }
   const emptyDoc = { type: 'doc', content: [] }
 
-  it('md export of empty doc returns empty string without throwing', () => {
-    const result = exportDoc(emptyDoc, 'Empty', 'md')
+  it('md export of empty doc returns empty string without throwing', async () => {
+    const result = await exportDoc(emptyDoc, 'Empty', 'md')
     expect(result.body).toBe('')
     expect(result.ext).toBe('md')
   })
 
-  it('txt export of empty doc returns empty string without throwing', () => {
-    const result = exportDoc(emptyDoc, 'Empty', 'txt')
+  it('txt export of empty doc returns empty string without throwing', async () => {
+    const result = await exportDoc(emptyDoc, 'Empty', 'txt')
     expect(result.body).toBe('')
     expect(result.ext).toBe('txt')
   })
 
-  it('html export of empty doc produces valid standalone html without throwing', () => {
-    const result = exportDoc(emptyDoc, 'Empty', 'html')
+  it('html export of empty doc produces valid standalone html without throwing', async () => {
+    const result = await exportDoc(emptyDoc, 'Empty', 'html')
     expect(result.body.toLowerCase()).toMatch(/^<!doctype html/)
     expect(result.ext).toBe('html')
   })

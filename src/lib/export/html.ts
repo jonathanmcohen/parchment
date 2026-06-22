@@ -2,8 +2,13 @@
  *  Uses renderToStaticMarkup(renderReadOnlyDoc(doc)) for the body.
  *  NO <script>. NO external resources. Never throws. */
 
-import { renderToStaticMarkup } from 'react-dom/server'
 import { renderReadOnlyDoc } from '@/components/share/render-pm'
+
+// react-dom/server is imported DYNAMICALLY inside docToStandaloneHtml: a static
+// top-level `import 'react-dom/server'` in a module that also imports a component
+// (render-pm) makes Next/Turbopack reject the build ("importing a component that
+// imports react-dom/server"). The dynamic import keeps it out of the static graph.
+// (The unit gate doesn't run the Next bundler, so only `pnpm build` surfaced this.)
 
 function escapeHtml(s: string): string {
   return s
@@ -172,8 +177,9 @@ sup { vertical-align: super; font-size: 0.75em; }
 sub { vertical-align: sub;   font-size: 0.75em; }
 `.trim()
 
-export function docToStandaloneHtml(doc: unknown, title: string): string {
+export async function docToStandaloneHtml(doc: unknown, title: string): Promise<string> {
   try {
+    const { renderToStaticMarkup } = await import('react-dom/server')
     // Strip plantuml nodes to their source-in-pre fallback before rendering
     // so the exported file never contains an external resource URL, regardless
     // of whether NEXT_PUBLIC_PLANTUML_SERVER_URL is configured on the server.

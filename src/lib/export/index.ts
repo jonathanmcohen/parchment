@@ -12,7 +12,11 @@ export interface ExportResult {
 
 /** Convert a doc to the requested format. Pure dispatch over serializeMarkdown /
  *  docToPlainText / docToStandaloneHtml. */
-export function exportDoc(doc: unknown, title: string, format: ExportFormat): ExportResult {
+export async function exportDoc(
+  doc: unknown,
+  title: string,
+  format: ExportFormat,
+): Promise<ExportResult> {
   switch (format) {
     case 'md':
       return {
@@ -28,7 +32,8 @@ export function exportDoc(doc: unknown, title: string, format: ExportFormat): Ex
       }
     case 'html':
       return {
-        body: docToStandaloneHtml(doc, title),
+        // async: docToStandaloneHtml dynamic-imports react-dom/server (build-safety).
+        body: await docToStandaloneHtml(doc, title),
         contentType: 'text/html; charset=utf-8',
         ext: 'html',
       }

@@ -153,8 +153,8 @@
 | I5 | Audit log (= A4) | DONE | ☑ | ☑ | Single impl = A4 (append-only logAudit, filterable viewer, testcontainers + browser-verified, axe clean). No separate work — shared. |
 | I6 | Health page (= A5) + Ollama + S3 pills | DONE | ☑ | ☑ | A5 base + probeOllama (configured on AI_BASE_URL, GET /models, resilient down) + probeS3 (configured on BACKUP_S3_ENDPOINT) — configured-only (null+omit when unset), probeAll Promise.allSettled (one failure never blanks page). Browser-verified: unconfigured→pills [db,collab,search-index,disk] NO ollama/s3; AI_BASE_URL set→ollama pill appears (down/resilient), all pills still render. |
 | I7 | MFA + passkeys (reuse Cairn lib) | TODO | ☐ | ☐ | |
-| I8 | SSO / SCIM route stubs (v0.2) | TODO | ☐ | ☐ | |
-| I9 | Help menu — replay tour / shortcuts / what's new drawer | TODO | ☐ | ☐ | |
+| I8 | SSO / SCIM route stubs (v0.2) | DONE | ☑ | ☑ | /api/auth/sso (501 sso_not_available) + /api/scim/v2/Users + /Groups (501 SCIM-shaped error body, schemas array). v0.2 scaffold. Browser-verified: sso 501, scim 501 + SCIM-shaped. |
+| I9 | Help menu — replay tour / shortcuts / what's new drawer | DONE | ☑ | ☑ | help/content.ts (SHORTCUTS, RELEASE_NOTES v0.1.0, TOUR_STEPS), HelpMenu in sidebar footer → Keyboard shortcuts dialog + What's new drawer + multi-step Replay tour (auto-once via parchment:tour-seen localStorage, replayable). Browser-verified: Help menu → [Keyboard shortcuts, What's new, Replay tour]; shortcuts dialog shows ⌘K/slash/etc. 952 unit. Review fixed 4 BLOCKING a11y (Esc not writing tour-seen→re-shows; focus-restore unreachable isOpen=true; role=menu without arrow-nav). |
 | I10 | Schedules — in-process scheduler **on-by-default, NO env flag** (avoid Cairn CFG-3) | TODO | ☐ | ☐ | |
 
 ## Plan J — Integrations / TIER 7 (7)

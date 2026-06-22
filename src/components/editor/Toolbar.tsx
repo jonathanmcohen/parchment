@@ -119,7 +119,7 @@ const keepSelection = (e: React.MouseEvent) => e.preventDefault()
 
 export function Toolbar({
   editor,
-  docId: _docId,
+  docId,
   onInsertImage,
   onOpenLink,
   onCropImage,
@@ -850,6 +850,30 @@ export function Toolbar({
       >
         ▶
       </button>
+
+      {/* ── H3/H4/H7: Export menu ────────────────────────────────────── */}
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+      <fieldset className="parchment-toolbar-export">
+        <legend className="parchment-toolbar-export-label">Export</legend>
+        {(
+          [
+            { label: 'Markdown', format: 'md' },
+            { label: 'HTML', format: 'html' },
+            { label: 'Plain text', format: 'txt' },
+          ] as const
+        ).map(({ label, format }) => (
+          <a
+            key={format}
+            href={`/api/docs/${docId}/export?format=${format}`}
+            download
+            className="parchment-toolbar-btn"
+            aria-label={`Download as ${label}`}
+            onMouseDown={keepSelection}
+          >
+            {label}
+          </a>
+        ))}
+      </fieldset>
 
       {/* ── G10: Voice typing ─────────────────────────────────────────── */}
       <VoiceButton editor={editor} />

@@ -76,6 +76,8 @@ type Props = {
   hasCollabState: boolean
   /** G9: doc-level watermark parsed from documents.meta.watermark on the server. */
   initialWatermark?: WatermarkConfig
+  /** G13: true when AI_BASE_URL is configured server-side. Never derived client-side. */
+  aiEnabled?: boolean
 }
 
 const FIELD = 'default'
@@ -92,6 +94,7 @@ export function Editor({
   currentUserId,
   hasCollabState,
   initialWatermark,
+  aiEnabled = false,
 }: Props) {
   // The Y.Doc is created empty — we do NOT eagerly seed it here (D4). Seeding is
   // gated on `hasCollabState` (a server-rendered fact, not a live fragment check)
@@ -1110,8 +1113,8 @@ export function Editor({
         {editor && backlinksOpen && <BacklinksPanel docId={docId} />}
       </div>
 
-      {/* Selection bubble menu (B2) */}
-      {editor && <BubbleMenu editor={editor} />}
+      {/* Selection bubble menu (B2 + G13: AI actions) */}
+      {editor && <BubbleMenu editor={editor} aiEnabled={aiEnabled} />}
 
       {/* G11: online/offline + sync status indicator */}
       <OfflineIndicator provider={provider} />

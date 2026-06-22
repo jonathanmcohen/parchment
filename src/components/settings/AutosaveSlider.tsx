@@ -6,7 +6,7 @@ import {
   DEFAULT_AUTOSAVE_MS,
   MAX_AUTOSAVE_MS,
   MIN_AUTOSAVE_MS,
-} from '@/lib/docs/settings-repo'
+} from '@/lib/docs/autosave-config'
 
 /** Format ms as a human-readable string: "5s", "30s", "2 min", "5 min". */
 function formatMs(ms: number): string {

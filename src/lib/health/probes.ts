@@ -130,7 +130,7 @@ export async function probeS3(): Promise<Pill | null> {
 }
 
 export async function probeAll(): Promise<Pill[]> {
-  const results = await Promise.all([
+  const settlements = await Promise.allSettled([
     probeDatabase(),
     probeCollab(),
     probeSearchIndex(),
@@ -138,6 +138,13 @@ export async function probeAll(): Promise<Pill[]> {
     probeOllama(),
     probeS3(),
   ])
-  // Filter out nulls from configured-only probes (Ollama, S3 when env is unset).
-  return results.filter((p): p is Pill => p !== null)
+  // Map any unexpected rejections to a 'down' pill; filter out nulls from
+  // configured-only probes (Ollama, S3 when env is unset). Using allSettled
+  // ensures one failing probe never blanks the health page.
+  return settlements.flatMap((s): Pill[] => {
+    if (s.status === 'rejected') {
+      return [{ name: 'unknown', status: 'down', detail: String(s.reason) }]
+    }
+    return s.value !== null ? [s.value] : []
+  })
 }

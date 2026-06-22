@@ -40,6 +40,7 @@ import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { WatermarkDialog } from '@/components/editor/WatermarkDialog'
+import { clampAutosaveMs } from '@/lib/docs/autosave-config'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
 import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
@@ -843,7 +844,7 @@ export function Editor({
   // Re-creates the interval when docId, editor, or the interval duration changes.
   const lastSnapshotMd = useRef<string | null>(null)
   useEffect(() => {
-    const clampedMs = Math.min(300_000, Math.max(5_000, autosaveIntervalMs))
+    const clampedMs = clampAutosaveMs(autosaveIntervalMs)
     const interval = setInterval(() => {
       if (!editor) return
       const json = editor.getJSON() as Record<string, unknown>

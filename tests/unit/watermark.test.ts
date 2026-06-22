@@ -135,10 +135,12 @@ describe('watermarkLayerStyle', () => {
     expect(style.opacity).toBe(0.25)
   })
 
-  it('reflects rotation in the style for enabled text watermark', () => {
+  it('does not apply rotation transform to the container style for text watermark (rotation is on inner span)', () => {
+    // Rotation was moved from the container div style to the inner <span> in WatermarkLayer
+    // so the container stays axis-aligned and its corners do not bleed outside page bounds.
     const cfg = { ...DEFAULT_WATERMARK, enabled: true, rotation: -45 }
     const style = watermarkLayerStyle(cfg)
-    expect(style.transform).toBe('rotate(-45deg)')
+    expect(style.transform).toBeUndefined()
   })
 
   it('sets backgroundImage for image watermark', () => {

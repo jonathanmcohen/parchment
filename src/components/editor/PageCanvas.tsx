@@ -19,7 +19,7 @@ import {
   type PageSetup,
   resolvePageDims,
 } from '@/lib/editor/paginate'
-import { DEFAULT_WATERMARK, type WatermarkConfig } from '@/lib/editor/watermark'
+import { DEFAULT_WATERMARK, parseWatermark, type WatermarkConfig } from '@/lib/editor/watermark'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -100,10 +100,13 @@ export function PageCanvas({
           pageBreakPositions.push(pos)
         }
         if (node.type.name === 'sectionBreak') {
-          // G9: pull watermark override from section attrs if present (undefined = inherit doc default)
+          // G9: pull watermark override from section attrs if present (undefined = inherit doc default).
+          // Use parseWatermark to validate/clamp all fields rather than a bare cast, so malformed or
+          // partial objects (from older schema versions or crafted by collaborators) get clamped to
+          // safe defaults instead of being passed through unvalidated.
           const sectionWatermark =
             node.attrs.watermark !== null && node.attrs.watermark !== undefined
-              ? (node.attrs.watermark as WatermarkConfig)
+              ? parseWatermark(node.attrs.watermark)
               : undefined
           sectionEntries.push({
             pos,
@@ -268,15 +271,42 @@ export function PageCanvas({
         )
       })}
 
-      {/* G9: Watermark overlay — behind content, pointer-events:none.
-          The doc-level watermark prop is the default; per-page the active section's
-          watermark override (if set) takes precedence. Since PageCanvas renders one
-          continuous canvas (not per-page divs), we use the doc-level default here.
-          Per-section watermark overrides are fully modelled in the data and resolve
-          correctly in resolveSection — a future rendering refactor to per-page divs
-          would wire them per-page. For v0.1 the doc-level watermark renders once
-          across the canvas, which is correct for docs with a single watermark. */}
-      <WatermarkLayer config={watermark} />
+      {/* G9: Per-page watermark overlays — one absolutely-positioned div per page region.
+          Rendering one overlay per page (rather than one spanning the full canvas) ensures
+          the watermark appears on every printed page: a single position:absolute element
+          anchored at the top of the canvas is not replicated by the browser's print
+          paginator, so pages 2+ would be bare. Instead we emit N overlays each sized to
+          exactly one page height and offset to their page's top within the continuous canvas.
+
+          The first page always starts at y=0. Each subsequent page starts at the previous
+          break offset. The active section's watermark override (if set) takes precedence
+          over the doc-level default for that page. */}
+      {(() => {
+        // Build page-start offsets: page 1 starts at 0, each subsequent page starts at its break.
+        const pageStarts: number[] = [0, ...allBreaks]
+        return pageStarts.map((startPx) => {
+          const section = resolveSection(sectionPxEntries, startPx)
+          const effectiveWatermark = section.watermark ?? watermark
+          return (
+            <div
+              key={startPx}
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                top: startPx,
+                left: 0,
+                right: 0,
+                height: heightPx,
+                pointerEvents: 'none',
+                overflow: 'hidden',
+                zIndex: 0,
+              }}
+            >
+              <WatermarkLayer config={effectiveWatermark} />
+            </div>
+          )
+        })
+      })()}
 
       {/* Content wrapper — measured by ResizeObserver */}
       <div ref={contentRef} className="parchment-page-content">

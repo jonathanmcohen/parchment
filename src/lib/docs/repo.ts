@@ -361,14 +361,14 @@ export async function setDocumentWatermark(
   ownerId: string,
   docId: string,
   cfg: WatermarkConfig,
-): Promise<void> {
+): Promise<boolean> {
   // Read existing meta to preserve other keys
   const [row] = await db
     .select({ meta: schema.documents.meta })
     .from(schema.documents)
     .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
     .limit(1)
-  if (!row) return // doc not found or not owned by this user
+  if (!row) return false // doc not found or not owned by this user
 
   const existingMeta =
     row.meta !== null &&
@@ -384,4 +384,6 @@ export async function setDocumentWatermark(
     .update(schema.documents)
     .set({ meta: updatedMeta, updatedAt: new Date() })
     .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
+
+  return true
 }

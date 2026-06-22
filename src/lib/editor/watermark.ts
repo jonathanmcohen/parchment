@@ -109,14 +109,15 @@ export function watermarkLayerStyle(cfg: WatermarkConfig): Record<string, string
     }
   }
 
-  // Text watermark
+  // Text watermark — rotation is intentionally NOT applied to the container div here;
+  // it is applied to the inner <span> in WatermarkLayer so the rectangular container
+  // stays axis-aligned and does not bleed outside .parchment-page bounds.
   return {
     ...base,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     opacity: cfg.opacity,
-    transform: `rotate(${cfg.rotation}deg)`,
     color: cfg.color,
     fontSize: `${cfg.fontSize}px`,
     fontWeight: 'bold',

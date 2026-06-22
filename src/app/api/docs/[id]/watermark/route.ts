@@ -18,6 +18,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const body = (await req.json()) as { watermark?: unknown }
   const cfg = parseWatermark(body.watermark)
 
-  await setDocumentWatermark(user.id, id, cfg)
+  const updated = await setDocumentWatermark(user.id, id, cfg)
+  if (!updated) return NextResponse.json({ error: 'not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

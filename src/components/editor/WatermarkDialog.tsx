@@ -46,16 +46,23 @@ export function WatermarkDialog({ initial = DEFAULT_WATERMARK, docId, onApply, o
     const cfg = buildConfig()
     setSaving(true)
     try {
-      await fetch(`/api/docs/${docId}/watermark`, {
+      const res = await fetch(`/api/docs/${docId}/watermark`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ watermark: cfg }),
       })
+      if (!res.ok) {
+        // Persist failed (e.g. 404 not found / not owned, or 401 unauthorized).
+        // Do not update local state or close the dialog — surface the failure.
+        setSaving(false)
+        return
+      }
     } catch {
-      // best-effort — local state still updated
-    } finally {
+      // Network error — treat as failure; do not update local state.
       setSaving(false)
+      return
     }
+    setSaving(false)
     onApply(cfg)
     onClose()
   }

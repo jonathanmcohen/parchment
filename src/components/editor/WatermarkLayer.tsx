@@ -70,14 +70,18 @@ export function WatermarkLayer({ config }: Props) {
     )
   }
 
-  // Single centred text watermark
+  // Single centred text watermark — rotation is applied on the inner span so the
+  // outer container (position:absolute; inset:0) stays axis-aligned and its corners
+  // do not bleed outside the page bounds when rotated.
   return (
     <div
       aria-hidden="true"
       className="parchment-watermark-layer"
       style={style as React.CSSProperties}
     >
-      <span>{config.text}</span>
+      <span style={{ display: 'block', transform: `rotate(${config.rotation}deg)` }}>
+        {config.text}
+      </span>
     </div>
   )
 }

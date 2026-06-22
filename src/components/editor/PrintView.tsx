@@ -22,11 +22,15 @@ type Props = {
   onClose: () => void
 }
 
-type Status = 'loading' | 'ready' | 'error'
+// 'ready'    = paged.js produced .pagedjs_page boxes (best-effort preview).
+// 'fallback' = paged.js failed (it is fragile under bundlers — "s.call is not a
+//   function"); we render the content directly and rely on the browser's NATIVE
+//   print engine + the injected @page CSS to paginate. The PDF is still correct
+//   (right page size/margins); only the in-app paged preview is missing.
+type Status = 'loading' | 'ready' | 'fallback'
 
 export function PrintView({ content, pageSetup, onClose }: Props) {
   const [status, setStatus] = useState<Status>('loading')
-  const [errorMsg, setErrorMsg] = useState('')
 
   // The hidden source container that we render the React tree into as HTML,
   // and the visible render target that paged.js will paginate into.
@@ -147,9 +151,12 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
         setStatus('ready')
       } catch (err) {
         if (cancelled) return
-        const msg = err instanceof Error ? err.message : String(err)
-        setErrorMsg(msg)
-        setStatus('error')
+        // paged.js failed — fall back to native browser pagination (the injected
+        // @page CSS still gives the correct page size/margins). Not an error state.
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[print] paged.js preview failed, using native print:', err)
+        }
+        setStatus('fallback')
       }
     }
 
@@ -213,9 +220,9 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
           </span>
         )}
 
-        {status === 'error' && (
-          <span className="parchment-print-status parchment-print-status--error" aria-live="polite">
-            Preview failed — use browser print ({errorMsg})
+        {status === 'fallback' && (
+          <span className="parchment-print-status" aria-live="polite">
+            Using browser pagination
           </span>
         )}
 
@@ -225,7 +232,7 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
         <button
           type="button"
           className="parchment-print-action"
-          disabled={status !== 'ready'}
+          disabled={status === 'loading'}
           onClick={() => window.print()}
           aria-label="Print or save as PDF"
         >
@@ -243,14 +250,33 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
         </button>
       </div>
 
-      {/* ── Hidden source container — paged.js reads from here ── */}
-      {/* Rendered offscreen (CSS: position:absolute; left:-9999px) */}
-      <div className="parchment-print-source" aria-hidden="true" ref={sourceRef}>
+      {/* @page size/margins + content styles. paged.js gets the same CSS, but
+          this <style> ALSO drives the browser's native print (the fallback path):
+          the @page rule sets the printed page size/margins to match the canvas. */}
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted local stylesheet (EXPORT_STYLESHEET + pageCss(pageSetup)) — no user-supplied HTML. */}
+      <style dangerouslySetInnerHTML={{ __html: `${EXPORT_STYLESHEET}\n${pageCss(pageSetup)}` }} />
+
+      {/* Source / native-print body. paged.js reads from here; it is ALSO the
+          printable content for the fallback path. Visible + in document flow
+          unless paged.js succeeded (status 'ready'), where the page boxes show. */}
+      <div
+        className="parchment-print-source"
+        ref={sourceRef}
+        style={
+          status === 'ready'
+            ? { display: 'none' }
+            : { position: 'static', left: 'auto', display: 'block' }
+        }
+      >
         <article className="parchment-export">{renderReadOnlyDoc(content)}</article>
       </div>
 
       {/* ── Paged.js render target — paginated .pagedjs_page boxes land here ── */}
-      <div className="parchment-print-pages" ref={renderTargetRef} />
+      <div
+        className="parchment-print-pages"
+        ref={renderTargetRef}
+        style={{ display: status === 'ready' ? 'block' : 'none' }}
+      />
     </div>
   )
 

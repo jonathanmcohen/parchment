@@ -4,8 +4,13 @@
 // Lazily loads paged.js (browser-only; needs `window`) via dynamic import —
 // NEVER a static/module-level import so SSR and the build are never affected.
 // Focus management and Esc handling mirror the G15/G16 overlay pattern.
+//
+// Rendered via ReactDOM.createPortal(…, document.body) so the overlay is a
+// direct child of <body>. This is required for the @media print selectors in
+// globals.css (`body > .parchment-print-overlay`, `body > *:not(…)`) to match.
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { renderReadOnlyDoc } from '@/components/share/render-pm'
 import type { PageSetup } from '@/lib/editor/paginate'
 import { EXPORT_STYLESHEET } from '@/lib/export/html'
@@ -35,8 +40,18 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
+  // Store the Previewer instance so we can destroy it on cleanup to prevent
+  // accumulating orphaned <style data-pagedjs-inserted-styles> in document.head
+  // and pagesArea/pageTemplate DOM nodes on every open/close cycle (issue 4).
+  const previewerRef = useRef<{
+    polisher?: { destroy?: () => void }
+    chunker?: { destroy?: () => void }
+  } | null>(null)
+
   // On mount: save focus, move into dialog.
   // On unmount: restore saved focus.
+  // The close button is never aria-hidden (the bar has no aria-hidden attribute),
+  // so moving focus to it is always valid (issue 5).
   useEffect(() => {
     returnFocusRef.current = document.activeElement as HTMLElement | null
     closeButtonRef.current?.focus()
@@ -110,10 +125,23 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
         const stylesheet = `${EXPORT_STYLESHEET}\n${pageCss(pageSetup)}`
 
         // paged.js preview(content, stylesheets, renderTo):
-        //   content    — the DOM node holding the source HTML (hidden offscreen)
-        //   stylesheets — array of CSS strings or URLs
-        //   renderTo   — the DOM node to paginate into
-        await new Previewer().preview(source, [stylesheet], renderTarget)
+        //   content     — the DOM node holding the source HTML (hidden offscreen)
+        //   stylesheets — array of objects { url: cssString } or URLs to fetch.
+        //                 Pass inline CSS as { 'about:blank': cssString } — the
+        //                 object form tells paged.js to use the value as CSS text
+        //                 rather than treating it as a URL to fetch (issue 3).
+        //   renderTo    — the DOM node to paginate into
+        const previewer = new Previewer()
+        previewerRef.current = previewer as typeof previewerRef.current
+        // paged.js polisher.add() accepts objects { url: cssText } as well as
+        // URL strings, but the inferred TS types only declare string[]. Cast to
+        // unknown[] to satisfy TypeScript while passing the object form at
+        // runtime — confirmed safe by reading paged.esm.js:27500–27526.
+        await previewer.preview(
+          source,
+          [{ 'about:blank': stylesheet }] as unknown as string[],
+          renderTarget,
+        )
 
         if (cancelled) return
         setStatus('ready')
@@ -128,6 +156,23 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
     void run()
     return () => {
       cancelled = true
+      // Destroy the paged.js Previewer to remove the injected <style> element
+      // and pagesArea/pageTemplate DOM nodes, preventing leaks on each
+      // open/close cycle (issue 4).
+      const p = previewerRef.current
+      if (p) {
+        try {
+          p.polisher?.destroy?.()
+        } catch {
+          /* ignore */
+        }
+        try {
+          p.chunker?.destroy?.()
+        } catch {
+          /* ignore */
+        }
+        previewerRef.current = null
+      }
     }
   }, [content, pageSetup])
 
@@ -141,7 +186,14 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
     return () => window.removeEventListener('afterprint', handler)
   }, [])
 
-  return (
+  // Render via createPortal so the overlay is a direct child of <body>.
+  // This is required for the @media print CSS selectors in globals.css to match:
+  //   `body > .parchment-print-overlay`  (show overlay during print)
+  //   `body > *:not(.parchment-print-overlay)` (hide everything else)
+  // Without the portal, the overlay is deeply nested inside the Next.js app
+  // container and the selectors never fire, producing a blank printed page
+  // (issues 1 & 2).
+  const overlay = (
     <div
       className="parchment-print-overlay"
       role="dialog"
@@ -149,7 +201,10 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
       aria-label="Print / PDF"
     >
       {/* ── Control bar (hidden during actual print via @media print) ── */}
-      <div className="parchment-print-bar" aria-hidden={status === 'loading'}>
+      {/* No aria-hidden on the bar: the close button must always be focusable
+          and announced by assistive technology (issue 5). The loading status
+          is communicated via aria-live on the status span instead. */}
+      <div className="parchment-print-bar">
         <span className="parchment-print-title">Print / Save as PDF</span>
 
         {status === 'loading' && (
@@ -164,10 +219,13 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
           </span>
         )}
 
+        {/* Print button: only enabled when pagination is complete (status=ready).
+            Printing during 'error' prints an empty render target; printing
+            during 'loading' races the async pagination (issue 6). */}
         <button
           type="button"
           className="parchment-print-action"
-          disabled={status === 'loading'}
+          disabled={status !== 'ready'}
           onClick={() => window.print()}
           aria-label="Print or save as PDF"
         >
@@ -195,4 +253,6 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
       <div className="parchment-print-pages" ref={renderTargetRef} />
     </div>
   )
+
+  return createPortal(overlay, document.body)
 }

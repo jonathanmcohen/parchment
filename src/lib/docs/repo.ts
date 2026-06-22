@@ -13,7 +13,7 @@ export type Doc = typeof schema.documents.$inferSelect
 
 export async function createDocument(
   ownerId: string,
-  opts: { title?: string; folderId?: string } = {},
+  opts: { title?: string; folderId?: string; content?: unknown } = {},
 ): Promise<{ id: string }> {
   const [row] = await db
     .insert(schema.documents)
@@ -21,6 +21,8 @@ export async function createDocument(
       ownerId,
       title: opts.title ?? 'Untitled',
       ...(opts.folderId ? { folderId: opts.folderId } : {}),
+      // G2: instantiate from a template's ProseMirror JSON when provided.
+      ...(opts.content !== undefined ? { content: opts.content } : {}),
     })
     .returning({ id: schema.documents.id })
   if (!row) throw new Error('createDocument: insert returned no row')

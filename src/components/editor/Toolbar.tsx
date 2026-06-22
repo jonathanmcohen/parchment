@@ -4,6 +4,7 @@ import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
 import { StylesMenu } from '@/components/editor/StylesMenu'
 import { TableControls } from '@/components/editor/TableControls'
+import { VoiceButton } from '@/components/editor/VoiceButton'
 import { detectLanguage, getActiveCodeBlockText } from '@/lib/editor/shiki/auto-detect'
 import { TOP_LANGUAGES } from '@/lib/editor/shiki/languages'
 
@@ -799,6 +800,11 @@ export function Toolbar({
       >
         🔗
       </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+      {/* ── G10: Voice typing ─────────────────────────────────────────── */}
+      <VoiceButton editor={editor} />
     </div>
   )
 }

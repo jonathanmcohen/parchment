@@ -8,6 +8,7 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { IndexeddbPersistence } from 'y-indexeddb'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
 import { BacklinksPanel } from '@/components/editor/BacklinksPanel'
@@ -21,6 +22,7 @@ import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { MathPopover } from '@/components/editor/MathPopover'
 import { MermaidPopover } from '@/components/editor/MermaidPopover'
+import { OfflineIndicator } from '@/components/editor/OfflineIndicator'
 import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
@@ -101,6 +103,51 @@ export function Editor({
   // Empty deps [] is correct: Y.Doc is created once on mount.
   const ydoc = useMemo(() => new Y.Doc(), [])
 
+  // G11: IndexedDB persistence — wires onto the ydoc so edits made offline are
+  // durably stored locally and survive page reloads without a server round-trip.
+  //
+  // Seeding interaction (footgun #3):
+  //   The IndexeddbPersistence loads stored updates from IDB and applies them to
+  //   the ydoc asynchronously. The provider syncs server state and merges via CRDT.
+  //   The seed-from-initialJson gate is extended with a THIRD condition:
+  //
+  //     Seed only when ALL of:
+  //       1. hasCollabState === false   (server has no persisted snapshot)
+  //       2. IDB fragment is empty      (this browser has never edited this doc)
+  //       3. Server-synced fragment is empty (two-tab race guard, pre-existing)
+  //
+  //   If IDB already holds content (condition 2 fails), the user is returning to
+  //   a previously-edited doc — IDB state is the source of truth and we must NOT
+  //   overlay initialJson on top (that would be a duplication event identical to
+  //   the D4 race). The Hocuspocus provider CRDT-merges IDB + server state when
+  //   it reconnects — this is idempotent and safe.
+  //
+  //   Implementation: we track whether IDB has finished syncing and whether the
+  //   IDB-loaded fragment had content. `idbSyncedRef` becomes true once IDB fires
+  //   its 'synced' event; `idbHadContentRef` records the fragment state AT that
+  //   moment (before the provider syncs). seedFromInitial reads both refs.
+  //
+  // Created in useMemo (not useEffect) so it is available before the provider
+  // mounts and before useEditor runs. Keyed by docId so each document gets an
+  // independent IDB store. Destroyed on unmount via the cleanup effect below.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally stable — docId and ydoc don't change after mount.
+  const idb = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    return new IndexeddbPersistence(`parchment-doc-${docId}`, ydoc)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tracks whether IDB has finished loading its updates into the ydoc.
+  const idbSyncedRef = useRef(false)
+  // Tracks whether the IDB-loaded fragment had content when 'synced' fired.
+  // If true, the IDB already has content → do NOT seed from initialJson.
+  const idbHadContentRef = useRef(false)
+  // Latches a force=true intent across an IDB deferral. If goOffline (offline
+  // fallback) calls seedFromInitial({force:true}) BEFORE IDB has synced, the call
+  // defers; the IDB 'synced' handler must then resolve it with force=true (not the
+  // plain force=false call, which would hit the hasCollabState early-return and
+  // never seed — leaving a doc-with-collab-state empty when the server is down).
+  const deferredForceRef = useRef(false)
+
   // `hasCollabState` captured in a ref so the provider's (mount-stable) callbacks
   // read it without re-creating the provider.
   const hasCollabStateRef = useRef(hasCollabState)
@@ -123,14 +170,64 @@ export function Editor({
    *     of hasCollabState so the editor shows the last-mirrored content from
    *     `documents.content`. The caller disconnects the provider in this path so
    *     the local seed never merges with server state on a later reconnect.
-   * Both modes keep the fragment-empty guard (two-tab race) and seededRef
-   * idempotency.
+   * Both modes keep the fragment-empty guard (two-tab race), the IDB-had-content
+   * guard (G11), and seededRef idempotency.
+   *
+   * G11 — IDB ordering guarantee (footgun #3 re-entrance prevention):
+   *
+   *   IndexedDB loading is async. If the provider's onSynced (or the offline
+   *   goOffline timer) fires before IDB has finished applying stored updates,
+   *   idbHadContentRef.current is still false AND the ydoc fragment is still
+   *   empty — all guards pass and seedFromInitial would write initialJson in.
+   *   When IDB then fires 'synced' and applies its stored updates on top of the
+   *   already-seeded ydoc, content is duplicated (identical to the D4 race).
+   *
+   *   Fix: gate FIRST on idbSyncedRef.current. If IDB has not yet reported
+   *   'synced', return WITHOUT setting seededRef — leaving the door open for the
+   *   IDB 'synced' handler to call seedFromInitial() itself once loading is done.
+   *   The 'synced' handler always calls seedFromInitial() after setting both refs,
+   *   so this is never a dead end. The only exception is when idb is null (SSR /
+   *   no window), in which case we skip this gate and proceed normally.
+   *
+   *   Only skip the IDB guard (idbHadContentRef check) is never omitted — even
+   *   the force=true offline path must not overlay IDB content with initialJson.
    */
-  // biome-ignore lint/correctness/useExhaustiveDependencies: initialJson and ydoc are stable per mount.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: idb, initialJson, and ydoc are all stable after mount (useMemo with []).
   const seedFromInitial = useCallback((opts?: { force?: boolean }) => {
     if (seededRef.current || !initialJson) return
     // Online path: server holds an authoritative snapshot — never seed on top.
+    // Do NOT set seededRef here: if the collab server turns out to be UNREACHABLE,
+    // goOffline() must still be able to force-seed the last mirrored content.
+    // (G11 regression: the IDB 'synced' handler calls seedFromInitial(force=false)
+    // ~100ms after mount, BEFORE the 4s offline fallback. Marking seeded in this
+    // branch pre-empted goOffline's force-seed, leaving a doc-with-collab-state
+    // empty whenever the collab server was down. force-seed ignores hasCollabState,
+    // so leaving seededRef false here is safe — settled/seededRef still guard against
+    // double-seeding once either onSynced or goOffline wins.)
     if (!opts?.force && hasCollabStateRef.current) {
+      return
+    }
+    // G11: IDB sync-completion guard — if IDB exists but has not yet finished
+    // loading its stored updates into the ydoc, DEFER: return without setting
+    // seededRef so the IDB 'synced' handler can call seedFromInitial() once
+    // loading is complete. This prevents the race where onSynced (or goOffline)
+    // fires before IDB applies its updates, causing seedFromInitial to run with
+    // an empty fragment, followed by IDB applying updates on top — duplicating
+    // content. The 'synced' handler always calls seedFromInitial() after setting
+    // both refs, so deferring here is safe and the seed is never skipped entirely.
+    if (idb !== null && !idbSyncedRef.current) {
+      // Deferred — IDB 'synced' handler will call us once loading is complete.
+      // Latch a force=true intent so the IDB handler resolves it as a force-seed
+      // (an offline fallback that deferred here must not be downgraded to a plain
+      // seed that the hasCollabState branch would refuse).
+      if (opts?.force) deferredForceRef.current = true
+      return
+    }
+    // G11: IDB had-content guard — if IDB has already loaded content into this
+    // ydoc, do NOT seed from initialJson. The IDB state IS the local source of
+    // truth; seeding on top would duplicate content exactly like the D4 race.
+    // Applies even in the force=true offline path.
+    if (idbHadContentRef.current) {
       seededRef.current = true
       return
     }
@@ -145,6 +242,40 @@ export function Editor({
     Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(seeded))
     seededRef.current = true
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // G11: IDB sync handler — must be declared AFTER seedFromInitial so the callback
+  // reference is stable when the effect registers. The effect sets idbSyncedRef and
+  // idbHadContentRef, then calls seedFromInitial to resolve any deferred seed that
+  // was blocked waiting for IDB to finish loading.
+  useEffect(() => {
+    if (!idb) return
+    // idb may have already fired 'synced' synchronously before this effect runs
+    // (unlikely but guard it). Check `.synced` first.
+    if (idb.synced) {
+      idbSyncedRef.current = true
+      idbHadContentRef.current = ydoc.get(FIELD, Y.XmlFragment).length > 0
+      // IDB already done — resolve any deferred seedFromInitial call (e.g. from
+      // onSynced or goOffline that fired before this effect registered). Pass the
+      // latched force so a deferred OFFLINE fallback still force-seeds.
+      seedFromInitial({ force: deferredForceRef.current })
+      return
+    }
+    const handleSynced = () => {
+      idbSyncedRef.current = true
+      idbHadContentRef.current = ydoc.get(FIELD, Y.XmlFragment).length > 0
+      // IDB has finished loading. If seedFromInitial was called by onSynced or
+      // goOffline before IDB completed, it deferred without setting seededRef.
+      // Now that IDB state is known, attempt the seed — passing the latched force
+      // so a deferred OFFLINE fallback still force-seeds. The guards inside
+      // seedFromInitial will correctly skip if IDB had content or the server
+      // already seeded.
+      seedFromInitial({ force: deferredForceRef.current })
+    }
+    idb.on('synced', handleSynced)
+    return () => {
+      idb.off('synced', handleSynced)
+    }
+  }, [idb, ydoc, seedFromInitial])
 
   // D4: HocuspocusProvider — wires the Y.Doc to the collab WebSocket server.
   //
@@ -243,6 +374,18 @@ export function Editor({
       }
     }
   }, [provider])
+
+  // G11: Destroy the IDB persistence on unmount to close the IndexedDB connection
+  // and release the store. The ydoc itself is garbage-collected by React; idb
+  // listens for doc.on('destroy') internally but we also call destroy() explicitly
+  // here to ensure the connection is released even if doc isn't destroyed first.
+  useEffect(() => {
+    return () => {
+      idb?.destroy().catch(() => {
+        // Ignore errors on unmount — best-effort cleanup.
+      })
+    }
+  }, [idb])
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -763,6 +906,9 @@ export function Editor({
 
       {/* Selection bubble menu (B2) */}
       {editor && <BubbleMenu editor={editor} />}
+
+      {/* G11: online/offline + sync status indicator */}
+      <OfflineIndicator provider={provider} />
 
       <StatusBar
         pageCount={pageCount}

@@ -126,6 +126,25 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'ADVANCED',
     keywords: ['section', 'break', 'sectionbreak', 'chapter'],
   },
+  // G4: KaTeX equations.
+  {
+    id: 'mathBlock',
+    title: 'Equation',
+    category: 'ADVANCED',
+    keywords: ['equation', 'math', 'katex', 'latex', 'formula', 'display', 'block'],
+  },
+  {
+    id: 'mathInline',
+    title: 'Inline equation',
+    category: 'ADVANCED',
+    keywords: ['inline', 'equation', 'math', 'katex', 'latex', 'formula'],
+  },
+  {
+    id: 'equationRef',
+    title: 'Equation reference',
+    category: 'ADVANCED',
+    keywords: ['equation', 'reference', 'ref', 'eqref', 'cite', 'math'],
+  },
 ]
 
 /**

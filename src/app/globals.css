@@ -2444,3 +2444,83 @@ body {
   color: var(--muted);
   font-style: italic;
 }
+
+/* ── G4: KaTeX equations ──────────────────────────────────────────────────── */
+
+.parchment-math-inline {
+  cursor: pointer;
+  padding: 0 1px;
+  border-radius: 3px;
+  user-select: none;
+}
+
+.parchment-math-inline:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.parchment-math-block {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0;
+  padding: 8px 56px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.parchment-math-block:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.parchment-math-block-formula {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.parchment-math-block-number {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.parchment-math-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.parchment-equation-ref {
+  color: var(--accent);
+  cursor: default;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.parchment-equation-ref--unresolved {
+  color: var(--muted);
+}
+
+/* G4: math editor popover (mirrors the dialog primitives). */
+.parchment-math-textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  resize: vertical;
+  min-height: 72px;
+}
+
+.parchment-math-preview {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--paper);
+  overflow-x: auto;
+}

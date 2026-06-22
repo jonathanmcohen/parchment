@@ -54,6 +54,7 @@
     "drizzle-orm": "0.45.2",
     "highlight.js": "11.11.1",
     "isomorphic-git": "^1.38.5",
+    "katex": "^0.17.0",
     "marked": "^18.0.5",
     "next": "16.2.9",
     "pg": "8.21.0",

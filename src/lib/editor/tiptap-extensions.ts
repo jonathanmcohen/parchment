@@ -5,6 +5,7 @@ import { CommentMark } from '@/lib/editor/extensions/comment'
 import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
+import { EquationRef, MathBlock, MathCommands, MathInline } from '@/lib/editor/extensions/math'
 import { PageBreakExtension, SectionBreakExtension } from '@/lib/editor/extensions/page-primitives'
 import { Suggesting } from '@/lib/editor/extensions/suggesting'
 import { tableExtensions } from '@/lib/editor/extensions/table'
@@ -57,6 +58,15 @@ export const baseExtensions = [
   // The `[[` autocomplete (WikiSuggestionExtension) is added in Editor.tsx so
   // it can drive the React popup, matching the SlashMenu wiring below.
   WikiLink,
+  // G4: KaTeX equations. The math NODE definitions do NOT import katex at
+  // module load (katex is lazy-imported inside the client NodeView render), so
+  // getSchema(baseExtensions) still builds in the server runtime. MathBlock
+  // owns the numbering ProseMirror plugin; MathCommands is an Extension (no
+  // schema node) hosting the shared updateMath command.
+  MathInline,
+  MathBlock,
+  EquationRef,
+  MathCommands,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

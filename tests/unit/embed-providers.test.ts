@@ -51,7 +51,7 @@ const ALLOWLISTED_HOSTS = new Set([
   'docs.google.com',
   'airtable.com',
   'onedrive.live.com',
-  'onedrive.live.com'.replace('onedrive', 'view.officeapps.live'), // view.officeapps.live.com
+  'view.officeapps.live.com',
 ])
 
 describe('J2/J3 — embed provider allowlist', () => {
@@ -141,6 +141,9 @@ describe('J2/J3 — embed provider allowlist', () => {
       'https://airtable.com/shr123',
       'https://airtable.com/embed/shr123',
       'https://onedrive.live.com/embed?cid=ABC&resid=DEF&authkey=GHI',
+      // Exercise the Office web-apps VIEWER branch so its
+      // view.officeapps.live.com output is actually checked against the host set.
+      'https://view.officeapps.live.com/op/embed.aspx?src=https%3A%2F%2Fexample.com%2Fa.xlsx',
       // adversarial inputs each provider must refuse to reflect:
       // biome-ignore lint/security/noJavascriptUrl: adversarial input under test
       'javascript:alert(1)',
@@ -165,6 +168,8 @@ describe('J2/J3 — embed provider allowlist', () => {
       'https://docs.google.com/spreadsheets/d/ABC/edit',
       'https://airtable.com/shr123',
       'https://onedrive.live.com/embed?cid=A&resid=B&authkey=C',
+      // Office web-apps viewer → emits a view.officeapps.live.com embed url.
+      'https://view.officeapps.live.com/op/embed.aspx?src=https%3A%2F%2Fexample.com%2Fa.xlsx',
       // biome-ignore lint/security/noJavascriptUrl: adversarial input under test
       'javascript:alert(1)',
       'data:text/html,x',

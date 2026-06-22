@@ -47,6 +47,15 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
   const providerLabel = resolved?.provider.label ?? providerById(providerId)?.label ?? ''
   const iframeTitle = title || (providerLabel ? `${providerLabel} embed` : 'Embedded content')
 
+  // The link-card fallback is reached precisely when resolveProvider returns null
+  // — i.e. for ANY non-allowlisted url, INCLUDING data:/vbscript:/mailto:/etc.
+  // that arrive via markdown import (parse.ts stores the raw url verbatim). React
+  // neutralises javascript: hrefs but NOT data:/vbscript:, so we MUST scheme-gate
+  // the href ourselves before it becomes a top-level navigation. Mirror the public
+  // share renderer (render-pm.tsx) + image handling: only ever emit an http(s)
+  // href; otherwise render the url as plain text (no clickable link).
+  const isSafeHref = /^https?:/i.test(url)
+
   const openEditor = () => {
     if (typeof getPos !== 'function') return
     const pos = getPos()
@@ -172,23 +181,41 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
           <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#333' }}>
             {title || 'External link'}
           </div>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'block',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              fontSize: '0.8rem',
-              color: '#0b6bcb',
-            }}
-          >
-            {url}
-          </a>
+          {isSafeHref ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontSize: '0.8rem',
+                color: '#0b6bcb',
+              }}
+            >
+              {url}
+            </a>
+          ) : (
+            // Non-http(s) scheme (data:/vbscript:/…) — show the url as inert text,
+            // NEVER as a navigable href.
+            <div
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontSize: '0.8rem',
+                color: '#999',
+              }}
+            >
+              {url}
+            </div>
+          )}
           <div style={{ fontSize: '0.72rem', color: '#999', marginTop: '0.2rem' }}>
-            Not an embeddable provider — opens in a new tab.
+            {isSafeHref
+              ? 'Not an embeddable provider — opens in a new tab.'
+              : 'Unsupported link — cannot be opened.'}
           </div>
         </div>
         <button

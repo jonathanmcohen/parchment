@@ -5,11 +5,23 @@
 //
 // The Next turbopack server runtime cannot load that editor graph
 // ("Class extends undefined"), so it could update documents.content but NOT the
-// collab Y.Doc — making external edits invisible to open editors and shadowed on
-// reopen (collab_state wins over documents.content). Running chokidar here too
-// would also double-watch the files root. So register() is now a no-op: the
-// collab process is the single owner of the watcher.
+// collab Y.Doc. So the disk-watcher stays owned by the collab process — we do
+// NOT touch the editor graph here.
+//
+// I10: this is where the in-process scheduler boots. It is ON BY DEFAULT with NO
+// env flag — a fresh install runs the scheduled jobs (e.g. trash-purge) with
+// zero config. The scheduler module is plain server code (DB only, no editor
+// graph), and it is DYNAMICALLY imported so its `@/db` import is only pulled on
+// the nodejs runtime (never the edge runtime or the client). `scheduler.start()`
+// is idempotent, and the whole thing is wrapped in try/catch so a scheduler
+// failure can never crash server boot.
 export async function register(): Promise<void> {
-  // Guard kept harmless: nothing to start on any runtime.
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
+
+  try {
+    const { scheduler } = await import('@/lib/schedules/scheduler')
+    scheduler.start()
+  } catch {
+    // A scheduler failure must never crash boot — the app still serves.
+  }
 }

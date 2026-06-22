@@ -47,11 +47,16 @@ export default function AdminSettingsPage() {
         </h2>
         <p className="mt-1 text-[var(--muted)] text-sm">Recurring jobs and data protection.</p>
         <ul className="mt-4 flex flex-col gap-2">
-          <li className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3">
-            <span className="font-medium text-sm">Schedules</span>
-            <span className="mt-0.5 block text-[var(--muted)] text-sm">
-              Automated cleanup and reporting jobs, enabled by default (Plan I10).
-            </span>
+          <li>
+            <Link
+              href="/settings/admin/schedules"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Schedules</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Automated cleanup and reporting jobs, enabled by default (Plan I10).
+              </span>
+            </Link>
           </li>
           <li className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3">
             <span className="font-medium text-sm">Backup</span>

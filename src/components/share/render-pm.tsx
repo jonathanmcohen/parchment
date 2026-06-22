@@ -1,4 +1,7 @@
 import { Fragment, type ReactNode } from 'react'
+import { formatBibliography, formatInText } from '@/lib/citations/format'
+import type { CiteStyle, CslEntry } from '@/lib/citations/types'
+import { parseCslEntries } from '@/lib/citations/types'
 import { plantumlImageUrl } from '@/lib/editor/plantuml'
 
 // G1: a small, XSS-safe ProseMirror-JSON → React renderer for the PUBLIC share
@@ -242,6 +245,90 @@ function renderNode(node: PMNode, key: number): ReactNode {
   }
 }
 
+// ── Citation + bibliography pre-pass ─────────────────────────────────────────
+
+/**
+ * G7b: pre-pass over the doc JSON to find the first bibliography node and build
+ * a key→inText resolution map. Used by the static share viewer to resolve
+ * inline citation nodes without running the editor or the PM plugin.
+ */
+function buildCiteMap(doc: PMNode): Map<string, string> {
+  const map = new Map<string, string>()
+  let found = false
+
+  function walk(node: PMNode): void {
+    if (found) return
+    if (node.type === 'bibliography') {
+      found = true
+      const refs: CslEntry[] = parseCslEntries(node.attrs?.refs as unknown)
+      const style: CiteStyle = (() => {
+        const s = node.attrs?.style
+        if (s === 'apa' || s === 'mla' || s === 'chicago') return s
+        return 'apa'
+      })()
+      for (const entry of refs) {
+        map.set(entry.id, formatInText(entry, style))
+      }
+      return
+    }
+    for (const child of node.content ?? []) walk(child)
+  }
+  walk(doc)
+  return map
+}
+
+// ── Stateful render (with cite resolution) ───────────────────────────────────
+
+/**
+ * Render a node, given a pre-built cite resolution map. The renderNode function
+ * above is used for the top-level pass; citation + bibliography need the map.
+ */
+function renderNodeWithCites(node: PMNode, key: number, citeMap: Map<string, string>): ReactNode {
+  if (node.type === 'text') {
+    return applyMarks(node.text ?? '', node.marks, key)
+  }
+
+  // citation inline — resolve via the pre-built map.
+  if (node.type === 'citation') {
+    const k = str(node.attrs?.citeKey)
+    const resolved = k ? citeMap.get(k) : undefined
+    const display = resolved ?? (k ? `[missing: ${k}]` : '(?)')
+    return (
+      <span key={key} className="parchment-citation">
+        {display}
+      </span>
+    )
+  }
+
+  // bibliography block — render the formatted reference list.
+  if (node.type === 'bibliography') {
+    const refs: CslEntry[] = parseCslEntries(node.attrs?.refs as unknown)
+    const style: CiteStyle = (() => {
+      const s = node.attrs?.style
+      if (s === 'apa' || s === 'mla' || s === 'chicago') return s
+      return 'apa'
+    })()
+    const formatted = formatBibliography(refs, style)
+    return (
+      <div key={key} className="parchment-bibliography-share">
+        <h2>References</h2>
+        {refs.length === 0 ? (
+          <p style={{ color: '#999', fontStyle: 'italic' }}>No references.</p>
+        ) : (
+          <ol>
+            {formatted.map(({ id, text }) => (
+              <li key={id}>{text}</li>
+            ))}
+          </ol>
+        )}
+      </div>
+    )
+  }
+
+  // Delegate all other nodes to the regular renderer.
+  return renderNode(node, key)
+}
+
 /** Render a ProseMirror `doc` JSON value to read-only React nodes. Accepts the
  *  raw `contentJson` from the API (unknown); a null/invalid value renders an
  *  empty doc. NEVER throws and NEVER emits raw HTML. */
@@ -251,7 +338,15 @@ export function renderReadOnlyDoc(content: unknown): ReactNode {
   }
   const doc = content as PMNode
   const top = doc.type === 'doc' ? doc.content : undefined
-  const children = renderChildren(top)
+
+  // G7b: build the cite resolution map from the whole doc before rendering.
+  const citeMap = buildCiteMap(doc)
+  const hasCitations = citeMap.size > 0
+
+  const children = hasCitations
+    ? (top ?? []).map((n, i) => renderNodeWithCites(n, i, citeMap))
+    : renderChildren(top)
+
   if (children.length === 0) {
     return <p className="parchment-share-empty">This document is empty.</p>
   }

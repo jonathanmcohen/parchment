@@ -1,5 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import { blockExtensions } from '@/lib/editor/block-extensions'
+import { BibliographyExtension, CitationExtension } from '@/lib/editor/extensions/citation'
 import { CodeBlockShiki } from '@/lib/editor/extensions/code-block-shiki'
 import { CommentMark } from '@/lib/editor/extensions/comment'
 import { DrawingExtension } from '@/lib/editor/extensions/drawing'
@@ -91,6 +92,15 @@ export const baseExtensions = [
   // renders the stored SVG; the modal uses an iframe). getSchema(baseExtensions)
   // builds in the server runtime without touching any window-dependent lib.
   DrawioExtension,
+  // G7b: Citation node + bibliography block. Neither imports any heavy lib at
+  // module load — CitationView / BibliographyView are lazy-required inside
+  // addNodeView (same pattern as drawing/mermaid). getSchema(baseExtensions)
+  // builds in the server runtime. BibliographyExtension owns the
+  // citationResolveKey ProseMirror plugin (DISTINCT PluginKey).
+  // CiteSuggestionExtension is added in Editor.tsx (like WikiSuggestionExtension)
+  // so its ReactRenderer popup only loads client-side.
+  CitationExtension,
+  BibliographyExtension,
   // B9: FindReplaceExtension is added in Editor.tsx so it can receive the
   // onOpen callback that controls the React UI panel.
   // B12: SlashMenuExtension is added in Editor.tsx so it can receive the

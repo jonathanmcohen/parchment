@@ -154,6 +154,13 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'ADVANCED',
     keywords: ['section', 'break', 'sectionbreak', 'chapter'],
   },
+  // G7b: bibliography block — inserts the reference list block.
+  {
+    id: 'bibliography',
+    title: 'Bibliography',
+    category: 'ADVANCED',
+    keywords: ['bibliography', 'references', 'citations', 'works cited', 'reference list'],
+  },
   // G4: KaTeX equations.
   {
     id: 'mathBlock',

@@ -32,6 +32,7 @@ import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { type Counts, countText } from '@/lib/editor/counts'
+import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import { WikiSuggestionExtension } from '@/lib/editor/extensions/wiki-suggestion'
@@ -389,6 +390,11 @@ export function Editor({
       // F6: [[ autocomplete — drives the React WikiSuggestionMenu popup. Wired
       // here (not baseExtensions) so its ReactRenderer popup only loads client-side.
       WikiSuggestionExtension,
+      // G7b: @ cite autocomplete — drives the React CiteSuggestionMenu popup.
+      // Wired here (not baseExtensions) so its ReactRenderer only loads client-side.
+      // Uses a DISTINCT PluginKey('citeSuggestion') — never shares a key with
+      // slashMenu or wikiSuggestion (F6 lesson).
+      CiteSuggestionExtension,
     ],
     editorProps: {
       attributes: { class: 'parchment-prose', 'aria-label': 'Document editor' },

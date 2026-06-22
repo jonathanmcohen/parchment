@@ -85,4 +85,20 @@ describe('G6a — mermaid serialize/parse round-trip', () => {
     expect(codeBlock).toBeDefined()
     expect(codeBlock?.attrs?.language).toBe('js')
   })
+
+  it('source containing a bare ``` line round-trips without data loss (four-backtick fence)', () => {
+    // Regression: a 3-backtick fence opener is prematurely closed by a bare ```
+    // line in the body, silently discarding content after it. The fix is a
+    // 4-backtick opener/closer so a bare ``` cannot match the GFM closer.
+    const srcWithBackticks = 'graph TD;\n```\nA-->B;'
+    const node = { type: 'mermaid', attrs: { source: srcWithBackticks } }
+    const md = serializeMarkdown(doc(node))
+    // Serialized fence must use 4 backticks
+    expect(md).toMatch(/^````mermaid/m)
+    // Parse must recover the full source including the bare ``` line
+    const back = markdownToJson(md) as Node
+    const recovered = find(back, (n) => n.type === 'mermaid')
+    expect(recovered).toBeDefined()
+    expect(recovered?.attrs?.source).toBe(srcWithBackticks)
+  })
 })

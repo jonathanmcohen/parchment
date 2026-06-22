@@ -199,7 +199,7 @@ function serializeBlock(node: PMNode): string {
     // import — source is a plain string stored in the node attr.
     case 'mermaid': {
       const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
-      return `\`\`\`mermaid\n${src}\n\`\`\``
+      return `\`\`\`\`mermaid\n${src}\n\`\`\`\``
     }
     default:
       return serializeInline(node.content)

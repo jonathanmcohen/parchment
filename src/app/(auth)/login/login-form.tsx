@@ -152,7 +152,7 @@ function SecondFactorStep({ hasTotp, hasPasskey }: { hasTotp: boolean; hasPasske
             onChange={(e) => setCode(e.target.value)}
             inputMode={useRecovery ? 'text' : 'numeric'}
             autoComplete="one-time-code"
-            placeholder={useRecovery ? 'xxxx-xxxx' : '123456'}
+            placeholder={useRecovery ? 'xxxx-xxxx-xxxx-xxxx' : '123456'}
             // biome-ignore lint/a11y/noAutofocus: focus the only field on this step
             autoFocus
             className="rounded-lg border border-[var(--border)] bg-[var(--paper)] px-3 py-2 tracking-widest"

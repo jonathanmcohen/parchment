@@ -1,5 +1,5 @@
 import 'server-only'
-import { cookies, headers } from 'next/headers'
+import { cookies } from 'next/headers'
 import { env } from '@/lib/env'
 
 // The Relying Party name shown in the authenticator UI.
@@ -14,36 +14,41 @@ const CHALLENGE_TTL_SECONDS = 60 * 5 // 5 minutes — one ceremony
 
 export type RpContext = { rpID: string; origin: string }
 
-// Resolves the RP ID (bare domain) and expected origin for the current request.
-// Prefers explicit env overrides; otherwise derives from the request headers so
-// a self-hoster needs no configuration. Falls back to localhost in dev.
+// The dev-only RP context. WebAuthn requires the origin/RPID to be a fixed,
+// trusted server constant — it IS the anti-phishing anchor that
+// verifyRegistration/AuthenticationResponse compares the ceremony against. We
+// therefore NEVER derive it from request headers (Host/Origin/X-Forwarded-*),
+// which an attacker or a hostile/misconfigured proxy hop can spoof; a spoofed
+// value would silently validate a phished credential against the wrong origin.
+const DEV_RP_ID = 'localhost'
+const DEV_RP_ORIGIN = 'http://localhost:3000'
+
+// Resolves the RP ID (bare domain) and expected origin from FIXED server config.
+// In production both PARCHMENT_RP_ID and PARCHMENT_RP_ORIGIN must be set or this
+// FAILS CLOSED (throws) — passkeys are unavailable until configured rather than
+// silently trusting attacker-influenceable headers. In development it falls back
+// to localhost:3000 so a self-hoster can try passkeys without config locally.
 export async function rpContext(): Promise<RpContext> {
   if (env.webauthnRpId && env.webauthnOrigin) {
     return { rpID: env.webauthnRpId, origin: env.webauthnOrigin }
   }
 
-  const h = await headers()
-  const origin = env.webauthnOrigin ?? originFromHeaders(h)
-  const rpID = env.webauthnRpId ?? hostnameOf(origin)
-  return { rpID, origin }
-}
-
-function originFromHeaders(h: Headers): string {
-  const explicit = h.get('origin')
-  if (explicit) return explicit
-
-  const host = h.get('host') ?? 'localhost:3000'
-  // Behind a proxy the forwarded proto is authoritative; else infer from host.
-  const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
-  return `${proto}://${host}`
-}
-
-function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname
-  } catch {
-    return 'localhost'
+  if (env.nodeEnv === 'production') {
+    throw new Error(
+      'WebAuthn is not configured: set PARCHMENT_RP_ID and PARCHMENT_RP_ORIGIN ' +
+        'to your deployment origin. They are the anti-phishing anchor and must be ' +
+        'fixed server config, never derived from request headers.',
+    )
   }
+
+  // Development convenience only. Partial config still requires both to be set
+  // explicitly to avoid mixing a configured origin with a derived RPID.
+  if (env.webauthnRpId || env.webauthnOrigin) {
+    throw new Error(
+      'WebAuthn is partially configured: set BOTH PARCHMENT_RP_ID and PARCHMENT_RP_ORIGIN.',
+    )
+  }
+  return { rpID: DEV_RP_ID, origin: DEV_RP_ORIGIN }
 }
 
 function challengeCookieOpts(maxAge: number) {

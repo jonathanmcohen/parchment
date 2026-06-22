@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { countMatchingRecoveryHash, formatRecoveryCode } from '@/lib/auth/mfa'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
@@ -38,10 +38,18 @@ export async function setTotp(
       totpSecret: secret,
       totpEnabledAt: null,
       recoveryCodes: recoveryHashes,
+      lastTotpStep: null,
     })
     .onConflictDoUpdate({
       target: schema.userMfa.userId,
-      set: { totpSecret: secret, totpEnabledAt: null, recoveryCodes: recoveryHashes },
+      // Reset the replay watermark: a fresh provisional secret starts a new
+      // step lineage, so a stale high step must not block the first new code.
+      set: {
+        totpSecret: secret,
+        totpEnabledAt: null,
+        recoveryCodes: recoveryHashes,
+        lastTotpStep: null,
+      },
     })
 }
 
@@ -53,12 +61,32 @@ export async function enableTotp(userId: string): Promise<void> {
     .where(eq(schema.userMfa.userId, userId))
 }
 
+// Records the highest TOTP time-step accepted for a user (RFC-6238 §5.2 replay
+// guard). Conditioned on the stored step being null or strictly less than the
+// new one, so a concurrent request cannot lower it. Returns true iff the step was
+// advanced — a false result means the token's step was already consumed (replay)
+// and the caller must reject the login. The condition makes the
+// check-then-record sequence atomic against a parallel replay of the same code.
+export async function recordTotpStep(userId: string, step: number): Promise<boolean> {
+  const updated = await db
+    .update(schema.userMfa)
+    .set({ lastTotpStep: step })
+    .where(
+      and(
+        eq(schema.userMfa.userId, userId),
+        or(isNull(schema.userMfa.lastTotpStep), lt(schema.userMfa.lastTotpStep, step)),
+      ),
+    )
+    .returning({ userId: schema.userMfa.userId })
+  return updated.length > 0
+}
+
 // Fully clears TOTP for a user: drops the secret, the enabled flag, and the
 // recovery codes. Leaves passkeys untouched (a separate second factor).
 export async function disableTotp(userId: string): Promise<void> {
   await db
     .update(schema.userMfa)
-    .set({ totpSecret: null, totpEnabledAt: null, recoveryCodes: [] })
+    .set({ totpSecret: null, totpEnabledAt: null, recoveryCodes: [], lastTotpStep: null })
     .where(eq(schema.userMfa.userId, userId))
 }
 

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
-import { verifyTotp } from '@/lib/auth/mfa'
-import { enableTotp, getMfa } from '@/lib/auth/mfa-repo'
+import { verifyTotpStep } from '@/lib/auth/mfa'
+import { enableTotp, getMfa, recordTotpStep } from '@/lib/auth/mfa-repo'
 
 async function requireSessionUser(req: NextRequest) {
   if (req.headers.get('authorization')?.startsWith('Bearer ')) return null
@@ -36,10 +36,14 @@ export async function POST(req: NextRequest) {
   }
 
   const token = await readToken(req)
-  if (!verifyTotp(row.totpSecret, token)) {
+  const step = verifyTotpStep(row.totpSecret, token)
+  if (step === null) {
     return NextResponse.json({ error: 'invalid_code' }, { status: 400 })
   }
 
   await enableTotp(user.id)
+  // Record the confirming code's step so it cannot be replayed as the first
+  // login's second factor (RFC-6238 §5.2).
+  await recordTotpStep(user.id, step)
   return NextResponse.json({ enabled: true })
 }

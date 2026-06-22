@@ -8,6 +8,7 @@ import {
   timingSafeEqualStr,
   totpUri,
   verifyTotp,
+  verifyTotpStep,
 } from '@/lib/auth/mfa'
 
 // A fixed instant so the TOTP window is deterministic across runs.
@@ -103,11 +104,14 @@ describe('verifyTotp', () => {
 })
 
 describe('generateRecoveryCodes', () => {
-  it('returns n unique, well-formed codes', () => {
+  it('returns n unique codes that normalize to 16 base32 chars (80-bit)', () => {
     const codes = generateRecoveryCodes(10)
     expect(codes).toHaveLength(10)
     for (const code of codes) {
-      expect(code).toMatch(RECOVERY_CODE_RE)
+      // Displayed grouped (four 4-char blocks); normalizes to the 16-char form.
+      const normalized = formatRecoveryCode(code)
+      expect(normalized).toMatch(RECOVERY_CODE_RE)
+      expect(normalized).toHaveLength(16)
     }
     expect(new Set(codes).size).toBe(10)
   })
@@ -119,8 +123,48 @@ describe('generateRecoveryCodes', () => {
 
 describe('formatRecoveryCode', () => {
   it('lowercases and strips separators/whitespace for comparison', () => {
-    expect(formatRecoveryCode('  ABcd-EF12 ')).toBe('abcdef12')
-    expect(formatRecoveryCode('abcd ef12')).toBe('abcdef12')
+    expect(formatRecoveryCode('  A3KF-9P2M ')).toBe('a3kf9p2m')
+    expect(formatRecoveryCode('a3kf 9p2m')).toBe('a3kf9p2m')
+  })
+
+  it('folds Crockford-ambiguous characters (O→0, I/L→1) so paper typos match', () => {
+    expect(formatRecoveryCode('OIL0')).toBe('0110')
+  })
+})
+
+describe('verifyTotpStep', () => {
+  it('returns the absolute time-step a valid token matched', async () => {
+    const secret = generateTotpSecret()
+    const token = await tokenAt(secret, NOW)
+    const step = verifyTotpStep(secret, token, NOW)
+    expect(step).toBe(Math.floor(NOW / 1000 / 30))
+  })
+
+  it('returns the prior/next step for the ±1 window, distinct from the current', async () => {
+    const secret = generateTotpSecret()
+    const current = Math.floor(NOW / 1000 / 30)
+    const prev = await tokenAt(secret, NOW - PERIOD_MS)
+    const next = await tokenAt(secret, NOW + PERIOD_MS)
+    expect(verifyTotpStep(secret, prev, NOW)).toBe(current - 1)
+    expect(verifyTotpStep(secret, next, NOW)).toBe(current + 1)
+  })
+
+  it('returns null for a wrong or malformed token', () => {
+    const secret = generateTotpSecret()
+    expect(verifyTotpStep(secret, '000000', NOW)).toBeNull()
+    expect(verifyTotpStep(secret, '12345', NOW)).toBeNull()
+  })
+
+  it('a replayed code maps to the same step (so the DB watermark rejects reuse)', async () => {
+    // The route persists the matched step and rejects steps <= the stored one.
+    // Two verifications of the same live code at the same instant yield the SAME
+    // step, which is how the watermark detects the replay.
+    const secret = generateTotpSecret()
+    const token = await tokenAt(secret, NOW)
+    const first = verifyTotpStep(secret, token, NOW)
+    const second = verifyTotpStep(secret, token, NOW + 5_000)
+    expect(first).not.toBeNull()
+    expect(second).toBe(first)
   })
 })
 

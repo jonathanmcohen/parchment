@@ -123,6 +123,12 @@ export const sessions = pgTable(
     // app/API routes; ONLY the 2FA-verify / passkey-auth routes accept it, and
     // they clear the flag on success to promote it to a full session.
     mfaPending: boolean('mfa_pending').notNull().default(false),
+    // I7 (hardening): count of failed second-factor attempts against this pending
+    // session. The 2FA-verify route increments it on each wrong TOTP/recovery
+    // code and destroys the pending session once it exceeds MFA_MAX_ATTEMPTS, so
+    // an attacker who has the password cannot brute-force the second factor for
+    // the whole pending TTL — they get a hard, bounded number of guesses.
+    failedMfaAttempts: integer('failed_mfa_attempts').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('sessions_user_idx').on(t.userId)],
@@ -141,6 +147,12 @@ export const userMfa = pgTable('user_mfa', {
   totpSecret: text('totp_secret'), // base32; null until TOTP enrollment begins
   totpEnabledAt: timestamp('totp_enabled_at', { withTimezone: true }), // null until confirmed
   recoveryCodes: jsonb('recovery_codes').notNull().default([]), // string[] of argon2 hashes
+  // I7 (hardening): the highest TOTP time-step already accepted for this user.
+  // RFC-6238 §5.2 says a verifier SHOULD reject a previously-accepted OTP within
+  // its validity window. verifyTotp returns the matched absolute step; the verify
+  // route persists it here and rejects any token whose step is <= this value, so
+  // a phished/shoulder-surfed live code cannot be replayed within its ~90s window.
+  lastTotpStep: bigint('last_totp_step', { mode: 'number' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

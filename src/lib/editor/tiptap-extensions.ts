@@ -1,5 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import { blockExtensions } from '@/lib/editor/block-extensions'
+import { CairnLink } from '@/lib/editor/extensions/cairn-link'
 import { BibliographyExtension, CitationExtension } from '@/lib/editor/extensions/citation'
 import { CodeBlockShiki } from '@/lib/editor/extensions/code-block-shiki'
 import { CommentMark } from '@/lib/editor/extensions/comment'
@@ -64,6 +65,13 @@ export const baseExtensions = [
   CommentMark,
   // D2: suggesting mode — tracked insertions/deletions.
   Suggesting,
+  // J1: [[cairn://page-id]] external cross-link inline atom node. Mirrors
+  // WikiLink but targets a Cairn page. addNodeView lazy-requires CairnLinkView
+  // (no React/DOM at module load → getSchema builds server-side). renderHTML is
+  // OFF-UNLESS-CONFIGURED: a non-navigable span when CAIRN_BASE_URL is unset.
+  // The `[[cairn://` autocomplete (CairnSuggestionExtension, DISTINCT PluginKey)
+  // is added in Editor.tsx next to WikiSuggestionExtension.
+  CairnLink,
   // F6: [[wiki]] link inline atom node (renders + serializes as [[Label]]).
   // The `[[` autocomplete (WikiSuggestionExtension) is added in Editor.tsx so
   // it can drive the React popup, matching the SlashMenu wiring below.

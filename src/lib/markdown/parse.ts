@@ -36,6 +36,9 @@
 
 import { marked } from 'marked'
 import { parseCslEntries } from '@/lib/citations/types'
+// J1: pageId validation for cairn-link parsing. cairn.ts is env-only (no editor
+// graph / DOM), safe under this module's server-runtime constraint.
+import { isValidCairnPageId } from '@/lib/integrations/cairn'
 
 type PMNode = {
   type: string
@@ -68,6 +71,16 @@ function textNode(s: string, marks: Mark[]): PMNode | null {
 // except `[` and `]` between double brackets so `[[A]] x [[B]]` yields two
 // distinct links and a stray `]]` cannot over-match.
 const WIKI_LINK_RE = /\[\[([^[\]]+)\]\]/g
+
+// J1: `[[cairn://<pageId>]]` and `[[cairn://<pageId>|<label>]]` recognition.
+// MUST be matched BEFORE the plain `[[Label]]` wiki rule (see splitCairnLinks /
+// splitWikiLinks ordering) so a cairn link is NEVER mis-parsed as a wiki link.
+//   - pageId: the conservative cairn-id grammar (validateCairnPageId narrows it
+//     further) — chars allowed inside double-brackets except `[`, `]`, `|`.
+//   - label: optional `|<label>` (anything but `[`, `]`, `|`).
+// The pageId is sanitized by sanitizeCairnPageId on reconstruction; an id that
+// fails sanitization is dropped (the run stays plain text via the wiki path).
+const CAIRN_LINK_RE = /\[\[cairn:\/\/([^[\]|]+)(?:\|([^[\]|]*))?\]\]/g
 
 /**
  * G4: CONSERVATIVE inline-math recognition. A `$…$` pair becomes a `mathInline`
@@ -143,13 +156,17 @@ function splitCrossRefs(s: string, marks: Mark[]): PMNode[] {
 }
 
 function splitCitations(s: string, marks: Mark[]): PMNode[] {
-  if (!s.includes('[@')) return splitWikiLinks(s, marks)
+  // No citation here → fall through to the cairn/wiki link splitters (cairn
+  // BEFORE wiki — J1 ordering invariant). Must NOT skip straight to
+  // splitWikiLinks or a `[[cairn://…]]` with no `[@` nearby would be mis-parsed
+  // as a wiki link.
+  if (!s.includes('[@')) return splitCairnLinks(s, marks)
   const out: PMNode[] = []
   let last = 0
   CITE_RE.lastIndex = 0
   let m: RegExpExecArray | null = CITE_RE.exec(s)
   while (m !== null) {
-    if (m.index > last) out.push(...splitWikiLinks(s.slice(last, m.index), marks))
+    if (m.index > last) out.push(...splitCairnLinks(s.slice(last, m.index), marks))
     const key = m[1] ?? ''
     const locator = m[2] ?? ''
     // Strip a leading "p. " prefix from the locator for the page field.
@@ -162,6 +179,46 @@ function splitCitations(s: string, marks: Mark[]): PMNode[] {
     }
     last = m.index + m[0].length
     m = CITE_RE.exec(s)
+  }
+  if (last < s.length) out.push(...splitCairnLinks(s.slice(last), marks))
+  return out
+}
+
+/**
+ * J1: split a literal text run into text + cairnLink atom nodes wherever a
+ * `[[cairn://<pageId>]]` or `[[cairn://<pageId>|<label>]]` appears, BEFORE the
+ * wiki rule. Matching cairn FIRST is the core ordering invariant: a plain
+ * `[[Label]]` must never be mis-parsed as cairn (CAIRN_LINK_RE requires the
+ * literal `cairn://` prefix), and a `[[cairn://id]]` must never be mis-parsed as
+ * a wiki link (it is consumed here so the leftover never reaches splitWikiLinks).
+ *
+ * The captured pageId must ALREADY be valid (isValidCairnPageId): traversal /
+ * scheme-injection / CRLF / overlong ids are REJECTED — and a rejected id is NOT
+ * salvaged into a different link target. Its raw `[[…]]` text is instead handed
+ * to splitWikiLinks, where `[[cairn://../x]]` (still containing `[[…]]`) parses
+ * to a wikiLink with the literal label, never to a cairn link with an unsafe id.
+ * Marks carry onto surrounding text, not the atom. Non-cairn segments are
+ * delegated to splitWikiLinks so wiki links still work.
+ */
+function splitCairnLinks(s: string, marks: Mark[]): PMNode[] {
+  if (!s.includes('cairn://')) return splitWikiLinks(s, marks)
+  const out: PMNode[] = []
+  let last = 0
+  CAIRN_LINK_RE.lastIndex = 0
+  let m: RegExpExecArray | null = CAIRN_LINK_RE.exec(s)
+  while (m !== null) {
+    const pageId = m[1] ?? ''
+    if (isValidCairnPageId(pageId)) {
+      // Emit everything before this match through the wiki path, then the atom.
+      if (m.index > last) out.push(...splitWikiLinks(s.slice(last, m.index), marks))
+      const label = (m[2] ?? '').replace(/[[\]|]/g, '')
+      out.push({ type: 'cairnLink', attrs: { pageId, label } })
+      last = m.index + m[0].length
+    }
+    // When the id is invalid, DON'T advance `last` past it — leave the whole
+    // match in the text stream so splitWikiLinks (below) handles it as ordinary
+    // [[…]] text, never producing a cairnLink with an unsafe id.
+    m = CAIRN_LINK_RE.exec(s)
   }
   if (last < s.length) out.push(...splitWikiLinks(s.slice(last), marks))
   return out

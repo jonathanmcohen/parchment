@@ -152,6 +152,21 @@ export function sanitizeCustomCss(css: string): string {
     return `url('${h}')`
   })
 
+  // Defense-in-depth catch-alls — the structured url()/expression passes above
+  // can be defeated by malformed input (a ')' inside a quoted url, a url() with no
+  // closing ')', or an expression() argument longer than the bounded match). These
+  // residuals are not exploitable in modern browsers (BAD_URL tokens load nothing,
+  // expression() is IE-only) but this is a security sanitizer whose output is shown
+  // to anonymous share viewers, so neutralize the tokens unconditionally:
+  //  • any leftover `expression(` → harmless `disabled(`
+  //  • any residual external/protocol-relative URL token (scheme:// or //host) →
+  //    removed (CSS values never legitimately contain `//`; comments are already
+  //    stripped), closing the url()-edge-case exfil channel
+  //  • any standalone javascript:/vbscript: scheme → removed
+  s = s.replace(/expression\s*\(/gi, 'disabled(')
+  s = s.replace(/(?:[a-z][a-z0-9+.-]*:)?\/\/[^\s'");}]*/gi, '')
+  s = s.replace(/(?:javascript|vbscript)\s*:/gi, '')
+
   // Strip `<` — prevents </style> break-out injection.
   s = s.replace(/</g, '')
 

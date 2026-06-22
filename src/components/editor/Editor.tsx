@@ -142,25 +142,6 @@ export function Editor({
   // If true, the IDB already has content → do NOT seed from initialJson.
   const idbHadContentRef = useRef(false)
 
-  useEffect(() => {
-    if (!idb) return
-    // idb may have already fired 'synced' synchronously before this effect runs
-    // (unlikely but guard it). Check `.synced` first.
-    if (idb.synced) {
-      idbSyncedRef.current = true
-      idbHadContentRef.current = ydoc.get(FIELD, Y.XmlFragment).length > 0
-      return
-    }
-    const handleSynced = () => {
-      idbSyncedRef.current = true
-      idbHadContentRef.current = ydoc.get(FIELD, Y.XmlFragment).length > 0
-    }
-    idb.on('synced', handleSynced)
-    return () => {
-      idb.off('synced', handleSynced)
-    }
-  }, [idb, ydoc])
-
   // `hasCollabState` captured in a ref so the provider's (mount-stable) callbacks
   // read it without re-creating the provider.
   const hasCollabStateRef = useRef(hasCollabState)
@@ -186,16 +167,26 @@ export function Editor({
    * Both modes keep the fragment-empty guard (two-tab race), the IDB-had-content
    * guard (G11), and seededRef idempotency.
    *
-   * G11 — IDB guard: if IDB already synced and found content, this browser has
-   * previously edited this doc. Never seed from initialJson in that case — IDB
-   * state is authoritative locally and the Hocuspocus CRDT merge handles server
-   * state on reconnect. Only skip the IDB guard in the force=true path where the
-   * collab server is unreachable and we still want to show the server-mirrored
-   * fallback (initialJson comes from the DB mirror, not the Yjs state, so it is
-   * safe to show when offline and IDB is empty, but NOT when IDB has content —
-   * that would duplicate the IDB content on top of itself).
+   * G11 — IDB ordering guarantee (footgun #3 re-entrance prevention):
+   *
+   *   IndexedDB loading is async. If the provider's onSynced (or the offline
+   *   goOffline timer) fires before IDB has finished applying stored updates,
+   *   idbHadContentRef.current is still false AND the ydoc fragment is still
+   *   empty — all guards pass and seedFromInitial would write initialJson in.
+   *   When IDB then fires 'synced' and applies its stored updates on top of the
+   *   already-seeded ydoc, content is duplicated (identical to the D4 race).
+   *
+   *   Fix: gate FIRST on idbSyncedRef.current. If IDB has not yet reported
+   *   'synced', return WITHOUT setting seededRef — leaving the door open for the
+   *   IDB 'synced' handler to call seedFromInitial() itself once loading is done.
+   *   The 'synced' handler always calls seedFromInitial() after setting both refs,
+   *   so this is never a dead end. The only exception is when idb is null (SSR /
+   *   no window), in which case we skip this gate and proceed normally.
+   *
+   *   Only skip the IDB guard (idbHadContentRef check) is never omitted — even
+   *   the force=true offline path must not overlay IDB content with initialJson.
    */
-  // biome-ignore lint/correctness/useExhaustiveDependencies: initialJson and ydoc are stable per mount.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: idb, initialJson, and ydoc are all stable after mount (useMemo with []).
   const seedFromInitial = useCallback((opts?: { force?: boolean }) => {
     if (seededRef.current || !initialJson) return
     // Online path: server holds an authoritative snapshot — never seed on top.
@@ -203,11 +194,22 @@ export function Editor({
       seededRef.current = true
       return
     }
-    // G11: IDB guard — if IDB has already loaded content into this ydoc, do NOT
-    // seed from initialJson. The IDB state IS the local source of truth; seeding
-    // on top would duplicate content exactly like the D4 race.
-    // idbHadContentRef is set in the 'synced' handler above. We check it here
-    // regardless of force — even the offline fallback must not overlay IDB content.
+    // G11: IDB sync-completion guard — if IDB exists but has not yet finished
+    // loading its stored updates into the ydoc, DEFER: return without setting
+    // seededRef so the IDB 'synced' handler can call seedFromInitial() once
+    // loading is complete. This prevents the race where onSynced (or goOffline)
+    // fires before IDB applies its updates, causing seedFromInitial to run with
+    // an empty fragment, followed by IDB applying updates on top — duplicating
+    // content. The 'synced' handler always calls seedFromInitial() after setting
+    // both refs, so deferring here is safe and the seed is never skipped entirely.
+    if (idb !== null && !idbSyncedRef.current) {
+      // Deferred — IDB 'synced' handler will call us once loading is complete.
+      return
+    }
+    // G11: IDB had-content guard — if IDB has already loaded content into this
+    // ydoc, do NOT seed from initialJson. The IDB state IS the local source of
+    // truth; seeding on top would duplicate content exactly like the D4 race.
+    // Applies even in the force=true offline path.
     if (idbHadContentRef.current) {
       seededRef.current = true
       return
@@ -223,6 +225,38 @@ export function Editor({
     Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(seeded))
     seededRef.current = true
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // G11: IDB sync handler — must be declared AFTER seedFromInitial so the callback
+  // reference is stable when the effect registers. The effect sets idbSyncedRef and
+  // idbHadContentRef, then calls seedFromInitial to resolve any deferred seed that
+  // was blocked waiting for IDB to finish loading.
+  useEffect(() => {
+    if (!idb) return
+    // idb may have already fired 'synced' synchronously before this effect runs
+    // (unlikely but guard it). Check `.synced` first.
+    if (idb.synced) {
+      idbSyncedRef.current = true
+      idbHadContentRef.current = ydoc.get(FIELD, Y.XmlFragment).length > 0
+      // IDB already done — resolve any deferred seedFromInitial call (e.g. from
+      // onSynced or goOffline that fired before this effect registered).
+      seedFromInitial()
+      return
+    }
+    const handleSynced = () => {
+      idbSyncedRef.current = true
+      idbHadContentRef.current = ydoc.get(FIELD, Y.XmlFragment).length > 0
+      // IDB has finished loading. If seedFromInitial was called by onSynced or
+      // goOffline before IDB completed, it deferred without setting seededRef.
+      // Now that IDB state is known, attempt the seed — the guards inside
+      // seedFromInitial will correctly skip if IDB had content or the server
+      // already seeded.
+      seedFromInitial()
+    }
+    idb.on('synced', handleSynced)
+    return () => {
+      idb.off('synced', handleSynced)
+    }
+  }, [idb, ydoc, seedFromInitial])
 
   // D4: HocuspocusProvider — wires the Y.Doc to the collab WebSocket server.
   //

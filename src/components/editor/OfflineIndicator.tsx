@@ -45,6 +45,31 @@ export function OfflineIndicator({ provider }: Props) {
       return
     }
 
+    // Read the provider's current WebSocket status eagerly on effect mount.
+    // If the provider is already connected (e.g. on a component re-mount with
+    // a stable provider), no 'connect' event will fire and the indicator would
+    // stay '↻ Syncing' until the next status change — which never comes on a
+    // stable connection. Snapshot the current status so the indicator is correct
+    // immediately, then continue listening for future transitions.
+    //
+    // HocuspocusProvider exposes the underlying websocketProvider through
+    // provider.configuration.websocketProvider. We defensively access it so
+    // this works even if the internal shape changes.
+    const wsProvider = (
+      provider as unknown as {
+        configuration?: { websocketProvider?: { wsconnected?: boolean; wsconnecting?: boolean } }
+      }
+    ).configuration?.websocketProvider
+    if (wsProvider) {
+      if (wsProvider.wsconnected) {
+        setProviderStatus('connected')
+      } else if (wsProvider.wsconnecting) {
+        setProviderStatus('connecting')
+      } else {
+        setProviderStatus('disconnected')
+      }
+    }
+
     const handleConnect = () => setProviderStatus('connected')
     const handleDisconnect = () => setProviderStatus('disconnected')
     const handleStatus = ({ status }: { status: string }) => {

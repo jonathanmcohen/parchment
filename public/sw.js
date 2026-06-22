@@ -17,17 +17,37 @@ const PRECACHE_URLS = ['/', '/offline']
 
 // ---------------------------------------------------------------------------
 // Install — precache shell + skipWaiting so the new SW activates immediately.
+//
+// cache.addAll() is atomic: if any URL fails (e.g. /offline returns 404 on
+// first deploy because the route doesn't exist yet), the ENTIRE batch is
+// rolled back — including the app shell '/'. That would leave nothing precached
+// and the app unable to load offline even after visiting once.
+//
+// Fix: cache '/' and '/offline' in separate calls. The app shell '/' is
+// always cached (required for offline support). '/offline' is best-effort —
+// a 404 on first deploy is silently ignored and it will be cached lazily on
+// first navigation, or on the next SW install once the route exists.
+//
+// skipWaiting() is chained last in the waitUntil promise (not in .finally())
+// so event.waitUntil properly holds the install event open until skipWaiting
+// resolves, which is the spec-correct pattern.
 // ---------------------------------------------------------------------------
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_VERSION)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .catch(() => {
-        // /offline route may not exist yet during first install — ignore so the
-        // SW still installs. It will be cached on first navigation.
-      })
-      .finally(() => self.skipWaiting()),
+      .then((cache) =>
+        // Cache the app shell unconditionally — this is the critical precache.
+        cache
+          .add('/')
+          .then(() =>
+            // Cache /offline separately; 404 on first deploy is expected and safe.
+            cache.add('/offline').catch(() => {
+              // /offline route may not exist yet — ignore so '/' is still cached.
+            }),
+          ),
+      )
+      .then(() => self.skipWaiting()),
   )
 })
 
@@ -130,12 +150,22 @@ async function cacheFirst(request) {
 /**
  * Network-first: try the network, fall back to cache (then offline page).
  * Used for navigation requests — guarantees fresh HTML after a deploy.
+ *
+ * Redirected responses (response.redirected === true) are NOT cached under the
+ * original request URL. A followed redirect has ok === true but its .url differs
+ * from the request URL. Storing it under the original key would silently serve
+ * the redirect destination's content for the original URL on the next offline
+ * load, bypassing any server-side redirect logic (e.g. /d/docId → /d/docId/).
+ * We skip caching redirects; they are re-fetched on each online visit and only
+ * the resolved destination gets cached when that URL is fetched directly.
  */
 async function networkFirst(request) {
   try {
     const response = await fetch(request)
-    if (response.ok) {
+    if (response.ok && !response.redirected) {
       // Update the shell cache so the offline fallback stays fresh.
+      // Skip redirected responses — cache.put under the original URL would store
+      // the redirect destination's body at the wrong key.
       const cache = await caches.open(CACHE_VERSION)
       cache.put(request, response.clone())
     }

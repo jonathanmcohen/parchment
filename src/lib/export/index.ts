@@ -2,16 +2,16 @@ import { serializeMarkdown } from '@/lib/markdown/serialize'
 import { docToStandaloneHtml } from './html'
 import { docToPlainText } from './plain-text'
 
-export type ExportFormat = 'md' | 'txt' | 'html'
+export type ExportFormat = 'md' | 'txt' | 'html' | 'docx' | 'epub' | 'tex'
 
 export interface ExportResult {
-  body: string
+  body: string | Uint8Array
   contentType: string
   ext: string
 }
 
 /** Convert a doc to the requested format. Pure dispatch over serializeMarkdown /
- *  docToPlainText / docToStandaloneHtml. */
+ *  docToPlainText / docToStandaloneHtml / docToDocx / docToEpub / docToLatex. */
 export async function exportDoc(
   doc: unknown,
   title: string,
@@ -37,12 +37,46 @@ export async function exportDoc(
         contentType: 'text/html; charset=utf-8',
         ext: 'html',
       }
+    case 'docx': {
+      // Dynamic import: docx module is server-safe but we import lazily
+      // for consistency and to keep the static graph clean.
+      const { docToDocx } = await import('./docx')
+      return {
+        body: await docToDocx(doc, title),
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ext: 'docx',
+      }
+    }
+    case 'epub': {
+      const { docToEpub } = await import('./epub')
+      return {
+        body: await docToEpub(doc, title),
+        contentType: 'application/epub+zip',
+        ext: 'epub',
+      }
+    }
+    case 'tex': {
+      const { docToLatex } = await import('./latex')
+      return {
+        body: docToLatex(doc, title),
+        contentType: 'application/x-tex; charset=utf-8',
+        ext: 'tex',
+      }
+    }
   }
 }
 
 /** Parse a raw format string → ExportFormat | null. */
 export function parseExportFormat(raw: unknown): ExportFormat | null {
-  if (raw === 'md' || raw === 'txt' || raw === 'html') return raw
+  if (
+    raw === 'md' ||
+    raw === 'txt' ||
+    raw === 'html' ||
+    raw === 'docx' ||
+    raw === 'epub' ||
+    raw === 'tex'
+  )
+    return raw
   return null
 }
 

@@ -132,12 +132,12 @@
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
-| H1 | `.docx` round-trip via Mammoth | TODO | ☐ | ☐ | |
+| H1 | `.docx` round-trip via Mammoth | DONE | ☑ | ☑ | EXPORT via docx@9.7.1 (docToDocx → Uint8Array). Browser-verified: export?format=docx → valid ZIP (PK magic) + word/document.xml, correct content-type, 8.9KB. Round-trip IMPORT side = H9 (Mammoth). Headings/lists/tables/data-images mapped. |
 | H2 | `.pdf` via paged.js (page fidelity) | TODO | ☐ | ☐ | |
 | H3 | `.html` standalone, embedded CSS, no JS | DONE | ☑ | ☑ | docToStandaloneHtml = renderToStaticMarkup(renderReadOnlyDoc) wrapped in <!doctype> + embedded EXPORT_STYLESHEET, NO <script>/external (plantuml stripped to <pre> source). Browser-verified: GET /export?format=html → standalone, content-type text/html, download filename, content rendered. |
 | H4 | `.md` canonical lossless round-trip | DONE | ☑ | ☑ | reuses serializeMarkdown (F3 lossless). Browser-verified: export?format=md → # heading, **bold**, - list; text/markdown; download filename. |
-| H5 | `.epub` long-form | TODO | ☐ | ☐ | |
-| H6 | LaTeX — equation + bibliography preserved | TODO | ☐ | ☐ | |
+| H5 | `.epub` long-form | DONE | ☑ | ☑ | docToEpub via jszip@3.10.1 — valid EPUB3 ZIP (mimetype FIRST + STORE, META-INF/container.xml, OEBPS/content.opf manifest+spine, nav.xhtml, chapter.xhtml from H3 body). Browser-verified: export?format=epub → application/epub+zip, mimetype-first, container+opf present. |
+| H6 | LaTeX — equation + bibliography preserved | DONE | ☑ | ☑ | docToLatex pure (article class, headings→section, marks, lists, math inline/display, citations→cite + thebibliography). Browser-verified: section{Report 50%% & Done} (specials escaped), href{raw url} (not escaped), inline code escaped, math present. Workflow review fixed 11 BLOCKING: sout w/o ulem→added; href URL over-escaped→raw; inline-code under-escaped→full escapeTex; verbatim end-injection→hardened. |
 | H7 | plain `.txt` | DONE | ☑ | ☑ | docToPlainText walk (headings/paras→lines, lists→prefixed, tables→tab, marks stripped). Browser-verified: export?format=txt → plain (no md syntax), text/plain. |
 | H8 | Bulk export — multi-select → ZIP in chosen format | TODO | ☐ | ☐ | |
 | H9 | Import — docx/md/html/Notion-zip/Google-Docs-paste | TODO | ☐ | ☐ | |

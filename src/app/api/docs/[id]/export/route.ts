@@ -30,7 +30,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { body, contentType, ext } = await exportDoc(content, doc.title, format)
   const filename = exportFilename(doc.title, ext)
 
-  return new Response(body, {
+  // body is string | Uint8Array — both are valid BodyInit at runtime.
+  // The DOM lib types Uint8Array without the Blob-compatible index signature so
+  // we cast through BodyInit to satisfy the strict type checker.
+  return new Response(body as BodyInit, {
     status: 200,
     headers: {
       'Content-Type': contentType,

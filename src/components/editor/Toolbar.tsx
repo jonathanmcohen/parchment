@@ -851,7 +851,7 @@ export function Toolbar({
         ▶
       </button>
 
-      {/* ── H3/H4/H7: Export menu ────────────────────────────────────── */}
+      {/* ── H3/H4/H7/H1/H5/H6: Export menu ─────────────────────────── */}
       <span className="parchment-toolbar-sep" aria-hidden="true" />
       <fieldset className="parchment-toolbar-export">
         <legend className="parchment-toolbar-export-label">Export</legend>
@@ -860,6 +860,9 @@ export function Toolbar({
             { label: 'Markdown', format: 'md' },
             { label: 'HTML', format: 'html' },
             { label: 'Plain text', format: 'txt' },
+            { label: 'Word (.docx)', format: 'docx' },
+            { label: 'EPUB', format: 'epub' },
+            { label: 'LaTeX', format: 'tex' },
           ] as const
         ).map(({ label, format }) => (
           <a

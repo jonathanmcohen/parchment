@@ -69,7 +69,8 @@ describe('exportDoc with null-equivalent content', () => {
 
   it('html export of empty doc produces valid standalone html without throwing', async () => {
     const result = await exportDoc(emptyDoc, 'Empty', 'html')
-    expect(result.body.toLowerCase()).toMatch(/^<!doctype html/)
+    // body is string for html; cast to string for the type checker (widened to string|Uint8Array)
+    expect(String(result.body).toLowerCase()).toMatch(/^<!doctype html/)
     expect(result.ext).toBe('html')
   })
 })

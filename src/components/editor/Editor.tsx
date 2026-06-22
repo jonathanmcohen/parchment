@@ -6,6 +6,7 @@ import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import { NodeSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
+import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { prosemirrorJSONToYDoc } from 'y-prosemirror'
 import * as Y from 'yjs'
@@ -13,7 +14,6 @@ import { BacklinksPanel } from '@/components/editor/BacklinksPanel'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { CommentsSidebar } from '@/components/editor/CommentsSidebar'
 import { CropDialog } from '@/components/editor/CropDialog'
-import { DrawingModal } from '@/components/editor/DrawingModal'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
@@ -37,6 +37,14 @@ import { type Reader, throttle } from '@/lib/editor/reading-presence'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { authorColor } from '@/lib/editor/track-changes'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
+
+// G5: DrawingModal is dynamic-imported so the Excalidraw CSS (imported at the
+// top of DrawingModal.tsx) is NOT pulled into the Editor chunk on every page
+// load — it is only fetched when a drawing modal is first opened.
+const DrawingModal = dynamic(
+  () => import('@/components/editor/DrawingModal').then((m) => m.DrawingModal),
+  { ssr: false },
+)
 
 // Public collab URL — falls back to localhost in dev when env var is absent.
 const COLLAB_URL =

@@ -95,23 +95,37 @@ export const DrawingExtension = Node.create({
       insertDrawing:
         () =>
         // biome-ignore lint/correctness/noUnusedFunctionParameters: dispatch is part of the Tiptap command signature; the command writes via view.dom.dispatchEvent (a DOM event, not a ProseMirror dispatch)
-        ({ commands, state, dispatch, view }) => {
+        ({ commands, dispatch, view }) => {
           // Insert empty drawing node at the current selection.
           const inserted = commands.insertContent({
             type: this.name,
             attrs: { scene: null, svg: '' },
           })
           if (!inserted) return false
-          // After insertion, dispatch the edit event so the modal opens immediately.
-          // The new node lands at the previous selection position.
-          const pos = state.selection.from
+          // After insertContent() the view's state has already been updated —
+          // use view.state (post-insertion) NOT the stale `state` closure variable
+          // which reflects the pre-insertion EditorState. Walk backward from the
+          // post-insertion cursor to find the newly inserted drawing node.
           if (view) {
-            view.dom.dispatchEvent(
-              new CustomEvent('parchment:edit-drawing', {
-                bubbles: true,
-                detail: { pos, scene: null },
-              }),
-            )
+            const postState = view.state
+            // The cursor is placed just after the inserted atom node. Walk
+            // backward from the current selection to find the drawing node.
+            let drawingPos: number | null = null
+            const cursorPos = postState.selection.from
+            postState.doc.nodesBetween(0, cursorPos, (node, pos) => {
+              if (node.type.name === 'drawing') {
+                drawingPos = pos
+              }
+              return true
+            })
+            if (drawingPos !== null) {
+              view.dom.dispatchEvent(
+                new CustomEvent('parchment:edit-drawing', {
+                  bubbles: true,
+                  detail: { pos: drawingPos, scene: null },
+                }),
+              )
+            }
           }
           return true
         },

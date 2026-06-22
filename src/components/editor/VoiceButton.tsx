@@ -54,6 +54,11 @@ export function VoiceButton({ editor }: Props) {
   }, [])
 
   const startRecording = useCallback(() => {
+    // Fix #1: Use ref as authoritative guard against double-start (stale React
+    // state in the closure can let a second click slip through before setState
+    // propagates; the ref is always current).
+    if (recRef.current) return
+
     const Ctor = getSpeechRecognition()
     if (!Ctor) {
       setUnsupported(true)
@@ -89,14 +94,27 @@ export function VoiceButton({ editor }: Props) {
     }
 
     rec.onerror = () => {
+      // Fix #3 / #7: Guard with session identity — a stale onerror from a
+      // superseded session must not stop the new session. Null both handlers
+      // before calling stop() so the stop() call doesn't trigger onend
+      // recursively (Web Speech API fires onend after onerror + stop()).
+      if (recRef.current !== rec) return
+      rec.onend = null
+      rec.onerror = null
       stopRecording()
     }
 
     rec.onend = () => {
-      // Only auto-clear if not already stopped by user action.
+      // Fix #2 / #5 / #7: Session identity guard — if this rec is no longer
+      // the active one (either stopRecording() already ran and nulled the ref,
+      // or a new session started), treat this onend as a no-op. This prevents:
+      //   • double-execution of teardown state setters after user stops
+      //   • post-unmount setState calls (unmount cleanup nulls the ref first)
+      //   • a stale onend from a previous session wiping the new session's ref
+      if (recRef.current !== rec) return
+      recRef.current = null
       setRecording(false)
       setPreview('')
-      recRef.current = null
     }
 
     recRef.current = rec
@@ -116,6 +134,14 @@ export function VoiceButton({ editor }: Props) {
   useEffect(() => {
     return () => {
       if (recRef.current) {
+        // Fix #4: Null all callbacks before abort() so no handler fires after
+        // unmount. The browser queues onresult/onerror/onend as tasks; if they
+        // were queued before abort() they would otherwise still execute on a
+        // dead component, inserting content into the editor or calling state
+        // setters after unmount.
+        recRef.current.onresult = null
+        recRef.current.onerror = null
+        recRef.current.onend = null
         recRef.current.abort()
         recRef.current = null
       }
@@ -140,12 +166,12 @@ export function VoiceButton({ editor }: Props) {
         {preview}
       </span>
 
-      {/* Unsupported note — announced via aria-live */}
-      {unsupported && (
-        <span role="status" aria-live="polite" className="parchment-voice-unsupported">
-          Voice typing isn&apos;t supported in this browser
-        </span>
-      )}
+      {/* Fix #6: Unsupported note — always in the DOM so VoiceOver observes
+          mutations to the existing live region rather than a freshly-mounted
+          node (ARIA spec requires regions be present before content changes). */}
+      <span role="status" aria-live="polite" className="parchment-voice-unsupported">
+        {unsupported ? <>Voice typing isn&apos;t supported in this browser</> : null}
+      </span>
     </>
   )
 }

@@ -94,19 +94,61 @@ export function ReadingView({ content, docId, onClose }: Props) {
     return () => cancelAnimationFrame(id)
   }, [docId])
 
-  // Trap focus on mount — move focus to the close button.
+  // Capture the element that had focus before the dialog opened so we can
+  // restore it when the dialog closes (WCAG 2.4.3 / spec "return focus on close").
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+
+  // On mount: save the currently focused element, then move focus into the dialog.
+  // On unmount: restore focus to the saved element.
   useEffect(() => {
+    returnFocusRef.current = document.activeElement as HTMLElement | null
     closeButtonRef.current?.focus()
+    return () => {
+      returnFocusRef.current?.focus()
+    }
   }, [])
 
-  // Esc closes.
+  // Esc closes + Tab/Shift-Tab focus trap.
   useEffect(() => {
+    const overlayEl = closeButtonRef.current?.closest('[role="dialog"]') as HTMLElement | null
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
         onCloseRef.current()
+        return
+      }
+
+      // Focus trap: keep Tab cycle inside the dialog.
+      if (e.key === 'Tab' && overlayEl) {
+        const focusable = Array.from(
+          overlayEl.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((el) => !el.hasAttribute('disabled') && el.tabIndex >= 0)
+
+        if (focusable.length === 0) {
+          e.preventDefault()
+          return
+        }
+
+        const first = focusable[0] as HTMLElement
+        const last = focusable[focusable.length - 1] as HTMLElement
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault()
+            last.focus()
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault()
+            first.focus()
+          }
+        }
       }
     }
+
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])

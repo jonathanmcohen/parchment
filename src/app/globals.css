@@ -2709,7 +2709,11 @@ body {
 .parchment-reading-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  /* z-index: 10000 — must exceed suggestion menus (.parchment-slash-menu /
+     .parchment-wiki-menu) which are appended to document.body at z-index 9999
+     by @tiptap/suggestion. If those menus are open when reading mode opens,
+     a lower z-index would let them bleed through the full-bleed overlay. */
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   background: var(--background);

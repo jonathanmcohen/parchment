@@ -49,6 +49,14 @@ const noDate: CslEntry = {
   URL: 'https://example.com',
 }
 
+const noDateBook: CslEntry = {
+  id: 'doe-nd-book',
+  type: 'book',
+  title: 'Undated Book',
+  author: [{ family: 'Doe', given: 'J.' }],
+  publisher: 'Press',
+}
+
 describe('formatInText', () => {
   it('APA single author with year', () => {
     expect(formatInText(smith1, 'apa')).toBe('(Smith, 2020)')
@@ -131,6 +139,20 @@ describe('formatBibliographyEntry', () => {
     const text = formatBibliographyEntry(two, 'chicago')
     expect(text).not.toContain('(2018)')
     expect(text).toContain('2018')
+  })
+
+  it('Chicago n.d. book does not produce a double period (n.d..)', () => {
+    const text = formatBibliographyEntry(noDateBook, 'chicago')
+    expect(text).not.toContain('n.d..')
+    expect(text).toContain('n.d.')
+  })
+
+  it('MLA n.d. book has no trailing comma after publisher', () => {
+    const text = formatBibliographyEntry(noDateBook, 'mla')
+    expect(text).not.toMatch(/Press,$/)
+    expect(text).not.toMatch(/Press,\s*$/)
+    expect(text).toContain('Press')
+    expect(text).not.toContain('n.d.')
   })
 })
 

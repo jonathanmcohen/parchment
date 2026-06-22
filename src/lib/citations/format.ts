@@ -288,7 +288,10 @@ function formatMla(entry: CslEntry, authorStr: string): string {
   } else {
     // book, report, thesis, paper-conference
     parts.push(`${title}.`)
-    if (entry.publisher) parts.push(`${entry.publisher},`)
+    if (entry.publisher) {
+      // Use a comma separator only when a year will follow; otherwise close with a period.
+      parts.push(year !== 'n.d.' ? `${entry.publisher},` : `${entry.publisher}.`)
+    }
     if (year !== 'n.d.') parts.push(`${year}.`)
   }
 
@@ -309,7 +312,8 @@ function formatChicago(entry: CslEntry, authorStr: string, year: string): string
   const parts: string[] = []
 
   if (authorStr) parts.push(`${authorStr}.`)
-  parts.push(`${year}.`)
+  // n.d. already ends with a period — avoid 'n.d..' in the output.
+  parts.push(year === 'n.d.' ? year : `${year}.`)
 
   if (
     entry.type === 'article-journal' ||

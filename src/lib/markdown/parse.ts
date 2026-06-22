@@ -18,7 +18,12 @@
 //   - parchment:table     → the full { type:'table', content:[…] } node
 //                           (cell `formula`, colspan/rowspan/colwidth preserved)
 // A malformed/un-parseable parchment fence degrades to a plain codeBlock and
-// NEVER throws. Footnotes round-trip via GFM `[^N]` syntax, not a fence.
+// NEVER throws.
+//
+// KNOWN GAP — footnoteRef: serialize.ts emits footnoteRef inline nodes as
+// `[^N]` (GFM syntax). parse.ts does NOT load a GFM footnote extension into
+// marked, so `[^1]` is lexed as plain text and reconstructed as a text node,
+// not a footnoteRef node. footnoteRef does NOT round-trip through markdown.
 //
 // RESERVED NAMESPACE — the `parchment:` code-fence language prefix is a
 // deliberate reconstruction sentinel (matched by /^parchment:(\S+)/ in the

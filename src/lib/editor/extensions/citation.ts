@@ -4,8 +4,11 @@
  *
  * LIBRARY BOUNDARY: @/lib/citations/{types,format,crossref} are pure-TS modules
  * (no React, no db, no window) — safe to import here and in serialize/parse.
- * ReactNodeViewRenderer is lazy-required in addNodeView (same pattern as
- * drawing.ts / mermaid.ts) so getSchema(baseExtensions) builds server-side.
+ * ReactNodeViewRenderer is imported at module top-level (same pattern as
+ * drawing.ts / mermaid.ts). getSchema(baseExtensions) builds server-side because
+ * schema construction only reads node/mark definitions — it never calls addNodeView()
+ * at all, so neither ReactNodeViewRenderer nor the lazy-required View components
+ * are reached during server-side schema construction.
  *
  * RESOLUTION PLUGIN (mirror of math.ts numbering):
  *   On every doc change the plugin walks the doc to find the (first) bibliography
@@ -173,7 +176,8 @@ export const BibliographyExtension = Node.create({
   },
 
   addNodeView() {
-    // Lazy-require so getSchema(baseExtensions) builds server-side.
+    // Lazy-require so the View component (BibliographyView) is not evaluated
+    // at module load time — guarding the React component import on the server.
     try {
       const { BibliographyView } = require('@/components/editor/BibliographyView') as {
         BibliographyView: Parameters<typeof ReactNodeViewRenderer>[0]
@@ -304,7 +308,8 @@ export const CitationExtension = Node.create({
   },
 
   addNodeView() {
-    // Lazy-require so getSchema(baseExtensions) builds server-side.
+    // Lazy-require so the View component (CitationView) is not evaluated
+    // at module load time — guarding the React component import on the server.
     try {
       const { CitationView } = require('@/components/editor/CitationView') as {
         CitationView: Parameters<typeof ReactNodeViewRenderer>[0]

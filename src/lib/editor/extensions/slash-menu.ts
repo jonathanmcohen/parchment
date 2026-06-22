@@ -287,6 +287,15 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       break
     }
 
+    // G7b: bibliography — insert the bibliography block. The block is edited
+    // inline via its NodeView (no auto-open needed — mirrors the footnote case).
+    // The corrected after-.run() pattern is used for consistency; bibliography
+    // edits inline so no secondary dispatch is needed.
+    case 'bibliography': {
+      editor.chain().focus().insertBibliography().run()
+      break
+    }
+
     case 'equationRef': {
       // v0.1 by-index picker: prompt for the equation ordinal, defaulting to the
       // last equation in the doc. The ref re-resolves through the numbering, so

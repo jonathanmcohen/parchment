@@ -116,6 +116,15 @@ function serializeInline(content: PMNode[] | undefined): string {
       // node. The rendered number is preserved in the markdown for human reading;
       // the live ref binding is an editor-only concern (documented v0.1 choice).
       if (n.type === 'equationRef') return `(${String(n.attrs?.targetIndex ?? 1)})`
+      // G7b: citation inline → Pandoc-style [@citeKey] or [@citeKey, p. X].
+      // Lossless round-trip: parse.ts reconstructs the citation node from this
+      // syntax via CITE_RE. The page locator is preserved in the brackets.
+      if (n.type === 'citation') {
+        const key = String(n.attrs?.citeKey ?? '')
+        const page = String(n.attrs?.page ?? '')
+        if (!key) return ''
+        return page ? `[@${key}, p. ${page}]` : `[@${key}]`
+      }
       return serializeInline(n.content)
     })
     .join('')
@@ -220,6 +229,17 @@ function serializeBlock(node: PMNode): string {
             xml: typeof node.attrs?.xml === 'string' ? node.attrs.xml : '',
             svg: typeof node.attrs?.svg === 'string' ? node.attrs.svg : '',
           },
+        }),
+      )
+    // G7b: bibliography — emit as a parchment:bibliography fence with the full
+    // {refs, style} JSON so parse.ts can reconstruct it losslessly. NO editor
+    // import — refs is a plain array already stored in the node attrs.
+    case 'bibliography':
+      return parchmentFence(
+        'bibliography',
+        JSON.stringify({
+          refs: Array.isArray(node.attrs?.refs) ? node.attrs.refs : [],
+          style: typeof node.attrs?.style === 'string' ? node.attrs.style : 'apa',
         }),
       )
     default:

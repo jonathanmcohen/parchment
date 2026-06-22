@@ -18,7 +18,12 @@
 //   - parchment:table     → the full { type:'table', content:[…] } node
 //                           (cell `formula`, colspan/rowspan/colwidth preserved)
 // A malformed/un-parseable parchment fence degrades to a plain codeBlock and
-// NEVER throws. Footnotes round-trip via GFM `[^N]` syntax, not a fence.
+// NEVER throws.
+//
+// KNOWN GAP — footnoteRef: serialize.ts emits footnoteRef inline nodes as
+// `[^N]` (GFM syntax). parse.ts does NOT load a GFM footnote extension into
+// marked, so `[^1]` is lexed as plain text and reconstructed as a text node,
+// not a footnoteRef node. footnoteRef does NOT round-trip through markdown.
 //
 // RESERVED NAMESPACE — the `parchment:` code-fence language prefix is a
 // deliberate reconstruction sentinel (matched by /^parchment:(\S+)/ in the
@@ -30,6 +35,7 @@
 // kind or a malformed body falls through to a plain codeBlock (never throws).
 
 import { marked } from 'marked'
+import { parseCslEntries } from '@/lib/citations/types'
 
 type PMNode = {
   type: string
@@ -81,6 +87,44 @@ const WIKI_LINK_RE = /\[\[([^[\]]+)\]\]/g
 const INLINE_MATH_RE = /(?<![\d$])\$([^$\s][^$]*?[^$\s]|[^$\s])\$(?![\d$])/g
 
 /**
+ * G7b: CONSERVATIVE inline citation recognition.
+ * Matches `[@citeKey]` and `[@citeKey, p. X]` patterns only.
+ * Pattern: \[@([\w:.-]+)(?:,\s*([^\]]+))?\]
+ *   - citeKey: word chars, colon, period, hyphen (e.g. "10.1000/xyz" or "smith2020")
+ *   - locator: optional ", ..." captured as-is (page field)
+ * A stray `[@` followed by anything not matching stays plain text (conservative).
+ * NEVER throws. Documents the locator round-trip: page stored as-is in the
+ * citation node's `page` attr and serialized back as `p. X` if originally
+ * from `p. X`, otherwise verbatim.
+ */
+const CITE_RE = /\[@([\w:./-]+)(?:,\s*([^\]]+))?\]/g
+
+function splitCitations(s: string, marks: Mark[]): PMNode[] {
+  if (!s.includes('[@')) return splitWikiLinks(s, marks)
+  const out: PMNode[] = []
+  let last = 0
+  CITE_RE.lastIndex = 0
+  let m: RegExpExecArray | null = CITE_RE.exec(s)
+  while (m !== null) {
+    if (m.index > last) out.push(...splitWikiLinks(s.slice(last, m.index), marks))
+    const key = m[1] ?? ''
+    const locator = m[2] ?? ''
+    // Strip a leading "p. " prefix from the locator for the page field.
+    const page = locator.replace(/^p\.\s*/, '').trim()
+    if (key) {
+      out.push({
+        type: 'citation',
+        attrs: { citeKey: key, page },
+      })
+    }
+    last = m.index + m[0].length
+    m = CITE_RE.exec(s)
+  }
+  if (last < s.length) out.push(...splitWikiLinks(s.slice(last), marks))
+  return out
+}
+
+/**
  * F6: split a literal text run into a mix of plain text nodes and wikiLink atom
  * nodes wherever `[[Label]]` appears. Marks carry onto the surrounding text but
  * NOT onto the wikiLink atom (its content is fixed). The targetId is left ''
@@ -116,23 +160,23 @@ function splitWikiLinks(s: string, marks: Mark[]): PMNode[] {
 /**
  * G4: split a literal text run into text + `mathInline` atom nodes wherever a
  * conservative `$…$` pair appears (see INLINE_MATH_RE). The surrounding text is
- * further split for wiki-links via splitWikiLinks. Marks carry onto text but NOT
+ * further split for wiki-links and citations. Marks carry onto text but NOT
  * onto the math atom (its content is the LaTeX attr, not styled text). NEVER
  * throws — on no match it degrades to plain wiki-split text.
  */
 function splitInlineMath(s: string, marks: Mark[]): PMNode[] {
-  if (!s.includes('$')) return splitWikiLinks(s, marks)
+  if (!s.includes('$')) return splitCitations(s, marks)
   const out: PMNode[] = []
   let last = 0
   INLINE_MATH_RE.lastIndex = 0
   let m: RegExpExecArray | null = INLINE_MATH_RE.exec(s)
   while (m !== null) {
-    if (m.index > last) out.push(...splitWikiLinks(s.slice(last, m.index), marks))
+    if (m.index > last) out.push(...splitCitations(s.slice(last, m.index), marks))
     out.push({ type: 'mathInline', attrs: { latex: m[1] ?? '' } })
     last = m.index + m[0].length
     m = INLINE_MATH_RE.exec(s)
   }
-  if (last < s.length) out.push(...splitWikiLinks(s.slice(last), marks))
+  if (last < s.length) out.push(...splitCitations(s.slice(last), marks))
   return out
 }
 
@@ -282,6 +326,18 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
           xml: typeof attrs.xml === 'string' ? attrs.xml : '',
           svg: typeof attrs.svg === 'string' ? attrs.svg : '',
         },
+      }
+    }
+    case 'bibliography': {
+      // The body is { refs: CslEntry[], style: CiteStyle }.
+      // parseCslEntries validates/normalizes; style is coerced to a known value.
+      const refsRaw = data.refs
+      const refs = parseCslEntries(Array.isArray(refsRaw) ? refsRaw : [])
+      const style = data.style
+      const safeStyle = style === 'apa' || style === 'mla' || style === 'chicago' ? style : 'apa'
+      return {
+        type: 'bibliography',
+        attrs: { refs, style: safeStyle },
       }
     }
     default:

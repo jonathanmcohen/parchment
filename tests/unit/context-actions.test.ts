@@ -18,11 +18,11 @@ describe('docMenuItems', () => {
     expect(star?.label).toBe('Unstar')
   })
 
-  it('template item is disabled with a note', () => {
+  it('template item is enabled (G2 save-as-template)', () => {
     const items = docMenuItems({ starred: false })
     const template = items.find((i) => i.key === 'template')
-    expect(template?.enabled).toBe(false)
-    expect(template?.note).toBeTruthy()
+    expect(template?.enabled).toBe(true)
+    expect(template?.label).toBe('Save as template')
   })
 
   it('share item is disabled with a note', () => {

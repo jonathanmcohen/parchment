@@ -297,5 +297,25 @@ export const docLinks = pgTable(
   ],
 )
 
+// ─── Templates (G2) — reusable document starting points ──────────────────────
+// Bundled templates ship in code (src/lib/docs/builtin-templates.ts); this table
+// holds the user's own saved templates. `content` is ProseMirror `doc` JSON,
+// instantiated into a fresh document by the from-template route. Owner-scoped via
+// templates_owner_idx; cascades on user delete.
+export const templates = pgTable(
+  'templates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    content: jsonb('content'), // ProseMirror JSON
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('templates_owner_idx').on(t.ownerId)],
+)
+
 // Hint for the migration generator: ensure extensions exist.
 export const _extensions = sql`create extension if not exists vector;`

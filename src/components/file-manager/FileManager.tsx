@@ -744,6 +744,25 @@ function ContextMenu({ state, onClose, onRefresh, navigateTo, onSetView }: Conte
         navigateTo(doc.folderId ?? null)
         break
       }
+      case 'template': {
+        // G2: capture this doc's current content as a reusable user template.
+        const name = window.prompt('Template name', doc.title)
+        if (name !== null && name.trim() !== '') {
+          try {
+            const res = await fetch('/api/templates', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ name: name.trim(), fromDocId: doc.id }),
+            })
+            if (res.ok) {
+              window.alert(`Saved “${name.trim()}” to your templates.`)
+            }
+          } catch {
+            // leave state unchanged
+          }
+        }
+        break
+      }
       case 'trash': {
         try {
           const res = await fetch(`/api/docs/${doc.id}/trash`, {
@@ -757,7 +776,7 @@ function ContextMenu({ state, onClose, onRefresh, navigateTo, onSetView }: Conte
         }
         break
       }
-      // template and share are disabled — no handler
+      // share is disabled — no handler
       default:
         break
     }

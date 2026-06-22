@@ -63,6 +63,7 @@ describe('A1 — migration + schema', () => {
       'shares',
       'smart_folders',
       'tags',
+      'templates',
       'users',
     ])
   })

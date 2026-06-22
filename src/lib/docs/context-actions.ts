@@ -23,8 +23,7 @@ export function docMenuItems(opts: { starred: boolean }): MenuItem[] {
     {
       key: 'template',
       label: 'Save as template',
-      enabled: false,
-      note: 'Templates arrive in Plan G',
+      enabled: true,
     },
     {
       key: 'share',

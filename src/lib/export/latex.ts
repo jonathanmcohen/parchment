@@ -74,7 +74,8 @@ function applyMark(text: string, mark: Mark): string {
       return `\\sout{${text}}`
     case 'link': {
       const href = String(mark.attrs?.href ?? '')
-      return href ? `\\href{${escapeTex(href)}}{${text}}` : text
+      // href is a raw URL — must NOT be TeX-escaped; only the display text (already done by caller) needs escaping
+      return href ? `\\href{${href}}{${text}}` : text
     }
     default:
       return text
@@ -84,9 +85,10 @@ function applyMark(text: string, mark: Mark): string {
 function renderInlineText(node: PMNode): string {
   const raw = node.text ?? ''
   const marks = node.marks ?? []
-  // If there is a code mark, pass verbatim (escape only chars that break \texttt)
-  const hasCode = marks.some((m) => m.type === 'code')
-  let out = hasCode ? raw.replace(/[{}]/g, (c) => (c === '{' ? '\\{' : '\\}')) : escapeTex(raw)
+  // Full escapeTex covers all LaTeX specials for both code and non-code text.
+  // \texttt{} requires the same escaping as normal text — % starts a comment,
+  // $ opens math mode, & misaligns, _ causes subscript errors, etc.
+  let out = escapeTex(raw)
   for (const mark of marks) {
     out = applyMark(out, mark)
   }
@@ -190,7 +192,20 @@ function renderBlock(node: PMNode): string {
       ].join('\n')
     case 'codeBlock': {
       const code = (node.content ?? []).map((n) => n.text ?? '').join('')
-      return `\\begin{verbatim}\n${code}\n\\end{verbatim}`
+      // The verbatim environment terminates at the first literal \end{verbatim}.
+      // Split on that sequence and re-open the environment to prevent early
+      // termination and LaTeX injection from content containing that string.
+      const VERBATIM_END = '\\end{verbatim}'
+      const parts = code.split(VERBATIM_END)
+      if (parts.length === 1) {
+        return `\\begin{verbatim}\n${code}\n\\end{verbatim}`
+      }
+      return parts
+        .map(
+          (part, i) =>
+            `\\begin{verbatim}\n${part}${i < parts.length - 1 ? '\n% [\\end{verbatim} in source omitted]\n' : '\n'}\\end{verbatim}`,
+        )
+        .join('')
     }
     case 'horizontalRule':
       return '\\hrule'
@@ -229,6 +244,7 @@ export function docToLatex(doc: unknown, title: string): string {
     return [
       '\\documentclass{article}',
       '\\usepackage{amsmath, graphicx, hyperref}',
+      '\\usepackage[normalem]{ulem}',
       `\\title{${safeTitle}}`,
       '\\date{}',
       '\\begin{document}',
@@ -242,6 +258,7 @@ export function docToLatex(doc: unknown, title: string): string {
     return [
       '\\documentclass{article}',
       '\\usepackage{amsmath, graphicx, hyperref}',
+      '\\usepackage[normalem]{ulem}',
       '\\title{Document}',
       '\\date{}',
       '\\begin{document}',

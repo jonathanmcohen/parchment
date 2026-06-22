@@ -17,6 +17,34 @@
  * Never throws — on error returns a minimal valid epub.
  */
 
+type PMNode = {
+  type?: string
+  attrs?: Record<string, unknown>
+  content?: PMNode[]
+  text?: string
+  marks?: unknown[]
+}
+
+/**
+ * Walk a PM doc JSON and rewrite 'plantuml' nodes to a codeBlock containing
+ * the source text. Mirrors html.ts's stripPlantumlToSource — prevents the
+ * render-pm plantuml case from emitting an <img> with an external server URL,
+ * which would violate the EPUB spec (remote-resources not declared in content.opf)
+ * and cause epubcheck failures.
+ */
+function stripPlantumlToSource(node: PMNode): PMNode {
+  if (node.type === 'plantuml') {
+    const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
+    return {
+      type: 'codeBlock',
+      attrs: { language: 'plantuml' },
+      content: src ? [{ type: 'text', text: src }] : [],
+    }
+  }
+  if (!node.content) return node
+  return { ...node, content: node.content.map(stripPlantumlToSource) }
+}
+
 function escapeXml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -147,10 +175,15 @@ export async function docToEpub(doc: unknown, title: string): Promise<Uint8Array
     const { renderReadOnlyDoc } = await import('@/components/share/render-pm')
     const { renderToStaticMarkup } = await import('react-dom/server')
 
+    // Strip plantuml nodes before rendering — render-pm emits <img src="<external-url>">
+    // for plantuml when NEXT_PUBLIC_PLANTUML_SERVER_URL is set, which violates the
+    // EPUB spec (remote resources not declared in content.opf) and breaks epubcheck.
+    const safeDoc = doc && typeof doc === 'object' ? stripPlantumlToSource(doc as PMNode) : doc
+
     // Render the body — reuse the same React component the HTML exporter uses
     let bodyXhtml = ''
     try {
-      const bodyNode = renderReadOnlyDoc(doc)
+      const bodyNode = renderReadOnlyDoc(safeDoc)
       bodyXhtml = renderToStaticMarkup(bodyNode as React.ReactElement)
     } catch {
       bodyXhtml = '<p></p>'

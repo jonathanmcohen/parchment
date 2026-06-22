@@ -2573,3 +2573,34 @@ body {
   color: var(--muted-foreground, #888);
   pointer-events: none;
 }
+
+/* G11: Offline / sync status indicator */
+.parchment-offline-indicator {
+  min-height: 0;
+}
+
+.parchment-offline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  margin: 4px 0;
+  user-select: none;
+}
+
+.parchment-offline-indicator[data-state="offline"] .parchment-offline-pill {
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.parchment-offline-indicator[data-state="syncing"] .parchment-offline-pill {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}

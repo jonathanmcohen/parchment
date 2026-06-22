@@ -206,7 +206,7 @@ function serializeBlock(node: PMNode): string {
     // plantuml import — source is a plain string stored in the node attr.
     case 'plantuml': {
       const src = typeof node.attrs?.source === 'string' ? node.attrs.source : ''
-      return `\`\`\`plantuml\n${src}\n\`\`\``
+      return `\`\`\`\`plantuml\n${src}\n\`\`\`\``
     }
     default:
       return serializeInline(node.content)

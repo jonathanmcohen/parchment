@@ -3,6 +3,7 @@ import { db, schema } from '@/db'
 import { removeDocFromDisk, syncDocToDisk } from '@/lib/disk/mirror'
 import { extractTargetIds } from '@/lib/docs/doc-links'
 import { setDocLinks } from '@/lib/docs/doc-links-repo'
+import { parseCustomCss } from '@/lib/editor/custom-css'
 import type { WatermarkConfig } from '@/lib/editor/watermark'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
 
@@ -379,6 +380,43 @@ export async function setDocumentWatermark(
       : {}
 
   const updatedMeta: Record<string, unknown> = { ...existingMeta, watermark: cfg }
+
+  await db
+    .update(schema.documents)
+    .set({ meta: updatedMeta, updatedAt: new Date() })
+    .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
+
+  return true
+}
+
+/**
+ * G17: Merge custom CSS into documents.meta.customCss (owner-scoped).
+ * Preserves all other keys in the meta jsonb column (e.g. watermark from G9).
+ * Stores the raw-but-parsed CSS; sanitize+scope happen at render time so the
+ * user can re-open and edit their original input.
+ */
+export async function setDocumentCustomCss(
+  ownerId: string,
+  docId: string,
+  css: string,
+): Promise<boolean> {
+  // Read existing meta to preserve other keys (watermark, etc.)
+  const [row] = await db
+    .select({ meta: schema.documents.meta })
+    .from(schema.documents)
+    .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
+    .limit(1)
+  if (!row) return false // doc not found or not owned by this user
+
+  const existingMeta =
+    row.meta !== null &&
+    row.meta !== undefined &&
+    typeof row.meta === 'object' &&
+    !Array.isArray(row.meta)
+      ? (row.meta as Record<string, unknown>)
+      : {}
+
+  const updatedMeta: Record<string, unknown> = { ...existingMeta, customCss: parseCustomCss(css) }
 
   await db
     .update(schema.documents)

@@ -7,7 +7,9 @@
 // bookmark (scroll position) per-doc. Esc closes; role=dialog aria-modal.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { CustomCssStyle } from '@/components/editor/CustomCssStyle'
 import { renderReadOnlyDoc } from '@/components/share/render-pm'
+import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
 import {
   DEFAULT_READING_PREFS,
   parseReadingPrefs,
@@ -20,6 +22,8 @@ import {
 type Props = {
   content: unknown
   docId: string
+  /** G17: raw custom CSS from doc meta — sanitized+scoped at render. */
+  customCss?: string
   onClose: () => void
 }
 
@@ -68,7 +72,7 @@ function saveBookmark(docId: string, scrollTop: number): void {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function ReadingView({ content, docId, onClose }: Props) {
+export function ReadingView({ content, docId, customCss = '', onClose }: Props) {
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadPrefs())
   const scrollRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -230,7 +234,13 @@ export function ReadingView({ content, docId, onClose }: Props) {
       </div>
 
       {/* ── Scrollable reading area ─────────────────────────────────── */}
-      <div ref={scrollRef} className={readingClassNames(prefs)} onScroll={handleScroll}>
+      {/* G17: scope class wraps doc content only; CustomCssStyle injects scoped style. */}
+      <div
+        ref={scrollRef}
+        className={`${readingClassNames(prefs)} ${CUSTOM_CSS_SCOPE}`}
+        onScroll={handleScroll}
+      >
+        <CustomCssStyle css={customCss} />
         {renderReadOnlyDoc(content)}
       </div>
     </div>

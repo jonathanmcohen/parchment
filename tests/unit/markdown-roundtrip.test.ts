@@ -227,4 +227,83 @@ describe('F3 — lossless custom-block round-trip', () => {
       pageNumberPosition: 'center',
     })
   })
+
+  // G8a: figure (image with caption + refId) round-trip via parchment:figure.
+  it('an image with caption and refId round-trips via parchment:figure (all attrs preserved)', () => {
+    const original = {
+      type: 'image',
+      attrs: {
+        src: 'https://example.com/photo.jpg',
+        alt: 'A sunset',
+        caption: 'The sunset over the bay',
+        refId: 'fig-abc-123',
+        position: 'inline',
+        width: null,
+        height: null,
+        lockAspect: true,
+      },
+    }
+    const md = serializeMarkdown(doc(original))
+    expect(md).toContain('```parchment:figure')
+    expect(md).toContain('fig-abc-123')
+    expect(md).toContain('The sunset over the bay')
+
+    const back = roundTrip(doc(original))
+    const node = find(back, (n) => n.type === 'image')
+    expect(node).toBeDefined()
+    expect(node?.attrs?.src).toBe('https://example.com/photo.jpg')
+    expect(node?.attrs?.alt).toBe('A sunset')
+    expect(node?.attrs?.caption).toBe('The sunset over the bay')
+    expect(node?.attrs?.refId).toBe('fig-abc-123')
+    expect(node?.attrs?.position).toBe('inline')
+    expect(node?.attrs?.lockAspect).toBe(true)
+  })
+
+  // G8a: table with caption + refId round-trip via parchment:table (attrs key carries them).
+  it('a table with caption and refId round-trips via parchment:table (attrs preserved)', () => {
+    const original = {
+      type: 'table',
+      attrs: { refId: 'tbl-xyz-456', caption: 'Summary statistics' },
+      content: [
+        {
+          type: 'tableRow',
+          content: [
+            {
+              type: 'tableCell',
+              attrs: { colspan: 1, rowspan: 1, colwidth: null, formula: null },
+              content: [p(text('value')) as Node],
+            },
+          ],
+        },
+      ],
+    }
+    const md = serializeMarkdown(doc(original))
+    expect(md).toContain('```parchment:table')
+    expect(md).toContain('tbl-xyz-456')
+    expect(md).toContain('Summary statistics')
+
+    const back = roundTrip(doc(original))
+    const node = find(back, (n) => n.type === 'table')
+    expect(node).toBeDefined()
+    expect(node?.attrs?.refId).toBe('tbl-xyz-456')
+    expect(node?.attrs?.caption).toBe('Summary statistics')
+  })
+
+  // G8a: mathBlock with refId round-trip via parchment:equation.
+  it('a mathBlock with refId round-trips via parchment:equation (latex + refId preserved)', () => {
+    const original = {
+      type: 'mathBlock',
+      attrs: { latex: 'E = mc^2', refId: 'eq-energy-001' },
+    }
+    const md = serializeMarkdown(doc(original))
+    expect(md).toContain('```parchment:equation')
+    expect(md).toContain('E = mc^2')
+    expect(md).toContain('eq-energy-001')
+
+    const back = roundTrip(doc(original))
+    const node = find(back, (n) => n.type === 'mathBlock')
+    expect(node).toBeDefined()
+    expect(node?.attrs?.latex).toBe('E = mc^2')
+    expect(node?.attrs?.refId).toBe('eq-energy-001')
+  })
 })

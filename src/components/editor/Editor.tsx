@@ -14,6 +14,7 @@ import { BacklinksPanel } from '@/components/editor/BacklinksPanel'
 import { BubbleMenu } from '@/components/editor/BubbleMenu'
 import { CommentsSidebar } from '@/components/editor/CommentsSidebar'
 import { CropDialog } from '@/components/editor/CropDialog'
+import { CrossRefPicker } from '@/components/editor/CrossRefPicker'
 import { DrawioModal } from '@/components/editor/DrawioModal'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
@@ -311,6 +312,12 @@ export function Editor({
   // after insertDrawio().run().
   const [drawioEdit, setDrawioEdit] = useState<{ pos: number; xml: string } | null>(null)
 
+  // G8b: cross-reference picker — open = true when the slash-menu "Cross-reference"
+  // item is selected. The CrossRefPicker lists the doc's live targets; picking one
+  // calls insertCrossRef at the current cursor position.
+  const [crossRefPickerOpen, setCrossRefPickerOpen] = useState(false)
+  const openCrossRefPicker = useCallback(() => setCrossRefPickerOpen(true), [])
+
   const openMathEditor = useCallback((pos: number) => {
     setMathEdit({ pos, latex: '' })
   }, [])
@@ -386,7 +393,12 @@ export function Editor({
       FindReplaceExtension.configure({ onOpen: openFind }),
       // B12: slash menu — onOpenImage delegates to the existing image dialog.
       // G4: onEditMath opens the LaTeX popover for a freshly-inserted math node.
-      SlashMenuExtension.configure({ onOpenImage: openImageDialog, onEditMath: openMathEditor }),
+      // G8b: onOpenCrossRefPicker opens the cross-reference picker.
+      SlashMenuExtension.configure({
+        onOpenImage: openImageDialog,
+        onEditMath: openMathEditor,
+        onOpenCrossRefPicker: openCrossRefPicker,
+      }),
       // F6: [[ autocomplete — drives the React WikiSuggestionMenu popup. Wired
       // here (not baseExtensions) so its ReactRenderer popup only loads client-side.
       WikiSuggestionExtension,
@@ -609,6 +621,28 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-drawio', handler)
   }, [editor])
 
+  // G8b: crossRef NodeViews dispatch parchment:goto-ref {targetId} on click —
+  // scroll the target node into view. We find the target in the doc by querying
+  // the PM dom for [data-ref-id="..."] (for figures/tables/equations) or #id
+  // (for headings), then scrollIntoView smooth/center.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const targetId = (e as CustomEvent<{ targetId: string }>).detail?.targetId
+      if (!targetId) return
+      // Query the editor's DOM for a node with this refId or heading id.
+      const el =
+        dom.querySelector(`[data-ref-id="${CSS.escape(targetId)}"]`) ??
+        dom.querySelector(`#${CSS.escape(targetId)}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+    dom.addEventListener('parchment:goto-ref', handler)
+    return () => dom.removeEventListener('parchment:goto-ref', handler)
+  }, [editor])
+
   // D5: publish own awareness presence + reading position
   useEffect(() => {
     if (!editor || !provider) return
@@ -782,6 +816,18 @@ export function Editor({
           pos={drawioEdit.pos}
           initialXml={drawioEdit.xml}
           onClose={() => setDrawioEdit(null)}
+        />
+      )}
+
+      {/* G8b: Cross-reference picker — opened from the slash-menu "Cross-reference" item */}
+      {editor && crossRefPickerOpen && (
+        <CrossRefPicker
+          editor={editor}
+          onPick={(targetId, kind) => {
+            setCrossRefPickerOpen(false)
+            editor.chain().focus().insertCrossRef(targetId, kind).run()
+          }}
+          onClose={() => setCrossRefPickerOpen(false)}
         />
       )}
 

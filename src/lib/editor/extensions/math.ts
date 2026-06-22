@@ -350,6 +350,17 @@ export const MathBlock = Node.create({
         parseHTML: (el) => el.getAttribute('data-latex') ?? '',
         renderHTML: (attrs) => ({ 'data-latex': String(attrs.latex ?? '') }),
       },
+      // G8a: stable refId (assigned by crossRefNumbering appendTransaction).
+      // Equations are numbered already by mathNumberingKey; refId adds stable
+      // identity so a cross-ref pinned to a specific equation survives reorder.
+      refId: {
+        default: '',
+        parseHTML: (el) => el.getAttribute('data-ref-id') ?? '',
+        renderHTML: (attrs) => {
+          const rid = String(attrs.refId ?? '')
+          return rid ? { 'data-ref-id': rid } : {}
+        },
+      },
     }
   },
 
@@ -371,6 +382,10 @@ export const MathBlock = Node.create({
       dom.className = 'parchment-math-block'
       dom.setAttribute('data-math-block', '')
       dom.contentEditable = 'false'
+      // G8b-fix: set data-ref-id on the NodeView DOM from the start so
+      // parchment:goto-ref can find this equation by [data-ref-id="..."].
+      const initialRefId = node.attrs.refId as string | undefined
+      if (initialRefId) dom.dataset.refId = initialRefId
 
       const formula = document.createElement('div')
       formula.className = 'parchment-math-block-formula'
@@ -422,6 +437,14 @@ export const MathBlock = Node.create({
             latex = next
             dom.dataset.latex = latex
             renderKatexInto(formula, latex, true)
+          }
+          // G8b-fix: keep data-ref-id on the NodeView DOM so parchment:goto-ref
+          // can find equations by [data-ref-id="..."] (renderHTML is bypassed).
+          const rid = updated.attrs.refId as string | undefined
+          if (rid) {
+            dom.dataset.refId = rid
+          } else {
+            delete dom.dataset.refId
           }
           // The number may have changed even when latex did not (a sibling
           // equation was added/removed) — always repaint it on update.

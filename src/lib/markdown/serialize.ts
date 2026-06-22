@@ -125,6 +125,22 @@ function serializeInline(content: PMNode[] | undefined): string {
         if (!key) return ''
         return page ? `[@${key}, p. ${page}]` : `[@${key}]`
       }
+      // G8b: cross-reference inline → `[#targetId]` (full format, default) or
+      // `[#targetId|number]` (number-only format). Lossless round-trip: parse.ts
+      // reconstructs the crossRef node from this syntax via CROSSREF_RE.
+      if (n.type === 'crossRef') {
+        const targetId = String(n.attrs?.targetId ?? '')
+        if (!targetId) return ''
+        const format = n.attrs?.format === 'number' ? 'number' : 'full'
+        return format === 'number' ? `[#${targetId}|number]` : `[#${targetId}]`
+      }
+      // G8a: image — plain ![alt](src) (no caption/refId metadata to preserve).
+      // Images WITH caption or refId are serialized as blocks (serializeBlock).
+      if (n.type === 'image') {
+        const alt = String(n.attrs?.alt ?? '')
+        const src = String(n.attrs?.src ?? '')
+        return `![${alt}](${src})`
+      }
       return serializeInline(n.content)
     })
     .join('')
@@ -153,8 +169,17 @@ function serializeListItem(item: PMNode, marker: string): string {
 
 function serializeBlock(node: PMNode): string {
   switch (node.type) {
-    case 'heading':
-      return `${'#'.repeat(Number(node.attrs?.level ?? 1))} ${serializeInline(node.content)}`
+    case 'heading': {
+      // G8a: preserve the `id` attr assigned by HeadingId so heading cross-ref
+      // targets survive a disk-mirror cycle. If the id is present and non-empty,
+      // append it as an HTML attribute comment `<!-- id:slug -->` on the same
+      // line. parse.ts picks this up and restores `attrs.id`. Without this, after
+      // a serialize → parse cycle all heading `id` attrs are '' and
+      // collectCrossRefTargets skips every heading (requires non-empty attrs.id).
+      const headingMd = `${'#'.repeat(Number(node.attrs?.level ?? 1))} ${serializeInline(node.content)}`
+      const id = typeof node.attrs?.id === 'string' && node.attrs.id ? node.attrs.id : ''
+      return id ? `${headingMd} <!-- id:${id} -->` : headingMd
+    }
     case 'paragraph':
       return serializeInline(node.content)
     case 'blockquote':
@@ -168,7 +193,40 @@ function serializeBlock(node: PMNode): string {
     // reconstruct it. Emitted even when latex is empty (`$$\n\n$$`), though an
     // empty display block won't round-trip back to a node (documented edge).
     case 'mathBlock':
+      // G8a: a mathBlock WITH a refId round-trips via parchment:equation fence
+      // so the stable refId survives the markdown cycle. Without a refId it uses
+      // the portable $$…$$ syntax (same as G4, remains parse-round-trippable).
+      if (node.attrs?.refId && String(node.attrs.refId).length > 0) {
+        return parchmentFence(
+          'equation',
+          JSON.stringify({
+            latex: String(node.attrs.latex ?? ''),
+            refId: String(node.attrs.refId),
+          }),
+        )
+      }
       return `$$\n${String(node.attrs?.latex ?? '')}\n$$`
+    // G8a: image as a block — losslessly encode src/alt/caption/refId and all
+    // layout attrs (position, width, height, lockAspect) via parchment:figure.
+    // parse.ts reconstructs the exact image node from this fence.
+    // ENCODING CHOICE: parchment:figure fence (same pattern as table/drawing)
+    // rather than "![alt](src)" + sentinel comment, because a figure has 7
+    // attrs that standard markdown cannot represent, and a fence is the proven
+    // lossless channel already used by every other custom block.
+    case 'image':
+      return parchmentFence(
+        'figure',
+        JSON.stringify({
+          src: String(node.attrs?.src ?? ''),
+          alt: String(node.attrs?.alt ?? ''),
+          caption: String(node.attrs?.caption ?? ''),
+          refId: String(node.attrs?.refId ?? ''),
+          position: String(node.attrs?.position ?? 'inline'),
+          width: node.attrs?.width ?? null,
+          height: node.attrs?.height ?? null,
+          lockAspect: node.attrs?.lockAspect ?? true,
+        }),
+      )
     case 'bulletList':
       return (node.content ?? []).map((li) => serializeListItem(li, '- ')).join('\n')
     case 'orderedList':
@@ -184,6 +242,8 @@ function serializeBlock(node: PMNode): string {
     case 'toc':
       return parchmentFence('toc', JSON.stringify(tocAttrs(node.attrs)))
     case 'table':
+      // G8a: table caption + refId are stored in node.attrs and round-trip
+      // through the parchment:table fence (attrs key carries them intact).
       return parchmentFence(
         'table',
         JSON.stringify({

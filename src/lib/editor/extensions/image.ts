@@ -3,6 +3,7 @@ import Image from '@tiptap/extension-image'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { NodeSelection } from '@tiptap/pm/state'
 import type { NodeView as ProseMirrorNodeView } from '@tiptap/pm/view'
+import { crossRefNumberingKey } from '@/lib/editor/extensions/cross-ref-numbering'
 
 // ── Attribute types ────────────────────────────────────────────────────────
 
@@ -15,6 +16,8 @@ export interface ImageAttrs {
   height?: number | null
   position?: ImagePosition
   lockAspect?: boolean
+  caption?: string
+  refId?: string
 }
 
 // ── Guard ─────────────────────────────────────────────────────────────────
@@ -58,10 +61,20 @@ function buildImageNodeView(
   _editor: Editor,
   getPos: boolean | (() => number | undefined),
 ): ProseMirrorNodeView {
+  // G8a-fix: track the current node in a mutable binding so paintCaption always
+  // reads the latest attrs (ProseMirror nodes are immutable — update() receives a
+  // new node object; without this the closure reads stale construction-time attrs
+  // and refId/caption changes never render).
+  let currentNode = node
+
   const wrapper = document.createElement('span')
   wrapper.classList.add('parchment-image-wrapper')
   const pos = node.attrs.position as ImagePosition | null
   if (pos) wrapper.dataset.imagePosition = pos
+  // G8b-fix: set data-ref-id on the NodeView DOM from the start so
+  // parchment:goto-ref can find this figure by [data-ref-id="..."].
+  const initialRefId = node.attrs.refId as string | undefined
+  if (initialRefId) wrapper.dataset.refId = initialRefId
 
   const img = document.createElement('img')
   img.src = node.attrs.src as string
@@ -69,6 +82,28 @@ function buildImageNodeView(
   if (node.attrs.width) img.style.width = `${node.attrs.width as number}px`
   if (node.attrs.height) img.style.height = `${node.attrs.height as number}px`
   img.dataset.position = pos ?? 'inline'
+
+  // G8a: caption element shown below the image as "Figure N: <caption>".
+  const captionEl = document.createElement('span')
+  captionEl.className = 'parchment-image-caption'
+  captionEl.contentEditable = 'false'
+
+  const paintCaption = (): void => {
+    const refId = _editor.view ? (currentNode.attrs.refId as string | undefined) : undefined
+    const numbering = _editor.view ? crossRefNumberingKey.getState(_editor.view.state) : undefined
+    const target = refId ? numbering?.get(refId) : undefined
+    const n = target?.number
+    const caption = currentNode.attrs.caption as string | undefined
+    if (n !== undefined || caption) {
+      const prefix = n !== undefined ? `Figure ${n}` : 'Figure'
+      captionEl.textContent = caption ? `${prefix}: ${caption}` : prefix
+      captionEl.style.display = ''
+    } else {
+      captionEl.textContent = ''
+      captionEl.style.display = 'none'
+    }
+  }
+  paintCaption()
 
   // ── Resize handles ──────────────────────────────────────────────────────
   const handles = ['nw', 'ne', 'sw', 'se'] as const
@@ -168,21 +203,37 @@ function buildImageNodeView(
   wrapper.appendChild(cropBtn)
 
   wrapper.appendChild(img)
+  wrapper.appendChild(captionEl)
 
   return {
     dom: wrapper,
     contentDOM: null,
     update(updatedNode) {
       if (updatedNode.type.name !== 'image') return false
+      // G8a-fix: update currentNode BEFORE calling paintCaption so the closure
+      // reads the new attrs (refId assigned by appendTransaction, caption edits).
+      currentNode = updatedNode
       img.src = updatedNode.attrs.src as string
       img.alt = updatedNode.attrs.alt as string
       const newPos = updatedNode.attrs.position as ImagePosition | null
       img.dataset.position = newPos ?? 'inline'
       wrapper.dataset.imagePosition = newPos ?? 'inline'
+      // G8b-fix: keep data-ref-id on the wrapper DOM so parchment:goto-ref can
+      // find the node by [data-ref-id="..."] (renderHTML is not used when a
+      // NodeView is active — the NodeView owns the DOM).
+      const rid = updatedNode.attrs.refId as string | undefined
+      if (rid) {
+        wrapper.dataset.refId = rid
+      } else {
+        delete wrapper.dataset.refId
+      }
       if (updatedNode.attrs.width) img.style.width = `${updatedNode.attrs.width as number}px`
       else img.style.width = ''
       if (updatedNode.attrs.height) img.style.height = `${updatedNode.attrs.height as number}px`
       else img.style.height = ''
+      // G8a: repaint caption/number — may change if a sibling figure moved
+      // (LESSON 2: always repaint on NodeView.update(), not once at render).
+      paintCaption()
       return true
     },
     selectNode() {
@@ -241,6 +292,24 @@ export const imageExtensions = Image.extend({
         parseHTML: (element) => element.dataset.lockAspect !== 'false',
         renderHTML: (attributes) => ({ 'data-lock-aspect': String(attributes.lockAspect) }),
       },
+      // G8a: stable refId (assigned by crossRefNumbering appendTransaction).
+      refId: {
+        default: '',
+        parseHTML: (element) => element.getAttribute('data-ref-id') ?? '',
+        renderHTML: (attributes) => {
+          const rid = attributes.refId as string | null
+          return rid ? { 'data-ref-id': rid } : {}
+        },
+      },
+      // G8a: optional caption shown as "Figure N: <caption>" under the image.
+      caption: {
+        default: '',
+        parseHTML: (element) => element.getAttribute('data-caption') ?? '',
+        renderHTML: (attributes) => {
+          const cap = attributes.caption as string | null
+          return cap ? { 'data-caption': cap } : {}
+        },
+      },
     }
   },
 
@@ -256,6 +325,10 @@ export const imageExtensions = Image.extend({
       'data-lock-aspect': String(HTMLAttributes.lockAspect),
     }
     if (style.length > 0) attrs.style = style.join(';')
+    const rid = HTMLAttributes.refId as string | undefined
+    if (rid) attrs['data-ref-id'] = rid
+    const cap = HTMLAttributes.caption as string | undefined
+    if (cap) attrs['data-caption'] = cap
     return ['img', attrs]
   },
 
@@ -278,6 +351,8 @@ export const imageExtensions = Image.extend({
               height: attrs.height ?? null,
               position: attrs.position ?? 'inline',
               lockAspect: attrs.lockAspect ?? true,
+              caption: attrs.caption ?? '',
+              refId: attrs.refId ?? '',
             },
           })
         },

@@ -12,6 +12,12 @@ export type SlashMenuOptions = {
    * If not provided, the image item is a no-op.
    */
   onOpenImage?: () => void
+  /**
+   * G4: called after a math node is inserted with empty LaTeX, with the doc
+   * position of the new node, so the editor can open the LaTeX popover. If not
+   * provided, the math node is inserted empty (still editable on click).
+   */
+  onEditMath?: (pos: number) => void
 }
 
 // ── Item → editor action map ───────────────────────────────────────────────
@@ -20,10 +26,24 @@ type ActionContext = {
   editor: import('@tiptap/core').Editor
   range: import('@tiptap/core').Range
   onOpenImage: (() => void) | undefined
+  onEditMath: ((pos: number) => void) | undefined
+}
+
+/**
+ * G4: count display equations (mathBlock) in the doc — used to default the
+ * "Equation reference" ordinal to the last equation and to clamp the prompt.
+ */
+function countMathBlocks(editor: import('@tiptap/core').Editor): number {
+  let n = 0
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === 'mathBlock') n += 1
+    return true
+  })
+  return n
 }
 
 function runAction(item: SlashItem, ctx: ActionContext): void {
-  const { editor, range, onOpenImage } = ctx
+  const { editor, range, onOpenImage, onEditMath } = ctx
 
   // Delete the slash + query text first
   editor.chain().focus().deleteRange(range).run()
@@ -93,6 +113,39 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
     case 'sectionBreak':
       editor.chain().focus().insertSectionBreak().run()
       break
+
+    // G4: equations. Insert with empty LaTeX, then open the editor popover at
+    // the new node's position so the user types the formula immediately.
+    case 'mathBlock': {
+      const insertAt = editor.state.selection.from
+      editor.chain().focus().insertMathBlock('').run()
+      onEditMath?.(insertAt)
+      break
+    }
+
+    case 'mathInline': {
+      const insertAt = editor.state.selection.from
+      editor.chain().focus().insertMathInline('').run()
+      onEditMath?.(insertAt)
+      break
+    }
+
+    case 'equationRef': {
+      // v0.1 by-index picker: prompt for the equation ordinal, defaulting to the
+      // last equation in the doc. The ref re-resolves through the numbering, so
+      // an out-of-range index simply renders as unresolved until an equation
+      // fills that slot.
+      const count = countMathBlocks(editor)
+      const def = count > 0 ? String(count) : '1'
+      const raw =
+        typeof window !== 'undefined' ? window.prompt('Reference equation number:', def) : def
+      if (raw === null) break
+      const idx = Number.parseInt(raw, 10)
+      if (Number.isFinite(idx) && idx >= 1) {
+        editor.chain().focus().insertEquationRef(idx).run()
+      }
+      break
+    }
   }
 }
 
@@ -126,6 +179,7 @@ export const SlashMenuExtension = Extension.create<SlashMenuOptions>({
             editor,
             range,
             onOpenImage: extensionOptions.onOpenImage,
+            onEditMath: extensionOptions.onEditMath,
           })
         },
 

@@ -64,6 +64,23 @@ function textNode(s: string, marks: Mark[]): PMNode | null {
 const WIKI_LINK_RE = /\[\[([^[\]]+)\]\]/g
 
 /**
+ * G4: CONSERVATIVE inline-math recognition. A `$…$` pair becomes a `mathInline`
+ * node ONLY when it is unambiguously math and not currency. The rules (modeled
+ * on pandoc's tex_math_dollars):
+ *   - the content between the dollars is non-empty and contains no `$`;
+ *   - the char right after the opening `$` is NOT whitespace;
+ *   - the char right before the closing `$` is NOT whitespace;
+ *   - the char right after the closing `$` is NOT a digit (so `$5.00 and $3.00`
+ *     stays text — the only closing candidate is followed by a digit);
+ *   - the char right before the opening `$` is NOT a digit (so `100$x$` — a
+ *     price-like prefix — does not start math).
+ * A lone `$` (e.g. a single `$5.00` price) has no closing partner and never
+ * matches. The capture group disallows `$` inside so `$a$ b $c$` yields two
+ * separate inline-math nodes, not one spanning the middle.
+ */
+const INLINE_MATH_RE = /(?<![\d$])\$([^$\s][^$]*?[^$\s]|[^$\s])\$(?![\d$])/g
+
+/**
  * F6: split a literal text run into a mix of plain text nodes and wikiLink atom
  * nodes wherever `[[Label]]` appears. Marks carry onto the surrounding text but
  * NOT onto the wikiLink atom (its content is fixed). The targetId is left ''
@@ -93,6 +110,29 @@ function splitWikiLinks(s: string, marks: Mark[]): PMNode[] {
     const tail = textNode(s.slice(last), marks)
     if (tail) out.push(tail)
   }
+  return out
+}
+
+/**
+ * G4: split a literal text run into text + `mathInline` atom nodes wherever a
+ * conservative `$…$` pair appears (see INLINE_MATH_RE). The surrounding text is
+ * further split for wiki-links via splitWikiLinks. Marks carry onto text but NOT
+ * onto the math atom (its content is the LaTeX attr, not styled text). NEVER
+ * throws — on no match it degrades to plain wiki-split text.
+ */
+function splitInlineMath(s: string, marks: Mark[]): PMNode[] {
+  if (!s.includes('$')) return splitWikiLinks(s, marks)
+  const out: PMNode[] = []
+  let last = 0
+  INLINE_MATH_RE.lastIndex = 0
+  let m: RegExpExecArray | null = INLINE_MATH_RE.exec(s)
+  while (m !== null) {
+    if (m.index > last) out.push(...splitWikiLinks(s.slice(last, m.index), marks))
+    out.push({ type: 'mathInline', attrs: { latex: m[1] ?? '' } })
+    last = m.index + m[0].length
+    m = INLINE_MATH_RE.exec(s)
+  }
+  if (last < s.length) out.push(...splitWikiLinks(s.slice(last), marks))
   return out
 }
 
@@ -128,7 +168,8 @@ function inline(tokens: Tok[] | undefined, marks: Mark[]): PMNode[] {
         if (t.tokens && t.tokens.length > 0) {
           out.push(...inline(t.tokens, marks))
         } else {
-          out.push(...splitWikiLinks(t.text ?? '', marks))
+          // G4: split inline math first (then wiki-links inside the text parts).
+          out.push(...splitInlineMath(t.text ?? '', marks))
         }
       }
     }
@@ -139,6 +180,25 @@ function inline(tokens: Tok[] | undefined, marks: Mark[]): PMNode[] {
 function paragraph(tokens: Tok[] | undefined): PMNode {
   const content = inline(tokens, [])
   return content.length ? { type: 'paragraph', content } : { type: 'paragraph' }
+}
+
+/**
+ * G4: a display-math block is serialized as `$$` on its own line, the LaTeX, and
+ * a closing `$$` on its own line. `marked` lexes that as a paragraph whose raw
+ * text is exactly that shape. This recognizer matches `$$ … $$` (the inner LaTeX
+ * may span multiple lines) and returns a `mathBlock` node, or null if the raw
+ * text is not a standalone display-math block. Conservative: requires the `$$`
+ * to open and close the whole block (anchored) so an inline `$$x$$` mid-sentence
+ * is left to the inline path / plain text. Empty inner LaTeX returns null so an
+ * empty `$$\n\n$$` degrades to text rather than an empty equation node.
+ */
+const DISPLAY_MATH_RE = /^\$\$\s*\n?([\s\S]*?)\n?\s*\$\$$/
+function displayMathBlock(raw: string): PMNode | null {
+  const m = DISPLAY_MATH_RE.exec(raw.trim())
+  if (!m) return null
+  const latex = (m[1] ?? '').trim()
+  if (latex.length === 0) return null
+  return { type: 'mathBlock', attrs: { latex } }
 }
 
 /**
@@ -211,9 +271,16 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
           ...(inline(t.tokens, []).length ? { content: inline(t.tokens, []) } : {}),
         })
         break
-      case 'paragraph':
+      case 'paragraph': {
+        // G4: a standalone `$$ … $$` paragraph is a display equation block.
+        const mathBlock = displayMathBlock(t.raw ?? t.text ?? '')
+        if (mathBlock) {
+          out.push(mathBlock)
+          break
+        }
         out.push(paragraph(t.tokens))
         break
+      }
       case 'code': {
         const code = t.text ?? ''
         // F3: a `parchment:<kind>` fence reconstructs a custom PM node. On any

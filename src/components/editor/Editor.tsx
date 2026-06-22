@@ -16,6 +16,7 @@ import { CropDialog } from '@/components/editor/CropDialog'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
+import { MathPopover } from '@/components/editor/MathPopover'
 import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
@@ -269,6 +270,14 @@ export function Editor({
   // B13: section-break edit dialog — holds the doc position of the node to edit.
   const [sectionDialogPos, setSectionDialogPos] = useState<number | null>(null)
 
+  // G4: math editor popover — holds the doc position + current LaTeX of the math
+  // node being edited (null = closed). Opened from the slash menu (new empty
+  // node) and from clicking an existing math node (parchment:edit-math event).
+  const [mathEdit, setMathEdit] = useState<{ pos: number; latex: string } | null>(null)
+  const openMathEditor = useCallback((pos: number) => {
+    setMathEdit({ pos, latex: '' })
+  }, [])
+
   // D1: comments sidebar toggle
   const [commentsSidebarOpen, setCommentsSidebarOpen] = useState(false)
 
@@ -339,7 +348,8 @@ export function Editor({
       // B9: configured with onOpen so Cmd-F / Cmd-Shift-H open the React panel.
       FindReplaceExtension.configure({ onOpen: openFind }),
       // B12: slash menu — onOpenImage delegates to the existing image dialog.
-      SlashMenuExtension.configure({ onOpenImage: openImageDialog }),
+      // G4: onEditMath opens the LaTeX popover for a freshly-inserted math node.
+      SlashMenuExtension.configure({ onOpenImage: openImageDialog, onEditMath: openMathEditor }),
       // F6: [[ autocomplete — drives the React WikiSuggestionMenu popup. Wired
       // here (not baseExtensions) so its ReactRenderer popup only loads client-side.
       WikiSuggestionExtension,
@@ -482,6 +492,21 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-section', handler)
   }, [editor])
 
+  // G4: math NodeViews dispatch parchment:edit-math {pos, latex} on click — open
+  // the LaTeX popover seeded with the clicked node's current source.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ pos: number; latex: string }>).detail
+      if (detail && typeof detail.pos === 'number') {
+        setMathEdit({ pos: detail.pos, latex: detail.latex ?? '' })
+      }
+    }
+    dom.addEventListener('parchment:edit-math', handler)
+    return () => dom.removeEventListener('parchment:edit-math', handler)
+  }, [editor])
+
   // D5: publish own awareness presence + reading position
   useEffect(() => {
     if (!editor || !provider) return
@@ -607,6 +632,16 @@ export function Editor({
 
       {/* B6: Link popover */}
       {editor && linkPopoverOpen && <LinkPopover editor={editor} onClose={closeLinkPopover} />}
+
+      {/* G4: Math editor popover */}
+      {editor && mathEdit !== null && (
+        <MathPopover
+          editor={editor}
+          pos={mathEdit.pos}
+          initialLatex={mathEdit.latex}
+          onClose={() => setMathEdit(null)}
+        />
+      )}
 
       {/* B13: section-break edit dialog */}
       {editor && sectionDialogPos !== null && (

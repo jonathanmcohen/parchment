@@ -107,6 +107,15 @@ function serializeInline(content: PMNode[] | undefined): string {
       // NOT stored in markdown — it is resolved on parse by title lookup, which
       // is a documented GAP in parse.ts since markdownToJson stays sync).
       if (n.type === 'wikiLink') return `[[${sanitizeWikiLabel(n.attrs?.label)}]]`
+      // G4: inline math → $latex$ (single dollars). Empty latex emits `$$`,
+      // which parse.ts (conservative) will NOT match back as math — a documented
+      // edge for a math node the user never filled in.
+      if (n.type === 'mathInline') return `$${String(n.attrs?.latex ?? '')}$`
+      // G4: equation reference → plain `(N)` text. This is intentionally lossy:
+      // on parse `(N)` is ordinary text, NOT reconstructed as an equationRef
+      // node. The rendered number is preserved in the markdown for human reading;
+      // the live ref binding is an editor-only concern (documented v0.1 choice).
+      if (n.type === 'equationRef') return `(${String(n.attrs?.targetIndex ?? 1)})`
       return serializeInline(n.content)
     })
     .join('')
@@ -145,6 +154,12 @@ function serializeBlock(node: PMNode): string {
       return `\`\`\`${String(node.attrs?.language ?? '')}\n${rawText(node.content)}\n\`\`\``
     case 'horizontalRule':
       return '---'
+    // G4: display equation → a `$$` fenced block on its own lines. The latex is
+    // emitted verbatim between the fences so parse.ts (DISPLAY_MATH_RE) can
+    // reconstruct it. Emitted even when latex is empty (`$$\n\n$$`), though an
+    // empty display block won't round-trip back to a node (documented edge).
+    case 'mathBlock':
+      return `$$\n${String(node.attrs?.latex ?? '')}\n$$`
     case 'bulletList':
       return (node.content ?? []).map((li) => serializeListItem(li, '- ')).join('\n')
     case 'orderedList':

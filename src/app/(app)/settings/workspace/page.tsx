@@ -1,5 +1,6 @@
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
 import { AutosaveSlider } from '@/components/settings/AutosaveSlider'
+import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { StylesManager } from '@/components/settings/StylesManager'
 
 export default function WorkspaceSettingsPage() {
@@ -86,6 +87,8 @@ export default function WorkspaceSettingsPage() {
       </section>
 
       <AppearanceSettings />
+
+      <ShortcutsSettings />
 
       <StylesManager />
     </section>

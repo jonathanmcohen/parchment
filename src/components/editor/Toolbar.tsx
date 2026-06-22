@@ -32,6 +32,11 @@ type Props = {
   presenterOpen: boolean
   /** H2: open the print / PDF view. */
   onExportPdf: () => void
+  /** I2 Part 3: enter Vim markdown source mode. */
+  onToggleSourceMode: () => void
+  sourceModeOpen: boolean
+  /** I2 Part 3: disabled while another peer is actively collaborating. */
+  sourceModeDisabled: boolean
 }
 
 const FONT_FAMILIES = [
@@ -142,6 +147,9 @@ export function Toolbar({
   onTogglePresenter,
   presenterOpen,
   onExportPdf,
+  onToggleSourceMode,
+  sourceModeOpen,
+  sourceModeDisabled,
 }: Props) {
   // Reactive state — re-renders the toolbar when the selection/marks change so
   // aria-pressed and the control values track the editor.
@@ -852,6 +860,24 @@ export function Toolbar({
         onClick={onTogglePresenter}
       >
         ▶
+      </button>
+
+      {/* ── I2 Part 3: Vim markdown source mode toggle ───────────────── */}
+      <button
+        type="button"
+        aria-label="Vim source mode"
+        aria-pressed={sourceModeOpen}
+        disabled={sourceModeDisabled}
+        title={
+          sourceModeDisabled
+            ? 'Source mode is unavailable while collaborating with others'
+            : 'Edit Markdown source (Vim)'
+        }
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={onToggleSourceMode}
+      >
+        {'</>'}
       </button>
 
       {/* ── H3/H4/H7/H1/H5/H6: Export menu ─────────────────────────── */}

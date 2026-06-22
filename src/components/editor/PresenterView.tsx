@@ -2,12 +2,14 @@
 
 // G16: PresenterView — full-screen slideshow overlay.
 //
-// Opens on F5 (or toolbar button). Slides are split on top-level pageBreak
-// nodes by splitIntoSlides(). Each slide's content is rendered read-only via
-// renderReadOnlyDoc(). Speaker notes are shown in a muted strip below (they
-// are extracted into slide.notes by splitIntoSlides and never appear in slide
-// content). Keyboard nav: Arrow/Space/Enter/PageDown → next; Arrow/Backspace/
-// PageUp → prev; Home/End → first/last; Esc/F5 → close. Stage click → next.
+// Opens on the presenter shortcut (default F5, remappable) or the toolbar
+// button. Slides are split on top-level pageBreak nodes by splitIntoSlides().
+// Each slide's content is rendered read-only via renderReadOnlyDoc(). Speaker
+// notes are shown in a muted strip below (they are extracted into slide.notes by
+// splitIntoSlides and never appear in slide content). Keyboard nav:
+// Arrow/Space/Enter/PageDown → next; Arrow/Backspace/PageUp → prev; Home/End →
+// first/last; Esc → close. Stage click → next. The presenter shortcut itself
+// (e.g. F5) toggles the overlay closed via the GlobalShortcuts dispatcher.
 //
 // FOCUS MANAGEMENT (G15 lesson): document.activeElement is captured on mount
 // and restored on close so focus returns to the editor.
@@ -89,9 +91,9 @@ export function PresenterView({ docJson, onClose }: Props) {
     const handler = (e: KeyboardEvent) => {
       // Guard: if focus has somehow escaped the overlay (e.g. OS accessibility
       // tool, browser chrome), do not intercept Space/Backspace/etc. globally.
-      // Escape and F5 are always handled so the presenter can always be closed.
+      // Escape is always handled so the presenter can always be closed.
       const focusInOverlay = overlayRef.current?.contains(document.activeElement) ?? false
-      if (!focusInOverlay && e.key !== 'Escape' && e.key !== 'F5') return
+      if (!focusInOverlay && e.key !== 'Escape') return
 
       switch (e.key) {
         case 'ArrowRight':
@@ -121,13 +123,12 @@ export function PresenterView({ docJson, onClose }: Props) {
           e.preventDefault()
           handleClose()
           break
-        case 'F5':
-          // F5 closes the presenter. The Editor.tsx handler is guarded to only
-          // open (not toggle) when the presenter is already closed, so this is
-          // the sole owner of F5 while the overlay is active.
-          e.preventDefault()
-          handleClose()
-          break
+        // Finding B: the presenter KEY (default F5, remappable) is no longer
+        // handled here. It is owned by the GlobalShortcuts dispatcher → the
+        // Editor `presenter` handler, which now TOGGLES, so the same (possibly
+        // remapped) key both opens and closes the overlay. Hardcoding F5 here
+        // would (a) ignore a remap and (b) double-fire with the dispatcher.
+        // Escape and the close button remain as the always-available close.
         default:
           break
       }

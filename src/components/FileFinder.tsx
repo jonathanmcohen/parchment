@@ -1,6 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import {
+  registerShortcutAction,
+  SHORTCUT_EVENT,
+  type ShortcutEventDetail,
+} from '@/components/shortcuts/GlobalShortcuts'
 import { fuzzyFilter } from '@/lib/search/fuzzy'
 
 interface DocTitle {
@@ -15,16 +20,24 @@ export function FileFinder() {
   const [activeIdx, setActiveIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Open/close via Cmd+P / Ctrl+P (prevents browser print dialog)
+  // I2: open/close is driven by the central GlobalShortcuts dispatcher, which
+  // owns the (remappable) fuzzy-finder binding and fires parchment:shortcut. The
+  // dispatcher preventDefault()s the combo, so the browser print dialog (the
+  // old reason this listener called preventDefault) is still suppressed.
   useEffect(() => {
-    function handleKeydown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
-        e.preventDefault()
+    function handleShortcut(e: Event) {
+      const detail = (e as CustomEvent<ShortcutEventDetail>).detail
+      if (detail?.action === 'fuzzy-finder') {
         setOpen((prev) => !prev)
       }
     }
-    window.addEventListener('keydown', handleKeydown)
-    return () => window.removeEventListener('keydown', handleKeydown)
+    window.addEventListener(SHORTCUT_EVENT, handleShortcut)
+    // Finding C: register so the dispatcher intercepts the fuzzy-finder combo.
+    const unregister = registerShortcutAction('fuzzy-finder')
+    return () => {
+      window.removeEventListener(SHORTCUT_EVENT, handleShortcut)
+      unregister()
+    }
   }, [])
 
   // Focus input when opened; reset state when closed

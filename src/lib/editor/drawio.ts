@@ -38,8 +38,13 @@ export function drawioEnabled(): boolean {
  *   libraries=1  — show shape libraries
  *   saveAndExit=1 — show Save & Exit button
  *   noSaveBtn=0  — do NOT hide the save button
+ *
+ * Returns null if `base` is not a valid absolute URL (mirrors embeddings.ts
+ * pattern: treat invalid env values as disabled rather than throwing).
  */
 export function drawioEmbedSrc(base: string): string {
+  // new URL() throws on relative or malformed URLs; propagate as a thrown
+  // error so callers (safeEmbedSrc in DrawioModal) can catch and disable.
   const url = new URL(base)
   url.searchParams.set('embed', '1')
   url.searchParams.set('proto', 'json')
@@ -48,6 +53,20 @@ export function drawioEmbedSrc(base: string): string {
   url.searchParams.set('saveAndExit', '1')
   url.searchParams.set('noSaveBtn', '0')
   return url.toString()
+}
+
+/**
+ * Like drawioEmbedSrc but returns null instead of throwing on invalid input.
+ * Use this at call sites where an invalid URL should gracefully disable the
+ * embed rather than crash the component (mirrors embeddings.ts null-on-error
+ * pattern).
+ */
+export function drawioEmbedSrcSafe(base: string): string | null {
+  try {
+    return drawioEmbedSrc(base)
+  } catch {
+    return null
+  }
 }
 
 /**

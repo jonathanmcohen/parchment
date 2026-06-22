@@ -4,6 +4,24 @@ import type { Editor } from '@tiptap/core'
 import { useEffect, useId, useRef } from 'react'
 import { drawioEmbedSrc, drawioEmbedUrl, parseDrawioExport } from '@/lib/editor/drawio'
 
+/** Parse the origin from a URL string; returns null on invalid input. */
+function safeOrigin(url: string): string | null {
+  try {
+    return new URL(url).origin
+  } catch {
+    return null
+  }
+}
+
+/** Build the iframe src from the base URL; returns null on invalid input. */
+function safeEmbedSrc(base: string): string | null {
+  try {
+    return drawioEmbedSrc(base)
+  } catch {
+    return null
+  }
+}
+
 type Props = {
   editor: Editor
   /** Document position of the drawio node being edited. */
@@ -30,7 +48,16 @@ type Props = {
 export function DrawioModal({ editor, pos, initialXml, onClose }: Props) {
   const titleId = useId()
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  // Use a ref so pendingXml survives effect re-runs without being a dep
+  const pendingXmlRef = useRef<string>(initialXml)
+  // Stable ref to onClose so it is not a dep that re-runs the effect
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
   const base = drawioEmbedUrl()
+  // Validate the base URL once; treat invalid as disabled
+  const expectedOrigin = base ? safeOrigin(base) : null
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -40,15 +67,16 @@ export function DrawioModal({ editor, pos, initialXml, onClose }: Props) {
   }
 
   useEffect(() => {
-    if (!base) return
+    if (!base || !expectedOrigin) return
 
-    let pendingXml = initialXml
-
-    const expectedOrigin = new URL(base).origin
+    // Seed pendingXml with the current initialXml each time the node changes
+    pendingXmlRef.current = initialXml
 
     const handleMessage = (e: MessageEvent) => {
       // SECURITY: only process messages from the configured embed origin
       if (e.origin !== expectedOrigin) return
+      // SECURITY: verify message comes from our iframe, not another same-origin window
+      if (e.source !== iframeRef.current?.contentWindow) return
 
       let data: Record<string, unknown>
       try {
@@ -68,15 +96,15 @@ export function DrawioModal({ editor, pos, initialXml, onClose }: Props) {
         case 'init':
           // drawio is ready — load the current XML
           contentWindow.postMessage(
-            JSON.stringify({ action: 'load', xml: pendingXml }),
+            JSON.stringify({ action: 'load', xml: pendingXmlRef.current }),
             expectedOrigin,
           )
           break
 
         case 'save': {
           // drawio has saved — capture the XML and request an SVG export
-          const savedXml = typeof data.xml === 'string' ? data.xml : pendingXml
-          pendingXml = savedXml
+          const savedXml = typeof data.xml === 'string' ? data.xml : pendingXmlRef.current
+          pendingXmlRef.current = savedXml
           contentWindow.postMessage(
             JSON.stringify({ action: 'export', format: 'xmlsvg' }),
             expectedOrigin,
@@ -88,14 +116,14 @@ export function DrawioModal({ editor, pos, initialXml, onClose }: Props) {
           // drawio returned the exported SVG data URI — decode and persist
           const dataUri = typeof data.data === 'string' ? data.data : ''
           const svg = parseDrawioExport(dataUri) ?? ''
-          editor.commands.updateDrawio(pos, pendingXml, svg)
-          onClose()
+          editor.commands.updateDrawio(pos, pendingXmlRef.current, svg)
+          onCloseRef.current()
           break
         }
 
         case 'exit':
           // user closed without saving
-          onClose()
+          onCloseRef.current()
           break
 
         default:
@@ -107,7 +135,7 @@ export function DrawioModal({ editor, pos, initialXml, onClose }: Props) {
     return () => {
       window.removeEventListener('message', handleMessage)
     }
-  }, [base, editor, initialXml, onClose, pos])
+  }, [base, editor, expectedOrigin, initialXml, pos])
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss on click is standard modal UX; keyboard close is handled by the inner dialog
@@ -140,8 +168,8 @@ export function DrawioModal({ editor, pos, initialXml, onClose }: Props) {
           </button>
         </div>
 
-        {base === null ? (
-          // Disabled state — no embed URL configured
+        {base === null || expectedOrigin === null ? (
+          // Disabled state — no embed URL configured (or URL is invalid)
           <div
             style={{
               flex: 1,
@@ -153,14 +181,16 @@ export function DrawioModal({ editor, pos, initialXml, onClose }: Props) {
             }}
           >
             <p style={{ color: '#999', fontStyle: 'italic' }}>
-              Drawio editing disabled — set NEXT_PUBLIC_DRAWIO_EMBED_URL
+              {base === null
+                ? 'Drawio editing disabled — set NEXT_PUBLIC_DRAWIO_EMBED_URL'
+                : 'Drawio editing disabled — NEXT_PUBLIC_DRAWIO_EMBED_URL is not a valid URL'}
             </p>
           </div>
         ) : (
           // Enabled state — render the embed iframe
           <iframe
             ref={iframeRef}
-            src={drawioEmbedSrc(base)}
+            src={safeEmbedSrc(base) ?? ''}
             title="Drawio diagram editor"
             style={{
               flex: 1,
@@ -173,7 +203,7 @@ export function DrawioModal({ editor, pos, initialXml, onClose }: Props) {
           />
         )}
 
-        {base === null && (
+        {(base === null || expectedOrigin === null) && (
           <div className="parchment-dialog-actions">
             <button type="button" className="parchment-dialog-btn-secondary" onClick={onClose}>
               Close

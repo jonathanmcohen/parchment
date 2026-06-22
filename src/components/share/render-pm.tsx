@@ -280,15 +280,19 @@ function buildCiteMap(doc: PMNode): Map<string, string> {
 // ── Stateful render (with cite resolution) ───────────────────────────────────
 
 /**
- * Render a node, given a pre-built cite resolution map. The renderNode function
- * above is used for the top-level pass; citation + bibliography need the map.
+ * Render a node, given a pre-built cite resolution map. Handles citation and
+ * bibliography nodes directly; all other nodes are rendered with
+ * renderChildrenWithCites so that citation atoms inside paragraphs/headings/
+ * list items are never silently dropped regardless of nesting depth.
  */
 function renderNodeWithCites(node: PMNode, key: number, citeMap: Map<string, string>): ReactNode {
   if (node.type === 'text') {
     return applyMarks(node.text ?? '', node.marks, key)
   }
 
-  // citation inline — resolve via the pre-built map.
+  // citation inline — resolve via the pre-built map. Always render (even when
+  // citeMap is empty) so citation atoms are visible as placeholders rather than
+  // silently absent when no bibliography exists or it has zero refs.
   if (node.type === 'citation') {
     const k = str(node.attrs?.citeKey)
     const resolved = k ? citeMap.get(k) : undefined
@@ -300,7 +304,8 @@ function renderNodeWithCites(node: PMNode, key: number, citeMap: Map<string, str
     )
   }
 
-  // bibliography block — render the formatted reference list.
+  // bibliography block — render the formatted reference list. Always renders
+  // regardless of whether citeMap is empty (zero-ref bibliography is valid).
   if (node.type === 'bibliography') {
     const refs: CslEntry[] = parseCslEntries(node.attrs?.refs as unknown)
     const style: CiteStyle = (() => {
@@ -325,8 +330,65 @@ function renderNodeWithCites(node: PMNode, key: number, citeMap: Map<string, str
     )
   }
 
-  // Delegate all other nodes to the regular renderer.
-  return renderNode(node, key)
+  // For all other node types re-use renderNode's layout logic but thread
+  // renderNodeWithCites through child rendering so citations at any depth are
+  // handled correctly (fixes: inline citations inside paragraphs/headings/lists
+  // being silently dropped because renderNode called renderChildren which called
+  // renderNode recursively — missing the citation case).
+  const children = renderChildrenWithCites(node.content, citeMap)
+
+  switch (node.type) {
+    case 'paragraph':
+      return <p key={key}>{children}</p>
+    case 'heading': {
+      const level = Number(node.attrs?.level)
+      const lvl = level >= 1 && level <= 6 ? level : 1
+      const Tag = `h${lvl}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
+      return <Tag key={key}>{children}</Tag>
+    }
+    case 'bulletList':
+      return <ul key={key}>{children}</ul>
+    case 'orderedList':
+      return <ol key={key}>{children}</ol>
+    case 'listItem':
+      return <li key={key}>{children}</li>
+    case 'taskList':
+      return (
+        <ul key={key} data-type="taskList">
+          {children}
+        </ul>
+      )
+    case 'taskItem':
+      return (
+        <li key={key} data-checked={node.attrs?.checked === true}>
+          {children}
+        </li>
+      )
+    case 'blockquote':
+      return <blockquote key={key}>{children}</blockquote>
+    case 'codeBlock':
+      return (
+        <pre key={key}>
+          <code>{children}</code>
+        </pre>
+      )
+    default:
+      // Delegate to the cite-unaware renderer for specialised block types
+      // (drawing, mermaid, plantuml, etc.) that cannot contain citation nodes.
+      return renderNode(node, key)
+  }
+}
+
+/**
+ * Citation-aware child renderer: calls renderNodeWithCites for each child so
+ * citation atoms at any nesting depth (inside paragraphs, headings, list items)
+ * are rendered rather than silently dropped.
+ */
+function renderChildrenWithCites(
+  nodes: PMNode[] | undefined,
+  citeMap: Map<string, string>,
+): ReactNode[] {
+  return (nodes ?? []).map((n, i) => renderNodeWithCites(n, i, citeMap))
 }
 
 /** Render a ProseMirror `doc` JSON value to read-only React nodes. Accepts the
@@ -340,12 +402,12 @@ export function renderReadOnlyDoc(content: unknown): ReactNode {
   const top = doc.type === 'doc' ? doc.content : undefined
 
   // G7b: build the cite resolution map from the whole doc before rendering.
+  // Always use renderNodeWithCites regardless of whether citeMap is empty: a
+  // bibliography with zero refs must still render, and citation nodes must
+  // produce their '[missing: key]' placeholder even when no bibliography exists.
   const citeMap = buildCiteMap(doc)
-  const hasCitations = citeMap.size > 0
 
-  const children = hasCitations
-    ? (top ?? []).map((n, i) => renderNodeWithCites(n, i, citeMap))
-    : renderChildren(top)
+  const children = (top ?? []).map((n, i) => renderNodeWithCites(n, i, citeMap))
 
   if (children.length === 0) {
     return <p className="parchment-share-empty">This document is empty.</p>

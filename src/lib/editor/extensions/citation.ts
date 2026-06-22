@@ -101,7 +101,6 @@ function makeCitationResolutionPlugin(): Plugin<CitationResolution> {
       },
       apply(tr, old, _oldState, newState) {
         if (!tr.docChanged && !tr.getMeta(CITE_REPAINT_META)) return old
-        if (!tr.docChanged) return old
         return buildResolution(newState.doc)
       },
     },

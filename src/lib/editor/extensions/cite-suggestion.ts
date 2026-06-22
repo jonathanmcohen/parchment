@@ -14,7 +14,9 @@ import { PluginKey } from '@tiptap/pm/state'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import type { CiteSuggestionMenuRef } from '@/components/editor/CiteSuggestionMenu'
+import { citeLabel } from '@/lib/citations/format'
 import type { CslEntry } from '@/lib/citations/types'
+import { parseCslEntries } from '@/lib/citations/types'
 import { citationResolveKey } from '@/lib/editor/extensions/citation'
 
 // DISTINCT key — critical (F6 lesson).
@@ -42,9 +44,6 @@ export const CiteSuggestionExtension = Extension.create({
           const entries: CslEntry[] = []
           this.editor.state.doc.descendants((node) => {
             if (node.type.name === 'bibliography') {
-              const { parseCslEntries } = require('@/lib/citations/types') as {
-                parseCslEntries: (v: unknown) => CslEntry[]
-              }
               entries.push(...parseCslEntries(node.attrs.refs as unknown))
               return false
             }
@@ -54,9 +53,6 @@ export const CiteSuggestionExtension = Extension.create({
           if (entries.length === 0) return []
           if (!query) return entries.slice(0, 10)
 
-          const { citeLabel } = require('@/lib/citations/format') as {
-            citeLabel: (entry: CslEntry) => string
-          }
           const q = query.toLowerCase()
           return entries
             .filter((e) => {

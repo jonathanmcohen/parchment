@@ -181,21 +181,46 @@ function formatApa(entry: CslEntry, authorStr: string, year: string): string {
     entry.type === 'article-newspaper'
   ) {
     parts.push(`${title}.`)
-    let source = entry['container-title'] ?? ''
+    const sourceParts: string[] = []
+    if (entry['container-title']) sourceParts.push(entry['container-title'])
     if (entry.volume) {
-      source += `, ${entry.volume}`
-      if (entry.issue) source += `(${entry.issue})`
+      const volStr = entry.issue ? `${entry.volume}(${entry.issue})` : entry.volume
+      sourceParts.push(volStr)
+    } else if (entry.issue) {
+      sourceParts.push(`(${entry.issue})`)
     }
-    if (entry.page) source += `, ${entry.page}`
+    if (entry.page) sourceParts.push(entry.page)
+    const source = sourceParts.join(', ')
     if (source) parts.push(`${source}.`)
     if (entry.DOI) parts.push(`https://doi.org/${entry.DOI}`)
     else if (entry.URL) parts.push(entry.URL)
   } else if (entry.type === 'chapter') {
     parts.push(`${title}.`)
-    let inPart = 'In'
-    if (entry['container-title']) inPart += ` ${entry['container-title']}`
-    if (entry.page) inPart += ` (pp. ${entry.page})`
-    parts.push(`${inPart}.`)
+    // APA 7 §10.3: In E. Editor (Ed.), Container (pp. X–Y). Publisher.
+    // Only emit the In-clause when it has meaningful content.
+    const hasInContent = !!(entry.editor?.length || entry['container-title'] || entry.page)
+    if (hasInContent) {
+      let inPart = 'In'
+      if (entry.editor && entry.editor.length > 0) {
+        const edList = entry.editor.map((ed) => {
+          // APA editor format: initials+family, e.g. "K. Jones"
+          const givenInitials = ed.given
+            ? ed.given
+                .split(/\s+/)
+                .map((g) => `${g[0] ?? ''}.`)
+                .join(' ')
+            : ''
+          if (ed.literal) return ed.literal
+          const fam = ed.family ?? ''
+          return givenInitials ? `${givenInitials} ${fam}` : fam
+        })
+        const suffix = entry.editor.length === 1 ? '(Ed.)' : '(Eds.)'
+        inPart += ` ${edList.join(', ')} ${suffix},`
+      }
+      if (entry['container-title']) inPart += ` ${entry['container-title']}`
+      if (entry.page) inPart += ` (pp. ${entry.page})`
+      parts.push(`${inPart}.`)
+    }
     if (entry.publisher) parts.push(`${entry.publisher}.`)
   } else if (entry.type === 'webpage') {
     parts.push(`${title}.`)
@@ -233,24 +258,28 @@ function formatMla(entry: CslEntry, authorStr: string): string {
     entry.type === 'article-newspaper'
   ) {
     parts.push(`"${title}."`)
-    let source = entry['container-title'] ?? ''
-    if (entry.volume) source += `, vol. ${entry.volume}`
-    if (entry.issue) source += `, no. ${entry.issue}`
-    if (year !== 'n.d.') source += `, ${year}`
-    if (entry.page) source += `, pp. ${entry.page}`
-    if (source) parts.push(`${source}.`)
+    const mlaSrcParts: string[] = []
+    if (entry['container-title']) mlaSrcParts.push(entry['container-title'])
+    if (entry.volume) mlaSrcParts.push(`vol. ${entry.volume}`)
+    if (entry.issue) mlaSrcParts.push(`no. ${entry.issue}`)
+    if (year !== 'n.d.') mlaSrcParts.push(year)
+    if (entry.page) mlaSrcParts.push(`pp. ${entry.page}`)
+    const mlaSrc = mlaSrcParts.join(', ')
+    if (mlaSrc) parts.push(`${mlaSrc}.`)
     if (entry.DOI) parts.push(`https://doi.org/${entry.DOI}`)
     else if (entry.URL) parts.push(entry.URL)
   } else if (entry.type === 'chapter') {
     parts.push(`"${title}."`)
-    let source = entry['container-title'] ?? ''
+    const mlaChSrcParts: string[] = []
+    if (entry['container-title']) mlaChSrcParts.push(entry['container-title'])
     if (entry.editor && entry.editor.length > 0) {
-      source += `, edited by ${entry.editor.map(nameGivenFirst).join(', ')}`
+      mlaChSrcParts.push(`edited by ${entry.editor.map(nameGivenFirst).join(', ')}`)
     }
-    if (entry.publisher) source += `, ${entry.publisher}`
-    if (year !== 'n.d.') source += `, ${year}`
-    if (entry.page) source += `, pp. ${entry.page}`
-    if (source) parts.push(`${source}.`)
+    if (entry.publisher) mlaChSrcParts.push(entry.publisher)
+    if (year !== 'n.d.') mlaChSrcParts.push(year)
+    if (entry.page) mlaChSrcParts.push(`pp. ${entry.page}`)
+    const mlaChSrc = mlaChSrcParts.join(', ')
+    if (mlaChSrc) parts.push(`${mlaChSrc}.`)
   } else if (entry.type === 'webpage') {
     parts.push(`"${title}."`)
     if (entry['container-title']) parts.push(`${entry['container-title']},`)
@@ -288,11 +317,20 @@ function formatChicago(entry: CslEntry, authorStr: string, year: string): string
     entry.type === 'article-newspaper'
   ) {
     parts.push(`"${title}."`)
-    let source = entry['container-title'] ?? ''
-    if (entry.volume) source += ` ${entry.volume}`
-    if (entry.issue) source += `, no. ${entry.issue}`
-    if (entry.page) source += `: ${entry.page}`
-    if (source) parts.push(`${source}.`)
+    // Chicago: Container vol (issue): page — build from parts to avoid leading separator
+    const chiSrcTokens: string[] = []
+    if (entry['container-title']) chiSrcTokens.push(entry['container-title'])
+    let chiVolIssue = ''
+    if (entry.volume) {
+      chiVolIssue = entry.volume
+      if (entry.issue) chiVolIssue += ` (${entry.issue})`
+    } else if (entry.issue) {
+      chiVolIssue = `(${entry.issue})`
+    }
+    if (chiVolIssue) chiSrcTokens.push(chiVolIssue)
+    const chiBaseSrc = chiSrcTokens.join(' ')
+    const chiSrc = entry.page ? `${chiBaseSrc}: ${entry.page}` : chiBaseSrc
+    if (chiSrc) parts.push(`${chiSrc}.`)
     if (entry.DOI) parts.push(`https://doi.org/${entry.DOI}`)
     else if (entry.URL) parts.push(entry.URL)
   } else if (entry.type === 'chapter') {
@@ -337,18 +375,18 @@ export function formatBibliography(
   const sorted = [...entries].sort((a, b) => {
     const aFamily = a.author?.[0]?.family ?? a.author?.[0]?.literal ?? a.title ?? ''
     const bFamily = b.author?.[0]?.family ?? b.author?.[0]?.literal ?? b.title ?? ''
-    const familyCmp = aFamily.localeCompare(bFamily)
+    const familyCmp = aFamily.localeCompare(bFamily, 'en', { sensitivity: 'base' })
     if (familyCmp !== 0) return familyCmp
 
     if (style === 'mla') {
       const aTitle = a.title ?? ''
       const bTitle = b.title ?? ''
-      return aTitle.localeCompare(bTitle)
+      return aTitle.localeCompare(bTitle, 'en', { sensitivity: 'base' })
     }
 
     const aYear = getYear(a)
     const bYear = getYear(b)
-    return aYear.localeCompare(bYear)
+    return aYear.localeCompare(bYear, 'en', { sensitivity: 'base' })
   })
 
   return sorted.map((e) => ({ id: e.id, text: formatBibliographyEntry(e, style) }))

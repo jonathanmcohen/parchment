@@ -93,9 +93,12 @@ export function crossrefToCsl(message: unknown): CslEntry | null {
   if (containerTitle) entry['container-title'] = containerTitle
 
   if (typeof message.publisher === 'string') entry.publisher = message.publisher
-  if (typeof message.volume === 'string') entry.volume = message.volume
-  if (typeof message.issue === 'string') entry.issue = message.issue
-  if (typeof message.page === 'string') entry.page = message.page
+  if (typeof message.volume === 'string' || typeof message.volume === 'number')
+    entry.volume = String(message.volume)
+  if (typeof message.issue === 'string' || typeof message.issue === 'number')
+    entry.issue = String(message.issue)
+  if (typeof message.page === 'string' || typeof message.page === 'number')
+    entry.page = String(message.page)
   if (typeof message.URL === 'string') entry.URL = message.URL
 
   return entry
@@ -113,7 +116,7 @@ export async function fetchDoiCsl(doi: string): Promise<CslEntry | null> {
     const normalized = doi.trim().replace(/^https?:\/\/doi\.org\//i, '')
     if (!normalized) return null
 
-    const url = `https://api.crossref.org/works/${encodeURIComponent(normalized)}`
+    const url = `https://api.crossref.org/works/${normalized}`
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Parchment/0.1 (citations)',

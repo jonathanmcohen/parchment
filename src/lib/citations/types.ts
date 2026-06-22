@@ -105,7 +105,7 @@ export function parseCslEntries(raw: unknown): CslEntry[] {
       type: item.type as CslType,
     }
 
-    if (typeof item.title === 'string') entry.title = item.title
+    if (typeof item.title === 'string' && item.title.trim() !== '') entry.title = item.title
     if (typeof item.publisher === 'string') entry.publisher = item.publisher
     if (typeof item['publisher-place'] === 'string')
       entry['publisher-place'] = item['publisher-place']

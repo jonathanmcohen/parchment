@@ -169,8 +169,17 @@ function serializeListItem(item: PMNode, marker: string): string {
 
 function serializeBlock(node: PMNode): string {
   switch (node.type) {
-    case 'heading':
-      return `${'#'.repeat(Number(node.attrs?.level ?? 1))} ${serializeInline(node.content)}`
+    case 'heading': {
+      // G8a: preserve the `id` attr assigned by HeadingId so heading cross-ref
+      // targets survive a disk-mirror cycle. If the id is present and non-empty,
+      // append it as an HTML attribute comment `<!-- id:slug -->` on the same
+      // line. parse.ts picks this up and restores `attrs.id`. Without this, after
+      // a serialize → parse cycle all heading `id` attrs are '' and
+      // collectCrossRefTargets skips every heading (requires non-empty attrs.id).
+      const headingMd = `${'#'.repeat(Number(node.attrs?.level ?? 1))} ${serializeInline(node.content)}`
+      const id = typeof node.attrs?.id === 'string' && node.attrs.id ? node.attrs.id : ''
+      return id ? `${headingMd} <!-- id:${id} -->` : headingMd
+    }
     case 'paragraph':
       return serializeInline(node.content)
     case 'blockquote':

@@ -1,6 +1,7 @@
 'use client'
 
 import type { Editor } from '@tiptap/core'
+import { useEditorState } from '@tiptap/react'
 import { useEffect, useRef } from 'react'
 import type { CrossRefTarget, RefKind } from '@/lib/editor/cross-ref'
 import { crossRefNumberingKey } from '@/lib/editor/extensions/cross-ref-numbering'
@@ -23,14 +24,20 @@ type Props = {
 export function CrossRefPicker({ editor, onPick, onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Collect targets from the live numbering plugin state.
-  const targets: CrossRefTarget[] = []
-  const numbering = crossRefNumberingKey.getState(editor.view.state)
-  if (numbering) {
-    for (const t of numbering.values()) {
-      targets.push(t)
-    }
-  }
+  // Collect targets from the live numbering plugin state. Subscribe via
+  // useEditorState so the list re-renders whenever any target in the document
+  // changes while the picker is open (e.g. a new figure inserted in a collab
+  // session). This is the G7 lesson — reading plugin state once at render goes
+  // stale; useEditorState subscribes to ALL transactions (same fix as CrossRefView).
+  const targets: CrossRefTarget[] =
+    useEditorState({
+      editor,
+      selector: ({ editor: e }) => {
+        const numbering = crossRefNumberingKey.getState(e.view.state)
+        if (!numbering) return []
+        return Array.from(numbering.values())
+      },
+    }) ?? []
 
   // Sort targets: by kind order then by number.
   const KIND_ORDER: RefKind[] = ['figure', 'table', 'equation', 'heading']

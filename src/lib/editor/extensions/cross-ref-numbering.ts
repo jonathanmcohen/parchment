@@ -89,6 +89,18 @@ function generateRefId(prefix: string): string {
 /** Node types that receive a stable refId (headings reuse their `id`). */
 const REFID_NODES = new Set(['image', 'mathBlock', 'table'])
 
+/**
+ * Validate that an existing refId was produced by generateRefId, not a junk
+ * string. A valid refId has the form `<prefix>-<content>` where prefix is one
+ * of the three known prefixes and content is non-empty. This prevents a node
+ * serialized with a corrupted or hand-written attr from being accepted as-is
+ * and never reassigned — the G8-crossref idempotency edge case.
+ */
+const VALID_REFID_RE = /^(?:fig|tbl|eq)-\S+$/
+function isValidRefId(v: string | undefined | null): boolean {
+  return typeof v === 'string' && VALID_REFID_RE.test(v)
+}
+
 function makeRefIdPlugin(): Plugin {
   return new Plugin({
     key: new PluginKey('crossRefAssignRefId'),
@@ -99,7 +111,7 @@ function makeRefIdPlugin(): Plugin {
       doc.descendants((node: PMNode, pos: number) => {
         if (!REFID_NODES.has(node.type.name)) return true
         const existing = node.attrs.refId as string | undefined | null
-        if (existing && existing.length > 0) return true
+        if (isValidRefId(existing)) return true
 
         // Assign a stable refId
         const prefix =

@@ -100,6 +100,14 @@ const INLINE_MATH_RE = /(?<![\d$])\$([^$\s][^$]*?[^$\s]|[^$\s])\$(?![\d$])/g
 const CITE_RE = /\[@([\w:./-]+)(?:,\s*([^\]]+))?\]/g
 
 /**
+ * G8a: heading id sentinel. serialize.ts appends ` <!-- id:<slug> -->` to
+ * heading lines that carry a non-empty HeadingId `id` attr so the id survives
+ * the disk-mirror cycle. We strip it from the rendered text and restore `attrs.id`.
+ * The sentinel is on the raw heading text token, not the inline token stream.
+ */
+const HEADING_ID_RE = /\s+<!--\s*id:([\w-]+)\s*-->\s*$/
+
+/**
  * G8b: CONSERVATIVE inline cross-reference recognition.
  * Matches `[#refId]` (full format) and `[#refId|number]` (number format).
  * Pattern: \[#([\w:-]+)(?:\|(number|full))?\]
@@ -423,13 +431,40 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
   const out: PMNode[] = []
   for (const t of tokens ?? []) {
     switch (t.type) {
-      case 'heading':
+      case 'heading': {
+        // G8a: restore heading `id` attr from the serialize.ts sentinel
+        // `<!-- id:<slug> -->`. We check the raw heading text before marked
+        // strips HTML comments, extract the id, then re-inline the remainder
+        // (which has the sentinel stripped) so the rendered label is clean.
+        const rawText = t.text ?? ''
+        const idMatch = HEADING_ID_RE.exec(rawText)
+        const headingId = idMatch ? (idMatch[1] ?? '') : ''
+        // Strip the sentinel from the raw token text so inline() doesn't emit
+        // the HTML comment as visible text. We mutate a local copy — marked
+        // token objects are plain JS objects so this is safe inside the switch.
+        const cleanTokens = idMatch
+          ? (() => {
+              // Walk t.tokens and strip the sentinel from any trailing text node.
+              return (t.tokens ?? []).map((tok) => {
+                if (tok.type === 'text' && tok.text) {
+                  const stripped = tok.text.replace(HEADING_ID_RE, '')
+                  return stripped !== tok.text ? { ...tok, text: stripped } : tok
+                }
+                return tok
+              })
+            })()
+          : (t.tokens ?? [])
+        const headingContent = inline(cleanTokens, [])
         out.push({
           type: 'heading',
-          attrs: { level: Math.min(Math.max(t.depth ?? 1, 1), 6) },
-          ...(inline(t.tokens, []).length ? { content: inline(t.tokens, []) } : {}),
+          attrs: {
+            level: Math.min(Math.max(t.depth ?? 1, 1), 6),
+            ...(headingId ? { id: headingId } : {}),
+          },
+          ...(headingContent.length ? { content: headingContent } : {}),
         })
         break
+      }
       case 'paragraph': {
         // G4: a standalone `$$ … $$` paragraph is a display equation block.
         const mathBlock = displayMathBlock(t.raw ?? t.text ?? '')

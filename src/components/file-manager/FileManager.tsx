@@ -987,6 +987,8 @@ function BulkActionBar({
   onTagsChanged,
 }: BulkActionBarProps) {
   const count = selected.size
+  const [exporting, setExporting] = useState(false)
+
   if (count === 0) return null
 
   const bulkPost = async (body: Record<string, unknown>) => {
@@ -1032,6 +1034,36 @@ function BulkActionBar({
     if (ok) {
       onClear()
       onRefresh()
+    }
+  }
+
+  const handleExportZip = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const format = e.target.value
+    // reset the select immediately so it looks like a trigger, not a persistent choice
+    e.target.value = ''
+    if (!format) return
+    setExporting(true)
+    try {
+      const res = await fetch('/api/export/bulk', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ids: [...selected], format }),
+      })
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'parchment-export.zip'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+    } catch {
+      // leave state unchanged; silently ignore network errors
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -1088,6 +1120,28 @@ function BulkActionBar({
           </select>
         </>
       )}
+
+      {/* Export as ZIP */}
+      <label htmlFor="bulk-export-select" className="sr-only">
+        Export selected documents as ZIP
+      </label>
+      <select
+        id="bulk-export-select"
+        defaultValue=""
+        disabled={exporting}
+        onChange={handleExportZip}
+        className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)] disabled:opacity-50"
+      >
+        <option value="" disabled>
+          {exporting ? 'Exporting…' : 'Export as ZIP…'}
+        </option>
+        <option value="md">Markdown</option>
+        <option value="html">HTML</option>
+        <option value="txt">Plain text</option>
+        <option value="docx">Word</option>
+        <option value="epub">EPUB</option>
+        <option value="tex">LaTeX</option>
+      </select>
 
       {/* Delete */}
       <button

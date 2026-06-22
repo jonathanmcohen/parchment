@@ -9,7 +9,7 @@
 // imports this module; it reads/writes through GET/PUT /api/settings/shortcuts.
 
 import { getSetting, setSetting } from '@/lib/docs/settings-repo'
-import { DEFAULT_BINDINGS, normalizeCombo } from '@/lib/help/keymap'
+import { DEFAULT_BINDINGS, normalizeCombo, splitCombo } from '@/lib/help/keymap'
 
 export const SHORTCUT_OVERRIDES_KEY = 'shortcutOverrides'
 
@@ -30,14 +30,11 @@ export function sanitizeOverrides(raw: unknown): Record<string, string> {
     if (!CUSTOMIZABLE_ACTIONS.has(action)) continue
     if (typeof value !== 'string') continue
     const normalized = normalizeCombo(value)
-    // Reject empty or modifier-only combos (must have a real key as the last
-    // part). normalizeCombo lowercases the real key but keeps modifier names
-    // capitalized (Mod / Shift / Alt), so a modifier-only combo ends in one of
-    // those capitalized tokens.
-    const parts = normalized.split('-')
-    const key = parts[parts.length - 1] ?? ''
+    // Reject empty or modifier-only combos (must have a real key). splitCombo
+    // decomposes robustly — a naive split('-') would drop a legal `-`/`+` key
+    // (finding E) and wrongly reject `Mod--`.
+    const { key } = splitCombo(normalized)
     if (key.length === 0) continue
-    if (key === 'Mod' || key === 'Shift' || key === 'Alt') continue
     out[action] = normalized
   }
   return out

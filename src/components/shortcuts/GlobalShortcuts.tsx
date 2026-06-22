@@ -37,6 +37,46 @@ export function dispatchShortcut(action: string): void {
   window.dispatchEvent(new CustomEvent<ShortcutEventDetail>(SHORTCUT_EVENT, { detail: { action } }))
 }
 
+// ── Handler registry (finding C) ──────────────────────────────────────────────
+//
+// The dispatcher is mounted in the app-group layout and wraps EVERY app route
+// (files, inbox, settings, the editor, …). Previously it preventDefault()'d and
+// fired EVERY matching chord — including F5/`presenter`, which only the editor
+// handles. On non-editor pages that suppressed the browser's F5 reload for an
+// action nobody would act on.
+//
+// Fix: an action is only intercepted (preventDefault + dispatch) when a live
+// handler for it is currently registered. Each feature component registers the
+// action(s) it handles via registerShortcutAction() on mount and unregisters on
+// unmount. Counted so multiple/Strict-Mode double-mounts are safe. The global
+// mounts (command palette, fuzzy finder, cheat sheet) register on every page;
+// the editor registers `presenter` only while a document is open — so on every
+// non-editor page F5 is NOT registered, the dispatcher ignores it, and the
+// browser reload works normally.
+const registeredActions = new Map<string, number>()
+
+/**
+ * Register a handler for `action`. Returns an unregister function. The
+ * dispatcher will only preventDefault()/dispatch this action while at least one
+ * handler is registered. Call from a useEffect and return the result as cleanup.
+ */
+export function registerShortcutAction(action: string): () => void {
+  registeredActions.set(action, (registeredActions.get(action) ?? 0) + 1)
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    const next = (registeredActions.get(action) ?? 1) - 1
+    if (next <= 0) registeredActions.delete(action)
+    else registeredActions.set(action, next)
+  }
+}
+
+/** True when at least one handler is currently registered for `action`. */
+export function isShortcutActionHandled(action: string): boolean {
+  return (registeredActions.get(action) ?? 0) > 0
+}
+
 type Props = {
   /** Server-provided overrides map (action → normalized combo). */
   overrides?: Record<string, string>
@@ -54,6 +94,11 @@ export function GlobalShortcuts({ overrides = {} }: Props) {
       for (const b of bindings) {
         if (!b.customizable) continue
         if (matchesCombo(e, b.defaultKeys)) {
+          // Finding C: only intercept (and suppress the browser default) when a
+          // live handler for this action exists in the current context. On a
+          // non-editor page nothing registers `presenter`, so F5 falls through
+          // to the browser (reload) instead of being silently swallowed.
+          if (!isShortcutActionHandled(b.action)) return
           e.preventDefault()
           dispatchShortcut(b.action)
           return

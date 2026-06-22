@@ -1,7 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { SHORTCUT_EVENT, type ShortcutEventDetail } from '@/components/shortcuts/GlobalShortcuts'
+import {
+  registerShortcutAction,
+  SHORTCUT_EVENT,
+  type ShortcutEventDetail,
+} from '@/components/shortcuts/GlobalShortcuts'
 import { fuzzyFilter } from '@/lib/search/fuzzy'
 
 interface DocTitle {
@@ -28,7 +32,12 @@ export function FileFinder() {
       }
     }
     window.addEventListener(SHORTCUT_EVENT, handleShortcut)
-    return () => window.removeEventListener(SHORTCUT_EVENT, handleShortcut)
+    // Finding C: register so the dispatcher intercepts the fuzzy-finder combo.
+    const unregister = registerShortcutAction('fuzzy-finder')
+    return () => {
+      window.removeEventListener(SHORTCUT_EVENT, handleShortcut)
+      unregister()
+    }
   }, [])
 
   // Focus input when opened; reset state when closed

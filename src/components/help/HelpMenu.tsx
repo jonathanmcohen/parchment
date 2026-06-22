@@ -13,9 +13,19 @@
 //   - Tab/Shift-Tab cycle is trapped within each dialog
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { SHORTCUT_EVENT, type ShortcutEventDetail } from '@/components/shortcuts/GlobalShortcuts'
+import {
+  registerShortcutAction,
+  SHORTCUT_EVENT,
+  type ShortcutEventDetail,
+} from '@/components/shortcuts/GlobalShortcuts'
 import { RELEASE_NOTES, TOUR_STEPS } from '@/lib/help/content'
-import { type Binding, DEFAULT_BINDINGS, mergeBindings } from '@/lib/help/keymap'
+import {
+  type Binding,
+  DEFAULT_BINDINGS,
+  mergeBindings,
+  normalizeCombo,
+  splitCombo,
+} from '@/lib/help/keymap'
 
 // ── Cheat-sheet key formatting ────────────────────────────────────────────────
 //
@@ -29,15 +39,13 @@ function isMac(): boolean {
 
 /** Turn a normalized combo (e.g. `Mod-Shift-/`) into a display string. */
 export function formatCombo(combo: string, mac: boolean): string {
-  const parts = combo.split('-')
-  const key = parts[parts.length - 1] ?? ''
-  const mods = parts.slice(0, -1)
+  // splitCombo decomposes robustly so a `-`/`+` key (finding E) isn't lost by a
+  // naive split('-').
+  const { mods, key } = splitCombo(normalizeCombo(combo))
   const pretty: string[] = []
-  for (const m of mods) {
-    if (m === 'Mod') pretty.push(mac ? '⌘' : 'Ctrl')
-    else if (m === 'Shift') pretty.push(mac ? '⇧' : 'Shift')
-    else if (m === 'Alt') pretty.push(mac ? '⌥' : 'Alt')
-  }
+  if (mods.has('Mod')) pretty.push(mac ? '⌘' : 'Ctrl')
+  if (mods.has('Shift')) pretty.push(mac ? '⇧' : 'Shift')
+  if (mods.has('Alt')) pretty.push(mac ? '⌥' : 'Alt')
   const sep = mac ? '' : '+'
   return [...pretty, key.toUpperCase()].join(sep)
 }
@@ -381,7 +389,13 @@ export function HelpMenu({ shortcutOverrides = {} }: HelpMenuProps) {
       }
     }
     window.addEventListener(SHORTCUT_EVENT, handleShortcut)
-    return () => window.removeEventListener(SHORTCUT_EVENT, handleShortcut)
+    // Finding C: register so the dispatcher intercepts the cheat-sheet combo
+    // (⌘⇧/) wherever the HelpMenu is mounted (every app page).
+    const unregister = registerShortcutAction('shortcuts-help')
+    return () => {
+      window.removeEventListener(SHORTCUT_EVENT, handleShortcut)
+      unregister()
+    }
   }, [])
 
   // Close dropdown menu when clicking outside.

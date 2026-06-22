@@ -40,7 +40,11 @@ import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { WatermarkDialog } from '@/components/editor/WatermarkDialog'
-import { SHORTCUT_EVENT, type ShortcutEventDetail } from '@/components/shortcuts/GlobalShortcuts'
+import {
+  registerShortcutAction,
+  SHORTCUT_EVENT,
+  type ShortcutEventDetail,
+} from '@/components/shortcuts/GlobalShortcuts'
 import { clampAutosaveMs } from '@/lib/docs/autosave-config'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
@@ -863,10 +867,19 @@ export function Editor({
   // I3: interval driven by autosaveIntervalMs prop (clamped defensively to 5s–5min).
   // Re-creates the interval when docId, editor, or the interval duration changes.
   const lastSnapshotMd = useRef<string | null>(null)
+  // Minor (I2): pause version-snapshot autosave while source mode is open. In
+  // source mode the WYSIWYG editor is frozen at the open-time snapshot (the user
+  // edits markdown in CodeMirror, not the Y.Doc), so the interval would keep
+  // POSTing the same stale snapshot — and could snapshot pre-exit content. Read
+  // via a ref so toggling source mode doesn't tear down/recreate the interval.
+  const sourceModeOpenRef = useRef(false)
+  sourceModeOpenRef.current = sourceModeOpen
   useEffect(() => {
     const clampedMs = clampAutosaveMs(autosaveIntervalMs)
     const interval = setInterval(() => {
       if (!editor) return
+      // Skip snapshots entirely while source mode is active; resume on exit.
+      if (sourceModeOpenRef.current) return
       const json = editor.getJSON() as Record<string, unknown>
       const md = serializeMarkdown(json)
       // Skip if content hasn't changed since last snapshot
@@ -933,25 +946,97 @@ export function Editor({
   // I2 Part 3 — snapshot the current doc as PM-JSON when entering source mode.
   const [sourceSnapshot, setSourceSnapshot] = useState<Record<string, unknown> | null>(null)
 
+  // I2 Part 3 — COLLAB-SAFETY watcher state (finding D). While source mode is
+  // open the WYSIWYG editor is hidden, so the user cannot edit the Y.Doc through
+  // it; therefore ANY Y.Doc `update` that fires during the session is CONCURRENT,
+  // committed content (a peer who joined after open, the same user editing from
+  // another tab/device over y-indexeddb or Hocuspocus). Such updates do NOT bump
+  // awareness size, so the open-time `collabActive` check cannot see them. We
+  // latch a flag whenever one fires and refuse to blind-overwrite on exit.
+  const sourceDocChangedRef = useRef(false)
+
   const openSourceMode = useCallback(() => {
     if (!editor || collabActive) return
+    sourceDocChangedRef.current = false
     setSourceSnapshot(editor.getJSON() as Record<string, unknown>)
     setSourceModeOpen(true)
   }, [editor, collabActive])
+
+  // While source mode is open, watch the live Y.Doc for ANY update. Because the
+  // WYSIWYG is hidden, every update is external/concurrent content that a blind
+  // exit-replace would clobber. We also auto-exit nothing (the user keeps their
+  // markdown edits) but mark the doc changed so exitSourceMode requires explicit
+  // confirmation before overwriting. Bound to the live ydoc, not a snapshot.
+  useEffect(() => {
+    if (!sourceModeOpen) return
+    const onUpdate = () => {
+      sourceDocChangedRef.current = true
+    }
+    ydoc.on('update', onUpdate)
+    // Also treat a peer ARRIVING mid-session as a change signal (covers the case
+    // where a peer joins but has not yet produced a content update).
+    const awareness = provider?.awareness
+    const onAwareness = () => {
+      if (awareness && awareness.getStates().size > 1) sourceDocChangedRef.current = true
+    }
+    awareness?.on('change', onAwareness)
+    return () => {
+      ydoc.off('update', onUpdate)
+      awareness?.off('change', onAwareness)
+    }
+  }, [sourceModeOpen, ydoc, provider])
 
   // Exit source mode: replace the editor content with the re-parsed markdown as a
   // SINGLE transaction. Because Collaboration is bound to the Y.Doc, this one
   // setContent writes one CRDT update — never a character-by-character replay.
   // emitUpdate:true so onUpdate fires and the disk-mirror/markdown is saved.
+  //
+  // COLLAB SAFETY (finding D): a wholesale setContent does
+  // replaceWith(0, size, …) — it overwrites the WHOLE doc, clobbering anything
+  // that CRDT-merged in during the session. We close the clobber TWO ways:
+  //   1. live watcher — sourceDocChangedRef is latched true if any Y.Doc update
+  //      or new peer arrived while source mode was open (these do not bump
+  //      awareness size, so the open-time check cannot catch them); AND
+  //   2. re-snapshot at exit — compare the live doc JSON now against the open-time
+  //      snapshot; if it differs, content changed underneath us.
+  // If EITHER signals a change we do NOT blind-overwrite — we require an explicit
+  // user confirmation first. Confirming proceeds with the replace (the user
+  // accepts losing the concurrent edits in favor of their markdown); cancelling
+  // aborts the exit so source mode stays open and nothing is lost.
   const exitSourceMode = useCallback(
     (updatedJson: Record<string, unknown>) => {
       if (editor) {
+        // Re-snapshot the LIVE doc and compare to the open-time snapshot. A
+        // structural change here means content merged in concurrently.
+        const liveJson = editor.getJSON() as Record<string, unknown>
+        const changedSinceOpen =
+          sourceSnapshot !== null && JSON.stringify(liveJson) !== JSON.stringify(sourceSnapshot)
+        const concurrentEdits = sourceDocChangedRef.current || changedSinceOpen
+
+        if (concurrentEdits) {
+          const proceed =
+            typeof window === 'undefined'
+              ? false
+              : window.confirm(
+                  'This document changed elsewhere while you were editing the source ' +
+                    '(another tab, device, or collaborator). Saving the source view will ' +
+                    'OVERWRITE those changes. Overwrite anyway?\n\n' +
+                    'Cancel to keep editing the source without saving.',
+                )
+          if (!proceed) {
+            // Abort the exit — keep source mode open so nothing is lost. The user
+            // can copy their markdown out, then cancel/reopen, before deciding.
+            return
+          }
+        }
+
         editor.commands.setContent(updatedJson, { emitUpdate: true })
       }
+      sourceDocChangedRef.current = false
       setSourceModeOpen(false)
       setSourceSnapshot(null)
     },
-    [editor],
+    [editor, sourceSnapshot],
   )
 
   // Overlay crop button (image NodeView) dispatches this DOM event.
@@ -1072,27 +1157,36 @@ export function Editor({
     return () => dom.removeEventListener('parchment:goto-ref', handler)
   }, [editor])
 
-  // G16 / I2: open presenter mode (only when closed). The presenter binding is
-  // now owned by the central GlobalShortcuts dispatcher (default F5, remappable),
-  // which preventDefault()s the combo and fires parchment:shortcut. This handler
+  // G16 / I2: TOGGLE presenter mode. The presenter binding is owned by the
+  // central GlobalShortcuts dispatcher (default F5, remappable), which
+  // preventDefault()s the combo and fires parchment:shortcut. This handler
   // listens for the 'presenter' action.
-  // When the presenter is already open, PresenterView owns the close key and
-  // closes it. Guarding with presenterOpenRef prevents a double-setState race:
-  // without the guard, both this handler and PresenterView's handler fire in the
-  // same event, and functional-update batching can chain false → !false = true,
-  // leaving the presenter stuck open. With the guard this handler is a no-op
-  // when the overlay is active, so open/close ownership is exclusive.
+  //
+  // Finding B: this is the SOLE owner of the remappable presenter key. It must
+  // TOGGLE (open when closed, close when open) so that when the user remaps the
+  // presenter away from F5, the remapped key closes the overlay too — previously
+  // it only opened (PresenterView hardcoded the close to raw F5/Escape, which a
+  // remapped key never delivers). presenterOpenRef is read (not the state) so the
+  // []-deps effect never stales. PresenterView keeps Escape-to-close and the
+  // close button; it no longer owns a raw key, so there is no double-setState
+  // race (this handler is the only producer of `presenter`-driven state changes).
+  //
+  // Finding C: register the `presenter` action so the dispatcher only
+  // intercepts F5 (and suppresses the browser reload) while a document editor is
+  // mounted. On every non-editor page `presenter` is unregistered, so F5 falls
+  // through to the browser.
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<ShortcutEventDetail>).detail
       if (detail?.action !== 'presenter') return
-      if (!presenterOpenRef.current) {
-        setPresenterOpen(true)
-      }
-      // When the presenter IS open, PresenterView's keydown handler closes it.
+      setPresenterOpen(!presenterOpenRef.current)
     }
     window.addEventListener(SHORTCUT_EVENT, handler)
-    return () => window.removeEventListener(SHORTCUT_EVENT, handler)
+    const unregister = registerShortcutAction('presenter')
+    return () => {
+      window.removeEventListener(SHORTCUT_EVENT, handler)
+      unregister()
+    }
   }, [])
 
   // I2 Part 3 — track whether another peer is actively present in the Y.Doc.

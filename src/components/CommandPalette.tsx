@@ -2,7 +2,11 @@
 
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { SHORTCUT_EVENT, type ShortcutEventDetail } from '@/components/shortcuts/GlobalShortcuts'
+import {
+  registerShortcutAction,
+  SHORTCUT_EVENT,
+  type ShortcutEventDetail,
+} from '@/components/shortcuts/GlobalShortcuts'
 
 interface SearchResult {
   id: string
@@ -39,7 +43,13 @@ export function CommandPalette() {
       }
     }
     window.addEventListener(SHORTCUT_EVENT, handleShortcut)
-    return () => window.removeEventListener(SHORTCUT_EVENT, handleShortcut)
+    // Finding C: tell the dispatcher this action has a live handler so it
+    // intercepts (and suppresses the browser default for) the combo here.
+    const unregister = registerShortcutAction('command-palette')
+    return () => {
+      window.removeEventListener(SHORTCUT_EVENT, handleShortcut)
+      unregister()
+    }
   }, [])
 
   // Focus input when opened; reset state when closed

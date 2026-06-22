@@ -31,6 +31,12 @@ class SchedulerSingleton {
   private timer: ReturnType<typeof setInterval> | null = null
   private started = false
   private registered = false
+  // True while a `core.tick()` is still resolving. The interval callback is
+  // fire-and-forget (it can't await), so without this guard a tick that runs
+  // longer than TICK_INTERVAL_MS would let the next interval fire a second,
+  // overlapping tick. The per-job lock in the core already prevents re-entering
+  // an individual job; this prevents whole ticks from piling up.
+  private ticking = false
 
   /**
    * Register the default jobs (once) and start the single polling interval.
@@ -45,13 +51,29 @@ class SchedulerSingleton {
 
     // Kick a tick on the next macrotask so a due-on-boot job runs shortly after
     // start without blocking the server boot path.
-    setTimeout(() => void this.core.tick(Date.now()), 0)
+    setTimeout(() => void this.tick(), 0)
 
     this.timer = setInterval(() => {
-      void this.core.tick(Date.now())
+      void this.tick()
     }, TICK_INTERVAL_MS)
     // Don't keep the process alive solely for the scheduler (clean test/CLI exit).
     this.timer.unref?.()
+  }
+
+  /**
+   * Run one polling tick, guarded so overlapping interval fires never pile up.
+   * If a previous tick is still resolving (a slow job is mid-run), this fire is
+   * dropped — the still-pending tick will pick up anything that came due. Never
+   * throws (core.tick swallows job errors; the guard is always released).
+   */
+  private async tick(): Promise<void> {
+    if (this.ticking) return
+    this.ticking = true
+    try {
+      await this.core.tick(Date.now())
+    } finally {
+      this.ticking = false
+    }
   }
 
   /** Stop the interval and reset the started guard (cleanup / tests). */

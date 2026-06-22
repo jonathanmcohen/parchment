@@ -1,4 +1,5 @@
 import { RunNowButton } from '@/components/schedules/RunNowButton'
+import { requireAdmin } from '@/lib/auth/guard'
 import type { JobState } from '@/lib/schedules/jobs'
 import { scheduler } from '@/lib/schedules/scheduler'
 
@@ -59,7 +60,11 @@ function StatusPill({ status }: { status: JobState['lastStatus'] }) {
   )
 }
 
-export default function SchedulesPage() {
+export default async function SchedulesPage() {
+  // Admin-gated: the page exposes the destructive "Run now" control, which fires
+  // a cross-tenant sweep. Non-admins are redirected away.
+  await requireAdmin()
+
   const jobs = scheduler.getState()
   const now = Date.now()
 

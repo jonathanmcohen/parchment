@@ -84,7 +84,13 @@ export function collectCrossRefTargets(doc: unknown): CrossRefTarget[] {
 }
 
 function nodeToTarget(node: JsonNode, counters: Record<RefKind, number>): CrossRefTarget | null {
-  const type = node.type
+  // `node.type` is a string in plain-JSON docs (unit tests) but a NodeType
+  // OBJECT in real ProseMirror nodes (the live editor + collab) — normalize to
+  // the type name so both walk paths work. Reading it as a string only worked
+  // for JSON, which is why unit tests passed while the live numbering map stayed
+  // empty (every crossRef rendered "(?)").
+  const rawType: unknown = node.type
+  const type = typeof rawType === 'string' ? rawType : (rawType as { name?: string } | null)?.name
   const attrs = node.attrs ?? {}
 
   if (type === 'image') {

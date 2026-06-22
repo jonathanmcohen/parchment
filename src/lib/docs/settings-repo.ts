@@ -1,10 +1,16 @@
 import { and, eq } from 'drizzle-orm'
 import { db, schema } from '@/db'
+import { DEFAULT_STYLES, type NamedStyle, parseStyles } from '@/lib/editor/styles'
+import { DEFAULT_THEME, parseTheme, type WorkspaceTheme } from '@/lib/editor/theme'
 
 // E11: generic owner key-value settings store.
 
 export const TRASH_RETENTION_KEY = 'trashRetentionDays'
 export const DEFAULT_TRASH_RETENTION_DAYS = 30
+
+// G3: workspace theme + named styles, both reusing this settings store.
+export const WORKSPACE_THEME_KEY = 'workspaceTheme'
+export const DOC_STYLES_KEY = 'docStyles'
 
 /** Return the stored value for (ownerId, key), or `fallback` if unset. */
 export async function getSetting<T>(ownerId: string, key: string, fallback: T): Promise<T> {
@@ -37,4 +43,31 @@ export async function getTrashRetentionDays(ownerId: string): Promise<number> {
 export async function setTrashRetentionDays(ownerId: string, days: number): Promise<void> {
   const clamped = Math.max(0, Math.round(days))
   await setSetting(ownerId, TRASH_RETENTION_KEY, clamped)
+}
+
+/** Read the owner's workspace theme (validated; defaults when unset/malformed). */
+export async function getWorkspaceTheme(ownerId: string): Promise<WorkspaceTheme> {
+  const raw = await getSetting<unknown>(ownerId, WORKSPACE_THEME_KEY, DEFAULT_THEME)
+  return parseTheme(raw)
+}
+
+/** Persist the owner's workspace theme (normalized via parseTheme). */
+export async function setWorkspaceTheme(ownerId: string, theme: unknown): Promise<WorkspaceTheme> {
+  const normalized = parseTheme(theme)
+  await setSetting(ownerId, WORKSPACE_THEME_KEY, normalized)
+  return normalized
+}
+
+/** Read the owner's named styles, or the built-in defaults if unset. */
+export async function getDocStyles(ownerId: string): Promise<NamedStyle[]> {
+  const raw = await getSetting<unknown>(ownerId, DOC_STYLES_KEY, undefined)
+  if (raw === undefined || raw === null) return [...DEFAULT_STYLES]
+  return parseStyles(raw)
+}
+
+/** Persist the owner's named styles (validated; malformed entries dropped). */
+export async function setDocStyles(ownerId: string, styles: unknown): Promise<NamedStyle[]> {
+  const normalized = parseStyles(styles)
+  await setSetting(ownerId, DOC_STYLES_KEY, normalized)
+  return normalized
 }

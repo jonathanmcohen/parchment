@@ -1,7 +1,10 @@
 import Link from 'next/link'
+import type { CSSProperties } from 'react'
 import { CommandPaletteMount } from '@/components/CommandPaletteMount'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
+import { getWorkspaceTheme } from '@/lib/docs/settings-repo'
+import { themeCssVars } from '@/lib/editor/theme'
 
 const nav = [
   { href: '/files', label: 'Files' },
@@ -15,8 +18,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Gate the whole app group: unauthenticated visitors are sent to /login.
   const user = await requireUser()
 
+  // G3: inject the workspace theme's CSS vars so they cascade to all children,
+  // overriding the globals.css defaults (--accent-contrast, --font-*).
+  const theme = await getWorkspaceTheme(user.id)
+  const themeStyle = themeCssVars(theme) as CSSProperties
+
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen" style={themeStyle}>
       <CommandPaletteMount />
       <aside className="flex w-56 shrink-0 flex-col gap-1 border-[var(--border)] border-r bg-[var(--paper)] p-4">
         <Link href="/" className="mb-4 px-2 font-semibold text-lg tracking-tight">

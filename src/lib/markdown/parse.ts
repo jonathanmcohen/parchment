@@ -362,13 +362,19 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
     case 'equation': {
       // G8a: lossless mathBlock + refId round-trip.
       // The body is { latex, refId }.
+      // G8a-fix: do NOT drop an empty-latex equation that carries a refId — the
+      // cross-ref target identity lives in refId, not in the latex content. A
+      // `parchment:equation` fence is only emitted when refId is non-empty (see
+      // serialize.ts), so if refId is also absent here the fence is degenerate and
+      // we correctly return null to degrade to a codeBlock.
       const latex = typeof data.latex === 'string' ? data.latex : ''
-      if (!latex) return null
+      const refId = typeof data.refId === 'string' ? data.refId : ''
+      if (!latex && !refId) return null
       return {
         type: 'mathBlock',
         attrs: {
           latex,
-          refId: typeof data.refId === 'string' ? data.refId : '',
+          refId,
         },
       }
     }

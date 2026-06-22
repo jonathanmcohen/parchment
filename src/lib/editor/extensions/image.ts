@@ -61,6 +61,12 @@ function buildImageNodeView(
   _editor: Editor,
   getPos: boolean | (() => number | undefined),
 ): ProseMirrorNodeView {
+  // G8a-fix: track the current node in a mutable binding so paintCaption always
+  // reads the latest attrs (ProseMirror nodes are immutable — update() receives a
+  // new node object; without this the closure reads stale construction-time attrs
+  // and refId/caption changes never render).
+  let currentNode = node
+
   const wrapper = document.createElement('span')
   wrapper.classList.add('parchment-image-wrapper')
   const pos = node.attrs.position as ImagePosition | null
@@ -79,11 +85,11 @@ function buildImageNodeView(
   captionEl.contentEditable = 'false'
 
   const paintCaption = (): void => {
-    const refId = _editor.view ? (node.attrs.refId as string | undefined) : undefined
+    const refId = _editor.view ? (currentNode.attrs.refId as string | undefined) : undefined
     const numbering = _editor.view ? crossRefNumberingKey.getState(_editor.view.state) : undefined
     const target = refId ? numbering?.get(refId) : undefined
     const n = target?.number
-    const caption = node.attrs.caption as string | undefined
+    const caption = currentNode.attrs.caption as string | undefined
     if (n !== undefined || caption) {
       const prefix = n !== undefined ? `Figure ${n}` : 'Figure'
       captionEl.textContent = caption ? `${prefix}: ${caption}` : prefix
@@ -200,6 +206,9 @@ function buildImageNodeView(
     contentDOM: null,
     update(updatedNode) {
       if (updatedNode.type.name !== 'image') return false
+      // G8a-fix: update currentNode BEFORE calling paintCaption so the closure
+      // reads the new attrs (refId assigned by appendTransaction, caption edits).
+      currentNode = updatedNode
       img.src = updatedNode.attrs.src as string
       img.alt = updatedNode.attrs.alt as string
       const newPos = updatedNode.attrs.position as ImagePosition | null

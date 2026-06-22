@@ -94,41 +94,15 @@ export const DrawingExtension = Node.create({
     return {
       insertDrawing:
         () =>
-        // biome-ignore lint/correctness/noUnusedFunctionParameters: dispatch is part of the Tiptap command signature; the command writes via view.dom.dispatchEvent (a DOM event, not a ProseMirror dispatch)
-        ({ commands, dispatch, view }) => {
-          // Insert empty drawing node at the current selection.
-          const inserted = commands.insertContent({
+        ({ commands }) =>
+          // Pure insert of an empty drawing node. Opening the editor modal is the
+          // caller's responsibility AFTER .run() dispatches (the slash-menu handler
+          // dispatches parchment:edit-drawing then) — inside a chain, view.state is
+          // still pre-insertion, so the new node's position cannot be resolved here.
+          commands.insertContent({
             type: this.name,
             attrs: { scene: null, svg: '' },
-          })
-          if (!inserted) return false
-          // After insertContent() the view's state has already been updated —
-          // use view.state (post-insertion) NOT the stale `state` closure variable
-          // which reflects the pre-insertion EditorState. Walk backward from the
-          // post-insertion cursor to find the newly inserted drawing node.
-          if (view) {
-            const postState = view.state
-            // The cursor is placed just after the inserted atom node. Walk
-            // backward from the current selection to find the drawing node.
-            let drawingPos: number | null = null
-            const cursorPos = postState.selection.from
-            postState.doc.nodesBetween(0, cursorPos, (node, pos) => {
-              if (node.type.name === 'drawing') {
-                drawingPos = pos
-              }
-              return true
-            })
-            if (drawingPos !== null) {
-              view.dom.dispatchEvent(
-                new CustomEvent('parchment:edit-drawing', {
-                  bubbles: true,
-                  detail: { pos: drawingPos, scene: null },
-                }),
-              )
-            }
-          }
-          return true
-        },
+          }),
       updateDrawing:
         (pos, scene, svg) =>
         ({ tr, dispatch, state }) => {

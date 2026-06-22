@@ -114,11 +114,37 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       editor.chain().focus().insertSectionBreak().run()
       break
 
-    // G5: drawing — insertDrawing also dispatches parchment:edit-drawing so the
-    // modal opens immediately after the empty node is inserted.
-    case 'drawing':
+    // G5: drawing — insert the empty node, then open the Excalidraw modal at the
+    // new node's position. The dispatch must happen AFTER .run() so editor.state
+    // reflects the inserted node (inside the chain, view.state is pre-insertion).
+    case 'drawing': {
       editor.chain().focus().insertDrawing().run()
+      const { state } = editor
+      const selFrom = state.selection.from
+      let drawingPos: number | null = null
+      // After inserting the block atom the selection node-selects it, so the
+      // drawing sits exactly at selFrom. Fall back to a small window scan in case
+      // the cursor landed beside the node rather than on it.
+      const selected = state.doc.nodeAt(selFrom)
+      if (selected?.type.name === 'drawing') {
+        drawingPos = selFrom
+      } else {
+        const lo = Math.max(0, selFrom - 2)
+        const hi = Math.min(state.doc.content.size, selFrom + 2)
+        state.doc.nodesBetween(lo, hi, (node, pos) => {
+          if (node.type.name === 'drawing') drawingPos = pos
+        })
+      }
+      if (drawingPos !== null) {
+        editor.view.dom.dispatchEvent(
+          new CustomEvent('parchment:edit-drawing', {
+            bubbles: true,
+            detail: { pos: drawingPos, scene: null },
+          }),
+        )
+      }
       break
+    }
 
     // G4: equations. Insert with empty LaTeX, then open the editor popover at
     // the new node's position so the user types the formula immediately.

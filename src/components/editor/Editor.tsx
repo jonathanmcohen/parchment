@@ -28,6 +28,7 @@ import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
 import { PlantumlPopover } from '@/components/editor/PlantumlPopover'
 import { ReadingPresence } from '@/components/editor/ReadingPresence'
+import { ReadingView } from '@/components/editor/ReadingView'
 import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
 import { ShareDialog } from '@/components/editor/ShareDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
@@ -495,6 +496,9 @@ export function Editor({
 
   // D5: reading presence readers list + canvas wrapper ref
   const [readers, setReaders] = useState<Reader[]>([])
+
+  // G15: Reading mode overlay — full-bleed read-only view.
+  const [readingOpen, setReadingOpen] = useState(false)
   const canvasWrapRef = useRef<HTMLDivElement>(null)
 
   // G12: page-fit — scaled host ref and page natural height tracking.
@@ -1056,6 +1060,8 @@ export function Editor({
           onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
           backlinksOpen={backlinksOpen}
           onOpenShare={() => setShareDialogOpen(true)}
+          onToggleReading={() => setReadingOpen((v) => !v)}
+          readingOpen={readingOpen}
         />
       )}
 
@@ -1242,6 +1248,17 @@ export function Editor({
 
       {/* G1: Share dialog */}
       {shareDialogOpen && <ShareDialog docId={docId} onClose={() => setShareDialogOpen(false)} />}
+
+      {/* G15: Reading mode overlay — rendered outside the layout flow so it is
+          full-screen fixed. Content is a snapshot of editor.getJSON() at render
+          time — read-only view via renderReadOnlyDoc, no editor/contenteditable. */}
+      {readingOpen && editor && (
+        <ReadingView
+          content={editor.getJSON()}
+          docId={docId}
+          onClose={() => setReadingOpen(false)}
+        />
+      )}
     </div>
   )
 }

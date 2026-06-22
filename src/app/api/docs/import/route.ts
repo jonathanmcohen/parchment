@@ -28,6 +28,14 @@ export async function POST(req: NextRequest) {
   const user = await authenticateRequest(req)
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
+  // Check Content-Length before buffering the body to avoid accepting arbitrarily
+  // large payloads. Next.js App Router route handlers have no automatic body-size
+  // limit (serverActions.bodySizeLimit applies only to Server Actions).
+  const contentLength = req.headers.get('content-length')
+  if (contentLength !== null && Number(contentLength) > MAX_BYTES) {
+    return NextResponse.json({ error: 'file too large (max 25 MB)' }, { status: 413 })
+  }
+
   let formData: FormData
   try {
     formData = await req.formData()
@@ -56,10 +64,19 @@ export async function POST(req: NextRequest) {
   // importToPmJson never throws — always returns a result (possibly with warnings)
   const result = await importToPmJson(importType, bytes, filename)
 
-  const { id } = await createDocument(user.id, {
-    title: result.title,
-    content: result.json,
-  })
+  let id: string
+  try {
+    const doc = await createDocument(user.id, {
+      title: result.title,
+      content: result.json,
+    })
+    id = doc.id
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Failed to create document: ${String(err)}` },
+      { status: 500 },
+    )
+  }
 
   return NextResponse.json({ id, warnings: result.warnings }, { status: 200 })
 }

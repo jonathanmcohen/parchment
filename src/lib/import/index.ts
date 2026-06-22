@@ -87,12 +87,35 @@ export async function htmlToMarkdown(html: string): Promise<string> {
   }
 }
 
+// Maximum total uncompressed bytes we'll accept from a ZIP before aborting.
+// Prevents zip-bomb attacks: a ≤25 MB compressed ZIP cannot expand beyond this.
+const MAX_UNCOMPRESSED_TOTAL = 100 * 1024 * 1024 // 100 MB
+// Maximum uncompressed size for the single entry we actually decompress.
+const MAX_UNCOMPRESSED_ENTRY = 50 * 1024 * 1024 // 50 MB
+
+/**
+ * Return the basename of a ZIP entry name and reject any entry that contains
+ * path-traversal sequences or absolute paths. Returns null for unsafe entries.
+ */
+function safeEntryBasename(name: string): string | null {
+  // Reject absolute paths and any component that is or contains '..'
+  if (name.startsWith('/') || name.startsWith('\\')) return null
+  const parts = name.split(/[/\\]/)
+  if (parts.some((p) => p === '..' || p === '.')) return null
+  return parts[parts.length - 1] ?? null
+}
+
 /**
  * Unzip a Notion export ZIP and return the primary markdown text.
  * Notion exports are ZIPs of .md files (one per page). We pick:
  *   1. The largest .md file (heuristic: the root page).
  *   2. Fallback: the largest .html file.
  * Returns { text, ext } — ext is 'md' or 'html'.
+ *
+ * Safety guards:
+ * - Total uncompressed size across all entries must not exceed MAX_UNCOMPRESSED_TOTAL.
+ * - The chosen entry's uncompressed size must not exceed MAX_UNCOMPRESSED_ENTRY.
+ * - Entry names with path-traversal sequences are silently skipped.
  */
 async function unpackNotionZip(
   bytes: Uint8Array,
@@ -102,12 +125,22 @@ async function unpackNotionZip(
     const zip = await JSZip.loadAsync(bytes)
     let bestMd: { name: string; size: number } | null = null
     let bestHtml: { name: string; size: number } | null = null
+    let totalUncompressed = 0
 
     for (const [name, entry] of Object.entries(zip.files)) {
       if (entry.dir) continue
-      const low = name.toLowerCase()
+
+      // Path-traversal guard: skip unsafe entry names
+      if (safeEntryBasename(name) === null) continue
+
       const size =
         (entry as unknown as { _data: { uncompressedSize: number } })._data?.uncompressedSize ?? 0
+
+      // Zip-bomb guard: abort if total uncompressed size exceeds threshold
+      totalUncompressed += size
+      if (totalUncompressed > MAX_UNCOMPRESSED_TOTAL) return null
+
+      const low = name.toLowerCase()
       if (low.endsWith('.md') || low.endsWith('.markdown')) {
         if (!bestMd || size > bestMd.size) bestMd = { name, size }
       } else if (low.endsWith('.html') || low.endsWith('.htm')) {
@@ -116,10 +149,14 @@ async function unpackNotionZip(
     }
 
     if (bestMd) {
+      // Per-entry size guard before decompression
+      if (bestMd.size > MAX_UNCOMPRESSED_ENTRY) return null
       const text = await zip.files[bestMd.name]?.async('string')
       if (text !== undefined) return { text, ext: 'md' }
     }
     if (bestHtml) {
+      // Per-entry size guard before decompression
+      if (bestHtml.size > MAX_UNCOMPRESSED_ENTRY) return null
       const text = await zip.files[bestHtml.name]?.async('string')
       if (text !== undefined) return { text, ext: 'html' }
     }

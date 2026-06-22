@@ -4,7 +4,7 @@ import { getWorkspaceTheme, setWorkspaceTheme } from '@/lib/docs/settings-repo'
 
 export const dynamic = 'force-dynamic'
 
-/** GET /api/settings/theme → WorkspaceTheme */
+/** GET /api/settings/theme → WorkspaceTheme (accent, fontPair, colorScheme, pageBg) */
 export async function GET(req: NextRequest) {
   const user = await authenticateRequest(req)
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(theme)
 }
 
-/** PUT /api/settings/theme { accent, fontPair } → { ok: true, theme } */
+/**
+ * PUT /api/settings/theme { accent, fontPair, colorScheme, pageBg } → { ok: true, theme }
+ * I1: colorScheme + pageBg validated by parseTheme inside setWorkspaceTheme.
+ */
 export async function PUT(req: NextRequest) {
   const user = await authenticateRequest(req)
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })

@@ -77,6 +77,38 @@ describe('sanitizeCustomCss', () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing runtime safety
     expect(sanitizeCustomCss(42 as any)).toBe('')
   })
+
+  it('strips @scope block entirely — adversarial :root prelude (scope-escape #1)', () => {
+    // @scope (:root) lets the inner selector target the document root, completely
+    // bypassing the .parchment-custom-scope prefix defence.
+    const input = '@scope (:root) { body { background: red } }'
+    const result = sanitizeCustomCss(input)
+    expect(result).not.toContain('@scope')
+    expect(result).not.toContain('background: red')
+  })
+
+  it('strips @scope block entirely — adversarial html prelude (scope-escape #2)', () => {
+    const input = '@scope (html) { .parchment-toolbar { display: none !important } }'
+    const result = sanitizeCustomCss(input)
+    expect(result).not.toContain('@scope')
+    expect(result).not.toContain('parchment-toolbar')
+  })
+
+  it('strips @scope block entirely — universal selector inside (scope-escape #3)', () => {
+    const input = '@scope (:root) { * { color: hotpink !important } }'
+    const result = sanitizeCustomCss(input)
+    expect(result).not.toContain('@scope')
+  })
+
+  it('strips @scope and preserves surrounding safe rules', () => {
+    const input = 'h1 { color: blue } @scope (:root) { body { background: red } } p { margin: 0 }'
+    const result = sanitizeCustomCss(input)
+    expect(result).not.toContain('@scope')
+    expect(result).not.toContain('background: red')
+    // Safe rules before and after the @scope block must survive.
+    expect(result).toContain('h1')
+    expect(result).toContain('p')
+  })
 })
 
 // ── scopeCustomCss ────────────────────────────────────────────────────────────

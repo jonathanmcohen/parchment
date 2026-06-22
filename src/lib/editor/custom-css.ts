@@ -24,6 +24,56 @@ export const CUSTOM_CSS_SCOPE = 'parchment-custom-scope'
 /** Maximum length of stored/processed CSS (characters). */
 const MAX_CSS_LENGTH = 20_000
 
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Remove every `@<keyword> … { … }` block from `css`, handling nested braces
+ * correctly so the entire at-rule body is consumed (not just up to the first `}`).
+ * Statement at-rules (`@<keyword> …;`) are also stripped.
+ * Case-insensitive on the keyword. Never throws.
+ */
+function stripAtRuleBlocks(css: string, keyword: string): string {
+  const re = new RegExp(`@${keyword}\\b`, 'gi')
+  let result = css
+  // Iterate until no occurrences remain (re-run after each splice, since indices shift).
+  for (;;) {
+    const match = re.exec(result)
+    if (match === null) break
+    const start = match.index
+    // Scan forward to find ';' (statement form) or '{' (block form).
+    let i = start + match[0].length
+    while (i < result.length && result[i] !== '{' && result[i] !== ';') i++
+    if (i >= result.length) {
+      // Ran off the end — strip from start to end.
+      result = result.slice(0, start)
+      break
+    }
+    if (result[i] === ';') {
+      // Statement form — strip from start through ';'.
+      result = result.slice(0, start) + result.slice(i + 1)
+      re.lastIndex = start
+      continue
+    }
+    // Block form — find the matching '}'.
+    let depth = 0
+    let end = i
+    while (end < result.length) {
+      if (result[end] === '{') depth++
+      else if (result[end] === '}') {
+        depth--
+        if (depth === 0) {
+          end++ // include the closing '}'
+          break
+        }
+      }
+      end++
+    }
+    result = result.slice(0, start) + result.slice(end)
+    re.lastIndex = start
+  }
+  return result
+}
+
 // ── Sanitize ──────────────────────────────────────────────────────────────────
 
 /**
@@ -49,6 +99,22 @@ export function sanitizeCustomCss(css: string): string {
   // Strip @import rules. Match `@import` through to the first `;` or end-of-line.
   // We handle both `@import "..."` and `@import url(...)` forms.
   s = s.replace(/@import\b[^;]*(;|$)/gi, '')
+
+  // Strip @scope at-rules entirely.
+  // CSS @scope (CSS Scoping Level 1, Chrome 118+, Firefox 128+, Safari 17.4+) lets
+  // an author declare an explicit scope-start selector via the at-rule prelude, e.g.
+  //   @scope (:root) { body { background: red } }
+  // The scope-start selector is evaluated against the full document — the <style>
+  // element's DOM position inside .parchment-custom-scope does NOT constrain it.
+  // A user-supplied prelude like `(:root)` or `(html)` routes the inner rules to
+  // the document root, bypassing the selector-prefixing defense entirely and
+  // allowing full app-chrome redressing (toolbar, body, shared-viewer page, etc.).
+  // Stripping @scope blocks unconditionally is the safe choice: relative-to-parent
+  // scoping (@scope without a prelude) could in principle be kept, but verifying
+  // that the prelude cannot escape the wrapper would require replicating selector
+  // matching logic that is error-prone. Strip the full at-rule block, handling
+  // nested braces so we remove the entire @scope { … } and not just the opener.
+  s = stripAtRuleBlocks(s, 'scope')
 
   // Strip expression(...) — IE CSS expression injection.
   // Match greedily including nested parens (simple heuristic: up to 500 chars).
@@ -194,7 +260,11 @@ function parseStyleRule(
  * At-rules that have bodies containing style rules — their inner rules must be scoped.
  * All other at-rules pass through untouched.
  */
-const CONTAINER_AT_RULES = new Set(['media', 'supports', 'container', 'layer', 'document'])
+// 'scope' is included here as defence-in-depth: @scope is stripped entirely in
+// sanitizeCustomCss (because a user-controlled prelude can root the scope at
+// :root/html and bypass the prefixing defence). If sanitization is ever called
+// without the scope-strip step, the inner selectors will at least be prefixed.
+const CONTAINER_AT_RULES = new Set(['media', 'supports', 'container', 'layer', 'document', 'scope'])
 
 /** Parse an at-rule starting at `start` (`block[start]` === '@'). Returns {text, end}. */
 function parseAtRule(css: string, start: number, scope: string): { text: string; end: number } {

@@ -14,6 +14,7 @@ import { EquationRef, MathBlock, MathCommands, MathInline } from '@/lib/editor/e
 import { MermaidExtension } from '@/lib/editor/extensions/mermaid'
 import { PageBreakExtension, SectionBreakExtension } from '@/lib/editor/extensions/page-primitives'
 import { PlantumlExtension } from '@/lib/editor/extensions/plantuml'
+import { SmartPasteExtension } from '@/lib/editor/extensions/smart-paste'
 import { Suggesting } from '@/lib/editor/extensions/suggesting'
 import { tableExtensions } from '@/lib/editor/extensions/table'
 import { TocExtension } from '@/lib/editor/extensions/toc'
@@ -118,4 +119,10 @@ export const baseExtensions = [
   // onOpenImage callback that controls the image dialog.
   // C3/C4: Shiki-powered code block (replaces StarterKit's built-in codeBlock).
   CodeBlockShiki,
+  // G14: Smart paste — sniff source (Word/GDocs/Notion/web/markdown/plain) and
+  // normalize foreign HTML before ProseMirror parses it. Uses transformPastedHTML
+  // (DOMParser, browser-only, never called at module load) + handlePaste for
+  // markdown-as-plaintext. Internal/plain paste passes through UNCHANGED.
+  // Image paste returns false so the B5 editorProps handler still runs.
+  SmartPasteExtension,
 ]

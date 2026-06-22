@@ -247,17 +247,43 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
 
     // G4: equations. Insert with empty LaTeX, then open the editor popover at
     // the new node's position so the user types the formula immediately.
+    // Read editor.state AFTER .run() so the position reflects the post-insertion
+    // state — the same pattern used by the G6 mermaid/plantuml/drawio cases.
     case 'mathBlock': {
-      const insertAt = editor.state.selection.from
       editor.chain().focus().insertMathBlock('').run()
-      onEditMath?.(insertAt)
+      const { state: mathBlockState } = editor
+      const mathBlockSelFrom = mathBlockState.selection.from
+      let mathBlockPos: number | null = null
+      const mathBlockNode = mathBlockState.doc.nodeAt(mathBlockSelFrom)
+      if (mathBlockNode?.type.name === 'mathBlock') {
+        mathBlockPos = mathBlockSelFrom
+      } else {
+        const lo = Math.max(0, mathBlockSelFrom - 2)
+        const hi = Math.min(mathBlockState.doc.content.size, mathBlockSelFrom + 2)
+        mathBlockState.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'mathBlock') mathBlockPos = nodePos
+        })
+      }
+      if (mathBlockPos !== null) onEditMath?.(mathBlockPos)
       break
     }
 
     case 'mathInline': {
-      const insertAt = editor.state.selection.from
       editor.chain().focus().insertMathInline('').run()
-      onEditMath?.(insertAt)
+      const { state: mathInlineState } = editor
+      const mathInlineSelFrom = mathInlineState.selection.from
+      let mathInlinePos: number | null = null
+      const mathInlineNode = mathInlineState.doc.nodeAt(mathInlineSelFrom)
+      if (mathInlineNode?.type.name === 'mathInline') {
+        mathInlinePos = mathInlineSelFrom
+      } else {
+        const lo = Math.max(0, mathInlineSelFrom - 2)
+        const hi = Math.min(mathInlineState.doc.content.size, mathInlineSelFrom + 2)
+        mathInlineState.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'mathInline') mathInlinePos = nodePos
+        })
+      }
+      if (mathInlinePos !== null) onEditMath?.(mathInlinePos)
       break
     }
 

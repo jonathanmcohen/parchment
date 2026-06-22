@@ -2,6 +2,7 @@
 
 import type { Editor } from '@tiptap/core'
 import { useCallback, useRef, useState } from 'react'
+import { authorColor } from '@/lib/editor/track-changes'
 
 type AiOperation = 'improve' | 'shorten' | 'translate' | 'continue'
 
@@ -29,15 +30,23 @@ export function AiMenu({ editor, aiEnabled }: Props) {
 
   const runOperation = useCallback(
     async (op: AiOperation, lang?: string) => {
-      const { from, to } = editor.state.selection
-      if (from === to) return
+      // Capture selection at click time — used only for the fetch body.
+      // We re-read positions from editor.state after the await to avoid
+      // stale-position corruption (the user may type during network latency).
+      const clickFrom = editor.state.selection.from
+      const clickTo = editor.state.selection.to
+      if (clickFrom === clickTo) return
 
-      const text = editor.state.doc.textBetween(from, to, ' ')
+      const text = editor.state.doc.textBetween(clickFrom, clickTo, ' ')
       if (!text.trim()) return
 
       setOpen(false)
       setShowLangInput(false)
       setStatus('loading')
+
+      // Capture suggesting state before the async work so we can restore it
+      // in the finally block regardless of success or error.
+      const wasOn = editor.storage.suggesting?.enabled ?? false
 
       try {
         const res = await fetch('/api/ai/compose', {
@@ -63,29 +72,67 @@ export function AiMenu({ editor, aiEnabled }: Props) {
           return
         }
 
-        // Capture current suggesting state — restore it after AI inserts
-        const wasOn = editor.storage.suggesting?.enabled ?? false
+        // ── Re-read positions after the async round-trip ────────────────────
+        // The document may have changed while the fetch was in-flight (user
+        // typed, Yjs sync, etc.). ProseMirror positions are absolute integers
+        // and are NOT remapped automatically — using clickFrom/clickTo here
+        // would corrupt the document.  Clamp to the current document size so
+        // we never pass an out-of-bounds position to insertContentAt.
+        const docSize = editor.state.doc.content.size
+        const from = Math.min(clickFrom, docSize)
+        const to = Math.min(clickTo, docSize)
 
-        // Enable suggesting mode so AI output is tracked as suggestions
+        // Enable suggesting so AI output is tracked as suggestions.
         editor.commands.setSuggesting(true)
 
         if (op === 'continue') {
-          // Append result at the end of the selection
+          // Append AI result after the selection end (or the remapped end).
           editor.chain().focus().insertContentAt(to, result).run()
         } else {
-          // Replace the selection with the AI result (tracked: old text gets
-          // deletion mark, new text gets insertion mark)
-          editor.chain().focus().insertContentAt({ from, to }, result).run()
-        }
+          // Replace ops (improve / shorten / translate):
+          //
+          // appendTransaction in suggesting.ts marks ONLY net-positive
+          // insertions (delta > 0) and ignores programmatic range deletions.
+          // This means a plain insertContentAt({from,to}, result) would:
+          //   • silently delete the original text (no deletion mark), AND
+          //   • only mark the excess tail bytes (if result is longer).
+          //
+          // Fix: apply the deletion mark to [from, to] ourselves FIRST, then
+          // insert `result` at `from` so appendTransaction sees a pure
+          // insertion and marks it correctly as an insertion suggestion.
+          // Together they form a reviewable tracked replace: old text is
+          // struck-through (deletion), new text is underlined (insertion).
+          const deletionMarkType = editor.state.schema.marks.deletion
+          const author: string = (editor.storage.suggesting?.author as string | undefined) ?? 'You'
+          const color = authorColor(author)
 
-        // Restore prior suggesting state (leave the tracked changes in place)
-        if (!wasOn) {
-          editor.commands.setSuggesting(false)
+          if (deletionMarkType && from < to) {
+            // Step 1: mark the original range as a tracked deletion.
+            editor
+              .chain()
+              .focus()
+              .command(({ tr }) => {
+                tr.addMark(from, to, deletionMarkType.create({ author, color }))
+                return true
+              })
+              .run()
+          }
+
+          // Step 2: insert new text at `from` (suggesting ON → appendTransaction
+          // marks it as an insertion).  insertContentAt with a single position
+          // inserts without deleting the marked-deleted range.
+          editor.chain().focus().insertContentAt(from, result).run()
         }
 
         setStatus('idle')
       } catch {
         setStatus('error_failed')
+      } finally {
+        // Always restore suggesting to its pre-operation state so a thrown
+        // error or early return never leaves suggesting stuck ON.
+        if (!wasOn) {
+          editor.commands.setSuggesting(false)
+        }
       }
     },
     [editor],
@@ -235,6 +282,21 @@ export function AiMenu({ editor, aiEnabled }: Props) {
           whiteSpace: 'nowrap',
         }}
       >
+        {status === 'loading' && (
+          <span
+            className="parchment-sr-only"
+            style={{
+              position: 'absolute',
+              width: 1,
+              height: 1,
+              overflow: 'hidden',
+              clip: 'rect(0,0,0,0)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            AI request in progress…
+          </span>
+        )}
         {status === 'error_disabled' && (
           <span
             style={{ color: 'var(--color-muted, #6b7280)', padding: '4px 8px', display: 'block' }}

@@ -166,6 +166,13 @@
      graceful fallback if the bundled woff2 is unavailable. */
   --font-body: "OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Verdana, sans-serif;
   --font-heading: var(--font-body);
+  /* The var override alone is inert for the UI chrome: only `body` declares
+     `font-family: var(--font-body)`, and `body` is the PARENT of this theme
+     wrapper, so it resolves the var from :root (system) rather than this rule.
+     Apply the font ON the wrapper so every descendant (sidebar, menus, buttons)
+     inherits OpenDyslexic; elements with their own font-family (code, prose
+     headings) keep theirs. */
+  font-family: var(--font-body);
 }
 
 @theme inline {

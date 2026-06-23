@@ -163,6 +163,16 @@ export function resolvePageBg(pageBg: string): string {
  *
  * I1: also emits `--page-bg` from the pageBg field.
  */
+// K2: the OpenDyslexic font stack. When dyslexicFont is on it MUST be emitted
+// here (inline on the wrapper), not only via the [data-font="dyslexic"] CSS
+// rule: themeCssVars sets `--font-body` inline, and an inline custom property
+// shadows any stylesheet override of the same property (the I1 inline-var
+// lesson). So the CSS rule's `--font-body` override never reached the UI chrome;
+// emitting the dyslexic stack here makes the inline var itself OpenDyslexic, and
+// the [data-font="dyslexic"] rule's `font-family: var(--font-body)` then carries
+// it to every descendant.
+const DYSLEXIC_FONT_STACK = '"OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Verdana, sans-serif'
+
 export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
   const pair = findPair(theme.fontPair)
   return {
@@ -172,8 +182,8 @@ export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
     // Emitting only one leaves a large share of the accent UI on the default.
     '--accent': theme.accent,
     '--accent-contrast': theme.accent,
-    '--font-heading': pair.heading,
-    '--font-body': pair.body,
+    '--font-heading': theme.dyslexicFont ? DYSLEXIC_FONT_STACK : pair.heading,
+    '--font-body': theme.dyslexicFont ? DYSLEXIC_FONT_STACK : pair.body,
     // I1: page/paper background, overrides --paper on the doc canvas.
     '--page-bg': resolvePageBg(theme.pageBg),
   }

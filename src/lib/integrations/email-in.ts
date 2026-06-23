@@ -167,11 +167,25 @@ export function parseInboundAddress(toAddress: string): { docId: string } | null
   return { docId }
 }
 
-/** Collapse a single field to safe plain text: strip HTML tags, drop C0/C1
- *  control chars (keep tab/newline), collapse runs of whitespace lightly, trim,
- *  and cap to `max` chars. */
+/** Collapse a single-line HEADER field (From/Subject) to safe plain text: strip
+ *  HTML tags, drop C0/C1 control chars, then collapse ALL whitespace — crucially
+ *  including newlines/CRs/tabs — to a single space so the value can never span
+ *  more than one line. This is the integrity gate for the `From:`/`Subject:`
+ *  provenance lines: a header field with an embedded newline is NOT a header
+ *  line, and must not be able to inject a forged `From:`/`Subject:` line into the
+ *  comment body. Trim and cap to `max` chars AFTER collapsing. */
 function sanitizeField(value: string, max: number): string {
-  return stripControl(stripHtml(value)).trim().slice(0, max)
+  return collapseWhitespace(stripControl(stripHtml(value)))
+    .trim()
+    .slice(0, max)
+}
+
+/** Collapse every run of whitespace (spaces, tabs, newlines, carriage returns,
+ *  and other Unicode whitespace) to a single ASCII space. Used only for the
+ *  single-line header fields, so an embedded newline cannot forge an extra
+ *  `From:`/`Subject:` provenance line in the comment body. */
+function collapseWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ')
 }
 
 /** Remove anything that looks like an HTML/XML tag, so no markup can be injected

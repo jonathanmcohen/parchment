@@ -20,7 +20,9 @@
     "db:migrate": "drizzle-kit migrate",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify:carry-forward": "node scripts/verify-carry-forward-closed.mjs",
+    "verify:workflows": "node scripts/check-workflows.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1074.0",

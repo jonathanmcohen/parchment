@@ -1,0 +1,67 @@
+name: Release
+
+# Tag-triggered publish. Pushing a `v*` tag (e.g. v0.1.0) on main re-runs the
+# full CI gate (typecheck/lint/unit/build/e2e-a11y + carry-forward closed) and,
+# only if green, builds + pushes the multi-arch image to GHCR.
+#
+# The release branch (release/v0.1.0) is NEVER deleted here — the user wants old
+# release branches kept. There is no branch-cleanup step anywhere in this file.
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # Re-run the identical PR/push gate (incl. the e2e+a11y 19-route axe harness and
+  # the carry-forward-closed check) so the tag publish can never outrun the gate.
+  gate:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Multi-arch (amd64 + arm64) builds run on the GitHub-hosted runner via QEMU
+      # emulation + buildx — the user's stated preference (not local builds).
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/jonathanmcohen/parchment
+          # type=ref,event=tag yields the literal git tag (v0.1.0) so the published
+          # image name matches the documented ghcr.io/jonathanmcohen/parchment:v0.1.0
+          # (scope L1). Plus the moving :latest tag.
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

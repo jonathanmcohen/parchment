@@ -1,0 +1,135 @@
+name: CI
+
+# PR + push gate. Mirrors the local release gate: biome 0/0, tsc 0, unit pass,
+# `pnpm build` compiles, the K4 19-route axe a11y harness is 0-violations, and
+# the carry-forward gate (scope.md has no silently-Open items) is green.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'release/**'
+  # release.yml calls this same gate on a tag, so the tag publish is gated on the
+  # identical typecheck/lint/unit/build/e2e-a11y/carry-forward jobs.
+  workflow_call:
+
+# Allow the release workflow (and re-runs) to reuse these jobs via workflow_call.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Exclude Testcontainers integration tests — the unit gate is hermetic.
+      - run: pnpm exec vitest run --exclude '**/integration/**'
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+  verify-carry-forward-closed:
+    # The Cairn "carry-forward closed" gate: fail if scope.md has any Open item.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/verify-carry-forward-closed.mjs
+
+  e2e-a11y:
+    # The K4 19-route axe-core a11y harness (Playwright + @axe-core/playwright),
+    # 0 WCAG 2 A/AA violations. Needs a pgvector-capable Postgres 18 for the
+    # `CREATE EXTENSION vector` in migration 0000.
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint, unit, build]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: parchment
+          POSTGRES_PASSWORD: parchment
+          POSTGRES_DB: parchment
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U parchment"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # global-setup + playwright webServer read these; drizzle migrate uses DATABASE_URL.
+      DATABASE_URL: postgres://parchment:parchment@127.0.0.1:5434/parchment
+      E2E_DATABASE_URL: postgres://parchment:parchment@127.0.0.1:5434/parchment
+      NEXT_TELEMETRY_DISABLED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply migrations to the e2e DB
+        run: pnpm db:migrate
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build (Playwright webServer runs `pnpm start`)
+        run: pnpm build
+      - name: Run Playwright + axe a11y harness
+        run: pnpm test:e2e
+      - name: Upload a11y report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-report
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

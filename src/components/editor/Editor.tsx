@@ -21,6 +21,7 @@ import { CustomCssStyle } from '@/components/editor/CustomCssStyle'
 import { DrawioModal } from '@/components/editor/DrawioModal'
 import { EmbedDialog } from '@/components/editor/EmbedDialog'
 import { FindReplace } from '@/components/editor/FindReplace'
+import { GithubEmbedDialog } from '@/components/editor/GithubEmbedDialog'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { MathPopover } from '@/components/editor/MathPopover'
@@ -61,6 +62,7 @@ import { type Reader, throttle } from '@/lib/editor/reading-presence'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { authorColor } from '@/lib/editor/track-changes'
 import { DEFAULT_WATERMARK, type WatermarkConfig } from '@/lib/editor/watermark'
+import { githubWebUrl } from '@/lib/integrations/github'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
 
 // G5: DrawingModal is dynamic-imported so the Excalidraw CSS (imported at the
@@ -521,6 +523,19 @@ export function Editor({
     setEmbedEdit({ pos, kind, url: '', title: '' })
   }, [])
 
+  // J6: github embed dialog — holds the doc position + seed url/title of the
+  // githubEmbed node being edited (null = closed). Opened from the slash menu
+  // (new empty node, after insertGithubEmbed().run()) and from clicking an
+  // existing node (parchment:edit-github-embed event from GithubEmbedView).
+  const [githubEmbedEdit, setGithubEmbedEdit] = useState<{
+    pos: number
+    url: string
+    title: string
+  } | null>(null)
+  const openGithubEmbedDialog = useCallback((pos: number) => {
+    setGithubEmbedEdit({ pos, url: '', title: '' })
+  }, [])
+
   const openMathEditor = useCallback((pos: number) => {
     setMathEdit({ pos, latex: '' })
   }, [])
@@ -824,6 +839,9 @@ export function Editor({
         onOpenCrossRefPicker: openCrossRefPicker,
         // J2/J3: onEditEmbed opens the EmbedDialog for a freshly-inserted embed node.
         onEditEmbed: openEmbedDialog,
+        // J6: onEditGithubEmbed opens the GithubEmbedDialog for a freshly-inserted
+        // githubEmbed node.
+        onEditGithubEmbed: openGithubEmbedDialog,
       }),
       // F6: [[ autocomplete — drives the React WikiSuggestionMenu popup. Wired
       // here (not baseExtensions) so its ReactRenderer popup only loads client-side.
@@ -1181,6 +1199,47 @@ export function Editor({
     return () => dom.removeEventListener('parchment:edit-embed', handler)
   }, [editor])
 
+  // J6: githubEmbed NodeViews dispatch parchment:edit-github-embed {pos, owner,
+  // repo, number, kind, title} on click — open the GithubEmbedDialog seeded with
+  // the clicked node's canonical github.com URL (rebuilt from owner/repo/number/
+  // kind via githubWebUrl) and title. A node with no ref yet seeds an empty url.
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const handler = (e: Event) => {
+      const detail = (
+        e as CustomEvent<{
+          pos: number
+          owner: string
+          repo: string
+          number: number
+          kind: 'pr' | 'issue'
+          title: string
+        }>
+      ).detail
+      if (detail && typeof detail.pos === 'number') {
+        const hasRef =
+          typeof detail.owner === 'string' &&
+          detail.owner.length > 0 &&
+          typeof detail.repo === 'string' &&
+          detail.repo.length > 0 &&
+          typeof detail.number === 'number' &&
+          detail.number > 0
+        const url = hasRef
+          ? githubWebUrl({
+              owner: detail.owner,
+              repo: detail.repo,
+              number: detail.number,
+              kind: detail.kind === 'pr' ? 'pr' : 'issue',
+            })
+          : ''
+        setGithubEmbedEdit({ pos: detail.pos, url, title: detail.title ?? '' })
+      }
+    }
+    dom.addEventListener('parchment:edit-github-embed', handler)
+    return () => dom.removeEventListener('parchment:edit-github-embed', handler)
+  }, [editor])
+
   // G8b: crossRef NodeViews dispatch parchment:goto-ref {targetId} on click —
   // scroll the target node into view. We find the target in the doc by querying
   // the PM dom for [data-ref-id="..."] (for figures/tables/equations) or #id
@@ -1489,6 +1548,17 @@ export function Editor({
           initialUrl={embedEdit.url}
           initialTitle={embedEdit.title}
           onClose={() => setEmbedEdit(null)}
+        />
+      )}
+
+      {/* J6: GitHub PR/issue embed URL dialog */}
+      {editor && githubEmbedEdit !== null && (
+        <GithubEmbedDialog
+          editor={editor}
+          pos={githubEmbedEdit.pos}
+          initialUrl={githubEmbedEdit.url}
+          initialTitle={githubEmbedEdit.title}
+          onClose={() => setGithubEmbedEdit(null)}
         />
       )}
 

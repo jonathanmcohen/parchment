@@ -31,6 +31,13 @@ export type SlashMenuOptions = {
    * editable on click via its NodeView).
    */
   onEditEmbed?: (pos: number, kind: 'calendar' | 'spreadsheet') => void
+  /**
+   * J6: called after an empty githubEmbed node is inserted, with the doc
+   * position of the new node, so the editor can open the GithubEmbedDialog to
+   * collect the GitHub PR/issue URL. If not provided, the node is inserted empty
+   * (still editable via its NodeView's configure button).
+   */
+  onEditGithubEmbed?: (pos: number) => void
 }
 
 // ── Item → editor action map ───────────────────────────────────────────────
@@ -42,6 +49,7 @@ type ActionContext = {
   onEditMath: ((pos: number) => void) | undefined
   onOpenCrossRefPicker: (() => void) | undefined
   onEditEmbed: ((pos: number, kind: 'calendar' | 'spreadsheet') => void) | undefined
+  onEditGithubEmbed: ((pos: number) => void) | undefined
 }
 
 /**
@@ -59,6 +67,7 @@ function countMathBlocks(editor: import('@tiptap/core').Editor): number {
 
 function runAction(item: SlashItem, ctx: ActionContext): void {
   const { editor, range, onOpenImage, onEditMath, onOpenCrossRefPicker, onEditEmbed } = ctx
+  const { onEditGithubEmbed } = ctx
 
   // Delete the slash + query text first
   editor.chain().focus().deleteRange(range).run()
@@ -285,6 +294,30 @@ function runAction(item: SlashItem, ctx: ActionContext): void {
       break
     }
 
+    // J6: github embed — insert the empty githubEmbed node, then open the
+    // GithubEmbedDialog at the new node's position to collect a GitHub URL. The
+    // dispatch must happen AFTER .run() so editor.state reflects the inserted
+    // node (inside the chain, view.state is pre-insertion). Mirrors the embed
+    // case exactly.
+    case 'githubEmbed': {
+      editor.chain().focus().insertGithubEmbed().run()
+      const { state } = editor
+      const selFrom = state.selection.from
+      let ghPos: number | null = null
+      const selectedGhNode = state.doc.nodeAt(selFrom)
+      if (selectedGhNode?.type.name === 'githubEmbed') {
+        ghPos = selFrom
+      } else {
+        const lo = Math.max(0, selFrom - 2)
+        const hi = Math.min(state.doc.content.size, selFrom + 2)
+        state.doc.nodesBetween(lo, hi, (node, nodePos) => {
+          if (node.type.name === 'githubEmbed') ghPos = nodePos
+        })
+      }
+      if (ghPos !== null) onEditGithubEmbed?.(ghPos)
+      break
+    }
+
     // G4: equations. Insert with empty LaTeX, then open the editor popover at
     // the new node's position so the user types the formula immediately.
     // Read editor.state AFTER .run() so the position reflects the post-insertion
@@ -404,6 +437,7 @@ export const SlashMenuExtension = Extension.create<SlashMenuOptions>({
             onEditMath: extensionOptions.onEditMath,
             onOpenCrossRefPicker: extensionOptions.onOpenCrossRefPicker,
             onEditEmbed: extensionOptions.onEditEmbed,
+            onEditGithubEmbed: extensionOptions.onEditGithubEmbed,
           })
         },
 

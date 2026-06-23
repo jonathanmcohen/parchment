@@ -10,6 +10,7 @@ import { DrawingExtension } from '@/lib/editor/extensions/drawing'
 import { DrawioExtension } from '@/lib/editor/extensions/drawio'
 import { EmbedExtension } from '@/lib/editor/extensions/embed'
 import { FootnoteItem, FootnoteRef, FootnotesBlock } from '@/lib/editor/extensions/footnote'
+import { GithubEmbedExtension } from '@/lib/editor/extensions/github-embed'
 import { HeadingId } from '@/lib/editor/extensions/heading-id'
 import { imageExtensions } from '@/lib/editor/extensions/image'
 import { EquationRef, MathBlock, MathCommands, MathInline } from '@/lib/editor/extensions/math'
@@ -112,6 +113,12 @@ export const baseExtensions = [
   // provider URL (else a link card). getSchema(baseExtensions) builds in the
   // server runtime. Serializes as a parchment:embed fence.
   EmbedExtension,
+  // J6: GitHub PR/issue embed. GithubEmbedExtension imports NO fetch / React
+  // code at module load — the NodeView (GithubEmbedView) is lazy-required inside
+  // addNodeView (same boundary as embed/drawio/mermaid), and it is the ONLY
+  // place that calls /api/github/status. getSchema(baseExtensions) builds in the
+  // server runtime. Serializes as a parchment:github fence.
+  GithubEmbedExtension,
   // G7b: Citation node + bibliography block. Neither imports any heavy lib at
   // module load — CitationView / BibliographyView are lazy-required inside
   // addNodeView (same pattern as drawing/mermaid). getSchema(baseExtensions)

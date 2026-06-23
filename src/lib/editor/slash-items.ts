@@ -147,6 +147,13 @@ export const SLASH_ITEMS: SlashItem[] = [
     category: 'EMBED',
     keywords: ['embed', 'spreadsheet', 'sheets', 'google', 'airtable', 'office', 'excel', 'grid'],
   },
+  // J6: GitHub PR / issue embed — live status card.
+  {
+    id: 'githubEmbed',
+    title: 'GitHub PR/issue',
+    category: 'EMBED',
+    keywords: ['github', 'pr', 'pull request', 'issue', 'embed', 'git', 'status'],
+  },
 
   // ── ADVANCED ─────────────────────────────────────────────────────────────
   {

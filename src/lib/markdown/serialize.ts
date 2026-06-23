@@ -348,6 +348,22 @@ function serializeBlock(node: PMNode): string {
           title: typeof node.attrs?.title === 'string' ? node.attrs.title : '',
         }),
       )
+    // J6: githubEmbed (PR / issue card) — emit a parchment:github fence carrying
+    // { owner, repo, number, kind, title } as JSON so parse.ts reconstructs the
+    // exact node losslessly. NO fetch / API logic on the serialize path — the
+    // live status is re-fetched at RENDER time (GithubEmbedView). Only the
+    // validated ref + optional title are stored.
+    case 'githubEmbed':
+      return parchmentFence(
+        'github',
+        JSON.stringify({
+          owner: typeof node.attrs?.owner === 'string' ? node.attrs.owner : '',
+          repo: typeof node.attrs?.repo === 'string' ? node.attrs.repo : '',
+          number: typeof node.attrs?.number === 'number' ? node.attrs.number : 0,
+          kind: node.attrs?.kind === 'pr' ? 'pr' : 'issue',
+          title: typeof node.attrs?.title === 'string' ? node.attrs.title : '',
+        }),
+      )
     // G16: speakerNote — lossless round-trip as parchment:speakernote fence
     // carrying the inline content array as JSON (like table/drawing/bibliography
     // do for their complex content). Storing serializeInline() text was lossy

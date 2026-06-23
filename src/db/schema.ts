@@ -195,6 +195,32 @@ export const pats = pgTable(
   (t) => [index('pats_owner_idx').on(t.ownerId)],
 )
 
+// ─── Webhooks (J7 / J4) — HMAC-signed HTTP callbacks on workspace events ───
+// The owner registers a webhook that fires on `events` (a subset of
+// WEBHOOK_EVENTS: document.saved | document.published | comment.created).
+// `kind` selects the request shaping: 'generic' POSTs the raw JSON payload with
+// an `X-Parchment-Signature` HMAC header the receiver verifies with `secret`;
+// 'slack'/'discord' POST a formatted message body to an incoming-webhook URL (no
+// signature header — the URL itself is the secret). `secret` is CSPRNG-generated
+// server-side and is NEVER returned to the client (the list endpoint masks it).
+// Inherently off-by-default: with no rows, no calls are ever made.
+export const webhooks = pgTable(
+  'webhooks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    url: text('url').notNull(),
+    secret: text('secret').notNull(), // HMAC signing key (generic); server-only
+    kind: text('kind').notNull().default('generic'), // generic | slack | discord
+    events: jsonb('events').notNull().default([]), // string[] of subscribed event ids
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('webhooks_owner_idx').on(t.ownerId)],
+)
+
 // ─── Collab state (Yjs document snapshots, written by parchment-collab) ───
 export const collabState = pgTable('collab_state', {
   name: text('name').primaryKey(),

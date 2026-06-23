@@ -7,6 +7,7 @@ import { extractTargetIds } from '@/lib/docs/doc-links'
 import { setDocLinks } from '@/lib/docs/doc-links-repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
 import type { WatermarkConfig } from '@/lib/editor/watermark'
+import { dispatchWebhooks } from '@/lib/integrations/webhook-dispatch'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
 
@@ -61,7 +62,7 @@ export async function saveDocument(
   id: string,
   data: { contentJson: unknown; markdown: string; title?: string },
 ): Promise<void> {
-  await db
+  const [updated] = await db
     .update(schema.documents)
     .set({
       content: data.contentJson,
@@ -70,6 +71,15 @@ export async function saveDocument(
       updatedAt: new Date(),
     })
     .where(eq(schema.documents.id, id))
+    .returning({ ownerId: schema.documents.ownerId, title: schema.documents.title })
+
+  // J7: fire `document.saved` to the owner's webhooks, NON-BLOCKING. `void` so we
+  // never await in the save's critical path; dispatchWebhooks itself never throws,
+  // so a bad/slow webhook can never fail or slow the save. Skipped if the update
+  // matched no row (e.g. a since-deleted doc).
+  if (updated) {
+    void dispatchWebhooks(updated.ownerId, 'document.saved', { docId: id, title: updated.title })
+  }
 
   // F6: best-effort wiki-link index — extract this doc's [[wiki]] targets from
   // the PM JSON and replace its doc_links rows. A failure here must NEVER break

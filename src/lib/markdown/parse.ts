@@ -39,6 +39,10 @@ import { parseCslEntries } from '@/lib/citations/types'
 // J1: pageId validation for cairn-link parsing. cairn.ts is env-only (no editor
 // graph / DOM), safe under this module's server-runtime constraint.
 import { isValidCairnPageId } from '@/lib/integrations/cairn'
+// J6: githubEmbed ref validation for the parchment:github fence. github.ts is
+// env-only (no editor graph / DOM), safe under this module's server-runtime
+// constraint — same justification as the cairn import above.
+import { parseGithubRef } from '@/lib/integrations/github'
 
 type PMNode = {
   type: string
@@ -493,6 +497,31 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
           provider: typeof data.provider === 'string' ? data.provider : '',
           url,
           title: typeof data.title === 'string' ? data.title : '',
+        },
+      }
+    }
+    case 'github': {
+      // J6: lossless githubEmbed round-trip. The body is { owner, repo, number,
+      // kind, title }. We re-validate the ref by reconstructing the canonical
+      // github.com URL and running it through parseGithubRef (the SAME strict
+      // anti-SSRF parser) — so a fence carrying a hostile owner/repo (bad chars)
+      // or a non-positive number degrades to a plain codeBlock rather than
+      // producing a node that would later steer a fetch. NO fetch on the parse
+      // path. title is coerced + length-capped.
+      const owner = typeof data.owner === 'string' ? data.owner : ''
+      const repo = typeof data.repo === 'string' ? data.repo : ''
+      const number = typeof data.number === 'number' ? data.number : 0
+      const kind = data.kind === 'pr' ? 'pull' : 'issues'
+      const ref = parseGithubRef(`https://github.com/${owner}/${repo}/${kind}/${number}`)
+      if (ref === null) return null
+      return {
+        type: 'githubEmbed',
+        attrs: {
+          owner: ref.owner,
+          repo: ref.repo,
+          number: ref.number,
+          kind: ref.kind,
+          title: typeof data.title === 'string' ? data.title.slice(0, 300) : '',
         },
       }
     }

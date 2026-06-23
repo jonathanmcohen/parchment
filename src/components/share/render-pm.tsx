@@ -250,6 +250,30 @@ function renderNode(node: PMNode, key: number): ReactNode {
         </p>
       )
     }
+    case 'githubEmbed': {
+      // J6: in the public viewer, a GitHub embed renders as a plain github.com
+      // link card — NO live API call from the unauthenticated page. The href is
+      // rebuilt from the node's own owner/repo/number/kind (validated chars
+      // stored by the parser); we re-check the grammar defensively so a tampered
+      // doc cannot inject a non-github path. Title (TEXT) labels the link.
+      const owner = str(node.attrs?.owner) ?? ''
+      const repo = str(node.attrs?.repo) ?? ''
+      const number = typeof node.attrs?.number === 'number' ? node.attrs.number : 0
+      const kind = node.attrs?.kind === 'pr' ? 'pull' : 'issues'
+      const okOwner = /^[A-Za-z0-9._-]+$/.test(owner)
+      const okRepo = /^[A-Za-z0-9._-]+$/.test(repo)
+      if (!okOwner || !okRepo || !Number.isInteger(number) || number <= 0) return null
+      const href = `https://github.com/${owner}/${repo}/${kind}/${number}`
+      const title = str(node.attrs?.title)
+      const label = title ?? `${owner}/${repo}#${number}`
+      return (
+        <p key={key}>
+          <a href={href} rel="nofollow noopener noreferrer" target="_blank">
+            {`[${label}]`}
+          </a>
+        </p>
+      )
+    }
     case 'hardBreak':
       return <br key={key} />
     case 'image': {

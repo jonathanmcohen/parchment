@@ -173,10 +173,10 @@
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
-| K1 | ARIA structure, semantic HTML, alt text required on insert | TODO | ☐ | ☐ | ties B5 |
+| K1 | ARIA structure, semantic HTML, alt text required on insert | DONE | ☑ | ☑ | Audit-and-remediate validated by axe. Single <main id="main-content"> per page (demoted FileManager inner <main> panels→div, fixed nested-landmark), <nav aria-label="Primary">, ordered headings, icon-button aria-labels, list semantics. Fixed <ul>-direct-<p> in WebhooksManager + --muted-on-tint contrast in AppearanceSettings. Alt-required-on-insert (B5) confirmed. Controller ran axe e2e → 19/19 routes 0 violations. See K4. |
 | K2 | High-contrast theme + OpenDyslexic toggle | TODO | ☐ | ☐ | |
-| K3 | Keyboard-only nav — every menu, focus ring, skip-to-content | TODO | ☐ | ☐ | |
-| K4 | axe-core harness — every top-level page a Playwright a11y target | WIP | ☐ | ☐ | harness live (Playwright + @axe-core), 6 routes green; extends as routes are added |
+| K3 | Keyboard-only nav — every menu, focus ring, skip-to-content | DONE | ☑ | ☑ | Skip-to-content link (visually-hidden-until-focus, first focusable, →#main-content) in app layout; global :focus-visible ring; menus/dialogs keyboard-operable. Review fixed 2 BLOCKING: Help dialogs now restore focus to the trigger (useFocusTrap restoreRef, fixing the unmount-race where activeElement was already body — WCAG 2.4.3/G15); duplicate <main> removed. MINOR logged: code-block toolbar buttons suppress the focus ring; public pages have #main-content but no skip-link (single-column, acceptable); focus-visible border-radius cosmetic. Controller-verified via axe 19/19 + SSR markup. |
+| K4 | axe-core harness — every top-level page a Playwright a11y target | DONE | ☑ | ☑ | Extended a11y.authed.spec (now 15 authed incl new /settings/admin/schedules + /backup) + a11y.public.spec (4: landing/login/setup/invalid-share) = 19 routes, withTags wcag2a/wcag2aa, 0-violation assertion. **Crux infra fix: the e2e DB :5434 had DRIFTED (missing 7 tables + 3 documents columns + collab_state.state text→bytea) → every authed route 500'd (not an a11y fail) — the G9 lesson at the test-DB level; synced :5434→schema.ts (drizzle-kit push + psql), now 20-table parity with :5433.** **Controller independently ran `pnpm test:e2e`: 19/19 passed, 0 WCAG 2 A/AA violations** (incl. /d/[id] editor). 1111 unit, build compiles. GAP: drizzle-kit push emits `"undefined"."bytea"` + aborts → bytea applied via psql (a fresh db:push hits this); e2e DB needs a reproducible CI seed/reset so it can't silently drift again. |
 | K5 | i18n via next-intl + RTL (Arabic/Hebrew) | TODO | ☐ | ☐ | |
 | K6 | Spell check — browser-native + per-workspace custom dict | TODO | ☐ | ☐ | |
 | K7 | Grammar check — LanguageTool (host URL + key UI) | TODO | ☐ | ☐ | |
@@ -208,8 +208,8 @@
 | H Export/import | 9 | 9 | 0 | 0 |
 | I Settings/ops | 10 | 10 | 0 | 0 |
 | J Integrations | 7 | 7 | 0 | 0 |
-| K A11y/i18n | 7 | 0 | 0 | 7 |
+| K A11y/i18n | 7 | 3 | 0 | 4 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **91** | **0** | **13** |
+| **Total** | **104** | **94** | **0** | **10** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

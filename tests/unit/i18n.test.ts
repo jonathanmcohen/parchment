@@ -1,14 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import {
-  DEFAULT_LOCALE,
-  isLocale,
-  isRtl,
-  LOCALES,
-  localeDir,
-  resolveLocale,
-} from '@/i18n/config'
+import { DEFAULT_LOCALE, isLocale, isRtl, LOCALES, localeDir, resolveLocale } from '@/i18n/config'
 
 // Resolve messages/*.json relative to this test file (repo root is two levels up
 // from tests/unit), independent of the process cwd.

@@ -2810,7 +2810,11 @@ body {
 
 .parchment-offline-indicator[data-state="offline"] .parchment-offline-pill {
   background: color-mix(in srgb, var(--foreground) 8%, transparent);
-  color: var(--muted);
+  /* --muted (#6b6b63) on this 8%-foreground tint is only 4.22:1 — below the
+     WCAG AA 4.5:1 for this small pill text (axe color-contrast). The offline
+     state is an important status, so use the full foreground for clear
+     contrast in every theme. */
+  color: var(--foreground);
   border: 1px solid var(--border);
 }
 

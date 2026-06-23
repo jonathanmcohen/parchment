@@ -65,6 +65,116 @@
   }
 }
 
+/* ── K2: High-contrast palette ───────────────────────────────────────────────
+ *
+ *  The app layout sets data-high-contrast="true" on the same wrapper as
+ *  data-color-scheme when the user enables "High contrast" in Appearance.
+ *
+ *  These overrides LAYER on top of the light/dark scheme rules above. Because
+ *  they are declared AFTER them and use an equal-or-higher specificity selector,
+ *  they win by source order. The result is a maximum-contrast palette targeting
+ *  WCAG AAA (>=7:1 for normal text):
+ *
+ *    light HC  → #000 text on #fff, accent #0a2e6e (white text 12.9:1)
+ *    dark  HC  → #fff text on #000, accent #66b2ff (black text 9.4:1)
+ *
+ *  Accent surfaces in this app fill with var(--accent-contrast) and hard-code
+ *  white text; in dark HC the bright accent needs BLACK text to reach AAA, so a
+ *  scoped rule below flips text to #000 on those accent-filled controls.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Light high-contrast (default scheme + forced light). */
+[data-high-contrast="true"],
+[data-high-contrast="true"][data-color-scheme="light"] {
+  --background: #ffffff;
+  --foreground: #000000;
+  --muted: #1a1a1a;
+  --accent: #0a2e6e;
+  --accent-contrast: #0a2e6e;
+  --paper: #ffffff;
+  --border: #000000;
+  --page-bg: #ffffff;
+}
+
+/* Dark high-contrast — forced dark, or system + OS dark. */
+[data-high-contrast="true"][data-color-scheme="dark"] {
+  --background: #000000;
+  --foreground: #ffffff;
+  --muted: #e8e8e8;
+  --accent: #66b2ff;
+  --accent-contrast: #66b2ff;
+  --paper: #000000;
+  --border: #ffffff;
+  --page-bg: #000000;
+}
+@media (prefers-color-scheme: dark) {
+  [data-high-contrast="true"][data-color-scheme="system"] {
+    --background: #000000;
+    --foreground: #ffffff;
+    --muted: #e8e8e8;
+    --accent: #66b2ff;
+    --accent-contrast: #66b2ff;
+    --paper: #000000;
+    --border: #ffffff;
+    --page-bg: #000000;
+  }
+}
+
+/* Propagate forced-dark HC to :root (mirrors the I1 dark :has() rule) so the
+ * html/body background and overscroll gutters go black, not light. */
+:root:has([data-high-contrast="true"][data-color-scheme="dark"]) {
+  --background: #000000;
+  --foreground: #ffffff;
+  color-scheme: dark;
+}
+
+/* NOTE: the dark-HC "flip accent text to black" rules and the dyslexic-prose
+ * font rules reference component classes (.parchment-*) defined later in this
+ * file. To avoid Biome's noDescendingSpecificity warnings (a higher-specificity
+ * selector appearing BEFORE the lower-specificity base rule), those two
+ * class-referencing blocks live at the very END of this file — see "K2: HC accent
+ * text" and "K2: dyslexic document text" near the bottom. The var-only overrides
+ * above reference no classes, so they stay here next to the scheme palette. */
+
+/* ── K2: OpenDyslexic @font-face ─────────────────────────────────────────────
+ *
+ *  Self-hosted (NO external CDN — a self-hosted Parchment never phones home for a
+ *  font). Binaries + SIL OFL license live in public/fonts/ (see its README).
+ *  The layout sets data-font="dyslexic" on the theme wrapper when the toggle is
+ *  on; the [data-font="dyslexic"] rule below swaps the UI font vars, and the
+ *  prose rule at the bottom of this file swaps the document text, both with a
+ *  system dyslexia-friendly fallback stack so the toggle still works if the
+ *  binaries are ever absent.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("/fonts/opendyslexic-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("/fonts/opendyslexic-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+[data-font="dyslexic"] {
+  /* Override the theme's font-pair vars so all UI chrome follows suit, with a
+     graceful fallback if the bundled woff2 is unavailable. */
+  --font-body: "OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Verdana, sans-serif;
+  --font-heading: var(--font-body);
+  /* The var override alone is inert for the UI chrome: only `body` declares
+     `font-family: var(--font-body)`, and `body` is the PARENT of this theme
+     wrapper, so it resolves the var from :root (system) rather than this rule.
+     Apply the font ON the wrapper so every descendant (sidebar, menus, buttons)
+     inherits OpenDyslexic; elements with their own font-family (code, prose
+     headings) keep theirs. */
+  font-family: var(--font-body);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -3240,4 +3350,53 @@ body {
     overflow: visible;
     flex: none;
   }
+}
+
+/* ── K2: HC accent text (placed last so it stays MORE specific AND later) ─────
+ *
+ *  Dark high-contrast only. The accent-filled controls below hard-code white
+ *  text, but the bright #66b2ff dark-HC accent needs BLACK text to clear WCAG
+ *  AAA (9.4:1). Light HC keeps white-on-#0a2e6e (12.9:1), so it is intentionally
+ *  excluded. These selectors are higher specificity than the base control rules
+ *  and appear after them, so they win cleanly with no descending-specificity.
+ * ─────────────────────────────────────────────────────────────────────────── */
+[data-high-contrast="true"][data-color-scheme="dark"] .parchment-size-btn[aria-pressed="true"],
+[data-high-contrast="true"][data-color-scheme="dark"] .parchment-toolbar-btn[aria-pressed="true"],
+[data-high-contrast="true"][data-color-scheme="dark"] .parchment-bubble-btn[aria-pressed="true"],
+[data-high-contrast="true"][data-color-scheme="dark"] .parchment-dialog-tab[aria-selected="true"],
+[data-high-contrast="true"][data-color-scheme="dark"] .parchment-toc-btn[aria-pressed="true"],
+[data-high-contrast="true"][data-color-scheme="dark"] .parchment-dialog-btn-primary,
+[data-high-contrast="true"][data-color-scheme="dark"] .parchment-skip-link {
+  color: #000000;
+}
+@media (prefers-color-scheme: dark) {
+  [data-high-contrast="true"][data-color-scheme="system"] .parchment-size-btn[aria-pressed="true"],
+  [data-high-contrast="true"][data-color-scheme="system"]
+    .parchment-toolbar-btn[aria-pressed="true"],
+  [data-high-contrast="true"][data-color-scheme="system"]
+    .parchment-bubble-btn[aria-pressed="true"],
+  [data-high-contrast="true"][data-color-scheme="system"]
+    .parchment-dialog-tab[aria-selected="true"],
+  [data-high-contrast="true"][data-color-scheme="system"] .parchment-toc-btn[aria-pressed="true"],
+  [data-high-contrast="true"][data-color-scheme="system"] .parchment-dialog-btn-primary,
+  [data-high-contrast="true"][data-color-scheme="system"] .parchment-skip-link {
+    color: #000000;
+  }
+}
+
+/* ── K2: dyslexic document text (placed last; more specific + later) ──────────
+ *
+ *  Editor + read-only share prose follow the OpenDyslexic font when the toggle is
+ *  on. Higher specificity than the base .parchment-prose rules and after them, so
+ *  no descending-specificity warning. @font-face + the UI-var override live near
+ *  the top of this file. Fallback stack matches the var override.
+ * ─────────────────────────────────────────────────────────────────────────── */
+[data-font="dyslexic"] .parchment-prose,
+[data-font="dyslexic"] .parchment-prose h1,
+[data-font="dyslexic"] .parchment-prose h2,
+[data-font="dyslexic"] .parchment-prose h3,
+[data-font="dyslexic"] .parchment-prose h4,
+[data-font="dyslexic"] .parchment-prose h5,
+[data-font="dyslexic"] .parchment-prose h6 {
+  font-family: "OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Verdana, sans-serif;
 }

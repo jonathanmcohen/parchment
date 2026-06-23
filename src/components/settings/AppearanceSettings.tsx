@@ -44,6 +44,9 @@ export function AppearanceSettings() {
           fontPair: data.fontPair,
           colorScheme: data.colorScheme ?? DEFAULT_THEME.colorScheme,
           pageBg: data.pageBg ?? DEFAULT_THEME.pageBg,
+          // K2: legacy-compat — themes stored before K2 omit these booleans.
+          highContrast: data.highContrast ?? DEFAULT_THEME.highContrast,
+          dyslexicFont: data.dyslexicFont ?? DEFAULT_THEME.dyslexicFont,
         })
         // Pre-fill custom inputs if the stored value is not a preset.
         const isPresetAccent = ACCENT_SWATCHES.includes(data.accent)
@@ -84,7 +87,7 @@ export function AppearanceSettings() {
         Appearance
       </h2>
       <p className="mt-1 text-[var(--muted)] text-sm">
-        Color scheme, accent color, page background, and font pairing.
+        Color scheme, accent color, page background, font pairing, and accessibility.
       </p>
 
       {/* ── Color scheme ── */}
@@ -273,6 +276,44 @@ export function AppearanceSettings() {
               </button>
             )
           })}
+        </div>
+      </fieldset>
+
+      {/* ── K2: Accessibility ── */}
+      <fieldset className="mt-6 border-0 p-0">
+        <legend className="font-medium text-sm">Accessibility</legend>
+        <div className="mt-2 flex flex-col gap-3">
+          <label className="flex cursor-pointer items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={theme.highContrast}
+              disabled={saving}
+              onChange={(e) => save({ ...theme, highContrast: e.target.checked })}
+              className="mt-0.5 h-4 w-4 accent-[var(--accent-contrast)]"
+            />
+            <span className="flex flex-col">
+              <span className="font-medium">High contrast</span>
+              <span className="text-[var(--muted)] text-xs">
+                Maximum-contrast colours (WCAG AAA). Layers on top of your light or dark scheme.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={theme.dyslexicFont}
+              disabled={saving}
+              onChange={(e) => save({ ...theme, dyslexicFont: e.target.checked })}
+              className="mt-0.5 h-4 w-4 accent-[var(--accent-contrast)]"
+            />
+            <span className="flex flex-col">
+              <span className="font-medium">Dyslexia-friendly font (OpenDyslexic)</span>
+              <span className="text-[var(--muted)] text-xs">
+                Switches the interface and document text to the OpenDyslexic typeface.
+              </span>
+            </span>
+          </label>
         </div>
       </fieldset>
 

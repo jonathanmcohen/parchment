@@ -4,6 +4,7 @@
 // custom properties produced by `themeCssVars`.
 //
 // I1: extended with colorScheme (light | dark | system) + pageBg (#hex or keyword).
+// K2: extended with highContrast (WCAG-AAA palette) + dyslexicFont (OpenDyslexic).
 
 /** A workspace theme: an accent color (#hex) + a key into {@link FONT_PAIRS}. */
 export interface WorkspaceTheme {
@@ -14,6 +15,18 @@ export interface WorkspaceTheme {
   colorScheme: 'light' | 'dark' | 'system'
   /** I1: Page/paper background — a #hex or one of the {@link PAGE_BG_PRESETS} keywords. */
   pageBg: string
+  /**
+   * K2: High-contrast mode. When true the layout sets data-high-contrast="true"
+   * on the theme wrapper, which globals.css uses to override the colour vars to a
+   * maximum-contrast (WCAG-AAA) palette layered on the active light/dark scheme.
+   */
+  highContrast: boolean
+  /**
+   * K2: Dyslexia-friendly font. When true the layout sets data-font="dyslexic" on
+   * the theme wrapper, switching the UI + document text to the bundled OpenDyslexic
+   * typeface (globals.css @font-face), falling back to a system dyslexia-ish stack.
+   */
+  dyslexicFont: boolean
 }
 
 /** A selectable heading/body font pairing. */
@@ -76,6 +89,9 @@ export const DEFAULT_THEME: WorkspaceTheme = {
   fontPair: 'system',
   colorScheme: 'system',
   pageBg: 'white',
+  // K2: accessibility toggles default off so existing/new workspaces are unchanged.
+  highContrast: false,
+  dyslexicFont: false,
 }
 
 const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
@@ -93,7 +109,9 @@ function findPair(key: string): FontPair {
  * to {@link DEFAULT_THEME}'s value for that field.
  *
  * Legacy compat: a stored value that lacks `colorScheme` or `pageBg` defaults
- * to `'system'` and `'white'` respectively — never breaks.
+ * to `'system'` and `'white'` respectively — never breaks. K2's `highContrast`
+ * and `dyslexicFont` default to `false` when absent (so themes stored before K2
+ * still parse) and coerce any non-boolean value to `false`.
  */
 export function parseTheme(raw: unknown): WorkspaceTheme {
   if (typeof raw !== 'object' || raw === null) return { ...DEFAULT_THEME }
@@ -123,7 +141,12 @@ export function parseTheme(raw: unknown): WorkspaceTheme {
     return DEFAULT_THEME.pageBg
   })()
 
-  return { accent, fontPair, colorScheme, pageBg }
+  // K2: accessibility booleans — only a literal `true` enables them; anything
+  // else (absent for legacy themes, null, a string, a number…) coerces to false.
+  const highContrast = obj.highContrast === true
+  const dyslexicFont = obj.dyslexicFont === true
+
+  return { accent, fontPair, colorScheme, pageBg, highContrast, dyslexicFont }
 }
 
 /** Resolve a pageBg value to the CSS color it represents. */
@@ -140,6 +163,16 @@ export function resolvePageBg(pageBg: string): string {
  *
  * I1: also emits `--page-bg` from the pageBg field.
  */
+// K2: the OpenDyslexic font stack. When dyslexicFont is on it MUST be emitted
+// here (inline on the wrapper), not only via the [data-font="dyslexic"] CSS
+// rule: themeCssVars sets `--font-body` inline, and an inline custom property
+// shadows any stylesheet override of the same property (the I1 inline-var
+// lesson). So the CSS rule's `--font-body` override never reached the UI chrome;
+// emitting the dyslexic stack here makes the inline var itself OpenDyslexic, and
+// the [data-font="dyslexic"] rule's `font-family: var(--font-body)` then carries
+// it to every descendant.
+const DYSLEXIC_FONT_STACK = '"OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Verdana, sans-serif'
+
 export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
   const pair = findPair(theme.fontPair)
   return {
@@ -149,8 +182,8 @@ export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
     // Emitting only one leaves a large share of the accent UI on the default.
     '--accent': theme.accent,
     '--accent-contrast': theme.accent,
-    '--font-heading': pair.heading,
-    '--font-body': pair.body,
+    '--font-heading': theme.dyslexicFont ? DYSLEXIC_FONT_STACK : pair.heading,
+    '--font-body': theme.dyslexicFont ? DYSLEXIC_FONT_STACK : pair.body,
     // I1: page/paper background, overrides --paper on the doc canvas.
     '--page-bg': resolvePageBg(theme.pageBg),
   }

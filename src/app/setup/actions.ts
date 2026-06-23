@@ -6,6 +6,7 @@ import { db, schema } from '@/db'
 import { ownerExists } from '@/lib/auth/bootstrap'
 import { hashPassword } from '@/lib/auth/password'
 import { createSession } from '@/lib/auth/session'
+import { seedGuideWorkspace } from '@/lib/docs/seed-guide'
 
 export type SetupState = { error: string } | null
 
@@ -54,5 +55,16 @@ export async function createOwner(_prev: SetupState, formData: FormData): Promis
   })
 
   await createSession(user.id)
+
+  // L6: seed the first-run "Parchment Guide" so a fresh install isn't empty.
+  // Wrapped: a seed failure must NEVER block owner creation. Runs before the
+  // redirect (which throws Next's control-flow signal) so it isn't skipped, and
+  // the catch is narrow to the seed so it can't swallow that signal.
+  try {
+    await seedGuideWorkspace(user.id)
+  } catch {
+    // ignore — the guide is a nicety; owner creation already succeeded.
+  }
+
   redirect('/')
 }

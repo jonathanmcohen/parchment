@@ -17,6 +17,7 @@ const routes = [
   '/settings/admin/health',
   '/settings/admin/schedules',
   '/settings/admin/backup',
+  '/whats-new',
   '/d/00000000-0000-0000-0000-0000000000d0',
 ]
 

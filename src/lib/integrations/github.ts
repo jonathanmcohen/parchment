@@ -93,6 +93,11 @@ export function parseGithubRef(url: unknown): GithubRef | null {
   if (!OWNER_REPO_RE.test(owner)) return null
   if (!OWNER_REPO_RE.test(repo)) return null
   if (!NUMBER_RE.test(numberRaw)) return null
+  // Cap the digit count: a real GitHub issue/PR number is far under 10 digits.
+  // Without this, a huge digit string parses to a float whose String() is
+  // scientific notation (e.g. 1e+21), which would interpolate a malformed
+  // segment into the api.github.com path. 9 digits keeps parseInt exact.
+  if (numberRaw.length > 9) return null
   const number = Number.parseInt(numberRaw, 10)
   if (!Number.isInteger(number) || number <= 0) return null
 

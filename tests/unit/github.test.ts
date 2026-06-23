@@ -41,6 +41,12 @@ describe('parseGithubRef — valid github.com PR/issue URLs', () => {
     const ref = parseGithubRef('https://www.github.com/a-b/c_d.e/pull/9/files?w=1#diff')
     expect(ref).toEqual({ owner: 'a-b', repo: 'c_d.e', number: 9, kind: 'pr' })
   })
+
+  it('rejects an oversized issue number that would parse to scientific notation', () => {
+    // 21 all-digits → Number.parseInt → 1e+21, whose String() is sci-notation.
+    // The length cap rejects it so no malformed segment reaches api.github.com.
+    expect(parseGithubRef('https://github.com/a/b/issues/999999999999999999999')).toBeNull()
+  })
 })
 
 describe('parseGithubRef — rejects non-github / malicious hosts (anti-SSRF)', () => {

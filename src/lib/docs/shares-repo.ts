@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { hash, verify } from '@node-rs/argon2'
 import { and, desc, eq } from 'drizzle-orm'
 import { db, schema } from '@/db'
+import { dispatchWebhooks } from '@/lib/integrations/webhook-dispatch'
 
 // G1 doc sharing. No 'server-only' guard so the repo stays integration-testable
 // (the integration suite imports it directly); it touches `db` (pg) and is only
@@ -77,6 +78,27 @@ export async function createShare(
     .returning({ id: schema.shares.id })
 
   if (!row) throw new Error('createShare: insert returned no row')
+
+  // J7: publishing (creating a share link) fires `document.published` to the
+  // owner's webhooks, NON-BLOCKING. The title lookup + dispatch are wrapped in a
+  // `void`-ed async IIFE that swallows its own errors, so a webhook (or even the
+  // title query) can never fail or slow the share creation.
+  void (async () => {
+    try {
+      const [doc] = await db
+        .select({ title: schema.documents.title })
+        .from(schema.documents)
+        .where(eq(schema.documents.id, docId))
+        .limit(1)
+      await dispatchWebhooks(ownerId, 'document.published', {
+        docId,
+        title: doc?.title ?? '',
+      })
+    } catch {
+      // best-effort — publishing must not fail on a webhook/title-lookup error
+    }
+  })()
+
   return { id: row.id, token }
 }
 

@@ -1,5 +1,6 @@
 import { asc, eq } from 'drizzle-orm'
 import { db, schema } from '@/db'
+import { dispatchWebhooks } from '@/lib/integrations/webhook-dispatch'
 
 // D1 comments data layer. No 'server-only' guard so the repo stays unit-testable.
 // Pure helpers + the JSON row type live in comments-shared.ts (client-safe).
@@ -8,6 +9,30 @@ export type Comment = typeof schema.comments.$inferSelect
 
 // Re-export the pure mention parser so existing importers keep working.
 export { parseMentions } from '@/lib/docs/comments-shared'
+
+// J7: fire `comment.created` to the doc owner's webhooks, NON-BLOCKING. Resolves
+// the doc's ownerId (a comment row carries docId, not ownerId) and includes a
+// short snippet of the body. Wrapped + `void`-ed so the owner lookup and the
+// dispatch can never fail or slow comment creation. Shared by createThread and
+// addReply.
+function fireCommentCreated(docId: string, body: string): void {
+  void (async () => {
+    try {
+      const [doc] = await db
+        .select({ ownerId: schema.documents.ownerId })
+        .from(schema.documents)
+        .where(eq(schema.documents.id, docId))
+        .limit(1)
+      if (!doc) return
+      await dispatchWebhooks(doc.ownerId, 'comment.created', {
+        docId,
+        snippet: body.slice(0, 140),
+      })
+    } catch {
+      // best-effort — commenting must not fail on a webhook/owner-lookup error
+    }
+  })()
+}
 
 // ─── createThread ─────────────────────────────────────────────────────────────
 
@@ -35,6 +60,8 @@ export async function createThread(
   // Set threadId = id (root comment is its own thread anchor)
   await db.update(schema.comments).set({ threadId: row.id }).where(eq(schema.comments.id, row.id))
 
+  fireCommentCreated(docId, opts.body)
+
   return { id: row.id, threadId: row.id }
 }
 
@@ -61,6 +88,9 @@ export async function addReply(
     .returning({ id: schema.comments.id })
 
   if (!row) throw new Error('addReply: insert returned no row')
+
+  fireCommentCreated(docId, opts.body)
+
   return { id: row.id }
 }
 

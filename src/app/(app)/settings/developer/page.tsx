@@ -1,3 +1,5 @@
+import { WebhooksManager } from '@/components/settings/WebhooksManager'
+
 export default function DeveloperSettingsPage() {
   return (
     <section className="max-w-2xl">
@@ -21,8 +23,11 @@ export default function DeveloperSettingsPage() {
           Webhooks
         </h2>
         <p className="mt-1 text-[var(--muted)] text-sm">
-          Send HTTP callbacks to your own services when documents change (Plan J7).
+          Send HTTP callbacks to your own services when documents change. Generic webhooks are
+          signed with HMAC-SHA256 (verify the <code>X-Parchment-Signature</code> header); Slack and
+          Discord presets post a formatted message to a channel.
         </p>
+        <WebhooksManager />
       </section>
     </section>
   )

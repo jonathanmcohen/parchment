@@ -127,6 +127,13 @@
       "when": 1782169647825,
       "tag": "0017_gifted_the_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782172274478,
+      "tag": "0018_reflective_millenium_guard",
+      "breakpoints": true
     }
   ]
 }

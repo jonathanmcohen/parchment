@@ -355,6 +355,28 @@ export const docLinks = pgTable(
   ],
 )
 
+// ─── Cairn links (J1) — cross-link graph: source doc → EXTERNAL Cairn page ────
+// A row per directed [[cairn://page-id]] link from a Parchment doc to a page in
+// the user's other self-hosted app (Cairn). The target is an external pageId
+// STRING, not a documents FK — Cairn pages are unknown to Parchment, so unlike
+// doc_links there is no targetDocId FK. The composite PK (sourceDocId, pageId)
+// dedupes multiple links to the same Cairn page. cairn_links_page_idx powers the
+// backlinks query (which docs link this Cairn page?) that Cairn polls. The
+// sourceDocId FK cascades on doc delete so the index never dangles.
+export const cairnLinks = pgTable(
+  'cairn_links',
+  {
+    sourceDocId: uuid('source_doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    pageId: text('page_id').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sourceDocId, t.pageId] }),
+    index('cairn_links_page_idx').on(t.pageId),
+  ],
+)
+
 // ─── Templates (G2) — reusable document starting points ──────────────────────
 // Bundled templates ship in code (src/lib/docs/builtin-templates.ts); this table
 // holds the user's own saved templates. `content` is ProseMirror `doc` JSON,

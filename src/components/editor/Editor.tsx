@@ -50,6 +50,7 @@ import { clampAutosaveMs } from '@/lib/docs/autosave-config'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
 import { resolveProvider } from '@/lib/editor/embed-providers'
+import { CairnSuggestionExtension } from '@/lib/editor/extensions/cairn-suggestion'
 import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
@@ -827,6 +828,12 @@ export function Editor({
       // F6: [[ autocomplete — drives the React WikiSuggestionMenu popup. Wired
       // here (not baseExtensions) so its ReactRenderer popup only loads client-side.
       WikiSuggestionExtension,
+      // J1: [[cairn:// autocomplete — drives the React CairnSuggestionMenu popup.
+      // Wired here (not baseExtensions) so its ReactRenderer only loads
+      // client-side. Uses a DISTINCT PluginKey('cairnSuggestion') — never shares
+      // a key with slashMenu, wikiSuggestion, or citeSuggestion (F6 lesson). The
+      // longer `[[cairn://` trigger fires only after the plain `[[` wiki trigger.
+      CairnSuggestionExtension,
       // G7b: @ cite autocomplete — drives the React CiteSuggestionMenu popup.
       // Wired here (not baseExtensions) so its ReactRenderer only loads client-side.
       // Uses a DISTINCT PluginKey('citeSuggestion') — never shares a key with

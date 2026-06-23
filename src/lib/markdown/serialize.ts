@@ -30,6 +30,11 @@
 // import the editor extension graph, @tiptap/html, or any DOM. The parchment
 // fences are produced with plain JSON.stringify, no editor deps.
 
+// J1: pageId sanitization for the cairn-link serialize form. cairn.ts imports
+// nothing heavy (env-only, no editor graph / DOM), so it is safe under this
+// module's server-runtime constraint.
+import { sanitizeCairnPageId } from '@/lib/integrations/cairn'
+
 type Mark = { type: string; attrs?: Record<string, unknown> }
 type PMNode = {
   type: string
@@ -43,6 +48,16 @@ const MARK_ORDER: Record<string, number> = { code: 0, italic: 1, bold: 2, strike
 
 function escapeText(t: string): string {
   return t.replace(/[\\`*_~[\]]/g, '\\$&')
+}
+
+/**
+ * J1: strip `[`, `]`, and `|` from a cairn-link label so the
+ * `[[cairn://id|label]]` form round-trips losslessly. `|` is the pageId/label
+ * delimiter and the brackets are the link delimiters — a label containing any of
+ * them would break the parse recognizer. Mirrors the F6 wiki-label invariant.
+ */
+function sanitizeCairnLabel(label: unknown): string {
+  return String(label ?? '').replace(/[[\]|]/g, '')
 }
 
 /**
@@ -103,6 +118,21 @@ function serializeInline(content: PMNode[] | undefined): string {
       if (n.type === 'hardBreak') return '\n'
       // B8: footnote reference → [^N] in GFM style
       if (n.type === 'footnoteRef') return `[^${String(n.attrs?.number ?? 1)}]`
+      // J1: cairn link → [[cairn://<pageId>|<label>]] (or bare [[cairn://<id>]]
+      // when label is empty / equals the id). UNLIKE wiki, the pageId IS stored
+      // in markdown — Cairn pages are external and resolved by stable id, not by
+      // title lookup. Emitted BEFORE the wikiLink case so a cairn node never
+      // falls through to the plain [[Label]] form; parse.ts (splitCairnLinks)
+      // likewise matches the `cairn://` prefix before the wiki rule. The label
+      // is bracket/pipe-stripped so the `|`-delimited form round-trips losslessly
+      // and an invalid pageId collapses to '' (a non-matching [[cairn://]] —
+      // declined by the parser).
+      if (n.type === 'cairnLink') {
+        const pageId = sanitizeCairnPageId(n.attrs?.pageId)
+        if (pageId === null) return ''
+        const label = sanitizeCairnLabel(n.attrs?.label)
+        return label.length ? `[[cairn://${pageId}|${label}]]` : `[[cairn://${pageId}]]`
+      }
       // F6: wiki link → [[Label]] (only the label is emitted; the targetId is
       // NOT stored in markdown — it is resolved on parse by title lookup, which
       // is a documented GAP in parse.ts since markdownToJson stays sync).

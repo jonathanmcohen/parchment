@@ -1,6 +1,8 @@
 import { and, desc, eq, ilike, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { removeDocFromDisk, syncDocToDisk } from '@/lib/disk/mirror'
+import { extractCairnPageIds } from '@/lib/docs/cairn-links'
+import { setCairnLinks } from '@/lib/docs/cairn-links-repo'
 import { extractTargetIds } from '@/lib/docs/doc-links'
 import { setDocLinks } from '@/lib/docs/doc-links-repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
@@ -77,6 +79,17 @@ export async function saveDocument(
     await setDocLinks(id, targetIds)
   } catch {
     // ignore — link indexing is best-effort
+  }
+
+  // J1: best-effort cairn-link index — extract this doc's [[cairn://page-id]]
+  // targets from the PM JSON and replace its cairn_links rows. Separate try so a
+  // failure here (or in the wiki index above) never breaks the document save and
+  // the two indexes are independent. pageIds are sanitized in extract/set.
+  try {
+    const pageIds = extractCairnPageIds(data.contentJson)
+    await setCairnLinks(id, pageIds)
+  } catch {
+    // ignore — cairn-link indexing is best-effort
   }
 
   // Best-effort embedding generation — never blocks or fails the save.

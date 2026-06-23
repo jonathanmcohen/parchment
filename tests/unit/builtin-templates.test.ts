@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  BUILTIN_TEMPLATES,
-  getBuiltinTemplate,
-} from '@/lib/docs/builtin-templates'
+import { BUILTIN_TEMPLATES, getBuiltinTemplate } from '@/lib/docs/builtin-templates'
 
 // G2: bundled templates are pure data — no db/React. Each must carry a usable
 // key/name and valid ProseMirror `doc` JSON so the from-template route can seed

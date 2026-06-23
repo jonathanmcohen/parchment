@@ -13,7 +13,7 @@
 const CACHE_VERSION = 'parchment-v1'
 // Shell URLs to precache on install (minimal set — the dynamic assets get
 // cached lazily on first fetch).
-const PRECACHE_URLS = ['/', '/offline']
+const _PRECACHE_URLS = ['/', '/offline']
 
 // ---------------------------------------------------------------------------
 // Install — precache shell + skipWaiting so the new SW activates immediately.
@@ -38,14 +38,12 @@ self.addEventListener('install', (event) => {
       .open(CACHE_VERSION)
       .then((cache) =>
         // Cache the app shell unconditionally — this is the critical precache.
-        cache
-          .add('/')
-          .then(() =>
-            // Cache /offline separately; 404 on first deploy is expected and safe.
-            cache.add('/offline').catch(() => {
-              // /offline route may not exist yet — ignore so '/' is still cached.
-            }),
-          ),
+        cache.add('/').then(() =>
+          // Cache /offline separately; 404 on first deploy is expected and safe.
+          cache.add('/offline').catch(() => {
+            // /offline route may not exist yet — ignore so '/' is still cached.
+          }),
+        ),
       )
       .then(() => self.skipWaiting()),
   )
@@ -59,11 +57,7 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key !== CACHE_VERSION)
-            .map((key) => caches.delete(key)),
-        ),
+        Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key))),
       )
       .then(() => self.clients.claim()),
   )

@@ -1,6 +1,7 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+
 import JSZip from 'jszip'
+import { describe, expect, it } from 'vitest'
 import { docToDocx } from '@/lib/export/docx'
 
 const sampleDoc = {
@@ -38,7 +39,7 @@ describe('docToDocx', () => {
     const result = await docToDocx(sampleDoc, 'Test Doc')
     const zip = await JSZip.loadAsync(result)
     const docXml = zip.file('word/document.xml')
-    const content = await docXml!.async('string')
+    const content = await docXml?.async('string')
     expect(content).toContain('My Heading')
     expect(content).toContain('Hello, paragraph text here.')
   })

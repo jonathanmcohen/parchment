@@ -28,7 +28,9 @@ const ordered = (...items: string[]) => ({
 
 describe('docToPlainText', () => {
   it('heading + paragraph + bulletList → expected line layout', () => {
-    const result = docToPlainText(doc([heading(1, 'My Title'), para('Hello world'), bullet('A', 'B')]))
+    const result = docToPlainText(
+      doc([heading(1, 'My Title'), para('Hello world'), bullet('A', 'B')]),
+    )
     expect(result).toContain('My Title')
     expect(result).toContain('Hello world')
     expect(result).toContain('- A')

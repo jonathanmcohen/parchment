@@ -75,7 +75,10 @@ describe('embeddings module', () => {
 
     expect(result).toEqual(mockVector)
     expect(globalThis.fetch).toHaveBeenCalledOnce()
-    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit]
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ]
     expect(url).toBe('http://test-embed.local/v1/embeddings')
     expect(init.method).toBe('POST')
     const body = JSON.parse(init.body as string) as { model: string; input: string }
@@ -96,9 +99,12 @@ describe('embeddings module', () => {
     const { embed } = await import('@/lib/search/embeddings')
     await embed('hello')
 
-    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit]
+    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      RequestInit,
+    ]
     const headers = init.headers as Record<string, string>
-    expect(headers['Authorization']).toBe('Bearer secret-key')
+    expect(headers.Authorization).toBe('Bearer secret-key')
   })
 
   it('embed returns null when response vector length != EMBEDDING_DIM', async () => {

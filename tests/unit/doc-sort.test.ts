@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { sortDocs } from '@/lib/docs/doc-sort'
 import type { SortableDoc } from '@/lib/docs/doc-sort'
+import { sortDocs } from '@/lib/docs/doc-sort'
 
 function makeDoc(overrides: Partial<SortableDoc> & { id?: string }): SortableDoc & { id: string } {
   return {
@@ -12,9 +12,27 @@ function makeDoc(overrides: Partial<SortableDoc> & { id?: string }): SortableDoc
   }
 }
 
-const alpha = makeDoc({ id: 'a', title: 'Alpha', updatedAt: '2024-03-01T00:00:00.000Z', createdAt: '2024-01-01T00:00:00.000Z', size: 100 })
-const beta = makeDoc({ id: 'b', title: 'beta', updatedAt: '2024-01-01T00:00:00.000Z', createdAt: '2024-03-01T00:00:00.000Z', size: 9 })
-const gamma = makeDoc({ id: 'c', title: 'GAMMA', updatedAt: '2024-02-01T00:00:00.000Z', createdAt: '2024-02-01T00:00:00.000Z', size: 10 })
+const alpha = makeDoc({
+  id: 'a',
+  title: 'Alpha',
+  updatedAt: '2024-03-01T00:00:00.000Z',
+  createdAt: '2024-01-01T00:00:00.000Z',
+  size: 100,
+})
+const beta = makeDoc({
+  id: 'b',
+  title: 'beta',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+  createdAt: '2024-03-01T00:00:00.000Z',
+  size: 9,
+})
+const gamma = makeDoc({
+  id: 'c',
+  title: 'GAMMA',
+  updatedAt: '2024-02-01T00:00:00.000Z',
+  createdAt: '2024-02-01T00:00:00.000Z',
+  size: 10,
+})
 
 describe('sortDocs', () => {
   it('sort by name asc is case-insensitive', () => {
@@ -58,8 +76,20 @@ describe('sortDocs', () => {
   })
 
   it('stable for equal keys — preserves relative input order for equal modified (tie-breaks on title)', () => {
-    const d1 = makeDoc({ id: 'z1', title: 'Zebra', updatedAt: '2024-01-01T00:00:00.000Z', size: 0, createdAt: '2024-01-01T00:00:00.000Z' })
-    const d2 = makeDoc({ id: 'z2', title: 'Apple', updatedAt: '2024-01-01T00:00:00.000Z', size: 0, createdAt: '2024-01-01T00:00:00.000Z' })
+    const d1 = makeDoc({
+      id: 'z1',
+      title: 'Zebra',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      size: 0,
+      createdAt: '2024-01-01T00:00:00.000Z',
+    })
+    const d2 = makeDoc({
+      id: 'z2',
+      title: 'Apple',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      size: 0,
+      createdAt: '2024-01-01T00:00:00.000Z',
+    })
     const result = sortDocs([d1, d2], 'modified', 'asc')
     // Same modified, tie-break by title asc → Apple before Zebra
     expect(result.map((d) => d.id)).toEqual(['z2', 'z1'])

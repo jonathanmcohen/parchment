@@ -36,7 +36,9 @@ function find(node: Node | undefined, pred: (n: Node) => boolean): Node | undefi
 
 describe('G4 — math serialize/parse round-trip', () => {
   it('mathInline serializes to $latex$ and round-trips with the LaTeX preserved', () => {
-    const original = doc(p(text('Let '), { type: 'mathInline', attrs: { latex: 'x_1 + y^2' } }, text(' hold.')))
+    const original = doc(
+      p(text('Let '), { type: 'mathInline', attrs: { latex: 'x_1 + y^2' } }, text(' hold.')),
+    )
     const md = serializeMarkdown(original)
     expect(md).toContain('$x_1 + y^2$')
 
@@ -86,7 +88,9 @@ describe('G4 — math serialize/parse round-trip', () => {
   })
 
   it('equationRef serializes to plain (N) text and does NOT throw on parse', () => {
-    const original = doc(p(text('See '), { type: 'equationRef', attrs: { targetIndex: 2 } }, text('.')))
+    const original = doc(
+      p(text('See '), { type: 'equationRef', attrs: { targetIndex: 2 } }, text('.')),
+    )
     const md = serializeMarkdown(original)
     expect(md).toContain('(2)')
     // Documented v0.1 choice: (N) is lossy — it parses back as plain text, not

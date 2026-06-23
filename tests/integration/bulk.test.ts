@@ -185,7 +185,7 @@ describe('E6 — bulk operations repo', () => {
   })
 
   it('bulk tag is idempotent (double-apply does not error or double-count)', async () => {
-    const { createDocument, getDocument } = await import('@/lib/docs/repo')
+    const { createDocument } = await import('@/lib/docs/repo')
     const { createTag, addTagToDoc, listDocsForTag } = await import('@/lib/docs/tags-repo')
 
     const { id: tagId } = await createTag(ownerId, { name: 'BulkTagIdem' })

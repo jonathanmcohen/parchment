@@ -5,8 +5,8 @@
 // sequential numbers in document order. indexTargets builds an O(1) lookup map.
 
 import { describe, expect, it } from 'vitest'
-import { collectCrossRefTargets, indexTargets } from '@/lib/editor/cross-ref'
 import type { CrossRefTarget } from '@/lib/editor/cross-ref'
+import { collectCrossRefTargets, indexTargets } from '@/lib/editor/cross-ref'
 
 // ── Doc-builder helpers ────────────────────────────────────────────────────
 
@@ -21,9 +21,7 @@ const fig = (refId: string, caption = '') => ({
 const tbl = (refId: string, caption = '') => ({
   type: 'table',
   attrs: { refId, caption },
-  content: [
-    { type: 'tableRow', content: [{ type: 'tableCell', content: [p(text('x'))] }] },
-  ],
+  content: [{ type: 'tableRow', content: [{ type: 'tableCell', content: [p(text('x'))] }] }],
 })
 const eq = (refId: string, latex = 'x') => ({
   type: 'mathBlock',

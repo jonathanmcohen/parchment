@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { formatBibliography, formatBibliographyEntry, formatInText } from '@/lib/citations/format'
-import { parseCslEntries } from '@/lib/citations/types'
 import type { CslEntry } from '@/lib/citations/types'
+import { parseCslEntries } from '@/lib/citations/types'
 
 // Fixtures
 const smith1: CslEntry = {

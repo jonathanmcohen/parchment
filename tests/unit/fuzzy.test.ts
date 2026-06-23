@@ -34,7 +34,7 @@ describe('fuzzyScore', () => {
     const scattered = fuzzyScore('abc', 'aXbXc')
     expect(consecutive).not.toBeNull()
     expect(scattered).not.toBeNull()
-    expect(consecutive!).toBeGreaterThan(scattered!)
+    expect(consecutive as number).toBeGreaterThan(scattered as number)
   })
 
   it('word-start bonus: "fb" ranks "Foo Bar" above "fabric"', () => {
@@ -44,7 +44,7 @@ describe('fuzzyScore', () => {
     const fabric = fuzzyScore('fb', 'fabric')
     expect(fooBar).not.toBeNull()
     expect(fabric).not.toBeNull()
-    expect(fooBar!).toBeGreaterThan(fabric!)
+    expect(fooBar as number).toBeGreaterThan(fabric as number)
   })
 
   it('earlier first-match scores marginally higher than late first-match', () => {
@@ -52,7 +52,7 @@ describe('fuzzyScore', () => {
     const late = fuzzyScore('a', 'xxxxa')
     expect(early).not.toBeNull()
     expect(late).not.toBeNull()
-    expect(early!).toBeGreaterThan(late!)
+    expect(early as number).toBeGreaterThan(late as number)
   })
 })
 

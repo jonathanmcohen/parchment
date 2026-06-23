@@ -182,7 +182,11 @@ describe('countMatchingRecoveryHash', () => {
     const hashes = ['h0', 'h1', 'h2']
     const idx = await countMatchingRecoveryHash(hashes, 'h1', async (hash, plain) => hash === plain)
     expect(idx).toBe(1)
-    const miss = await countMatchingRecoveryHash(hashes, 'zz', async (hash, plain) => hash === plain)
+    const miss = await countMatchingRecoveryHash(
+      hashes,
+      'zz',
+      async (hash, plain) => hash === plain,
+    )
     expect(miss).toBe(-1)
   })
 })

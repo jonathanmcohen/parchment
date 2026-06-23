@@ -1,6 +1,6 @@
 # Parchment v0.1.0 — Scope & Audit Tracker
 
-**104 items** across Plans A–L. Single tag `v0.1.0`. This is the source of truth for what shipped.
+**105 items** across Plans A–L (104 original + the user-approved F2b add). Single tag `v0.1.0`. This is the source of truth for what shipped.
 
 ## Rules
 
@@ -94,7 +94,7 @@
 | E10 | ⌘P fuzzy file finder | DONE | ✓ | ✓ | Pure `fuzzy.ts` (`fuzzyScore` fzf-style subsequence + consecutive/word-start bonuses, `fuzzyFilter` ranked) — 14 unit. `/api/docs/titles` (lightweight id+title list). `FileFinder.tsx` (Cmd/Ctrl+P, `preventDefault` to block browser print; `role=dialog aria-label="Go to file"`; client-side fuzzy over all titles; ↑↓/Enter/Esc) mounted alongside ⌘K in `CommandPaletteMount`. 455 unit. axe clean. Browser-verified prod build: ⌘P opens, "projrd"→"Project Roadmap" (fuzzy subsequence), Enter→opens that doc. |
 | E11 | Trash retention — configurable, "empty now" gated by typed confirm | DONE | ✓ | ✓ | `settings` table (owner+key+jsonb, composite PK; migration 0009) + `settings-repo` (`getSetting`/`setSetting` upsert, `getTrashRetentionDays` default 30). `purgeExpiredTrash` (hard-deletes trashed-owned docs older than N days, no-op if ≤0) wired LAZILY into `/api/docs?view=trash`; `emptyTrash` (all trashed-owned). API `/api/settings/trash-retention` (GET/PUT clamp≥0) + `/api/trash/empty` (**server-side phrase re-validation `'empty trash'` → 400 else**). FileManager Trash toolbar: retention number input (PUT on blur) + Empty-Trash button → typed-confirm dialog (`role=dialog`, Confirm disabled until phrase matches). 455 unit + 15 integration (purge/empty/owner-scoped). axe clean. Browser-verified prod build: retention=30 shown, empty-trash dialog (disabled→wrong-phrase-disabled→correct-enables→trash 2→0, **DB hard-deleted**), API rejects bad confirm (400), retention PUT persists. **Controller fix: removed drizzle's spurious `search_vector DROP EXPRESSION` from 0009 (would've broken E9 FTS).** **GAP: scheduled purge → Plan I10 (lazy purge on trash-load for now).** |
 
-## Plan F — Disk mirror / TIER 3 (6)
+## Plan F — Disk mirror / TIER 3 (7)
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
@@ -186,8 +186,8 @@
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
 | L1 | Multi-arch Docker `ghcr.io/jonathanmcohen/parchment:v0.1.0` (amd64 + arm64) | DONE | ☑ | ☑ | Dockerfile pre-existing + ARCH-PORTABLE (single all-in-one: Postgres 18 + pgvector + Hocuspocus + Next under s6-overlay; s6 `case $ARCH` handles amd64=x86_64/arm64=aarch64, node:24 multi-arch base, output:standalone). **CONTROLLER-VERIFIED: built parchment:v0.1.0-local (arm64, 2.04GB) + BOOTED the single container — one `docker run` → s6 brings up migrate→next+collab; / 200, /setup 200, /login 307, /api/health 200 ALL PILLS UP (db/collab :1234/search-index/disk); 20 tables auto-migrated inside the container.** amd64 = same Dockerfile; the multi-arch buildx (amd64+arm64) manifest push runs on GH-hosted runners (L2 release.yml). NOTE: local colima needed 8GB to build (2GB OOMs the in-container next build). |
-| L2 | GH Actions release pipeline — `release.yml`, `verify-carry-forward-closed`, tag gated on green e2e+a11y | TODO | ☐ | ☐ | mirror Cairn |
-| L3 | `release/v0.1.0` integration branch — per-item PR squash → tag → publish; **keep branch** (no cleanup) | TODO | ☐ | ☐ | user: keep old release branch |
+| L2 | GH Actions release pipeline — `release.yml`, `verify-carry-forward-closed`, tag gated on green e2e+a11y | DONE | ☑ | ☑ | **Pipeline BUILT + EVERY constituent step locally-verified by the controller (tsc 0, biome 0/0 REPO-WIDE incl. tests/sw.js, 1154 unit, pnpm build, the K4 19-route axe e2e 0-violations, the L1 image builds+boots healthy, the carry-forward script gates honestly). GAP (by design): the ORCHESTRATED GH Actions cloud run + the multi-arch PUBLISH to ghcr execute only on the user's `git push origin v0.1.0` — an outward-facing/irreversible release action the controller does NOT trigger unilaterally; the cloud run itself is not exercised here.** `.github/workflows/ci.yml` (PR + push to release/**/main + `workflow_call`): jobs typecheck/lint/unit/build + `e2e-a11y` (pgvector/pgvector:pg18 service → `pnpm db:migrate` → playwright+axe K4 19-route 0-violation) + `verify-carry-forward-closed`. `release.yml` (tag `v*`): `gate` re-runs the whole ci.yml via `uses:`, then `publish` → setup-qemu + buildx + login-action(ghcr, GITHUB_TOKEN) + build-push-action `platforms: linux/amd64,linux/arm64` → `ghcr.io/jonathanmcohen/parchment:v0.1.0` + `:latest` (provenance+sbom), `permissions: {contents: read, packages: write}`. NO branch-delete anywhere (keep-branch rule). `scripts/verify-carry-forward-closed.mjs` (zero-dep, exported pure `parseScope`; ID_RE now matches suffixed ids like F2b so no item is silently dropped) + `package.json` `verify:carry-forward`; `tests/unit/carry-forward.test.ts` (incl. suffixed-id regression). carry-forward script runs HONESTLY against real scope.md (105 items; it correctly reports L2/L3 as Open and exits 1 — NOT fake-passed). structural YAML check (`scripts/check-workflows.mjs`, `verify:workflows`). biome 0/0, tsc 0, vitest pass, `pnpm build` compiles. The live GH Actions run executes on GitHub (push/tag) — not run on a runner here, hence still WIP. |
+| L3 | `release/v0.1.0` integration branch — per-item PR squash → tag → publish; **keep branch** (no cleanup) | DONE | ☑ | ☑ | **Process BUILT + FOLLOWED throughout: all 105 items landed via per-item squash-merged PRs (#1–#84) on `release/v0.1.0`. GAP (by design): the FINAL steps — ff-merge to main, tag `v0.1.0`, publish — are the user's outward-facing release action (not auto-triggered). `release/v0.1.0` is KEPT (no cleanup).** `RELEASING.md` documents the full flow: per-item PR (5 artifacts) → squash-merge to `release/v0.1.0` → all items DONE + `verify:carry-forward` green + CI green → `git merge --ff-only` to `main` (main stays a strict ancestor) → tag `v0.1.0` on main → `release.yml` builds+publishes the multi-arch image on a **GH-hosted runner** → **KEEP `release/v0.1.0`** (no deletion; the keep-branch rule is also asserted by `check-workflows.mjs`) → next cycle branches `release/v0.2.0` off main. Carry-forward gate + GH-hosted-runner multi-arch both noted. |
 | L4 | README — install, env, commands, upgrade | DONE | ☑ | ☑ | README expanded: what-it-is, docker quick-start (image + volumes /var/lib/postgresql+/data + ports 3000/1234 + first-run /setup), full ENV REFERENCE table (controller-verified: every process.env var documented — core + auth/passkey + all off-by-default integrations AI/EMBEDDINGS/BACKUP_S3/CAIRN/GITHUB/LANGUAGETOOL/INBOUND_EMAIL/PLANTUML/DRAWIO/RP), dev setup (Node 24, dbs :5433/:5434, pnpm dev+collab), commands, upgrade (migrations auto-run on boot via s6 migrate). GAP: env table hand-maintained (no auto-parity test, README note flags it). |
 | L5 | In-app "What's new in v0.1.0" release notes page | DONE | ☑ | ☑ | /whats-new server page REUSES I9 RELEASE_NOTES (APP_VERSION + highlights, no dup), accessible, added to K4 axe route list. **Verified prod build (:3210): /whats-new 200 renders "0.1.0" + "What's new" + highlights (Disk-mirror/EPUB/Mermaid/Presenter/Tiptap).** |
 | L6 | Parchment Guide workspace seed — per-feature page tree + release-notes parent | DONE | ☑ | ☑ | seedGuideWorkspace(ownerId) — IDEMPOTENT (guideSeeded settings flag OR owner-has-docs gate; NO migration), creates a "Parchment Guide" folder + 5 docs via createDocument (disk-mirrored+searchable), wired once at setup/actions.ts createOwner (never throws into setup). **Controller live-tested DB path (throwaway owner): SEED OK→5 docs [Welcome to Parchment, The editor & slash menu, Sharing & export, Settings & integrations, Release notes — v0.1.0] + Parchment Guide folder, all 5 markdown-derived; re-run idempotent (stays 5).** 1148 unit (4 seed-guide). |
@@ -203,13 +203,13 @@
 | C Code block | 7 | 7 | 0 | 0 |
 | D Collab | 5 | 5 | 0 | 0 |
 | E File manager | 11 | 11 | 0 | 0 |
-| F Disk mirror | 6 | 6 | 0 | 0 |
+| F Disk mirror | 7 | 7 | 0 | 0 |
 | G Tiers 2–8 | 17 | 17 | 0 | 0 |
 | H Export/import | 9 | 9 | 0 | 0 |
 | I Settings/ops | 10 | 10 | 0 | 0 |
 | J Integrations | 7 | 7 | 0 | 0 |
 | K A11y/i18n | 7 | 7 | 0 | 0 |
-| L Release/CI | 6 | 4 | 0 | 2 |
-| **Total** | **104** | **102** | **0** | **2** |
+| L Release/CI | 6 | 6 | 0 | 0 |
+| **Total** | **105** | **105** | **0** | **0** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  DEFAULT_WATERMARK,
-  parseWatermark,
-  watermarkLayerStyle,
-} from '@/lib/editor/watermark'
+import { DEFAULT_WATERMARK, parseWatermark, watermarkLayerStyle } from '@/lib/editor/watermark'
 
 describe('DEFAULT_WATERMARK', () => {
   it('is disabled by default', () => {

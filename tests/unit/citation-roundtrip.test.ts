@@ -38,12 +38,12 @@ function find(node: Node | undefined, pred: (n: Node) => boolean): Node | undefi
   return undefined
 }
 
-function findAll(node: Node | undefined, pred: (n: Node) => boolean): Node[] {
+function _findAll(node: Node | undefined, pred: (n: Node) => boolean): Node[] {
   const out: Node[] = []
   if (!node) return out
   if (pred(node)) out.push(node)
   for (const child of node.content ?? []) {
-    out.push(...findAll(child, pred))
+    out.push(..._findAll(child, pred))
   }
   return out
 }
@@ -81,7 +81,7 @@ describe('G7b — bibliography serialize/parse round-trip', () => {
     const md = serializeMarkdown(original)
     const bodyMatch = md.match(/```parchment:bibliography\n([\s\S]*?)\n```/)
     expect(bodyMatch).not.toBeNull()
-    const body = bodyMatch![1] ?? ''
+    const body = bodyMatch?.[1] ?? ''
     const parsed = JSON.parse(body) as { refs: unknown[]; style: string }
     expect(parsed.style).toBe('mla')
     expect(Array.isArray(parsed.refs)).toBe(true)
@@ -133,10 +133,7 @@ describe('G7b — citation inline serialize/parse round-trip', () => {
   })
 
   it('round-trips a doc with both bibliography and citation', () => {
-    const original = doc(
-      p(text('Smith says '), CITE_NODE, text(' about this.')),
-      BIB_NODE,
-    )
+    const original = doc(p(text('Smith says '), CITE_NODE, text(' about this.')), BIB_NODE)
     const md = serializeMarkdown(original)
     expect(md).toContain('[@smith2020]')
     expect(md).toContain('```parchment:bibliography')

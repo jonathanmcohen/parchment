@@ -117,8 +117,9 @@ describe('E7 — duplicateDocument', () => {
   })
 
   it('copy is not starred and not trashed', async () => {
-    const { createDocument, duplicateDocument, getDocument, setStarred } =
-      await import('@/lib/docs/repo')
+    const { createDocument, duplicateDocument, getDocument, setStarred } = await import(
+      '@/lib/docs/repo'
+    )
     const { id: srcId } = await createDocument(ownerId, { title: 'StarredSrc' })
     await setStarred(ownerId, srcId, true)
     const { id: copyId } = await duplicateDocument(ownerId, srcId)

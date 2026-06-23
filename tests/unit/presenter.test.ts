@@ -47,7 +47,9 @@ describe('splitIntoSlides', () => {
     expect(slides[0]?.notes).toHaveLength(1)
     expect(slides[0]?.notes[0]).toMatchObject({ type: 'speakerNote' })
     // speakerNote is NOT in content
-    expect(slides[0]?.content.some((n) => (n as Record<string, unknown>).type === 'speakerNote')).toBe(false)
+    expect(
+      slides[0]?.content.some((n) => (n as Record<string, unknown>).type === 'speakerNote'),
+    ).toBe(false)
     expect(slides[0]?.content).toHaveLength(2) // h1 + paragraph
   })
 

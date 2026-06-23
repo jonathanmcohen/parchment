@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { buildTree, folderPath, wouldCreateCycle } from '@/lib/docs/folder-tree'
 import type { FolderNode } from '@/lib/docs/folder-tree'
+import { buildTree, folderPath, wouldCreateCycle } from '@/lib/docs/folder-tree'
 
 const f = (id: string, name: string, parentId: string | null = null): FolderNode => ({
   id,
@@ -20,11 +20,7 @@ describe('buildTree', () => {
   })
 
   it('builds a 3-level nested tree', () => {
-    const folders = [
-      f('a', 'A'),
-      f('b', 'B', 'a'),
-      f('c', 'C', 'b'),
-    ]
+    const folders = [f('a', 'A'), f('b', 'B', 'a'), f('c', 'C', 'b')]
     const tree = buildTree(folders)
     expect(tree[0]?.children[0]?.children[0]?.id).toBe('c')
   })
@@ -63,11 +59,7 @@ describe('buildTree', () => {
 })
 
 describe('folderPath', () => {
-  const folders = [
-    f('a', 'A'),
-    f('b', 'B', 'a'),
-    f('c', 'C', 'b'),
-  ]
+  const folders = [f('a', 'A'), f('b', 'B', 'a'), f('c', 'C', 'b')]
 
   it('returns root→leaf chain', () => {
     const path = folderPath(folders, 'c')

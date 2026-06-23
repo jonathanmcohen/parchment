@@ -83,9 +83,7 @@ describe('G2 — templates repo', () => {
 
   it('createTemplateFromDoc copies the doc content', async () => {
     const { createDocument, saveDocument } = await import('@/lib/docs/repo')
-    const { createTemplateFromDoc, getTemplateContent } = await import(
-      '@/lib/docs/templates-repo'
-    )
+    const { createTemplateFromDoc, getTemplateContent } = await import('@/lib/docs/templates-repo')
     const content = {
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hello' }] }],

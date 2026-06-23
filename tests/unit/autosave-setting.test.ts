@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  clampAutosaveMs,
   DEFAULT_AUTOSAVE_MS,
   MAX_AUTOSAVE_MS,
   MIN_AUTOSAVE_MS,
-  clampAutosaveMs,
 } from '@/lib/docs/settings-repo'
 
 // I3: pure clampAutosaveMs helper — no DB needed.

@@ -8,8 +8,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   filterMatchesByDict,
-  type Match,
   MAX_DICT_WORDS,
+  type Match,
   normalizeDict,
   normalizeWord,
 } from '@/lib/integrations/dictionary'

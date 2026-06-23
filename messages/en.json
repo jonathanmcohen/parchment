@@ -1,0 +1,51 @@
+{
+  "nav": {
+    "files": "Files",
+    "templates": "Templates",
+    "inbox": "Inbox",
+    "trash": "Trash",
+    "settings": "Settings",
+    "primaryLabel": "Primary"
+  },
+  "shell": {
+    "appName": "Parchment",
+    "skipToContent": "Skip to content",
+    "signOut": "Sign out"
+  },
+  "actions": {
+    "newDocument": "New document",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "search": "Search"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageDescription": "The language used across the interface.",
+    "account": "Account",
+    "workspace": "Workspace",
+    "admin": "Admin",
+    "developer": "Developer",
+    "notifications": "Notifications",
+    "security": "Security",
+    "appearance": "Appearance",
+    "identity": "Identity",
+    "documents": "Documents",
+    "autosave": "Autosave",
+    "storage": "Storage"
+  },
+  "help": {
+    "menu": "Help",
+    "menuLabel": "Help menu",
+    "keyboardShortcuts": "Keyboard shortcuts",
+    "whatsNew": "What's new",
+    "welcomeTour": "Welcome tour"
+  },
+  "locale": {
+    "switcherLabel": "Language",
+    "en": "English",
+    "ar": "العربية",
+    "he": "עברית"
+  }
+}

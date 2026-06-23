@@ -1,0 +1,28 @@
+{
+  "nav": {
+    "files": "קבצים",
+    "templates": "תבניות",
+    "inbox": "דואר נכנס",
+    "trash": "אשפה",
+    "settings": "הגדרות",
+    "primaryLabel": "ניווט ראשי"
+  },
+  "shell": {
+    "appName": "פּארצ'מנט",
+    "skipToContent": "דלג לתוכן",
+    "signOut": "התנתקות"
+  },
+  "actions": {
+    "newDocument": "מסמך חדש",
+    "save": "שמירה",
+    "cancel": "ביטול",
+    "delete": "מחיקה",
+    "search": "חיפוש"
+  },
+  "locale": {
+    "switcherLabel": "שפה",
+    "en": "English",
+    "ar": "العربية",
+    "he": "עברית"
+  }
+}

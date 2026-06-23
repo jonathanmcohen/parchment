@@ -1,4 +1,6 @@
 allowBuilds:
+  '@parcel/watcher': false
+  '@swc/core': false
   core-js: false
   cpu-features: false
   es5-ext: false

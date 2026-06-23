@@ -1,0 +1,51 @@
+{
+  "nav": {
+    "files": "الملفات",
+    "templates": "القوالب",
+    "inbox": "صندوق الوارد",
+    "trash": "المهملات",
+    "settings": "الإعدادات",
+    "primaryLabel": "التنقل الرئيسي"
+  },
+  "shell": {
+    "appName": "بارشمنت",
+    "skipToContent": "تخطٍّ إلى المحتوى",
+    "signOut": "تسجيل الخروج"
+  },
+  "actions": {
+    "newDocument": "مستند جديد",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "search": "بحث"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "language": "اللغة",
+    "languageDescription": "اللغة المستخدمة في جميع أنحاء الواجهة.",
+    "account": "الحساب",
+    "workspace": "مساحة العمل",
+    "admin": "الإدارة",
+    "developer": "المطوّر",
+    "notifications": "الإشعارات",
+    "security": "الأمان",
+    "appearance": "المظهر",
+    "identity": "الهوية",
+    "documents": "المستندات",
+    "autosave": "الحفظ التلقائي",
+    "storage": "التخزين"
+  },
+  "help": {
+    "menu": "المساعدة",
+    "menuLabel": "قائمة المساعدة",
+    "keyboardShortcuts": "اختصارات لوحة المفاتيح",
+    "whatsNew": "الجديد",
+    "welcomeTour": "جولة ترحيبية"
+  },
+  "locale": {
+    "switcherLabel": "اللغة",
+    "en": "English",
+    "ar": "العربية",
+    "he": "עברית"
+  }
+}

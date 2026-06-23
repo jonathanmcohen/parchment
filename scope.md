@@ -166,7 +166,7 @@
 | J3 | Spreadsheet embed — GSheets/Cairn-db/Airtable iframe | DONE | ☑ | ☑ | Same shared embed node as J2 (one impl). Spreadsheet providers: Google Sheets (/edit→pubhtml/widget embed form), Airtable (/embed), Office (view.officeapps.live.com/op/embed). Allowlist host-exact (no substring bypass — lookalike/userinfo-@ rejected). Browser-verified above (GSheets URL→sandboxed iframe on docs.google.com). See J2 notes. |
 | J4 | Slack / Discord — share to channel, notify on comment | TODO | ☐ | ☐ | |
 | J5 | Email-in — per-doc address, SMTP relay replies → comments | TODO | ☐ | ☐ | |
-| J6 | GitHub — embed PR/issue with live status | TODO | ☐ | ☐ | |
+| J6 | GitHub — embed PR/issue with live status | DONE | ☑ | ☑ | githubEmbed node {owner,repo,number,kind} (getSchema-safe) + GithubEmbedView card (live status badge open/closed/merged/draft, loading/unavailable states, always a plain github.com link fallback, title/author as escaped TEXT). integrations/github.ts: parseGithubRef (STRICT anti-SSRF — host must be EXACTLY github.com, owner/repo ^[A-Za-z0-9._-]+$, number ^\d+$ + ≤9 digits), githubApiUrl ALWAYS api.github.com, fetchGithubStatus resilient (network/404/403→null, GITHUB_TOKEN server-only optional, never client-exposed). GET /api/github/status?url= (auth, 400 on invalid/non-github before any fetch, 60s in-mem cache, graceful {unavailable}). parchment:github md fence round-trip. **Verified prod build (:3210, LIVE GitHub fetch):** valid PR→{title,state:merged,author,kind:pr} real card (title with <iframe> escaped, no XSS); non-github host→400; lookalike github.com.evil.com→400; oversized 21-digit number→400; unauth→401. 1080 unit (16 github incl host-spoof+oversized-number), build compiles, no migration. Review 1 finding (0 blocking); controller fixed the 1 MINOR (oversized number→parseInt sci-notation→cap ≤9 digits, ac9c73c + regression test). GAP: live API depends on network/rate-limit (boundary+degradation verified; live path confirmed via the real PR fetch above). |
 | J7 | Webhooks — save/publish/comment, HMAC-signed | TODO | ☐ | ☐ | |
 
 ## Plan K — Accessibility + i18n / TIER 8 (7)
@@ -207,9 +207,9 @@
 | G Tiers 2–8 | 17 | 17 | 0 | 0 |
 | H Export/import | 9 | 9 | 0 | 0 |
 | I Settings/ops | 10 | 10 | 0 | 0 |
-| J Integrations | 7 | 3 | 0 | 4 |
+| J Integrations | 7 | 4 | 0 | 3 |
 | K A11y/i18n | 7 | 0 | 0 | 7 |
 | L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **87** | **0** | **17** |
+| **Total** | **104** | **88** | **0** | **16** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

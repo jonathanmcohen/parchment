@@ -220,7 +220,9 @@ body {
 .parchment-skip-link {
   position: absolute;
   top: 0;
-  left: 0;
+  /* K5/RTL: logical inline-start so the skip link anchors to the leading edge
+     in both LTR (left) and RTL (right). */
+  inset-inline-start: 0;
   z-index: 2000;
   /* Off-screen until focused (not display:none, so it stays focusable). */
   transform: translateY(-150%);

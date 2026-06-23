@@ -1,9 +1,12 @@
+import { getTranslations } from 'next-intl/server'
+import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher'
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
 import { AutosaveSlider } from '@/components/settings/AutosaveSlider'
 import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { StylesManager } from '@/components/settings/StylesManager'
 
-export default function WorkspaceSettingsPage() {
+export default async function WorkspaceSettingsPage() {
+  const t = await getTranslations('settings')
   return (
     <section className="max-w-2xl">
       <h1 className="font-semibold text-2xl tracking-tight">Workspace</h1>
@@ -83,6 +86,16 @@ export default function WorkspaceSettingsPage() {
           <p className="text-[var(--muted)] text-xs">
             An absolute path on the server. Changing this does not move existing files.
           </p>
+        </div>
+      </section>
+
+      <section aria-labelledby="workspace-language" className="mt-8">
+        <h2 id="workspace-language" className="font-medium text-lg">
+          {t('language')}
+        </h2>
+        <p className="mt-1 text-[var(--muted)] text-sm">{t('languageDescription')}</p>
+        <div className="mt-4 max-w-xs">
+          <LocaleSwitcher />
         </div>
       </section>
 

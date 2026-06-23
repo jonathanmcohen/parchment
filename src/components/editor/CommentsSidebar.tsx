@@ -69,6 +69,10 @@ export function CommentsSidebar({ docId, editor, currentUserId }: Props) {
   const [composerBody, setComposerBody] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  // J5: the doc's per-doc inbound email address — null unless email-in is
+  // configured server-side (the GET route returns { address: null } then).
+  const [inboundAddress, setInboundAddress] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const focusRefs = useRef<Record<string, HTMLElement | null>>({})
 
@@ -88,6 +92,36 @@ export function CommentsSidebar({ docId, editor, currentUserId }: Props) {
   useEffect(() => {
     void load()
   }, [load])
+
+  // ── Load the per-doc inbound email address (J5) ───────────────────────────
+
+  useEffect(() => {
+    let active = true
+    void (async () => {
+      try {
+        const res = await fetch(`/api/docs/${docId}/inbound-address`)
+        if (!res.ok) return
+        const data = (await res.json()) as { address: string | null }
+        if (active) setInboundAddress(data.address ?? null)
+      } catch {
+        // swallow — the address row is non-critical and simply hides on failure
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [docId])
+
+  const handleCopyAddress = useCallback(async () => {
+    if (!inboundAddress) return
+    try {
+      await navigator.clipboard.writeText(inboundAddress)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // clipboard may be unavailable (insecure context) — no-op
+    }
+  }, [inboundAddress])
 
   // ── Focus thread via DOM event ─────────────────────────────────────────
 
@@ -249,6 +283,51 @@ export function CommentsSidebar({ docId, editor, currentUserId }: Props) {
           +
         </button>
       </div>
+
+      {/* J5: Email-to-comment address — shown ONLY when email-in is configured */}
+      {inboundAddress && (
+        <div
+          style={{
+            padding: '8px 12px',
+            borderBottom: '1px solid var(--border, #e5e7eb)',
+            fontSize: 11,
+            color: 'var(--muted, #6b7280)',
+          }}
+        >
+          <div style={{ marginBottom: 4 }}>Email to comment:</div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <code
+              style={{
+                flex: 1,
+                fontSize: 11,
+                wordBreak: 'break-all',
+                color: 'var(--text, #111827)',
+                background: 'var(--surface-hover, #f9fafb)',
+                padding: '2px 4px',
+                borderRadius: 4,
+              }}
+            >
+              {inboundAddress}
+            </code>
+            <button
+              type="button"
+              aria-label="Copy email-to-comment address"
+              onClick={() => void handleCopyAddress()}
+              style={{
+                fontSize: 11,
+                padding: '2px 8px',
+                border: '1px solid var(--border, #e5e7eb)',
+                borderRadius: 4,
+                background: 'transparent',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Composer */}
       {composerOpen && (

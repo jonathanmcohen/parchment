@@ -25,6 +25,10 @@ type Props = {
   suggestionsOpen: boolean
   onToggleBacklinks: () => void
   backlinksOpen: boolean
+  /** K7: grammar-check panel toggle — only rendered when grammar is enabled. */
+  onToggleGrammar?: () => void
+  grammarOpen?: boolean
+  grammarEnabled?: boolean
   onOpenShare: () => void
   onToggleReading: () => void
   readingOpen: boolean
@@ -141,6 +145,9 @@ export function Toolbar({
   suggestionsOpen,
   onToggleBacklinks,
   backlinksOpen,
+  onToggleGrammar,
+  grammarOpen = false,
+  grammarEnabled = false,
   onOpenShare,
   onToggleReading,
   readingOpen,
@@ -822,6 +829,22 @@ export function Toolbar({
           </span>
         )}
       </button>
+
+      {/* ── K7: Grammar check toggle (LanguageTool) ─────────────────────
+          Rendered ONLY when LanguageTool is enabled server-side; absent
+          entirely otherwise so a disabled instance shows no grammar action. */}
+      {grammarEnabled && onToggleGrammar && (
+        <button
+          type="button"
+          aria-label="Grammar check"
+          aria-pressed={grammarOpen}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={onToggleGrammar}
+        >
+          <span aria-hidden="true">📝</span>
+        </button>
+      )}
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 

@@ -3,10 +3,15 @@ import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher'
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
 import { AutosaveSlider } from '@/components/settings/AutosaveSlider'
 import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
+import { SpellingSettings } from '@/components/settings/SpellingSettings'
 import { StylesManager } from '@/components/settings/StylesManager'
+import { isLanguageToolEnabled } from '@/lib/integrations/languagetool'
 
 export default async function WorkspaceSettingsPage() {
   const t = await getTranslations('settings')
+  // K7: grammar status computed server-side (the LANGUAGETOOL_URL env is never
+  // read client-side); the UI shows enabled/disabled + the env-config note.
+  const grammarEnabled = isLanguageToolEnabled()
   return (
     <section className="max-w-2xl">
       <h1 className="font-semibold text-2xl tracking-tight">Workspace</h1>
@@ -100,6 +105,8 @@ export default async function WorkspaceSettingsPage() {
       </section>
 
       <AppearanceSettings />
+
+      <SpellingSettings grammarEnabled={grammarEnabled} />
 
       <ShortcutsSettings />
 

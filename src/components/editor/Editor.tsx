@@ -22,6 +22,7 @@ import { DrawioModal } from '@/components/editor/DrawioModal'
 import { EmbedDialog } from '@/components/editor/EmbedDialog'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { GithubEmbedDialog } from '@/components/editor/GithubEmbedDialog'
+import { GrammarPanel } from '@/components/editor/GrammarPanel'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { MathPopover } from '@/components/editor/MathPopover'
@@ -54,6 +55,7 @@ import { resolveProvider } from '@/lib/editor/embed-providers'
 import { CairnSuggestionExtension } from '@/lib/editor/extensions/cairn-suggestion'
 import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
+import { GrammarCheckExtension } from '@/lib/editor/extensions/grammar-check'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import { WikiSuggestionExtension } from '@/lib/editor/extensions/wiki-suggestion'
 import { classifySwipe, isMobileWidth, pageFitScale } from '@/lib/editor/page-fit'
@@ -107,6 +109,10 @@ type Props = {
   aiEnabled?: boolean
   /** I3: autosave version-snapshot interval in ms (clamped to 5s–5min, default 30s). */
   autosaveIntervalMs?: number
+  /** K6: the owner's browser-native-spellcheck preference (default ON). */
+  spellcheckEnabled?: boolean
+  /** K7: true when LANGUAGETOOL_URL is configured server-side. Never derived client-side. */
+  grammarEnabled?: boolean
 }
 
 const FIELD = 'default'
@@ -126,6 +132,8 @@ export function Editor({
   initialCustomCss,
   aiEnabled = false,
   autosaveIntervalMs = 30_000,
+  spellcheckEnabled = true,
+  grammarEnabled = false,
 }: Props) {
   // The Y.Doc is created empty — we do NOT eagerly seed it here (D4). Seeding is
   // gated on `hasCollabState` (a server-rendered fact, not a live fragment check)
@@ -549,6 +557,9 @@ export function Editor({
   // D2: suggestions panel toggle
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
 
+  // K7: grammar-check panel toggle (only reachable when grammar is enabled).
+  const [grammarPanelOpen, setGrammarPanelOpen] = useState(false)
+
   // F6: backlinks panel toggle
   const [backlinksOpen, setBacklinksOpen] = useState(false)
 
@@ -857,9 +868,20 @@ export function Editor({
       // Uses a DISTINCT PluginKey('citeSuggestion') — never shares a key with
       // slashMenu or wikiSuggestion (F6 lesson).
       CiteSuggestionExtension,
+      // K7: grammar-check decorations. Uses a DISTINCT PluginKey('grammarCheck')
+      // — never shares a key with slashMenu/wikiSuggestion/citeSuggestion/
+      // cairnSuggestion/findReplace (F6 lesson). Only registered when LanguageTool
+      // is enabled server-side; with no extension the doc carries no grammar state.
+      ...(grammarEnabled ? [GrammarCheckExtension] : []),
     ],
     editorProps: {
-      attributes: { class: 'parchment-prose', 'aria-label': 'Document editor' },
+      // K6: drive the ProseMirror contenteditable's `spellcheck` attr from the
+      // owner's setting. When false, the browser-native squiggles are disabled.
+      attributes: {
+        class: 'parchment-prose',
+        'aria-label': 'Document editor',
+        spellcheck: spellcheckEnabled ? 'true' : 'false',
+      },
       // B5: handle image paste and drop
       handleDOMEvents: {
         paste: (_view, event) => {
@@ -1378,6 +1400,9 @@ export function Editor({
           suggestionsOpen={suggestionsOpen}
           onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
           backlinksOpen={backlinksOpen}
+          onToggleGrammar={() => setGrammarPanelOpen((v) => !v)}
+          grammarOpen={grammarPanelOpen}
+          grammarEnabled={grammarEnabled}
           onOpenShare={() => setShareDialogOpen(true)}
           onToggleReading={() => setReadingOpen((v) => !v)}
           readingOpen={readingOpen}
@@ -1458,6 +1483,11 @@ export function Editor({
 
         {/* D2: suggestions panel (right rail) */}
         {editor && suggestionsOpen && <SuggestionsPanel editor={editor} />}
+
+        {/* K7: grammar-check panel (right rail) — only when LanguageTool is enabled */}
+        {editor && grammarEnabled && grammarPanelOpen && (
+          <GrammarPanel editor={editor} onClose={() => setGrammarPanelOpen(false)} />
+        )}
 
         {/* F6: backlinks panel (right rail) */}
         {editor && backlinksOpen && <BacklinksPanel docId={docId} />}

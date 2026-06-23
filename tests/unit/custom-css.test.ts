@@ -132,7 +132,8 @@ describe('scopeCustomCss', () => {
   })
 
   it('leaves @keyframes body untouched (from/to are not selectors)', () => {
-    const input = '@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }'
+    const input =
+      '@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }'
     const result = scopeCustomCss(input, SCOPE)
     expect(result).toContain('@keyframes spin')
     // The keyframe stops must NOT be prefixed with the scope class.
@@ -166,10 +167,7 @@ describe('scopeCustomCss', () => {
   })
 
   it('prefixes inside @supports', () => {
-    const result = scopeCustomCss(
-      '@supports (display: grid) { .grid { display: grid } }',
-      SCOPE,
-    )
+    const result = scopeCustomCss('@supports (display: grid) { .grid { display: grid } }', SCOPE)
     expect(result).toContain('@supports')
     expect(result).toContain(`${SCOPE} .grid`)
   })

@@ -5,7 +5,12 @@
 // SVG data-URI decoding. Runs in the node env — no DOM, no drawio imports.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { drawioEmbedSrc, drawioEmbedUrl, drawioEnabled, parseDrawioExport } from '@/lib/editor/drawio'
+import {
+  drawioEmbedSrc,
+  drawioEmbedUrl,
+  drawioEnabled,
+  parseDrawioExport,
+} from '@/lib/editor/drawio'
 
 const ENV_KEY = 'NEXT_PUBLIC_DRAWIO_EMBED_URL'
 const TEST_URL = 'https://embed.diagrams.net'
@@ -19,7 +24,6 @@ describe('G6c — drawio helper', () => {
 
   afterEach(() => {
     if (originalValue === undefined) {
-      // biome-ignore lint/performance/noDelete: must unset to restore original absence
       delete process.env[ENV_KEY]
     } else {
       process.env[ENV_KEY] = originalValue
@@ -28,7 +32,6 @@ describe('G6c — drawio helper', () => {
 
   describe('with NEXT_PUBLIC_DRAWIO_EMBED_URL unset', () => {
     beforeEach(() => {
-      // biome-ignore lint/performance/noDelete: must unset env var for this test group
       delete process.env[ENV_KEY]
     })
 

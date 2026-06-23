@@ -20,7 +20,6 @@ describe('G6b — plantuml helper', () => {
 
   afterEach(() => {
     if (originalValue === undefined) {
-      // biome-ignore lint/performance/noDelete: must unset to restore original absence
       delete process.env[ENV_KEY]
     } else {
       process.env[ENV_KEY] = originalValue
@@ -29,7 +28,6 @@ describe('G6b — plantuml helper', () => {
 
   describe('with NEXT_PUBLIC_PLANTUML_SERVER_URL unset', () => {
     beforeEach(() => {
-      // biome-ignore lint/performance/noDelete: must unset env var for this test group
       delete process.env[ENV_KEY]
     })
 
@@ -56,9 +54,9 @@ describe('G6b — plantuml helper', () => {
       expect(url).not.toBeNull()
       expect(url).toContain('/svg/')
       // The encoded token after /svg/ must be non-empty
-      const token = url!.split('/svg/')[1]
+      const token = url?.split('/svg/')[1]
       expect(token).toBeTruthy()
-      expect(token!.length).toBeGreaterThan(0)
+      expect(token?.length).toBeGreaterThan(0)
     })
 
     it('plantumlImageUrl includes the server base in the URL', () => {

@@ -4,11 +4,7 @@
  * Uses jsdom so DOMParser is available for normalizePastedHtml.
  */
 import { describe, expect, it } from 'vitest'
-import {
-  looksLikeMarkdown,
-  normalizePastedHtml,
-  sniffPasteSource,
-} from '@/lib/editor/smart-paste'
+import { looksLikeMarkdown, normalizePastedHtml, sniffPasteSource } from '@/lib/editor/smart-paste'
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -59,7 +55,12 @@ describe('sniffPasteSource', () => {
   })
 
   it('detects Word via <w: namespace', () => {
-    expect(sniffPasteSource('<html xmlns:w="urn:schemas-microsoft-com:office:word"><body></body></html>', '')).toBe('word')
+    expect(
+      sniffPasteSource(
+        '<html xmlns:w="urn:schemas-microsoft-com:office:word"><body></body></html>',
+        '',
+      ),
+    ).toBe('word')
   })
 
   it('detects GDocs via docs-internal-guid', () => {

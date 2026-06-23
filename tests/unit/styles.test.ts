@@ -10,7 +10,13 @@ describe('resolveStyleProps', () => {
   it('merges a basedOn chain with the child winning', () => {
     const styles: NamedStyle[] = [
       { id: 'a', name: 'A', type: 'paragraph', props: { fontSize: '12pt', color: '#111111' } },
-      { id: 'b', name: 'B', type: 'paragraph', basedOn: 'a', props: { color: '#222222', bold: true } },
+      {
+        id: 'b',
+        name: 'B',
+        type: 'paragraph',
+        basedOn: 'a',
+        props: { color: '#222222', bold: true },
+      },
       { id: 'c', name: 'C', type: 'paragraph', basedOn: 'b', props: { fontSize: '20pt' } },
     ]
     const resolved = resolveStyleProps(styles, 'c')

@@ -18,7 +18,7 @@ describe('collectReaders', () => {
   ): [number, Record<string, unknown>] {
     const state: Record<string, unknown> = {}
     if (!opts.noUser) {
-      state['user'] = {
+      state.user = {
         name: opts.name ?? 'Alice',
         ...(opts.color !== undefined ? { color: opts.color } : {}),
       }
@@ -26,9 +26,9 @@ describe('collectReaders', () => {
     if (!opts.noReading) {
       const reading: Record<string, unknown> = { pos: opts.pos ?? 10 }
       if (opts.updatedAt !== undefined) {
-        reading['updatedAt'] = opts.updatedAt
+        reading.updatedAt = opts.updatedAt
       }
-      state['reading'] = reading
+      state.reading = reading
     }
     return [clientId, state]
   }
@@ -44,7 +44,11 @@ describe('collectReaders', () => {
     const states = new Map([makeState(2, { name: 'Bob', color: '#ff0000', pos: 5 })])
     const result = collectReaders(states, 1, NOW)
     expect(result).toHaveLength(1)
-    expect(result[0]).toMatchObject({ clientId: 2, user: { name: 'Bob', color: '#ff0000' }, pos: 5 })
+    expect(result[0]).toMatchObject({
+      clientId: 2,
+      user: { name: 'Bob', color: '#ff0000' },
+      pos: 5,
+    })
   })
 
   it('sorts by pos ascending, then by clientId for stability', () => {

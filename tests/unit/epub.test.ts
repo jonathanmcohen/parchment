@@ -1,6 +1,7 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+
 import JSZip from 'jszip'
+import { describe, expect, it } from 'vitest'
 import { docToEpub } from '@/lib/export/epub'
 
 const sampleDoc = {
@@ -25,7 +26,7 @@ describe('docToEpub', () => {
     const zip = await JSZip.loadAsync(result)
     const mimetypeFile = zip.file('mimetype')
     expect(mimetypeFile).not.toBeNull()
-    const mimetypeContent = await mimetypeFile!.async('string')
+    const mimetypeContent = await mimetypeFile?.async('string')
     expect(mimetypeContent).toBe('application/epub+zip')
   })
 
@@ -34,7 +35,7 @@ describe('docToEpub', () => {
     const zip = await JSZip.loadAsync(result)
     const containerFile = zip.file('META-INF/container.xml')
     expect(containerFile).not.toBeNull()
-    const content = await containerFile!.async('string')
+    const content = await containerFile?.async('string')
     expect(content).toContain('content.opf')
   })
 
@@ -43,7 +44,7 @@ describe('docToEpub', () => {
     const zip = await JSZip.loadAsync(result)
     const opfFile = zip.file('OEBPS/content.opf')
     expect(opfFile).not.toBeNull()
-    const content = await opfFile!.async('string')
+    const content = await opfFile?.async('string')
     expect(content).toContain('Test EPUB')
     expect(content).toContain('chapter.xhtml')
   })
@@ -53,7 +54,7 @@ describe('docToEpub', () => {
     const zip = await JSZip.loadAsync(result)
     const chapterFile = zip.file('OEBPS/chapter.xhtml')
     expect(chapterFile).not.toBeNull()
-    const content = await chapterFile!.async('string')
+    const content = await chapterFile?.async('string')
     expect(content).toContain('Hello from the epub chapter.')
   })
 

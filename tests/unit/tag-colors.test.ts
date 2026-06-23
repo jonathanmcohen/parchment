@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_TAG_COLOR,
-  TAG_COLORS,
   isValidTagColor,
   resolveTagColor,
+  TAG_COLORS,
 } from '@/lib/docs/tag-colors'
 
 describe('tag-colors', () => {

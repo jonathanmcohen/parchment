@@ -14,8 +14,12 @@ describe('swStrategyFor — SW cache-strategy classifier', () => {
   it('returns network-only for non-GET requests', () => {
     expect(swStrategyFor(`${ORIGIN}/d/abc123`, 'POST', 'same-origin', ORIGIN)).toBe('network-only')
     expect(swStrategyFor(`${ORIGIN}/d/abc123`, 'PUT', 'same-origin', ORIGIN)).toBe('network-only')
-    expect(swStrategyFor(`${ORIGIN}/d/abc123`, 'DELETE', 'same-origin', ORIGIN)).toBe('network-only')
-    expect(swStrategyFor(`${ORIGIN}/api/docs/x`, 'POST', 'same-origin', ORIGIN)).toBe('network-only')
+    expect(swStrategyFor(`${ORIGIN}/d/abc123`, 'DELETE', 'same-origin', ORIGIN)).toBe(
+      'network-only',
+    )
+    expect(swStrategyFor(`${ORIGIN}/api/docs/x`, 'POST', 'same-origin', ORIGIN)).toBe(
+      'network-only',
+    )
   })
 
   it('returns network-only for WebSocket URLs (collab server)', () => {
@@ -42,12 +46,12 @@ describe('swStrategyFor — SW cache-strategy classifier', () => {
   // ── cache-first ───────────────────────────────────────────────────────────
 
   it('returns cache-first for /_next/static/ assets', () => {
-    expect(
-      swStrategyFor(`${ORIGIN}/_next/static/chunks/main.js`, 'GET', 'no-cors', ORIGIN),
-    ).toBe('cache-first')
-    expect(
-      swStrategyFor(`${ORIGIN}/_next/static/css/app.css`, 'GET', 'same-origin', ORIGIN),
-    ).toBe('cache-first')
+    expect(swStrategyFor(`${ORIGIN}/_next/static/chunks/main.js`, 'GET', 'no-cors', ORIGIN)).toBe(
+      'cache-first',
+    )
+    expect(swStrategyFor(`${ORIGIN}/_next/static/css/app.css`, 'GET', 'same-origin', ORIGIN)).toBe(
+      'cache-first',
+    )
     // Typical hashed chunk filename
     expect(
       swStrategyFor(

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { formatTranscript, getSpeechRecognition, isVoiceSupported } from '@/lib/editor/voice'
 
 // ---------------------------------------------------------------------------
@@ -25,17 +25,26 @@ describe('formatTranscript', () => {
   })
 
   it('maps "question mark" to "?" with no leading space', () => {
-    const result = formatTranscript('question mark', { atSentenceStart: false, precededBySpace: false })
+    const result = formatTranscript('question mark', {
+      atSentenceStart: false,
+      precededBySpace: false,
+    })
     expect(result).toBe('?')
   })
 
   it('maps "exclamation mark" to "!" with no leading space', () => {
-    const result = formatTranscript('exclamation mark', { atSentenceStart: false, precededBySpace: false })
+    const result = formatTranscript('exclamation mark', {
+      atSentenceStart: false,
+      precededBySpace: false,
+    })
     expect(result).toBe('!')
   })
 
   it('maps "exclamation point" to "!" with no leading space', () => {
-    const result = formatTranscript('exclamation point', { atSentenceStart: false, precededBySpace: false })
+    const result = formatTranscript('exclamation point', {
+      atSentenceStart: false,
+      precededBySpace: false,
+    })
     expect(result).toBe('!')
   })
 
@@ -45,17 +54,26 @@ describe('formatTranscript', () => {
   })
 
   it('maps "new paragraph" to "\\n" with no leading space', () => {
-    const result = formatTranscript('new paragraph', { atSentenceStart: false, precededBySpace: false })
+    const result = formatTranscript('new paragraph', {
+      atSentenceStart: false,
+      precededBySpace: false,
+    })
     expect(result).toBe('\n')
   })
 
   it('maps "open quote" to \'"\'', () => {
-    const result = formatTranscript('open quote', { atSentenceStart: false, precededBySpace: false })
+    const result = formatTranscript('open quote', {
+      atSentenceStart: false,
+      precededBySpace: false,
+    })
     expect(result).toBe('"')
   })
 
   it('maps "close quote" to \'"\'', () => {
-    const result = formatTranscript('close quote', { atSentenceStart: false, precededBySpace: false })
+    const result = formatTranscript('close quote', {
+      atSentenceStart: false,
+      precededBySpace: false,
+    })
     expect(result).toBe('"')
   })
 
@@ -65,7 +83,10 @@ describe('formatTranscript', () => {
   })
 
   it('leaves word lowercase mid-sentence', () => {
-    const result = formatTranscript('hello world', { atSentenceStart: false, precededBySpace: true })
+    const result = formatTranscript('hello world', {
+      atSentenceStart: false,
+      precededBySpace: true,
+    })
     expect(result).toBe('hello world')
   })
 
@@ -96,7 +117,10 @@ describe('formatTranscript', () => {
   })
 
   it('trims stray whitespace from the API before mapping', () => {
-    const result = formatTranscript('  period  ', { atSentenceStart: false, precededBySpace: false })
+    const result = formatTranscript('  period  ', {
+      atSentenceStart: false,
+      precededBySpace: false,
+    })
     expect(result).toBe('.')
   })
 })
@@ -108,9 +132,7 @@ describe('formatTranscript', () => {
 describe('isVoiceSupported', () => {
   afterEach(() => {
     // Clean up any stubs we set.
-    // biome-ignore lint/performance/noDelete: test cleanup requires deletion
     delete (globalThis as Record<string, unknown>).SpeechRecognition
-    // biome-ignore lint/performance/noDelete: test cleanup requires deletion
     delete (globalThis as Record<string, unknown>).webkitSpeechRecognition
   })
 
@@ -131,9 +153,7 @@ describe('isVoiceSupported', () => {
 
 describe('getSpeechRecognition', () => {
   afterEach(() => {
-    // biome-ignore lint/performance/noDelete: test cleanup requires deletion
     delete (globalThis as Record<string, unknown>).SpeechRecognition
-    // biome-ignore lint/performance/noDelete: test cleanup requires deletion
     delete (globalThis as Record<string, unknown>).webkitSpeechRecognition
   })
 

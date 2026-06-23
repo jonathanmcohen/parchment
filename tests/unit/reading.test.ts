@@ -104,8 +104,6 @@ describe('readingBookmarkKey', () => {
   })
 
   it('handles special characters in docId', () => {
-    expect(readingBookmarkKey('doc/with:colon')).toBe(
-      'parchment:reading-bookmark:doc/with:colon',
-    )
+    expect(readingBookmarkKey('doc/with:colon')).toBe('parchment:reading-bookmark:doc/with:colon')
   })
 })

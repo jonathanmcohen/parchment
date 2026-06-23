@@ -60,7 +60,10 @@ describe('G5 — drawing serialize/parse round-trip', () => {
     // Extract the JSON body from the fence
     const fenceBody = md.match(/```parchment:drawing\n([\s\S]*?)\n```/)?.[1] ?? ''
     expect(fenceBody).toBeTruthy()
-    const parsed = JSON.parse(fenceBody) as { type: string; attrs: { scene: typeof SCENE; svg: string } }
+    const parsed = JSON.parse(fenceBody) as {
+      type: string
+      attrs: { scene: typeof SCENE; svg: string }
+    }
     expect(parsed.type).toBe('drawing')
     expect(parsed.attrs.scene.elements[0]?.id).toBe('a')
     expect(parsed.attrs.svg).toBe(SVG)

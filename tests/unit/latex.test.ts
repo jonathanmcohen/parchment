@@ -4,12 +4,16 @@ import { docToLatex } from '@/lib/export/latex'
 
 const heading1Doc = {
   type: 'doc',
-  content: [{ type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Hello World' }] }],
+  content: [
+    { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Hello World' }] },
+  ],
 }
 
 const heading2Doc = {
   type: 'doc',
-  content: [{ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Sub heading' }] }],
+  content: [
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Sub heading' }] },
+  ],
 }
 
 const boldDoc = {
@@ -38,8 +42,14 @@ const bulletListDoc = {
     {
       type: 'bulletList',
       content: [
-        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Item one' }] }] },
-        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Item two' }] }] },
+        {
+          type: 'listItem',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Item one' }] }],
+        },
+        {
+          type: 'listItem',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Item two' }] }],
+        },
       ],
     },
   ],
@@ -61,9 +71,7 @@ const mathInlineDoc = {
 
 const mathBlockDoc = {
   type: 'doc',
-  content: [
-    { type: 'mathBlock', attrs: { latex: 'E = mc^2' } },
-  ],
+  content: [{ type: 'mathBlock', attrs: { latex: 'E = mc^2' } }],
 }
 
 const citationDoc = {
@@ -80,7 +88,14 @@ const citationDoc = {
     {
       type: 'bibliography',
       attrs: {
-        refs: [{ id: 'einstein1905', author: 'Einstein, A.', year: '1905', title: 'On the Electrodynamics of Moving Bodies' }],
+        refs: [
+          {
+            id: 'einstein1905',
+            author: 'Einstein, A.',
+            year: '1905',
+            title: 'On the Electrodynamics of Moving Bodies',
+          },
+        ],
         style: 'apa',
       },
     },

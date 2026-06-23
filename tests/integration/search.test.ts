@@ -49,7 +49,11 @@ describe('E9 — full-text search', () => {
     const { createDocument, saveDocument } = await import('@/lib/docs/repo')
 
     const { id } = await createDocument(ownerId, { title: 'Quantum Physics Notes' })
-    await saveDocument(id, { contentJson: {}, markdown: 'Introduction to quantum mechanics', title: 'Quantum Physics Notes' })
+    await saveDocument(id, {
+      contentJson: {},
+      markdown: 'Introduction to quantum mechanics',
+      title: 'Quantum Physics Notes',
+    })
 
     const results = await searchFullText(ownerId, 'quantum')
     expect(results.map((r) => r.id)).toContain(id)
@@ -132,7 +136,9 @@ describe('E9 — full-text search', () => {
     })
     await setStarred(ownerId, starredId, true)
 
-    const { id: notStarredId } = await createDocument(ownerId, { title: 'Non-starred xenobiology doc' })
+    const { id: notStarredId } = await createDocument(ownerId, {
+      title: 'Non-starred xenobiology doc',
+    })
     await saveDocument(notStarredId, {
       contentJson: {},
       markdown: 'xenobiology also covers astrobiology topics',
@@ -152,7 +158,10 @@ describe('E9 — full-text search', () => {
 
     const { id: folderId } = await createFolder(ownerId, { name: 'Physics Folder' })
 
-    const { id: inFolderDocId } = await createDocument(ownerId, { title: 'Optics in folder', folderId })
+    const { id: inFolderDocId } = await createDocument(ownerId, {
+      title: 'Optics in folder',
+      folderId,
+    })
     await saveDocument(inFolderDocId, {
       contentJson: {},
       markdown: 'Fresnel diffraction is a wave optics phenomenon',
@@ -187,7 +196,9 @@ describe('E9 — full-text search', () => {
     })
     await addTagToDoc(ownerId, taggedId, tagId)
 
-    const { id: untaggedId } = await createDocument(ownerId, { title: 'Gravitational waves untagged' })
+    const { id: untaggedId } = await createDocument(ownerId, {
+      title: 'Gravitational waves untagged',
+    })
     await saveDocument(untaggedId, {
       contentJson: {},
       markdown: 'Interferometry is also used in optical coherence tomography',

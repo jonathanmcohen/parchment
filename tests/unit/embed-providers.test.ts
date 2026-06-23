@@ -19,10 +19,7 @@
 //     provider/url/title.
 
 import { describe, expect, it } from 'vitest'
-import {
-  EMBED_PROVIDERS,
-  resolveProvider,
-} from '@/lib/editor/embed-providers'
+import { EMBED_PROVIDERS, resolveProvider } from '@/lib/editor/embed-providers'
 import { markdownToJson } from '@/lib/markdown/parse'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
 
@@ -104,7 +101,6 @@ describe('J2/J3 — embed provider allowlist', () => {
 
   // ── REJECTIONS — the crux ─────────────────────────────────────────────────
   it('rejects a javascript: URL (no iframe)', () => {
-    // biome-ignore lint/security/noJavascriptUrl: deliberately testing the rejection path
     expect(resolveProvider('javascript:alert(1)')).toBeNull()
   })
 
@@ -145,7 +141,6 @@ describe('J2/J3 — embed provider allowlist', () => {
       // view.officeapps.live.com output is actually checked against the host set.
       'https://view.officeapps.live.com/op/embed.aspx?src=https%3A%2F%2Fexample.com%2Fa.xlsx',
       // adversarial inputs each provider must refuse to reflect:
-      // biome-ignore lint/security/noJavascriptUrl: adversarial input under test
       'javascript:alert(1)',
       'data:text/html,x',
       'http://airtable.com/shr123',
@@ -170,7 +165,6 @@ describe('J2/J3 — embed provider allowlist', () => {
       'https://onedrive.live.com/embed?cid=A&resid=B&authkey=C',
       // Office web-apps viewer → emits a view.officeapps.live.com embed url.
       'https://view.officeapps.live.com/op/embed.aspx?src=https%3A%2F%2Fexample.com%2Fa.xlsx',
-      // biome-ignore lint/security/noJavascriptUrl: adversarial input under test
       'javascript:alert(1)',
       'data:text/html,x',
       'https://evil.example/x',

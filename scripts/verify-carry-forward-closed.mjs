@@ -27,9 +27,14 @@ import { fileURLToPath } from 'node:url'
  */
 
 // An item row looks like: `| L2 | title | STATUS | cov | fm | notes |`.
-// The id cell is a single plan letter (A–L) followed by digits — this excludes
-// the legend / gate-column / roll-up tables, whose first cells are never ids.
-const ID_RE = /^[A-L]\d+$/
+// The id cell is a single plan letter (A–L) followed by digits, with an OPTIONAL
+// lowercase suffix (e.g. `F2b`, a user-approved add) — this excludes the legend /
+// gate-column / roll-up tables, whose first cells are never ids.
+// The suffix MUST be matched: an unsuffixed regex (`^[A-L]\d+$`) silently drops
+// suffixed rows like `| F2b | ... | TODO | ... |`, which would let an Open item
+// slip past the gate entirely — defeating the whole "no silently-Open items"
+// purpose. (Regression-tested in tests/unit/carry-forward.test.ts.)
+const ID_RE = /^[A-L]\d+[a-z]*$/
 
 /** Split a markdown table row into trimmed cells (drops the leading/trailing |). */
 function splitRow(line) {

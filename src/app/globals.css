@@ -1830,6 +1830,15 @@ body {
   border-radius: 2px;
 }
 
+/* ── Grammar-check decorations (K7) ─────────────────────────────────── */
+
+.parchment-grammar-match {
+  text-decoration: underline wavy color-mix(in srgb, #d97706 80%, transparent);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 2px;
+  cursor: help;
+}
+
 /* ── Find + Replace panel (B9) ──────────────────────────────────────── */
 
 .parchment-find-panel {

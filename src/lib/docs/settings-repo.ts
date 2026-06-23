@@ -17,6 +17,11 @@ export const DEFAULT_TRASH_RETENTION_DAYS = 30
 export const WORKSPACE_THEME_KEY = 'workspaceTheme'
 export const DOC_STYLES_KEY = 'docStyles'
 
+// K6: browser-native spellcheck on/off (default ON — matches contenteditable
+// default). Reuses this settings store; no migration.
+export const SPELLCHECK_KEY = 'spellcheckEnabled'
+export const DEFAULT_SPELLCHECK_ENABLED = true
+
 /** Return the stored value for (ownerId, key), or `fallback` if unset. */
 export async function getSetting<T>(ownerId: string, key: string, fallback: T): Promise<T> {
   const [row] = await db
@@ -84,6 +89,17 @@ export async function getAutosaveInterval(ownerId: string): Promise<number> {
 export async function setAutosaveInterval(ownerId: string, ms: number): Promise<void> {
   const clamped = clampAutosaveMs(ms)
   await setSetting(ownerId, AUTOSAVE_INTERVAL_KEY, clamped)
+}
+
+/** Read the owner's native-spellcheck preference (default ON). */
+export async function getSpellcheckEnabled(ownerId: string): Promise<boolean> {
+  const raw = await getSetting<unknown>(ownerId, SPELLCHECK_KEY, DEFAULT_SPELLCHECK_ENABLED)
+  return typeof raw === 'boolean' ? raw : DEFAULT_SPELLCHECK_ENABLED
+}
+
+/** Persist the owner's native-spellcheck preference (coerced to a boolean). */
+export async function setSpellcheckEnabled(ownerId: string, enabled: boolean): Promise<void> {
+  await setSetting(ownerId, SPELLCHECK_KEY, !!enabled)
 }
 
 /** Read the owner's named styles, or the built-in defaults if unset. */

@@ -12,7 +12,10 @@ export default async function LoginPage() {
   if (await getCurrentUser()) redirect('/')
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-16">
+    <main
+      id="main-content"
+      className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-16"
+    >
       <div className="flex flex-col gap-2">
         <h1 className="font-semibold text-3xl tracking-tight">Sign in</h1>
         <p className="text-[var(--muted)]">Welcome back to Parchment.</p>

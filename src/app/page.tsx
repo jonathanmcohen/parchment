@@ -2,7 +2,10 @@ import Link from 'next/link'
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-8 px-6 py-16">
+    <main
+      id="main-content"
+      className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-8 px-6 py-16"
+    >
       <div className="flex flex-col gap-3">
         <h1 className="text-4xl font-semibold tracking-tight">Parchment</h1>
         <p className="text-[var(--muted)] text-lg">

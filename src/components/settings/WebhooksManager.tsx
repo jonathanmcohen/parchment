@@ -145,9 +145,9 @@ export function WebhooksManager() {
         </p>
       ) : null}
 
-      <ul className="flex flex-col gap-2">
-        {webhooks && webhooks.length > 0 ? (
-          webhooks.map((w) => (
+      {webhooks && webhooks.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {webhooks.map((w) => (
             <li key={w.id} className="rounded-lg border border-[var(--border)] p-3 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -187,13 +187,13 @@ export function WebhooksManager() {
                 </div>
               </div>
             </li>
-          ))
-        ) : (
-          <p className="text-[var(--muted)] text-sm">
-            No webhooks yet. Add one above, or use a preset to share to a channel.
-          </p>
-        )}
-      </ul>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[var(--muted)] text-sm">
+          No webhooks yet. Add one above, or use a preset to share to a channel.
+        </p>
+      )}
     </div>
   )
 }

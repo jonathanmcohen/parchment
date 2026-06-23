@@ -259,9 +259,13 @@ export function AppearanceSettings() {
                 >
                   {pair.name}
                 </span>
-                {/* Body preview */}
+                {/* Body preview — use full-contrast foreground on the selected
+                    card (its accent-tinted background drops --muted below AA). */}
                 <span
-                  className="mt-1 truncate text-xs text-[var(--muted)]"
+                  className={[
+                    'mt-1 truncate text-xs',
+                    selected ? 'text-[var(--foreground)]' : 'text-[var(--muted)]',
+                  ].join(' ')}
                   style={{ fontFamily: pair.body }}
                 >
                   The quick brown fox

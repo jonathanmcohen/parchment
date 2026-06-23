@@ -2111,8 +2111,12 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
       {/* View content */}
       {(view === 'all' || view === 'smart' || view === 'tag') && (
         <div className="flex gap-6 flex-1 min-h-0">
-          {/* Left rail — folder tree + smart folders */}
-          <aside className="w-56 shrink-0 border-r border-[var(--border)] pr-4 flex flex-col gap-2">
+          {/* Left rail — folder tree + smart folders. Plain wrapper, not an
+              <aside> landmark: it sits inside the layout's <main>, and a
+              complementary landmark nested in main is flagged by axe
+              (landmark-complementary-is-top-level). The folder tree below uses
+              <ul>/<li> list semantics for its structure. */}
+          <div className="w-56 shrink-0 border-r border-[var(--border)] pr-4 flex flex-col gap-2">
             <button
               type="button"
               onClick={handleNewFolder}
@@ -2351,10 +2355,13 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 />
               )}
             </div>
-          </aside>
+          </div>
 
-          {/* Main panel */}
-          <main className="flex-1 min-w-0">
+          {/* Main panel — plain wrapper, NOT a <main> landmark: the (app) layout
+              already provides the page's single <main id="main-content">, so a
+              nested <main> here would create a duplicate landmark (K1: one <main>
+              per page). */}
+          <div className="flex-1 min-w-0">
             {view === 'all' && (
               <>
                 {/* Breadcrumb — each crumb is also a drop target (E8): drag a doc
@@ -2661,12 +2668,14 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                   </>
                 )
               })()}
-          </main>
+          </div>
         </div>
       )}
 
       {(view === 'recents' || view === 'starred' || view === 'trash') && (
-        <main className="flex-1 min-w-0">
+        // Plain wrapper, not a <main> landmark (see note above): the layout owns
+        // the page's single <main>.
+        <div className="flex-1 min-w-0">
           {view === 'trash' && (
             <TrashToolbar docCount={flatDocs.length} onAfterEmpty={() => fetchFlatDocs('trash')} />
           )}
@@ -2712,15 +2721,17 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               />
             </>
           )}
-        </main>
+        </div>
       )}
 
       {view === 'shared' && (
-        <main className="flex-1 min-w-0 flex items-center justify-center">
+        // Plain wrapper, not a <main> landmark (see note above): the layout owns
+        // the page's single <main>.
+        <div className="flex-1 min-w-0 flex items-center justify-center">
           <p className="text-[var(--muted)] text-center">
             Shared documents arrive in v0.2. Parchment v0.1 is single-owner.
           </p>
-        </main>
+        </div>
       )}
     </div>
   )

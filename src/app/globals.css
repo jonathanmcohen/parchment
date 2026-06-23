@@ -83,6 +83,57 @@ body {
   font-family: var(--font-body);
 }
 
+/* ── K3: global keyboard-focus ring ──────────────────────────────────────────
+ *
+ * A single, clearly visible focus indicator for every interactive control that
+ * does not already define its own :focus-visible style. Keyboard users (Tab)
+ * see the ring; pointer users (:focus without -visible) do not, so click states
+ * stay clean. Components that ship a bespoke ring (e.g. .parchment-cb-btn,
+ * .parchment-outline-link) override this via their own :focus-visible rule.
+ *
+ * NOTE: this is additive — it never removes an outline without a replacement.
+ * Any `outline: none` in this file MUST pair with a :focus-visible substitute.
+ * ─────────────────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent-contrast);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── K3: skip-to-content link ────────────────────────────────────────────────
+ *
+ * Visually hidden until it receives keyboard focus, at which point it slides
+ * into the top-left corner as a high-contrast button. It is the first focusable
+ * element in the app/public layouts and targets the <main id="main-content">
+ * landmark so keyboard/screen-reader users can bypass the sidebar nav.
+ * ─────────────────────────────────────────────────────────────────────────── */
+.parchment-skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2000;
+  /* Off-screen until focused (not display:none, so it stays focusable). */
+  transform: translateY(-150%);
+  margin: 8px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--accent-contrast);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+  transition: transform 0.12s ease;
+}
+
+.parchment-skip-link:focus,
+.parchment-skip-link:focus-visible {
+  transform: translateY(0);
+  /* The link itself is the focus target — keep the global ring legible on it. */
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 /* Page canvas (B1) */
 .parchment-page {
   position: relative;

@@ -79,20 +79,36 @@ function setTourSeen(): void {
 //   - On unmount cleanup: restore focus to saved element (WCAG 2.4.3).
 // Esc and Tab-trap run for the lifetime of the mounted dialog (no isOpen toggle).
 
-function useFocusTrap(containerRef: React.RefObject<HTMLElement | null>, onClose: () => void) {
+function useFocusTrap(
+  containerRef: React.RefObject<HTMLElement | null>,
+  onClose: () => void,
+  // WCAG 2.4.3 / G15: explicit restore target. The dropdown menuitem that opened
+  // the dialog is unmounted in the SAME React commit that mounts the dialog, so by
+  // the time this effect reads document.activeElement it is already <body>. We must
+  // be handed the durable trigger (the Help toggle button) to restore focus to it.
+  restoreRef?: React.RefObject<HTMLElement | null>,
+) {
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+  const restoreRefRef = useRef(restoreRef)
+  restoreRefRef.current = restoreRef
 
   // On mount: save previous focus + move focus into dialog.
   // On unmount: restore focus to saved element (WCAG 2.4.3).
   useLayoutEffect(() => {
-    const previous = document.activeElement as HTMLElement | null
+    // Prefer the explicit restore target (the trigger). Fall back to whatever was
+    // focused at mount only when no trigger is provided (e.g. the auto-shown tour).
+    const explicit = restoreRefRef.current?.current ?? null
+    const previous = explicit ?? (document.activeElement as HTMLElement | null)
     const first = containerRef.current?.querySelector<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     )
     first?.focus()
     return () => {
-      previous?.focus()
+      // Read the trigger again at close time in case it remounted; fall back to the
+      // value captured at open.
+      const target = restoreRefRef.current?.current ?? previous
+      target?.focus()
     }
   }, [containerRef])
 
@@ -173,9 +189,17 @@ const STATIC_REFERENCE: { keys: string; label: string }[] = [
   { keys: '⇧Tab', label: 'Outdent list item' },
 ]
 
-function ShortcutsDialog({ bindings, onClose }: { bindings: Binding[]; onClose: () => void }) {
+function ShortcutsDialog({
+  bindings,
+  onClose,
+  restoreRef,
+}: {
+  bindings: Binding[]
+  onClose: () => void
+  restoreRef?: React.RefObject<HTMLElement | null>
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
-  useFocusTrap(containerRef, onClose)
+  useFocusTrap(containerRef, onClose, restoreRef)
   const mac = useMemo(() => isMac(), [])
 
   return (
@@ -227,9 +251,15 @@ function ShortcutsDialog({ bindings, onClose }: { bindings: Binding[]; onClose: 
 
 // ── What's new dialog ─────────────────────────────────────────────────────────
 
-function WhatsNewDialog({ onClose }: { onClose: () => void }) {
+function WhatsNewDialog({
+  onClose,
+  restoreRef,
+}: {
+  onClose: () => void
+  restoreRef?: React.RefObject<HTMLElement | null>
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
-  useFocusTrap(containerRef, onClose)
+  useFocusTrap(containerRef, onClose, restoreRef)
 
   return (
     <Backdrop onClose={onClose}>
@@ -269,7 +299,13 @@ function WhatsNewDialog({ onClose }: { onClose: () => void }) {
 
 // ── Tour modal ────────────────────────────────────────────────────────────────
 
-function TourModal({ onClose }: { onClose: () => void }) {
+function TourModal({
+  onClose,
+  restoreRef,
+}: {
+  onClose: () => void
+  restoreRef?: React.RefObject<HTMLElement | null>
+}) {
   const [step, setStep] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -287,7 +323,7 @@ function TourModal({ onClose }: { onClose: () => void }) {
     onClose()
   }
 
-  useFocusTrap(containerRef, handleDone)
+  useFocusTrap(containerRef, handleDone, restoreRef)
 
   return (
     <Backdrop onClose={handleDone}>
@@ -364,6 +400,13 @@ export function HelpMenu({ shortcutOverrides = {} }: HelpMenuProps) {
   const [dialog, setDialog] = useState<Dialog>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
+  // WCAG 2.4.3: only the dropdown-menuitem open path needs the toggle as the
+  // restore anchor (the menuitem unmounts in the same commit as the dialog mounts,
+  // so document.activeElement is already <body> by the time the trap saves it).
+  // The global-chord and auto-shown-tour paths must restore to wherever the user
+  // actually was, so they leave this null and let useFocusTrap fall back to the
+  // activeElement it captured at mount.
+  const restoreOnClose = useRef<HTMLElement | null>(null)
 
   // I2: cheat-sheet bindings reflect the user's custom keys.
   const bindings = useMemo(
@@ -384,6 +427,8 @@ export function HelpMenu({ shortcutOverrides = {} }: HelpMenuProps) {
     function handleShortcut(e: Event) {
       const detail = (e as CustomEvent<ShortcutEventDetail>).detail
       if (detail?.action === 'shortcuts-help') {
+        // Global chord: restore focus to wherever the user was, not the toggle.
+        restoreOnClose.current = null
         setMenuOpen(false)
         setDialog('shortcuts')
       }
@@ -425,6 +470,9 @@ export function HelpMenu({ shortcutOverrides = {} }: HelpMenuProps) {
   }, [menuOpen, dialog])
 
   function openDialog(d: Dialog) {
+    // Opened from a dropdown menuitem: the menuitem unmounts in the same commit as
+    // the dialog mounts, so capture the durable trigger now as the restore anchor.
+    restoreOnClose.current = toggleRef.current
     setMenuOpen(false)
     setDialog(d)
   }
@@ -475,9 +523,13 @@ export function HelpMenu({ shortcutOverrides = {} }: HelpMenuProps) {
         )}
       </div>
 
-      {dialog === 'shortcuts' && <ShortcutsDialog bindings={bindings} onClose={closeDialog} />}
-      {dialog === 'whats-new' && <WhatsNewDialog onClose={closeDialog} />}
-      {dialog === 'tour' && <TourModal onClose={closeDialog} />}
+      {dialog === 'shortcuts' && (
+        <ShortcutsDialog bindings={bindings} onClose={closeDialog} restoreRef={restoreOnClose} />
+      )}
+      {dialog === 'whats-new' && (
+        <WhatsNewDialog onClose={closeDialog} restoreRef={restoreOnClose} />
+      )}
+      {dialog === 'tour' && <TourModal onClose={closeDialog} restoreRef={restoreOnClose} />}
     </>
   )
 }

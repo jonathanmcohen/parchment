@@ -879,6 +879,12 @@ export function Editor({
       // owner's setting. When false, the browser-native squiggles are disabled.
       attributes: {
         class: 'parchment-prose',
+        // role=textbox + aria-multiline makes aria-label valid on the
+        // contenteditable div (a bare div may not carry aria-label —
+        // axe aria-prohibited-attr) and is the correct semantic for a
+        // rich-text editor surface.
+        role: 'textbox',
+        'aria-multiline': 'true',
         'aria-label': 'Document editor',
         spellcheck: spellcheckEnabled ? 'true' : 'false',
       },

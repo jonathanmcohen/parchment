@@ -2,7 +2,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  ⛔  HOLD — SCAFFOLD ONLY. NO IMPLEMENTATION.                              ║
+║  🟢  GO — EXECUTING (Plan S1→S5).                                          ║
 ║                                                                            ║
 ║  Scope is locked but execution is gated. Do NOT branch a feature, write    ║
 ║  code, or open a PR until the user replies "GO" on Plan S1.                ║

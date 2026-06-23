@@ -1,6 +1,6 @@
 # Parchment v0.1.1 — scope tracker
 
-> ⛔ **HOLD — scope locked, execution gated.** No item starts until the user says
+> 🟢 **GO — executing.** S1→S5 in progress; user gave GO 2026-06-23.
 > GO on Plan S1. See [README](README.md). Status legend: `TODO` · `WIP` ·
 > `PARTIAL (n%)` · `DONE`. `Cov` = covered by a per-PR snapshot+axe artifact.
 > `LV` = live-deploy verified.

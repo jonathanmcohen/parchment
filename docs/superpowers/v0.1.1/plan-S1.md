@@ -1,6 +1,6 @@
 # Plan S1 — Color, theme tokens, surfaces
 
-> ⛔ HOLD. The token foundation every later plan consumes. Land S1 first.
+> 🟢 **GO — executing.** S1→S5 in progress; user gave GO 2026-06-23.
 > No branch, no code, no PR until the user replies "GO" on Plan S1. On GO this
 > banner flips to "🟢 GO — Plan S1".
 

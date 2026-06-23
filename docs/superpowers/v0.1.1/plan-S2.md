@@ -1,6 +1,6 @@
 # Plan S2 — Global chrome (nav rails, top bar, sidebar)
 
-> ⛔ HOLD. Run after S1 (consumes its tokens). No branch / code / PR until the
+> 🟢 **GO — executing.** S1→S5 in progress; user gave GO 2026-06-23.
 > user replies "GO" on Plan S1. See [README](README.md).
 
 **Intent:** restyle the global shell to Google Drive shape — white sidebar with a

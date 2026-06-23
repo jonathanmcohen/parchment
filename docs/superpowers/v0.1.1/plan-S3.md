@@ -1,6 +1,6 @@
 # Plan S3 — Editor chrome (title bar, menu bar, toolbar, outline, status bar)
 
-> ⛔ HOLD. Run after S2. The heaviest plan — introduces two NEW chrome rows
+> 🟢 **GO — executing.** S1→S5 in progress; user gave GO 2026-06-23.
 > (title bar S3-1, menu bar S3-2) + a full toolbar restyle (S3-3) and re-homes the
 > outline (S3-5) and status bar (S3-6). **S3-2 is the confirmed PARTIAL risk:** the
 > File/Edit/View/Insert/Format/Tools/Extensions/Help dropdown system needs a NEW

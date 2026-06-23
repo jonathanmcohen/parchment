@@ -2,7 +2,7 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  ⛔  HOLD — SCAFFOLD/PLAN ONLY. NO IMPLEMENTATION.                         ║
+║  🟢  GO — EXECUTING (Plan S1→S5).                                        ║
 ║                                                                            ║
 ║  Runs AFTER S1 (tokens), S2 (chrome), S3 (editor chrome). Do NOT branch,   ║
 ║  write code, or open a PR until the user replies "GO" on Plan S1 and S1–S3 ║

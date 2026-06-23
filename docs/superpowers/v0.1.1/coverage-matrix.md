@@ -1,6 +1,6 @@
 # Parchment v0.1.1 — coverage matrix (audit close-out)
 
-> ⛔ **HOLD** — scope locked, execution gated. No item starts until the user says
+> 🟢 **GO — executing.** S1→S5 in progress; user gave GO 2026-06-23.
 > GO on Plan S1. See [README](README.md).
 
 An adversarial review of the v0.1.1 scaffold found **22 blocking/important + 9 minor

@@ -31,7 +31,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const shortcutOverrides = await getShortcutOverrides(user.id)
 
   return (
-    <div className="flex min-h-screen" style={themeStyle} data-color-scheme={theme.colorScheme}>
+    <div
+      className="flex min-h-screen"
+      style={themeStyle}
+      data-color-scheme={theme.colorScheme}
+      // K2: accessibility toggles — globals.css keys high-contrast var overrides
+      // off [data-high-contrast="true"] and the OpenDyslexic font off
+      // [data-font="dyslexic"]. Omit the attribute entirely when off so the
+      // base/light/dark vars apply unchanged.
+      data-high-contrast={theme.highContrast ? 'true' : undefined}
+      data-font={theme.dyslexicFont ? 'dyslexic' : undefined}
+    >
       <GlobalShortcuts overrides={shortcutOverrides} />
       <CommandPaletteMount />
       {/* K3: skip-to-content — first focusable element, visually hidden until

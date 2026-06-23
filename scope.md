@@ -185,12 +185,12 @@
 
 | ID | Item | Status | Cov | FM | Notes |
 |---|---|---|---|---|---|
-| L1 | Multi-arch Docker `ghcr.io/jonathanmcohen/parchment:v0.1.0` (amd64 + arm64) | TODO | ☐ | ☐ | |
+| L1 | Multi-arch Docker `ghcr.io/jonathanmcohen/parchment:v0.1.0` (amd64 + arm64) | DONE | ☑ | ☑ | Dockerfile pre-existing + ARCH-PORTABLE (single all-in-one: Postgres 18 + pgvector + Hocuspocus + Next under s6-overlay; s6 `case $ARCH` handles amd64=x86_64/arm64=aarch64, node:24 multi-arch base, output:standalone). **CONTROLLER-VERIFIED: built parchment:v0.1.0-local (arm64, 2.04GB) + BOOTED the single container — one `docker run` → s6 brings up migrate→next+collab; / 200, /setup 200, /login 307, /api/health 200 ALL PILLS UP (db/collab :1234/search-index/disk); 20 tables auto-migrated inside the container.** amd64 = same Dockerfile; the multi-arch buildx (amd64+arm64) manifest push runs on GH-hosted runners (L2 release.yml). NOTE: local colima needed 8GB to build (2GB OOMs the in-container next build). |
 | L2 | GH Actions release pipeline — `release.yml`, `verify-carry-forward-closed`, tag gated on green e2e+a11y | TODO | ☐ | ☐ | mirror Cairn |
 | L3 | `release/v0.1.0` integration branch — per-item PR squash → tag → publish; **keep branch** (no cleanup) | TODO | ☐ | ☐ | user: keep old release branch |
-| L4 | README — install, env, commands, upgrade | TODO | ☐ | ☐ | |
-| L5 | In-app "What's new in v0.1.0" release notes page | TODO | ☐ | ☐ | |
-| L6 | Parchment Guide workspace seed — per-feature page tree + release-notes parent | TODO | ☐ | ☐ | |
+| L4 | README — install, env, commands, upgrade | DONE | ☑ | ☑ | README expanded: what-it-is, docker quick-start (image + volumes /var/lib/postgresql+/data + ports 3000/1234 + first-run /setup), full ENV REFERENCE table (controller-verified: every process.env var documented — core + auth/passkey + all off-by-default integrations AI/EMBEDDINGS/BACKUP_S3/CAIRN/GITHUB/LANGUAGETOOL/INBOUND_EMAIL/PLANTUML/DRAWIO/RP), dev setup (Node 24, dbs :5433/:5434, pnpm dev+collab), commands, upgrade (migrations auto-run on boot via s6 migrate). GAP: env table hand-maintained (no auto-parity test, README note flags it). |
+| L5 | In-app "What's new in v0.1.0" release notes page | DONE | ☑ | ☑ | /whats-new server page REUSES I9 RELEASE_NOTES (APP_VERSION + highlights, no dup), accessible, added to K4 axe route list. **Verified prod build (:3210): /whats-new 200 renders "0.1.0" + "What's new" + highlights (Disk-mirror/EPUB/Mermaid/Presenter/Tiptap).** |
+| L6 | Parchment Guide workspace seed — per-feature page tree + release-notes parent | DONE | ☑ | ☑ | seedGuideWorkspace(ownerId) — IDEMPOTENT (guideSeeded settings flag OR owner-has-docs gate; NO migration), creates a "Parchment Guide" folder + 5 docs via createDocument (disk-mirrored+searchable), wired once at setup/actions.ts createOwner (never throws into setup). **Controller live-tested DB path (throwaway owner): SEED OK→5 docs [Welcome to Parchment, The editor & slash menu, Sharing & export, Settings & integrations, Release notes — v0.1.0] + Parchment Guide folder, all 5 markdown-derived; re-run idempotent (stays 5).** 1148 unit (4 seed-guide). |
 
 ---
 
@@ -209,7 +209,7 @@
 | I Settings/ops | 10 | 10 | 0 | 0 |
 | J Integrations | 7 | 7 | 0 | 0 |
 | K A11y/i18n | 7 | 7 | 0 | 0 |
-| L Release/CI | 6 | 0 | 0 | 6 |
-| **Total** | **104** | **98** | **0** | **6** |
+| L Release/CI | 6 | 4 | 0 | 2 |
+| **Total** | **104** | **102** | **0** | **2** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.

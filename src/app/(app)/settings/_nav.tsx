@@ -10,6 +10,8 @@ const groups = [
   { href: '/settings/developer', label: 'Developer' },
   { href: '/settings/notifications', label: 'Notifications' },
   { href: '/settings/security', label: 'Security' },
+  // L5: "About" links to the dedicated, linkable What's-new page.
+  { href: '/whats-new', label: 'About' },
 ]
 
 export function SettingsNav() {

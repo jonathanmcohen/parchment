@@ -38,6 +38,15 @@
   --page-ink: #202124;
   --page-ink-muted: #5f6368;
 
+  /* F2b: page-scoped table surfaces — same crux as --page-ink. The table header
+     fill + cell/header borders must contrast the PAGE canvas (light sheet), not
+     the chrome --border (#5f6368 in dark) which produced unreadable dark-ink-on-
+     dark-grey headers in dark mode. Scheme-INDEPENDENT for normal light/dark/
+     system (deliberately NOT overridden in the dark/system-dark blocks below);
+     only the HC blocks (whose --page-bg flips to black) re-point them. */
+  --page-surface-muted: #f1f3f4;
+  --page-border: #dadce0;
+
   /* FIXED brand — chrome only; the picker can NEVER repaint these */
   --primary: #1a73e8;
   --primary-hover: #1765cc;
@@ -242,6 +251,9 @@
   /* F2: HC-light page is white → keep black ink (AAA). */
   --page-ink: #000000;
   --page-ink-muted: #1a1a1a;
+  /* F2b: HC-light table surfaces — black-on-grey header fill + black borders. */
+  --page-surface-muted: #e8e8e8;
+  --page-border: #000000;
 }
 
 /* Dark high-contrast — forced dark, or system + OS dark. */
@@ -266,6 +278,9 @@
   /* F2: HC-dark page is BLACK → ink must flip WHITE (AAA). */
   --page-ink: #ffffff;
   --page-ink-muted: #e8e8e8;
+  /* F2b: HC-dark table surfaces — white-on-near-black header fill + white borders. */
+  --page-surface-muted: #1a1a1a;
+  --page-border: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   [data-high-contrast="true"][data-color-scheme="system"] {
@@ -289,6 +304,9 @@
     /* F2: HC-dark page is BLACK → ink must flip WHITE (AAA). */
     --page-ink: #ffffff;
     --page-ink-muted: #e8e8e8;
+    /* F2b: HC-dark table surfaces — white-on-near-black header fill + white borders. */
+    --page-surface-muted: #1a1a1a;
+    --page-border: #ffffff;
   }
 }
 

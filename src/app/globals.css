@@ -1291,7 +1291,7 @@ body {
 
 .parchment-prose table th,
 .parchment-prose table td {
-  border: 1px solid var(--border);
+  border: 1px solid var(--page-border);
   padding: 6px 10px;
   vertical-align: top;
   min-width: 40px;
@@ -1300,14 +1300,14 @@ body {
 
 /* Header row */
 .parchment-prose table th {
-  background: var(--border);
+  background: var(--page-surface-muted);
   font-weight: 600;
   text-align: left;
 }
 
 /* Alternating row shading — even data rows get a subtle tint */
 .parchment-prose table tbody tr:nth-child(even) td {
-  background: color-mix(in srgb, var(--border) 30%, transparent);
+  background: color-mix(in srgb, var(--page-surface-muted) 50%, transparent);
 }
 
 /* Selected cell highlight (ProseMirror adds .selectedCell) */

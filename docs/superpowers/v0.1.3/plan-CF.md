@@ -1,6 +1,6 @@
 # Plan CF — carry-forward from the v0.1.2 live deploy
 
-> ⛔ **HOLD.** No code until GO on CF1+CF6. Grounded vs the v0.1.2 code. **Every CF item
+> 🟢 **GO — executing.** Plans fine-combed; deploy confirmed v0.1.2 (reports real). Grounded vs the v0.1.2 code. **Every CF item
 > is reproduce-first: paste a curl / DOM probe / screenshot SHOWING the bug before writing
 > the fix.** Several CF items are already correct in code (CF3/CF5/CF7) — the probe on the
 > redeployed build decides confirm-or-fix. No raw hex; S1 tokens.
@@ -37,9 +37,15 @@ curl -v -b cookies.txt -X PUT https://parchment.local.jonco.dev/api/settings/the
 ```
 
 **Fix (after the probe pins the cause):**
-- If 401/cookie: `session.ts:37` → `secure: true` (force secure regardless of NODE_ENV)
-  AND/OR ensure the deploy sets `NODE_ENV=production` (docker-compose). Verify the cookie
-  is `SameSite=Lax; Secure` and transmits on the PUT.
+- If 401/cookie: do **NOT** blindly `secure: true` — that breaks **local http dev**
+  (a secure cookie is not sent over `http://localhost`). Use a guarded approach:
+  `secure: env.nodeEnv === 'production' || process.env.SECURE_COOKIES === 'true'` (so the
+  deploy sets `SECURE_COOKIES=true`, local dev stays http-friendly) AND/OR ensure the
+  deploy container actually sets `NODE_ENV=production`. The cookie is `httpOnly; sameSite:
+  'lax'` (`session.ts:36-38`) — also confirm via DevTools that the cookie is *transmitted*
+  on the PUT (vs regenerated/dropped); SameSite=Lax can interact with the proxy. Document
+  `SECURE_COOKIES` (or the NODE_ENV requirement) in the docker-compose `.env` for the
+  redeploy.
 - If 400/500: fix the body parse / `setWorkspaceTheme` write per the actual error.
 - Remove the error toast path only once save succeeds (keep it for genuine failures).
 - **Add an e2e test:** toggle light→dark→system, assert each persists across reload.
@@ -196,20 +202,25 @@ PUBLIC_URL. 4) Set it on the homelab `.env`; redeploy-verify the copied link.
 `src/components/editor/Editor.tsx:1465` + `DocTitleBar.tsx:243` (title-bar `UserCluster`).
 
 **Current (grounded):** the code **gates correctly** — `TopbarUserCluster` returns `null`
-when `pathname === '/d' || pathname.startsWith('/d/')`, so on the editor route only the
-title-bar avatar renders. **No double avatar in code.** If the deploy shows two, the likely
-cause is a **locale or Caddy pathname prefix** (e.g. `/en/d/…`) that breaks the string
-guard.
+when `pathname === '/d' || pathname.startsWith('/d/')`. **The locale hypothesis is RULED
+OUT** — the review confirmed there is **no URL locale prefix** (no `[locale]` group, no
+`middleware.ts`, i18n is **cookie-based** `NEXT_LOCALE` per `src/i18n/config.ts`), so the
+pathname is never `/en/d/…`. The guard is correct as written. **So if the user sees a
+double avatar on the v0.1.2 deploy, the cause is something ELSE the code-read missed** — do
+not invent the locale fix.
 
-**Reproduce-first probe:** on the deploy, open `/files` (expect 1 avatar in the topbar) and
-a doc `/d/<id>` (expect 1 in the title bar, 0 in the topbar). DOM-count avatars per route.
-If 2 on `/d/`, capture the actual `pathname` (`window.location.pathname`) to see if it's
-prefixed.
+**Reproduce-first probe (find the REAL cause):** on the deploy, open `/files` (expect 1
+avatar in the topbar) and a doc `/d/<id>` (expect 1 in the title bar, 0 in the topbar).
+DOM-count `[aria-haspopup="menu"]`/avatar elements per route + log `window.location.pathname`
+(confirm it's NOT prefixed). If 2 on `/d/`: trace WHICH two components render — is the
+topbar `TopbarUserCluster` actually returning null? is `DocTitleBar` rendering its avatar
+twice? is there a third avatar source? Find the actual second render path.
 
-**Fix (decided by the probe):** if double → make the guard locale/prefix-tolerant
-(`pathname.includes('/d/') || pathname === '/d'`, or a regex tolerating a leading locale
-segment). If single post-redeploy → stale-deploy; close verified-with-screenshot. **PARTIAL
-gap (named):** the routing root-cause if it's a deeper i18n/proxy rewrite.
+**Fix (decided by the probe):** fix the real second render path the probe finds. If the
+probe shows a SINGLE avatar on the redeployed (full v0.1.2) build → the user's report was
+against an older build → close **DONE / verified-no-change WITH the screenshot** (NOT on
+the code-read). **PARTIAL gap (named):** only if a genuine second source is found that
+can't be cleanly removed in-window.
 
 **Accept (LV):** exactly ONE avatar on every route (topbar on non-editor, title-bar on
 `/d/`) on the deploy — DOM count + screenshot.

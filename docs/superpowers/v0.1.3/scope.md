@@ -1,6 +1,6 @@
 # Parchment v0.1.3 — scope tracker
 
-> ⛔ **HOLD — scope locked, execution gated.** No code until "GO" on CF1+CF6. See
+> 🟢 **GO — executing.** Plans fine-combed (deploy confirmed v0.1.2, corrections applied); user gave GO. See
 > [README](README.md). Status: `TODO` · `WIP` · `PARTIAL (n%)` · `DONE`. `Repro` = the
 > reproduce-first evidence (curl/DOM/screenshot) is attached. `LV` = **live-deploy**
 > verified (light AND dark, screenshot in release notes — NOT localhost). 🌐 =
@@ -100,9 +100,16 @@ CF2 (Security `/api/auth/password` + `/api/auth/sessions`, Developer PATManager 
 build-SHA), CF5 (locale/proxy pathname guard), LT1-3, LT2-4, LT3-1, LT3-6, LT4-2, LT4-3,
 LT4-5, LT5-2, LT5-3, LT6-1, LT6-3, LT7-1, LT7-2.
 
-## Already-correct-in-code (stale-deploy candidates — reproduce-first decides)
+## "Appears-correct-in-code" — reproduce-first to find the missed cause
 CF3 (rail opacity), CF5/CF7 gating+dropdown, LT1-4, LT1-5, LT3-3, LT4-1, LT5-1, LT6-4.
-**Do NOT close any on the code-read — require a live-deploy screenshot (the C2 lesson).**
+**The deploy is CONFIRMED v0.1.2 — the user sees these broken on the very code that looks
+correct, so a code-read verdict is SUSPECT: reproduce-first to find the cause the read
+missed** (a cascade, a view-conditional — e.g. CF3's rail only renders in all/smart/tag
+views, `FileManager.tsx:2319` — a prop gate, a runtime difference). **Closing rule:** never
+close on a code-read; reproduce-first on the redeployed build → if genuinely correct there,
+close **DONE / verified-no-change WITH the screenshot, no code PR** (allowed + expected); if
+broken, fix the real cause. *(Grounding correction: **LT6-1 is NOT in this list** — file
+rows use `--selection-bg`, a real change to `--primary-surface`.)*
 
 ## Deploy-surfaced (🌐 — local verify cannot catch)
 CF1, CF2, CF3, CF4, CF5, LT1-1, LT7-3.

@@ -1,6 +1,6 @@
 # Plan L — layout drift (7 tiers)
 
-> ⛔ **HOLD.** No code until GO. Grounded vs the v0.1.2 code (file:line + current value +
+> 🟢 **GO — executing.** Plans fine-combed; deploy confirmed v0.1.2 (layout drift is real, not stale). Grounded vs the v0.1.2 code (file:line + current value +
 > target). **Mostly CSS value changes**; the few needing JSX/logic are flagged
 > PARTIAL-risk. **Reproduce-first on the redeployed build** (DOM computed-style probe +
 > screenshot) before each change — several items are ALREADY correct in code (stale-deploy

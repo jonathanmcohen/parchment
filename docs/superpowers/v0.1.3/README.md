@@ -2,10 +2,11 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  ⛔  HOLD — SCOPE LOCKED, EXECUTION GATED.                                 ║
+║  🟢  GO — EXECUTING (CF1+CF6 → CF2-5,CF7 → LT1 → LT2-7).                   ║
 ║                                                                            ║
-║  Do NOT branch a feature, write code, or open a PR until the user replies  ║
-║  "GO" on Plan CF1+CF6. On GO, this banner flips to "🟢 GO — CF1+CF6".      ║
+║  Plans fine-combed (5-lens review, 45 findings: deploy CONFIRMED v0.1.2,   ║
+║  reports REAL not stale; corrections applied). User gave GO. Deploy is     ║
+║  reachable; user redeploys the fixed build manually. One PR per item.      ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
 
@@ -33,28 +34,36 @@ prod-standalone verification** — and the live deploy contradicts it. The root 
    render empty. This **reproduces locally**; v0.1.2's F1 verify only checked the theme
    select, not these fields. Honest miss.
 
-### The deploy-state caveat (unresolved, and it matters)
-The homelab redeploy was **blocked on the 1Password SSH agent for BOTH v0.1.1 and
-v0.1.2** — so the deploy version is **unconfirmed and likely stale/mixed.** Grounding
-found **many reported items are ALREADY correct in the v0.1.2 code** — CF3 (rail
-`opacity:1`), CF5 (avatar already pathname-gated off `/d/`), CF7 / LT1-5 (mode dropdown
-shipped, `Toolbar.tsx:1303`), LT1-4 (separators exist), LT3-3 (doc icon already 32px),
-LT4-1 (active pill already `--primary-surface`), LT5-1 (status bar already 24px), LT6-4
-(segmented already `--primary-surface`). That pattern says **stale deploy.** Yet CF1
-reports v0.1.2-only code (the F1 error toast), so the deploy has *some* v0.1.2 code — a
-contradiction only the deploy can resolve.
+### The deploy-state fact (CONFIRMED v0.1.2, and reachable)
+The deploy was probed (2026-06-24): `parchment.local.jonco.dev` is **confirmed running
+v0.1.2 code** (its public 404 shows the F6-only "wandered off"; the login shows the
+v0.1.1 meta copy) and is **reachable over HTTPS** from this machine for public-route
+probes (no SSH needed for those). So **the user's CF/LT reports are REAL observations
+against v0.1.2 — NOT stale-deploy artifacts.** That overturns the earlier "probably
+stale" hypothesis.
 
-**Therefore the corrective discipline (the user's, adopted verbatim):**
-- **Redeploy is the #1 prerequisite.** Nothing is verifiable until the homelab actually
-  runs the v0.1.3 build (needs the 1Password unlock). Without it, v0.1.3 repeats the v0.1.2
-  "green locally, broken live" failure.
-- **Reproduce-first WITH EVIDENCE on every item.** The implementer pastes a curl / DOM
-  probe / screenshot **showing the bug before writing the fix.** An item that does NOT
-  reproduce on the redeployed build was stale-deploy → close it **verified-with-screenshot**
-  (never silently, never on a code-read).
-- **Live-verify AFTER deploy, both light AND dark.** Not unit-test-green. Screenshot every
-  restyled surface on the live deploy; the theme-switch fix (CF1) needs a **GIF** of the
-  toggle working live.
+**This raises the bar, not lowers it.** Grounding found several items *appear* correct in
+the v0.1.2 code (CF3 rail `opacity:1` in all/smart/tag views, CF5 avatar pathname-gated
+off `/d/`, CF7 mode dropdown rendered `Toolbar.tsx:1303`, LT1-4 separators, LT3-3, LT4-1,
+LT5-1, LT6-4). **But the user sees them broken on that very code — so a code-read verdict
+of "correct" is SUSPECT: there is a real cause the read missed** (a cascade, a conditional,
+a prop gate, a view-specific render, a runtime/build difference). The job is to find it,
+not to dismiss the report. *(Grounding error already caught: LT6-1 is NOT already-correct —
+file rows use `--selection-bg`, not `--primary-surface`; it is a real change.)*
+
+**Corrective discipline (the user's, adopted):**
+- **Redeploy is the user's manual step.** The user redeploys the v0.1.3 build when ready
+  (the 1Password SSH agent is only needed for that, not for HTTP probes). The deploy is
+  reachable now for public-route reproduce-first; authed routes are verified on the local
+  prod-standalone build (identical image) + the user confirms on the deploy post-redeploy.
+- **Reproduce-first WITH EVIDENCE on every item** — curl / DOM probe / screenshot showing
+  the bug (or, for an "appears-correct" item, the probe that finds the missed cause)
+  **before** writing the fix. **An "appears-correct" item is NOT closed on the code-read**
+  — it is reproduced first; if the probe shows it genuinely correct on the redeployed
+  build, close **DONE / verified-no-change WITH the screenshot, no code PR** (that outcome
+  is allowed and expected — the C2 lesson is only against closing on a *code-read*).
+- **Live-verify after the user redeploys, both light AND dark** — screenshot every restyled
+  surface; CF1 adds a **GIF** of the theme toggle.
 - **Name every PARTIAL with the specific gap.** No `0 PARTIAL` claim without a deploy
   screenshot backing every item.
 
@@ -105,10 +114,15 @@ word-count modal split, LT4-3 bottom-cluster pin, LT6-1 active-pill semantics, L
 share-dialog).
 
 ## Execution model (when GO lands)
-**Prerequisite #1 — redeploy.** Unblock the 1Password SSH agent; redeploy the homelab to
-the v0.1.3 build BEFORE collecting any artifact. Then per item: branch off `release/v0.1.3`
-→ **reproduce-first on the deploy (paste evidence)** → implement → controller live-verify
-on the deploy (light + dark, screenshot) → per-PR artifacts → squash-merge → ledger. Same
-pipeline as v0.1.2; the difference is the verification SURFACE is the live deploy, not
-localhost. `release/v0.1.3` ff-merges to `main` + tags `v0.1.3` + multi-arch publish +
-homelab redeploy at release.
+**The deploy is reachable now; the user redeploys the FIXED build manually.** Per item:
+branch off `release/v0.1.3` → **reproduce-first** (public route → curl the deploy directly;
+authed route → re-read the code for the missed cause + verify on the local prod-standalone
+build, which runs the identical image; paste the evidence) → implement → controller verify
+on the local prod-standalone build (light + dark) → per-PR artifacts → squash-merge →
+ledger. **The CONFIG bugs local verify structurally missed (CF1 cookie, CF4 PUBLIC_URL) are
+fixed at the code/env level and the env is documented for the redeploy** — those + every
+restyled surface get a **final live-deploy confirmation after the user redeploys** (the
+controller curls public routes; the user screenshots authed routes). `release/v0.1.3`
+ff-merges to `main` + tags `v0.1.3` + multi-arch publish; the user redeploys; final
+live-verify closes the release. **No `0 PARTIAL` claim without that post-redeploy
+verification.**

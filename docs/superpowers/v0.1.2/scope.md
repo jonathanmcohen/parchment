@@ -46,7 +46,7 @@ F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = 
 | C1 | Top-right floating avatar → into title bar; wire account menu | DONE | ☑ | ☑ | PR #106. Title-bar avatar = wired account menu (Manage/Theme submenu/Sign out); one avatar; Theme submenu reuses F1 path. Live-verified
 | C2 | Files middle column ("Import/Root/Guide/Smart folders/Tags") — fix or remove | DONE | n/a | ☑ | **Stale-deploy artifact, no code change.** Reproduce-first on the current build: Files rail opacity=1, pointer-events=auto, 0 dimmed descendants (drag-drop wired per grounding). Reported "30% opacity broken" was the stale v0.1.0 deploy. No PR (nothing to deploy)
 | C3 | Save wording "All changes saved to disk" → "All changes saved" + hover detail | DONE | ☑ | ☑ | PR #107. Label "All changes saved" + connection-aware tooltip (online/offline) via useConnectionState. Live-verified
-| C4 | Title-bar icons (star/move/comments/history) — tooltips + working clicks | PARTIAL-risk | ☐ | ☐ | comments/history wired; **star is local-state only, no persist endpoint** → wire to existing `POST /api/docs/{id}/star` (used by FileManager) OR keep disabled+"coming soon"; add missing tooltips |
+| C4 | Title-bar icons (star/move/comments/history) — tooltips + working clicks | DONE | ☑ | ☑ | PR #108. Star REAL (persists via existing /star endpoint, reload-survives, DB=t verified); Move disabled "coming soon"; all 4 icons tooltipped; star-request 4 TDD. No PARTIAL
 | C5 | "Saving…" transient visible 200–500ms on first edit | TODO | ☐ | ☐ | **small new logic** — add a min-visible delay to `useSaveStatus.markSaved()` so a fast save still flashes "Saving…" |
 
 ## Roll-up

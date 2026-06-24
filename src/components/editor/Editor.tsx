@@ -555,6 +555,11 @@ export function Editor({
 
   // D1: comments sidebar toggle
   const [commentsSidebarOpen, setCommentsSidebarOpen] = useState(false)
+  // F3: monotonic "open the composer" intent. The toolbar "Add comment" button
+  // bumps this; CommentsSidebar reacts to each change in its OWN effect (which
+  // runs after the sidebar mounts), so the signal cannot be dropped against the
+  // sidebar's mount the way a one-shot DOM event could. 0 = no request yet.
+  const [openComposerSignal, setOpenComposerSignal] = useState(0)
 
   // D3: version history panel toggle
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
@@ -1007,6 +1012,25 @@ export function Editor({
   // OfflineIndicator pill used to render — now a dot in the status bar's right
   // slot. Same derivation, new placement (no new connection logic).
   const connection = useConnectionState(provider)
+
+  // F3: "Add comment" — reuse the D1 create flow. Open the sidebar AND bump the
+  // composer-open intent in the SAME state update, then pass that intent into
+  // CommentsSidebar as a prop. The sidebar opens its composer (which reads the
+  // live editor selection and POSTs via the SAME handleAddComment path) from its
+  // own effect once mounted, so a freshly-mounted sidebar never misses the
+  // signal — no rAF/DOM-event race against the child's mount. No parallel
+  // comment system.
+  const handleAddComment = useCallback(() => {
+    if (!editor) return
+    setCommentsSidebarOpen(true)
+    setOpenComposerSignal((n) => n + 1)
+  }, [editor])
+
+  // F3: once the sidebar has consumed the open-composer intent, clear it so a
+  // later rail toggle (which re-mounts CommentsSidebar) does not re-open the
+  // composer for a stale signal value. Stable so it doesn't re-fire the child's
+  // open effect.
+  const resetOpenComposerSignal = useCallback(() => setOpenComposerSignal(0), [])
 
   const openCropForSelection = useCallback(() => {
     if (!editor) return
@@ -1468,6 +1492,7 @@ export function Editor({
             onOpenCustomCss={() => setCustomCssOpen(true)}
             onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
             commentsSidebarOpen={commentsSidebarOpen}
+            onAddComment={handleAddComment}
             onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
             versionHistoryOpen={versionHistoryOpen}
             onToggleSuggestions={() => setSuggestionsOpen((v) => !v)}
@@ -1575,7 +1600,14 @@ export function Editor({
           </div>
 
           {/* D1: comments sidebar (right rail) */}
-          {editor && commentsSidebarOpen && <CommentsSidebar docId={docId} editor={editor} />}
+          {editor && commentsSidebarOpen && (
+            <CommentsSidebar
+              docId={docId}
+              editor={editor}
+              openComposerSignal={openComposerSignal}
+              onComposerOpened={resetOpenComposerSignal}
+            />
+          )}
 
           {/* D3: version history panel (right rail) */}
           {editor && versionHistoryOpen && <VersionHistory docId={docId} editor={editor} />}

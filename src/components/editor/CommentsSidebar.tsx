@@ -59,9 +59,24 @@ interface Props {
   docId: string
   editor: Editor
   currentUserId?: string
+  // F3: monotonic intent from the toolbar "Add comment" button. Each increment
+  // is a request to open the composer focused on the live selection. Driven by a
+  // prop (not a one-shot DOM event) so the request survives until this component
+  // is mounted and its effect runs — no race against mount. 0 (default) = none.
+  openComposerSignal?: number
+  // F3: called once this sidebar has consumed an `openComposerSignal` (> 0) and
+  // opened its composer. The parent resets the intent back to 0 so a later rail
+  // toggle that re-mounts this sidebar does NOT re-open the composer.
+  onComposerOpened?: () => void
 }
 
-export function CommentsSidebar({ docId, editor, currentUserId }: Props) {
+export function CommentsSidebar({
+  docId,
+  editor,
+  currentUserId,
+  openComposerSignal = 0,
+  onComposerOpened,
+}: Props) {
   const [comments, setComments] = useState<CommentRow[]>([])
   const [filter, setFilter] = useState<Filter>('open')
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null)
@@ -141,6 +156,38 @@ export function CommentsSidebar({ docId, editor, currentUserId }: Props) {
     dom.addEventListener('parchment:focus-comment', handler)
     return () => dom.removeEventListener('parchment:focus-comment', handler)
   }, [editor])
+
+  // ── F3: open the composer on the toolbar "Add comment" signal ──────────────
+  // The toolbar button (via Editor.handleAddComment) opens this sidebar AND
+  // increments `openComposerSignal` in the same state update. This effect reacts
+  // to each change of that prop, so the request is delivered after THIS
+  // component mounts and its effect runs — it cannot be dropped against the
+  // sidebar's mount the way a one-shot DOM event could. We only open the
+  // composer; the existing handleAddComment below reads the live selection and
+  // anchors the comment, so no comment-create logic is duplicated.
+  //
+  // Skip the initial value (0) so opening the sidebar via the rail toggle does
+  // not auto-open the composer; only an actual "Add comment" click (which bumps
+  // the signal to >= 1) opens it. The ref guards against StrictMode / re-mount
+  // double-invocation re-opening the composer for the same signal value, and we
+  // notify the parent so it can reset the intent to 0 (preventing a later rail
+  // re-mount from re-opening the composer for a stale signal value).
+  const lastComposerSignalRef = useRef(0)
+  useEffect(() => {
+    if (openComposerSignal <= 0) return
+    if (openComposerSignal === lastComposerSignalRef.current) return
+    lastComposerSignalRef.current = openComposerSignal
+    setComposerOpen(true)
+    onComposerOpened?.()
+    // Focus the textarea once it renders.
+    const dom = editor.view.dom
+    requestAnimationFrame(() => {
+      const ta = dom
+        .closest('body')
+        ?.querySelector<HTMLTextAreaElement>('textarea[aria-label="New comment body"]')
+      ta?.focus()
+    })
+  }, [openComposerSignal, editor, onComposerOpened])
 
   // ── Create thread ─────────────────────────────────────────────────────
 

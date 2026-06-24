@@ -351,7 +351,9 @@ body {
     inset-block: 0;
     inset-inline-start: 0;
     z-index: 50;
-    width: 256px;
+    /* F8+L3: shared rail-width token (the always-on rail uses w-64 = the same
+       16rem) so the drawer + the pinned status-bar offset can never desync. */
+    width: var(--sidebar-width);
     /* Off-canvas to the leading edge until the drawer opens. */
     transform: translateX(-100%);
     transition: transform 0.2s ease;
@@ -941,10 +943,17 @@ body {
    border. "min read" dropped from the default view (surfaced in Tools → Word
    count); the connection dot lives in the right slot.
 
-   F8+L3: pinned full-width to the viewport bottom (fixed; bottom:0; right:0).
-   The left edge clears the global sidebar so the bar matches the chrome stack's
-   horizontal extent (sidebar is 256px = 16rem >= 768px; below that it becomes an
-   off-canvas drawer and the bar goes full-width — see the narrow block below).
+   F8+L3: pinned full-width to the viewport bottom (fixed; bottom:0). The leading
+   edge clears the global sidebar so the bar matches the chrome stack's horizontal
+   extent. The offset uses LOGICAL inset-inline-start/end (NOT physical left/right)
+   so it flips with dir="rtl" — the app sets dir from the locale and the rail sits
+   on the inline-start side in both directions, exactly like the chrome bars (which
+   live inside the flex <main> sibling of the <aside> rail). The offset is the
+   shared --sidebar-width token PLUS the rail's 1px border-e, so the bar's leading
+   edge lands on the rail's true content edge (16rem + 1px) — flush with every
+   sticky chrome bar above it — and can never desync from a future rail-width
+   change (the literal lives in ONE place, the token). Below 768px the rail is an
+   off-canvas drawer and the bar spans full-width — see the narrow block below.
    --surface is scheme-aware (white light / dark in dark chrome) so no per-scheme
    override is needed. z-index sits above the canvas; as a bottom-pinned footer it
    never overlaps the top-pinned chrome stack. The bg bleeds edge-to-edge while the
@@ -952,8 +961,8 @@ body {
 .parchment-status-bar {
   position: fixed;
   bottom: 0;
-  left: 16rem;
-  right: 0;
+  inset-inline-start: calc(var(--sidebar-width) + 1px);
+  inset-inline-end: 0;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -977,9 +986,11 @@ body {
 }
 
 @media (max-width: 767px) {
-  /* The sidebar is an off-canvas drawer below 768px → the bar spans full-width. */
+  /* The sidebar is an off-canvas drawer below 768px → the bar spans full-width.
+     Logical inset-inline-start (RTL-safe) so it resets the leading edge in both
+     directions, matching the >=768px rule above. */
   .parchment-status-bar {
-    left: 0;
+    inset-inline-start: 0;
   }
 }
 

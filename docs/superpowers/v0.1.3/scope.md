@@ -55,10 +55,10 @@ build decides; see [coverage-matrix.md](coverage-matrix.md).**
 ### LT4 — global sidebar
 | ID | Item | Status | Repro | LV | Notes |
 |---|---|---|---|---|---|
-| LT4-1 | Active-row pill bg `#E8F0FE` | TODO | ☐ | ☐ | **already `--primary-surface`** (`NavRow.tsx:38`) — confirm on deploy (= LT6-1) |
+| LT4-1 | Active-row pill bg `#E8F0FE` | DONE | ☑ | deploy-pend | PR #118. already --primary-surface; confirmed
 | LT4-2 | Icon-to-text baseline align | PARTIAL-risk | ☐ | ☐ | Material Symbols baseline drift; `align-middle`/`leading-none`; test Safari+Chrome |
 | LT4-3 | Pin bottom cluster to viewport bottom (kill 150px gap) | PARTIAL-risk | ☐ | ☐ | `justify-between` / `mt-auto` restructure; risk to other alignments |
-| LT4-4 | +New width ~220px | TODO | ☐ | ☐ | `NewMenu.tsx:97` min-w-[224px]→w-[220px] |
+| LT4-4 | +New width ~220px | DONE | ☑ | deploy-pend | PR #118. menu w-220 (button ~223=w-full); done
 | LT4-5 | Bottom-cluster 12px row density | PARTIAL-risk | ☐ | ☐ | `layout.tsx:85` gap-1→gap-3 + child padding audit |
 
 ### LT5 — bottom status bar

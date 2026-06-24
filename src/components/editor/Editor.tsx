@@ -47,7 +47,7 @@ import { useSaveStatus } from '@/components/editor/useSaveStatus'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { WatermarkDialog } from '@/components/editor/WatermarkDialog'
 import { WordCountDialog } from '@/components/editor/WordCountDialog'
-import { Avatar } from '@/components/shell/Avatar'
+import { UserCluster } from '@/components/shell/UserCluster'
 import {
   registerShortcutAction,
   SHORTCUT_EVENT,
@@ -1456,7 +1456,7 @@ export function Editor({
           onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
           onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
           onOpenShare={() => setShareDialogOpen(true)}
-          avatar={<Avatar name={currentUserName} size={32} />}
+          avatar={<UserCluster name={currentUserName} />}
         />
 
         {/* S3-2: menu bar (PARTIAL) — File/Edit/View/Insert/Format/Tools/

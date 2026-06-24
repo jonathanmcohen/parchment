@@ -20,9 +20,10 @@ import { type RefObject, useEffect } from 'react'
 //
 // No new feature logic — pure interaction wiring shared by both menus.
 //
-// `enabled` items are the non-disabled `[role="menuitem"]` descendants of the
-// menu container. Disabled items (e.g. the "Switch account" placeholder) are
-// skipped by roving focus so keyboard users never land on a dead control.
+// `enabled` items are the non-disabled `[role="menuitem"]` (and its radio /
+// checkbox variants — C1's Theme submenu) descendants of the menu container.
+// Disabled items (e.g. the "Switch account" placeholder) are skipped by roving
+// focus so keyboard users never land on a dead control.
 export function useMenuKeyboard(open: boolean, menuRef: RefObject<HTMLElement | null>): void {
   useEffect(() => {
     if (!open) return
@@ -31,9 +32,15 @@ export function useMenuKeyboard(open: boolean, menuRef: RefObject<HTMLElement | 
 
     function items(): HTMLElement[] {
       if (!menu) return []
-      return Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]')).filter(
-        (el) => !el.hasAttribute('disabled') && el.getAttribute('aria-disabled') !== 'true',
-      )
+      // C1: roving focus covers menuitem AND its radio/checkbox variants (the
+      // UserCluster Theme submenu uses role="menuitemradio"), so expanded
+      // single-select options join the same Arrow/Home/End/Tab flow with no
+      // per-menu keyboard code.
+      return Array.from(
+        menu.querySelectorAll<HTMLElement>(
+          '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]',
+        ),
+      ).filter((el) => !el.hasAttribute('disabled') && el.getAttribute('aria-disabled') !== 'true')
     }
 
     // Roving tabindex: only the currently-focused item is tabbable.

@@ -110,6 +110,15 @@ export const DEFAULT_STYLES: readonly NamedStyle[] = [
     props: { fontSize: '28pt', bold: true },
   },
   {
+    // F4: a paragraph subtitle — larger than body, muted ink. The color uses the
+    // theme's `--muted` token (no hardcoded hex) so it tracks light/dark.
+    id: 'subtitle',
+    name: 'Subtitle',
+    type: 'paragraph',
+    basedOn: 'body',
+    props: { fontSize: '16pt', color: 'var(--muted)' },
+  },
+  {
     id: 'emphasis',
     name: 'Emphasis',
     type: 'character',

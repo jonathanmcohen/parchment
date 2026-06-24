@@ -78,4 +78,21 @@ describe('DEFAULT_STYLES', () => {
     expect(DEFAULT_STYLES.some((s) => s.type === 'paragraph')).toBe(true)
     expect(DEFAULT_STYLES.some((s) => s.type === 'character')).toBe(true)
   })
+
+  it('includes the F4 Subtitle paragraph style (larger than body, muted, no hex)', () => {
+    const subtitle = DEFAULT_STYLES.find((s) => s.id === 'subtitle')
+    expect(subtitle).toBeDefined()
+    expect(subtitle?.type).toBe('paragraph')
+    // Larger than the 12pt body.
+    expect(subtitle?.props.fontSize).toBe('16pt')
+    // Muted ink via the theme token — no hardcoded hex.
+    expect(subtitle?.props.color).toBe('var(--muted)')
+    expect(subtitle?.props.color).not.toMatch(/#/)
+  })
+
+  it('resolves Subtitle props through its basedOn=body chain', () => {
+    const resolved = resolveStyleProps(DEFAULT_STYLES, 'subtitle')
+    // body contributes fontFamily ''; subtitle overrides fontSize + adds color.
+    expect(resolved).toEqual({ fontFamily: '', fontSize: '16pt', color: 'var(--muted)' })
+  })
 })

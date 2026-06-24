@@ -2,6 +2,8 @@
 
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
+import { useEffect, useRef, useState } from 'react'
+import { Menu } from '@/components/editor/menus/Menu'
 import { StylesMenu } from '@/components/editor/StylesMenu'
 import { TableControls } from '@/components/editor/TableControls'
 import { VoiceButton } from '@/components/editor/VoiceButton'
@@ -10,7 +12,6 @@ import { TOP_LANGUAGES } from '@/lib/editor/shiki/languages'
 
 type Props = {
   editor: Editor
-  docId: string
   onInsertImage: (prefillSrc?: string) => void
   onOpenLink: () => void
   onCropImage: () => void
@@ -130,7 +131,6 @@ const keepSelection = (e: React.MouseEvent) => e.preventDefault()
 
 export function Toolbar({
   editor,
-  docId,
   onInsertImage,
   onOpenLink,
   onCropImage,
@@ -261,8 +261,117 @@ export function Toolbar({
     }
   }
 
+  // S3-3: overflow `⋯`. When the single 48px row is too narrow to show every
+  // control, the trailing secondary actions collapse into a `⋯` dropdown (the
+  // shared S3-2 Menu primitive). A control appears EXACTLY once — inline OR in
+  // the overflow, never both. Visibility is driven by a ResizeObserver on the
+  // toolbar (the same pattern used for page-fit), not by JS width math on every
+  // control, so it cannot duplicate or drop a control.
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [overflowed, setOverflowed] = useState(false)
+  useEffect(() => {
+    const el = toolbarRef.current
+    if (!el) return
+    // Collapse the secondary group below this width threshold. The threshold is
+    // a single boolean flip (not per-control measurement) to dodge the G12
+    // ResizeObserver feedback loop.
+    const THRESHOLD = 920
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? el.clientWidth
+      setOverflowed(w < THRESHOLD)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // The secondary actions that move into the `⋯` menu when overflowed. Each
+  // re-surfaces an EXISTING handler (no new feature logic).
+  const overflowItems = [
+    { label: 'Page setup', icon: 'settings_overscan', onSelect: onOpenPageSetup },
+    { label: 'Watermark', icon: 'branding_watermark', onSelect: onOpenWatermark },
+    { label: 'Custom CSS', icon: 'code', onSelect: onOpenCustomCss },
+    { label: 'Reading mode', icon: 'menu_book', onSelect: onToggleReading },
+    { label: 'Presenter mode', icon: 'slideshow', onSelect: onTogglePresenter },
+  ] as const
+
   return (
-    <div className="parchment-toolbar" role="toolbar" aria-label="Formatting">
+    <div ref={toolbarRef} className="parchment-toolbar" role="toolbar" aria-label="Formatting">
+      {/* ── S3-3: leading actions (Undo · Redo · Print) + ⊘ placeholders ──
+          Undo/Redo/Print are EXISTING actions; Spell check / Format painter /
+          Zoom do NOT exist in the code and ship as visibly-disabled "coming
+          soon" placeholders (finding #21), NOT real controls. ─────────────── */}
+      <button
+        type="button"
+        aria-label="Undo"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().undo().run()}
+      >
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          undo
+        </span>
+      </button>
+      <button
+        type="button"
+        aria-label="Redo"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={() => editor.chain().focus().redo().run()}
+      >
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          redo
+        </span>
+      </button>
+      <button
+        type="button"
+        aria-label="Print"
+        className="parchment-toolbar-btn"
+        onMouseDown={keepSelection}
+        onClick={onExportPdf}
+      >
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          print
+        </span>
+      </button>
+      <button
+        type="button"
+        aria-label="Spell check"
+        aria-disabled="true"
+        disabled
+        title="Spell check (coming soon)"
+        className="parchment-toolbar-btn"
+      >
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          spellcheck
+        </span>
+      </button>
+      <button
+        type="button"
+        aria-label="Format painter"
+        aria-disabled="true"
+        disabled
+        title="Format painter (coming soon)"
+        className="parchment-toolbar-btn"
+      >
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_paint
+        </span>
+      </button>
+      <button
+        type="button"
+        aria-label="Zoom"
+        aria-disabled="true"
+        disabled
+        title="Zoom (coming soon)"
+        className="parchment-toolbar-btn"
+      >
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          zoom_in
+        </span>
+      </button>
+
+      <span className="parchment-toolbar-sep" aria-hidden="true" />
+
       {/* ── Block type selector ───────────────────────────────────────── */}
       <label className="parchment-toolbar-label" htmlFor="toolbar-block-type">
         Block
@@ -720,47 +829,55 @@ export function Toolbar({
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* ── Page setup (B14) ─────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Page setup"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={(e) => {
-          e.preventDefault()
-          onOpenPageSetup()
-        }}
-      >
-        ☰⊞
-      </button>
+      {/* ── S3-3: Page setup / Watermark / Custom CSS — secondary actions
+          that move into the `⋯` overflow menu when the toolbar is narrow.
+          Rendered inline ONLY when not overflowed (each appears exactly once,
+          inline OR in `⋯`). ──────────────────────────────────────────────── */}
+      {!overflowed && (
+        <>
+          {/* ── Page setup (B14) ─────────────────────────────────────────── */}
+          <button
+            type="button"
+            aria-label="Page setup"
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={(e) => {
+              e.preventDefault()
+              onOpenPageSetup()
+            }}
+          >
+            ☰⊞
+          </button>
 
-      {/* ── G9: Watermark ────────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Watermark"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={(e) => {
-          e.preventDefault()
-          onOpenWatermark()
-        }}
-      >
-        ≋
-      </button>
+          {/* ── G9: Watermark ────────────────────────────────────────────── */}
+          <button
+            type="button"
+            aria-label="Watermark"
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={(e) => {
+              e.preventDefault()
+              onOpenWatermark()
+            }}
+          >
+            ≋
+          </button>
 
-      {/* ── G17: Custom CSS ─────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Custom CSS"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={(e) => {
-          e.preventDefault()
-          onOpenCustomCss()
-        }}
-      >
-        {'</>'}
-      </button>
+          {/* ── G17: Custom CSS ─────────────────────────────────────────── */}
+          <button
+            type="button"
+            aria-label="Custom CSS"
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={(e) => {
+              e.preventDefault()
+              onOpenCustomCss()
+            }}
+          >
+            {'</>'}
+          </button>
+        </>
+      )}
 
       {/* ── Table context controls (visible when cursor is in a table) ── */}
       {s.table && (
@@ -861,29 +978,35 @@ export function Toolbar({
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* ── G15: Reading mode toggle ─────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Reading mode"
-        aria-pressed={readingOpen}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={onToggleReading}
-      >
-        📖
-      </button>
+      {/* ── S3-3: Reading / Presenter — secondary actions; inline only when not
+          overflowed (otherwise they live in the `⋯` menu, once each). ─────── */}
+      {!overflowed && (
+        <>
+          {/* ── G15: Reading mode toggle ─────────────────────────────────── */}
+          <button
+            type="button"
+            aria-label="Reading mode"
+            aria-pressed={readingOpen}
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={onToggleReading}
+          >
+            📖
+          </button>
 
-      {/* ── G16: Presenter mode toggle (F5 fallback) ─────────────────── */}
-      <button
-        type="button"
-        aria-label="Presenter mode"
-        aria-pressed={presenterOpen}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={onTogglePresenter}
-      >
-        ▶
-      </button>
+          {/* ── G16: Presenter mode toggle (F5 fallback) ─────────────────── */}
+          <button
+            type="button"
+            aria-label="Presenter mode"
+            aria-pressed={presenterOpen}
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={onTogglePresenter}
+          >
+            ▶
+          </button>
+        </>
+      )}
 
       {/* ── I2 Part 3: Vim markdown source mode toggle ───────────────── */}
       <button
@@ -903,45 +1026,30 @@ export function Toolbar({
         {'</>'}
       </button>
 
-      {/* ── H3/H4/H7/H1/H5/H6: Export menu ─────────────────────────── */}
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-      <fieldset className="parchment-toolbar-export">
-        <legend className="parchment-toolbar-export-label">Export</legend>
-        {(
-          [
-            { label: 'Markdown', format: 'md' },
-            { label: 'HTML', format: 'html' },
-            { label: 'Plain text', format: 'txt' },
-            { label: 'Word (.docx)', format: 'docx' },
-            { label: 'EPUB', format: 'epub' },
-            { label: 'LaTeX', format: 'tex' },
-          ] as const
-        ).map(({ label, format }) => (
-          <a
-            key={format}
-            href={`/api/docs/${docId}/export?format=${format}`}
-            download
-            className="parchment-toolbar-btn"
-            aria-label={`Download as ${label}`}
-            onMouseDown={keepSelection}
-          >
-            {label}
-          </a>
-        ))}
-        {/* H2: PDF — client-side via paged.js + window.print(); not a download link. */}
-        <button
-          type="button"
-          className="parchment-toolbar-btn"
-          aria-label="Export as PDF"
-          onMouseDown={keepSelection}
-          onClick={onExportPdf}
-        >
-          PDF
-        </button>
-      </fieldset>
+      {/* ── S3-4: the standalone Export fieldset is removed. All formats now
+          live under File → Download in the menu bar (S3-2), which reuses the
+          SAME export hrefs + onExportPdf wiring this strip used. No export logic
+          changed — the v0.1.0 export registry is untouched. ──────────────── */}
 
       {/* ── G10: Voice typing ─────────────────────────────────────────── */}
       <VoiceButton editor={editor} />
+
+      {/* ── S3-3: overflow `⋯` — holds the secondary actions hidden at narrow
+          widths (the SAME items removed from inline above; once each). Reuses
+          the shared S3-2 Menu primitive. ────────────────────────────────── */}
+      {overflowed && (
+        <Menu
+          label="More"
+          items={[...overflowItems]}
+          triggerClassName="parchment-toolbar-btn parchment-toolbar-overflow"
+          triggerAriaLabel="More tools"
+          triggerContent={
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              more_horiz
+            </span>
+          }
+        />
+      )}
     </div>
   )
 }

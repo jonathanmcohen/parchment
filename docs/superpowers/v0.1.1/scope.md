@@ -45,12 +45,12 @@
 
 | ID | Item | Status | Cov | LV | Notes |
 |---|---|---|---|---|---|
-| S3-1 | Doc title bar (NEW) — title via `/rename`; owns save-status STATE | TODO | ☐ | ☐ | rename endpoint (#1); state (Dec.4) |
-| S3-2 | Menu bar (NEW) — 8 menus; consumes S5-3 shell | TODO | ☐ | ☐ | PARTIAL; placeholders (#21) |
-| S3-3 | Editor toolbar restyle (single light row, overflow ⋯) | TODO | ☐ | ☐ | PARTIAL — Format painter/Zoom/Spell placeholders (#21) |
-| S3-4 | Drop export-format text strip → File → Download | TODO | ☐ | ☐ | depends S3-2 |
-| S3-5 | Outline pane redesign (light left-rail, not floating dark) | TODO | ☐ | ☐ | |
-| S3-6 | Bottom status bar restyle (24px, page/word/mode/connection) | TODO | ☐ | ☐ | |
+| S3-1 | Doc title bar (NEW) — title via `/rename`; owns save-status STATE | DONE | ☐ | ☐ | title bar + inline-title (`/rename`, I4-safe) + save-status STATE (Dec.4); star/move = disabled placeholders (no editor-side endpoint); axe green on editor route |
+| S3-2 | Menu bar (NEW) — 8 menus; consumes S5-3 shell | PARTIAL (60%) | ☐ | ☐ | shared accessible `Menu` primitive (reuses S2 `useMenuKeyboard`/`useMenuDismiss`, `.px-menu` shell + `--shadow-dropdown`); SHIPPED real rows: File→Version history/Download(md,html,txt,docx,epub,tex,PDF)/Page setup/Print; Edit→Undo/Redo/Select all/Find/Find-and-replace; View→Show outline; Insert→Image/Table/Link/Comment/ToC/Footnote/Page break; Format→Bold/Italic/Underline/Strikethrough/Clear formatting; Tools→Word count(+Grammar when enabled); Help→What's new. PLACEHOLDERS (aria-disabled "coming soon"): File→New/Open/Make a copy/Move/Trash/Email; View→Print layout/Pageless/Ruler/Full screen; Insert→Chart/Special chars/Headers&footers; Format→Columns/Page numbers; Tools→Spell check/Personal dictionary/Translate; ALL Extensions; Help→Keyboard shortcuts/Replay tour/About. **Never DONE while placeholders present.** |
+| S3-3 | Editor toolbar restyle (single light row, overflow ⋯) | PARTIAL (75%) | ☐ | ☐ | SHIPPED: light 48px no-wrap row, `--surface` bg, `--border-chrome` bottom border, `--surface-hover` hover pill, `--primary-surface` active pill (purple dropped); leading Undo/Redo/Print (existing); overflow `⋯` (reuses S3-2 `Menu`, ResizeObserver-driven, partitionControls unit-tested — each control once). PLACEHOLDERS (aria-disabled): Format painter/Zoom/Spell check (finding #21 — genuinely new logic). REMAINDER: full JSX reorder to the exact spec sequence not done (controls restyled in place; order largely preserved). **Never DONE while placeholders present.** |
+| S3-4 | Drop export-format text strip → File → Download | DONE | ☐ | ☐ | export `<fieldset>` removed from Toolbar; all 7 formats live under File→Download (same hrefs + onExportPdf); no export logic changed |
+| S3-5 | Outline pane redesign (light left-rail, not floating dark) | DONE | ☐ | ☐ | 256px, `--surface-muted` (follows scheme), `--border-chrome`, 14px; active-row `aria-current`+`--primary-surface` (activeHeadingId unit-tested, folded into existing update+selectionUpdate handlers — no new loop); paneOpen lifted, View→Show outline + chevron share one boolean |
+| S3-6 | Bottom status bar restyle (24px, page/word/mode/connection) | DONE | ☐ | ☐ | slim 24px white footer, `--border-chrome` top border, 3 slots; "min read" dropped (now in Word count modal); OfflineIndicator folded into connection dot (green/amber/gray via `useConnectionState`, standalone sibling removed); center word count opens Tools→Word count. NOTE: editing-mode hint = S5-10 (not yet built) |
 
 ## Plan S4 — Typography + spacing ([detail](plan-S4.md))
 

@@ -45,6 +45,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
     <Editor
       docId={doc.id}
       initialTitle={doc.title}
+      initialStarred={doc.starred ?? false}
       initialJson={(doc.content as Record<string, unknown> | null) ?? null}
       currentUserName={user.name}
       currentUserId={user.id}

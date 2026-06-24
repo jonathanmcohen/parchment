@@ -95,6 +95,9 @@ const COLLAB_URL =
 type Props = {
   docId: string
   initialTitle: string
+  /** C4: the doc's current starred state — server-rendered from documents.starred
+   * so the title-bar Star icon reflects reality on mount and survives reload. */
+  initialStarred: boolean
   initialJson: Record<string, unknown> | null
   /** D4: current authenticated user — threaded from the server component. */
   currentUserName: string
@@ -129,6 +132,7 @@ const FIELD = 'default'
 export function Editor({
   docId,
   initialTitle,
+  initialStarred,
   initialJson,
   currentUserName,
   currentUserId,
@@ -1452,6 +1456,7 @@ export function Editor({
         <DocTitleBar
           docId={docId}
           initialTitle={initialTitle}
+          initialStarred={initialStarred}
           saveStatus={saveStatus}
           connection={connection}
           onToggleComments={() => setCommentsSidebarOpen((v) => !v)}

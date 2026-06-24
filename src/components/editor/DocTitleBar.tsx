@@ -3,8 +3,10 @@
 import { useTranslations } from 'next-intl'
 import { useCallback, useRef, useState } from 'react'
 import type { ConnectionState } from '@/components/editor/StatusBar'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { buildRenameRequest } from '@/lib/docs/rename-request'
 import { type SaveStatus, saveTooltipKind } from '@/lib/docs/save-status'
+import { buildStarRequest } from '@/lib/docs/star-request'
 
 // S3-1: the pinned doc title bar (NEW). A near-pure shell over EXISTING
 // Editor.tsx handlers, plus two small honestly-flagged NEW bits:
@@ -12,8 +14,13 @@ import { type SaveStatus, saveTooltipKind } from '@/lib/docs/save-status'
 //       (DECISION 3) — it writes ONLY the title and can never clobber the body;
 //   (b) the save-status slot driven by S3-1's state (DECISION 4); S5-9 supplies
 //       the COPY.
-// star / move are visibly-disabled "coming soon" placeholders — no backing
-// files-side endpoint is reachable from the editor today (placeholder honesty).
+// C4: Star now persists via the EXISTING `POST /api/docs/:id/star` endpoint —
+// the SAME one FileManager's row star uses (REUSE, no new backend). The icon is
+// seeded from the server-rendered `initialStarred` so it reflects reality on
+// mount and survives reload. Move stays a visibly-disabled "coming soon"
+// placeholder — there is no editor-side move endpoint today (placeholder
+// honesty). All four icons (Star, Move, Comments, Version history) carry a
+// visible hover/focus Tooltip (S5-2) on top of their aria-label.
 
 // C3: the COPY now routes through the editor.saveStatus i18n keys (en catalog;
 // other locales fall back to en). This maps the STATE to a key name only — the
@@ -79,6 +86,12 @@ function InlineTitle({ docId, initialTitle }: { docId: string; initialTitle: str
 export type DocTitleBarProps = {
   docId: string
   initialTitle: string
+  /**
+   * C4: the doc's current starred state, server-rendered from `documents.starred`
+   * so the Star icon reflects reality on mount and survives reload. The toggle
+   * persists back via the EXISTING `POST /api/docs/:id/star` endpoint.
+   */
+  initialStarred: boolean
   saveStatus: SaveStatus
   /**
    * C3: live collab connection state (computed in Editor.tsx). Drives the
@@ -96,6 +109,7 @@ export type DocTitleBarProps = {
 export function DocTitleBar({
   docId,
   initialTitle,
+  initialStarred,
   saveStatus,
   connection,
   onToggleComments,
@@ -104,7 +118,27 @@ export function DocTitleBar({
   avatar,
 }: DocTitleBarProps) {
   const t = useTranslations('editor.saveStatus')
-  const [starred, setStarred] = useState(false)
+  // C4: seed from the server-rendered starred flag so the icon reflects reality
+  // on mount (survives reload). The toggle persists via the EXISTING star
+  // endpoint — optimistic flip, revert on a non-ok/failed response so the icon
+  // never claims a state the server rejected.
+  const [starred, setStarred] = useState(initialStarred)
+  const toggleStar = useCallback(() => {
+    const next = !starred
+    setStarred(next)
+    const req = buildStarRequest(docId, next)
+    void fetch(req.url, {
+      method: req.method,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(req.body),
+    })
+      .then((res) => {
+        if (!res.ok) setStarred(!next)
+      })
+      .catch(() => {
+        setStarred(!next)
+      })
+  }, [docId, starred])
   const statusKey = saveStatusKey(saveStatus)
   const status = statusKey ? t(statusKey) : ''
   // C3: the tooltip reflects the LIVE connection — only a confirmed-online link
@@ -126,31 +160,38 @@ export function DocTitleBar({
 
         <InlineTitle docId={docId} initialTitle={initialTitle} />
 
-        {/* star + move are placeholders (no editor-side endpoint) — visibly inert. */}
-        <button
-          type="button"
-          className="parchment-titlebar-iconbtn"
-          aria-pressed={starred}
-          aria-label={starred ? 'Unstar' : 'Star'}
-          title="Star"
-          onClick={() => setStarred((v) => !v)}
-        >
-          <span aria-hidden className="material-symbols-rounded text-[20px]">
-            {starred ? 'star' : 'star_border'}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="parchment-titlebar-iconbtn"
-          aria-label="Move"
-          aria-disabled
-          disabled
-          title="Move (coming soon)"
-        >
-          <span aria-hidden className="material-symbols-rounded text-[20px]">
-            drive_file_move
-          </span>
-        </button>
+        {/* C4: Star persists via the EXISTING star endpoint (REUSE); Move stays a
+            visibly-disabled "coming soon" placeholder (no editor-side endpoint).
+            Each icon carries a visible hover/focus Tooltip (S5-2) on top of its
+            aria-label / native title. */}
+        <Tooltip label={starred ? 'Unstar' : 'Star'}>
+          <button
+            type="button"
+            className="parchment-titlebar-iconbtn"
+            aria-pressed={starred}
+            aria-label={starred ? 'Unstar' : 'Star'}
+            title={starred ? 'Unstar' : 'Star'}
+            onClick={toggleStar}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              {starred ? 'star' : 'star_border'}
+            </span>
+          </button>
+        </Tooltip>
+        <Tooltip label="Move (coming soon)">
+          <button
+            type="button"
+            className="parchment-titlebar-iconbtn"
+            aria-label="Move (coming soon)"
+            aria-disabled
+            disabled
+            title="Move (coming soon)"
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              drive_file_move
+            </span>
+          </button>
+        </Tooltip>
 
         {status && (
           <span
@@ -165,28 +206,32 @@ export function DocTitleBar({
 
         <span className="parchment-titlebar-spacer" />
 
-        <button
-          type="button"
-          className="parchment-titlebar-iconbtn"
-          aria-label="Comments"
-          title="Comments"
-          onClick={onToggleComments}
-        >
-          <span aria-hidden className="material-symbols-rounded text-[20px]">
-            chat_bubble
-          </span>
-        </button>
-        <button
-          type="button"
-          className="parchment-titlebar-iconbtn"
-          aria-label="Version history"
-          title="Version history"
-          onClick={onToggleVersionHistory}
-        >
-          <span aria-hidden className="material-symbols-rounded text-[20px]">
-            history
-          </span>
-        </button>
+        <Tooltip label="Comments">
+          <button
+            type="button"
+            className="parchment-titlebar-iconbtn"
+            aria-label="Comments"
+            title="Comments"
+            onClick={onToggleComments}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              chat_bubble
+            </span>
+          </button>
+        </Tooltip>
+        <Tooltip label="Version history">
+          <button
+            type="button"
+            className="parchment-titlebar-iconbtn"
+            aria-label="Version history"
+            title="Version history"
+            onClick={onToggleVersionHistory}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              history
+            </span>
+          </button>
+        </Tooltip>
 
         <button type="button" className="parchment-titlebar-share" onClick={onOpenShare}>
           <span aria-hidden className="material-symbols-rounded text-[16px]">

@@ -8,6 +8,12 @@ type ReaderInfo = { name: string; color: string }
 // online (no label), amber when syncing, gray when offline.
 export type ConnectionState = 'online' | 'syncing' | 'offline'
 
+// LT5-2: the active editing mode (mirrors the Toolbar's right-end dropdown).
+// Threaded from the editor so the status bar shows the live mode before the
+// connection dot. Same derivation as Toolbar (read-only → viewing, D2
+// suggesting plugin → suggesting, else editing) — no new mode state.
+export type EditorMode = 'editing' | 'suggesting' | 'viewing'
+
 type Props = {
   pageCount: number
   full: Counts
@@ -15,8 +21,16 @@ type Props = {
   readers?: ReaderInfo[]
   /** S3-6: connection dot state (folded in from OfflineIndicator). */
   connection?: ConnectionState
+  /** LT5-2: live editing mode label, rendered before the connection dot. */
+  mode?: EditorMode
   /** S3-2/S3-6: clicking the word count opens the Tools → Word count modal. */
   onOpenWordCount?: () => void
+}
+
+const MODE_LABEL: Record<EditorMode, string> = {
+  editing: 'Editing',
+  suggesting: 'Suggesting',
+  viewing: 'Viewing',
 }
 
 const CONNECTION_LABEL: Record<ConnectionState, string> = {
@@ -36,15 +50,20 @@ export function StatusBar({
   selection,
   readers = [],
   connection = 'online',
+  mode,
   onOpenWordCount,
 }: Props) {
   const names = readers.map((r) => r.name)
   const connectionLabel = CONNECTION_LABEL[connection]
+  const modeLabel = mode ? MODE_LABEL[mode] : null
 
+  // LT5-3: the always-on bar shows words only ("116 words"); the "· N chars"
+  // detail moved into the Tools → Word count modal (WordCountDialog already
+  // lists Characters). A live selection still surfaces its word count inline.
   const countText =
     selection !== null
-      ? `Selection: ${selection.words} ${selection.words === 1 ? 'word' : 'words'} · ${selection.chars} ${selection.chars === 1 ? 'char' : 'chars'}`
-      : `${full.words} ${full.words === 1 ? 'word' : 'words'} · ${full.chars} ${full.chars === 1 ? 'char' : 'chars'}`
+      ? `Selection: ${selection.words} ${selection.words === 1 ? 'word' : 'words'}`
+      : `${full.words} ${full.words === 1 ? 'word' : 'words'}`
 
   return (
     // F8+L3: the bar is pinned full-width to the viewport bottom via
@@ -81,6 +100,9 @@ export function StatusBar({
               </span>
               {readers.length}
             </span>
+          )}
+          {modeLabel && (
+            <span className="parchment-status-mode text-[var(--muted)]">{modeLabel}</span>
           )}
           <span className="parchment-status-connection" data-state={connection}>
             <span aria-hidden className="parchment-status-dot" />

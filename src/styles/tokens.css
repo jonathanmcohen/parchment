@@ -32,6 +32,9 @@
   --primary-hover: #1765cc;
   --primary-pressed: #185abc;
   --primary-surface: #e8f0fe;
+  /* Text/icon on --primary-surface (active pills). --primary (#1a73e8) on
+     #e8f0fe is only 4.23:1 — below AA; the pressed blue is 5.47:1. */
+  --primary-surface-text: #185abc;
   --on-primary: #ffffff;
 
   /* user accent — picker DEFAULT; themeCssVars() overrides inline per-workspace */
@@ -91,6 +94,8 @@
   --primary-hover: #aecbfa;
   --primary-pressed: #aecbfa;
   --primary-surface: #283142;
+  /* #8ab4f8 on #283142 = 6:1 — AA-clear. */
+  --primary-surface-text: #8ab4f8;
   --on-primary: #202124;
 
   --surface: #292a2d;

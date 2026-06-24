@@ -484,16 +484,22 @@ export function HelpMenu({ shortcutOverrides = {} }: HelpMenuProps) {
   return (
     <>
       <div ref={menuRef} className="parchment-help-menu-wrap">
+        {/* S2-2: icon-only Help. Dropping the "Help" text would remove the
+            accessible name, so aria-label + title carry it (full tooltip
+            styling is S5-2). The `?` is a Material Symbol glyph. */}
         <button
           ref={toggleRef}
           type="button"
           aria-haspopup="true"
           aria-expanded={menuOpen}
-          aria-label="Help menu"
-          className="rounded-md px-2 py-1.5 text-left text-[var(--foreground)] text-sm hover:bg-[var(--background)]"
+          aria-label="Help"
+          title="Help"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
           onClick={() => setMenuOpen((v) => !v)}
         >
-          ? Help
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            help
+          </span>
         </button>
 
         {menuOpen && (

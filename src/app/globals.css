@@ -229,6 +229,146 @@ body {
   outline-offset: 2px;
 }
 
+/* ── S2: global chrome (sidebar, "+ New" mega-menu, menus, responsive) ───────
+ *
+ *  All colors resolve through S1 canonical tokens — no inline hex, no inline
+ *  shadow literal. Menu elevation references --shadow-dropdown (S5-3 finalizes
+ *  the shared `.px-menu` shell; S2 menus may ship flat with the token present).
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* S2-3: optional wordmark glyph — a small --primary square left of the brand.
+   Decorative (aria-hidden in markup); sized to the 16px cap height. */
+.parchment-logo-glyph {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--primary);
+}
+
+/* S2-1: "+ New" button — 56px white, 16px radius, resting 1px lift, deeper on
+   hover. Both shadows are S1 tokens (dark variants included), never inline. */
+.parchment-new-btn {
+  height: 56px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-page);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  font: 600 14px / 1 var(--font-ui);
+  color: var(--foreground);
+  transition: box-shadow 0.12s ease;
+}
+.parchment-new-btn:hover {
+  box-shadow: var(--shadow-dropdown);
+}
+
+/* S2-1 / S2-5: flat menu surfaces in S2 (S5-3 adopts the shared elevation
+   shell). The menu rows hover to --surface-hover; account "danger" hover is
+   not needed here (sign-out lives in the row, no destructive styling in S2). */
+.parchment-new-menuitem,
+.parchment-account-menuitem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 40px;
+  padding: 0 16px;
+  text-align: start;
+  font: 400 14px / 1 var(--font-ui);
+  color: var(--foreground);
+  background: transparent;
+}
+.parchment-new-menuitem:hover,
+.parchment-account-menuitem:not(:disabled):hover {
+  background: var(--surface-hover);
+}
+.parchment-account-menuitem:disabled {
+  cursor: default;
+}
+
+/* S2-2: HelpMenu dropdown — first CSS for the `parchment-help-*` classes that
+   were referenced in markup but had no rules (map gap closed here). Flat in S2;
+   S5-3 elevation + S5-11 dialog shell finalize the rest. */
+.parchment-help-menu-wrap {
+  position: relative;
+}
+.parchment-help-dropdown {
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.parchment-help-menuitem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 36px;
+  padding: 0 16px;
+  text-align: start;
+  font: 400 14px / 1 var(--font-ui);
+  color: var(--foreground);
+  background: transparent;
+}
+.parchment-help-menuitem:hover {
+  background: var(--surface-hover);
+}
+
+/* ── S2-6: responsive chrome ─────────────────────────────────────────────────
+ *  >= 768px : sidebar is an always-on rail; hamburger + scrim hidden.
+ *  <  768px : sidebar collapses to a slide-in overlay drawer behind a hamburger
+ *             in the top bar; content goes full-width; a scrim covers the page.
+ *  Breakpoints are CSS-driven (no JS width math) to dodge the G12 RO loop. */
+.parchment-menu-toggle {
+  display: none;
+}
+.parchment-scrim {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .parchment-sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 50;
+    width: 256px;
+    /* Off-canvas to the leading edge until the drawer opens. */
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+  /* RTL: the leading edge is the right, so slide out to the right. */
+  [dir="rtl"] .parchment-sidebar {
+    transform: translateX(100%);
+  }
+  .parchment-app-shell[data-drawer-open] .parchment-sidebar {
+    transform: translateX(0);
+    box-shadow: var(--shadow-dropdown);
+  }
+  .parchment-menu-toggle {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+  }
+  .parchment-app-shell[data-drawer-open] .parchment-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    border: 0;
+    background: rgb(0 0 0 / 0.32);
+  }
+}
+
 /* ── S1-2: editor route gutter ───────────────────────────────────────────────
  * The full-bleed gray field (Docs #F1F3F4 / dark #202124) the white page floats
  * on. It is applied to the editor route's full-width shell ONLY (NOT the inner

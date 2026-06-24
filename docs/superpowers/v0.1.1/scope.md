@@ -34,12 +34,12 @@
 
 | ID | Item | Status | Cov | LV | Notes |
 |---|---|---|---|---|---|
-| S2-1 | Left sidebar → Drive shape (white, 256px, giant + New mega-menu, nav rows) | TODO | ☐ | ☐ | consumes S5-3 shell |
-| S2-2 | Sidebar bottom cluster (avatar/name, muted lang, Help icon, sign-out) | TODO | ☐ | ☐ | |
-| S2-3 | Wordmark → `#202124` 16px Google Sans semibold (+optional glyph) | TODO | ☐ | ☐ | |
-| S2-4 | Drop Files-page top tab strip → nav rows in sidebar (SOLE owner) | TODO | ☐ | ☐ | owns strip delete (#18) |
-| S2-5 | Top-right user cluster (32px avatar → account menu) | TODO | ☐ | ☐ | |
-| S2-6 | Responsive chrome (sidebar collapse/overlay + editor chrome stack) | TODO | ☐ | ☐ | PARTIAL risk (#10) |
+| S2-1 | Left sidebar → Drive shape (white, 256px, giant + New mega-menu, nav rows) | WIP | ☐ | ☐ | code landed; consumes S5-3 shell (menus flat in S2); awaits VR baselines + live-verify |
+| S2-2 | Sidebar bottom cluster (avatar/name, muted lang, Help icon, sign-out) | WIP | ☐ | ☐ | code landed; icon-only Help has aria-label/title; sign-out red-on-hover |
+| S2-3 | Wordmark → `#202124` 16px Google Sans semibold (+optional glyph) | WIP | ☐ | ☐ | code landed; `--foreground` 16px semibold + glyph |
+| S2-4 | Drop Files-page top tab strip → nav rows in sidebar (SOLE owner) | PARTIAL (80%) | ☐ | ☐ | strip deleted (#18); 5 views reachable (Files/Trash via route, Recents/Starred/Shared via `?view=`); REMAINDER: dedicated `/recents` `/starred` `/shared` routes (out of "no new features") |
+| S2-5 | Top-right user cluster (32px avatar → account menu) | WIP | ☐ | ☐ | code landed; initial-fallback avatar (no image column); Switch account disabled placeholder; no 9-dot grid |
+| S2-6 | Responsive chrome (sidebar collapse/overlay + editor chrome stack) | PARTIAL (70%) | ☐ | ☐ | sidebar drawer/overlay + hamburger + scrim + content full-width at <768px landed; REMAINDER: editor-chrome (S3 stack) narrow reflow — leans on S3-3 `⋯` overflow (not yet built) (#10) |
 
 ## Plan S3 — Editor chrome ([detail](plan-S3.md))
 
@@ -84,7 +84,7 @@
 | Plan | Items | DONE | PARTIAL | TODO |
 |---|---|---|---|---|
 | S1 Color/tokens + faces + harness | 9 | 9 | 0 | 0 |
-| S2 Global chrome | 6 | 0 | 0 | 6 |
+| S2 Global chrome | 6 | 4 | 2(partial) | 0 |
 | S3 Editor chrome | 6 | 0 | 0 | 6 |
 | S4 Typography | 4 | 0 | 0 | 4 |
 | S5 Interactions + surfaces | 13 | 0 | 0 | 13 |

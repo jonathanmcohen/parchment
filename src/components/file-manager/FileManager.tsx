@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { docMenuItems } from '@/lib/docs/context-actions'
 import type { SortDir, SortKey } from '@/lib/docs/doc-sort'
@@ -9,6 +10,7 @@ import { buildTree, folderPath } from '@/lib/docs/folder-tree'
 import { rangeBetween, toggle as toggleSelection } from '@/lib/docs/selection'
 import { describeCriteria, parseCriteria } from '@/lib/docs/smart-folder-criteria'
 import { resolveTagColor, TAG_COLORS } from '@/lib/docs/tag-colors'
+import { normalizeFilesView } from '@/lib/shell/nav'
 
 export type FolderDTO = {
   id: string
@@ -49,13 +51,9 @@ type DocTagDTO = {
 type View = 'all' | 'recents' | 'starred' | 'shared' | 'trash' | 'smart' | 'tag'
 type ViewMode = 'list' | 'grid' | 'details'
 
-const VIEWS: { key: View; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'recents', label: 'Recents' },
-  { key: 'starred', label: 'Starred' },
-  { key: 'shared', label: 'Shared' },
-  { key: 'trash', label: 'Trash' },
-]
+// S2-4: the `VIEWS` strip array is gone — the view tab bar it backed was removed
+// (the views now live in the global sidebar nav). The `View` type below still
+// drives the in-component `view` state, reached via `?view=` + sidebar routing.
 
 const SORT_KEYS: { key: SortKey; label: string }[] = [
   { key: 'modified', label: 'Modified' },
@@ -1796,6 +1794,7 @@ function TrashToolbar({ docCount, onAfterEmpty }: TrashToolbarProps) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function FileManager({ initialFolders, initialDocs }: Props) {
+  const searchParams = useSearchParams()
   const [view, setView] = useState<View>('all')
   const [folders, setFolders] = useState<FolderDTO[]>(initialFolders)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
@@ -2047,7 +2046,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
     }
   }, [])
 
-  const handleNewFolder = async () => {
+  const handleNewFolder = useCallback(async () => {
     const name = window.prompt('Folder name')
     if (!name?.trim()) return
     try {
@@ -2062,7 +2061,45 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
     } catch {
       // leave state unchanged
     }
-  }
+  }, [currentFolderId, fetchFolders])
+
+  // S2-4: surface the sidebar's routeless Drive views (`/files?view=starred`
+  // etc.) into the existing `view` state. The routeless views (Recents/Starred/
+  // Shared) have no dedicated route, so the sidebar links here with a query
+  // param; this reads it into existing state (no new view logic). Files/Trash
+  // have their own routes and never reach this code via `?view=`.
+  const viewParam = searchParams.get('view')
+  useEffect(() => {
+    setView(normalizeFilesView(viewParam))
+    setActiveSmartId(null)
+    setActiveTagId(null)
+    clearSelection()
+  }, [viewParam, clearSelection])
+
+  // S2-1: the "+ New" mega-menu routes here with `?new=folder|upload` to invoke
+  // the EXISTING folder / import handlers (the create logic is unchanged; only
+  // the trigger is surfaced from the global sidebar). A ref guards against the
+  // handler firing more than once for a given navigation (replaceState clears
+  // the URL but does not refresh React's searchParams, so without the guard a
+  // later unrelated re-render would re-open the prompt).
+  const newParam = searchParams.get('new')
+  const handledNewParam = useRef(false)
+  useEffect(() => {
+    if (newParam !== 'folder' && newParam !== 'upload') {
+      handledNewParam.current = false
+      return
+    }
+    if (handledNewParam.current) return
+    handledNewParam.current = true
+    const url = new URL(window.location.href)
+    url.searchParams.delete('new')
+    window.history.replaceState(null, '', url.toString())
+    if (newParam === 'folder') {
+      void handleNewFolder()
+    } else {
+      importInputRef.current?.click()
+    }
+  }, [newParam, handleNewFolder])
 
   const tree = buildTree(folders as FolderNode[])
   const subfolders = folders.filter((f) => f.parentId === currentFolderId)
@@ -2083,30 +2120,11 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
 
   return (
     <div className="flex flex-col gap-4 h-full min-h-0">
-      {/* View switcher tab bar */}
-      <nav aria-label="views" className="flex gap-1 border-b border-[var(--border)] pb-2">
-        {VIEWS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => {
-              setView(key)
-              setActiveSmartId(null)
-              setActiveTagId(null)
-              clearSelection()
-            }}
-            aria-current={view === key && view !== 'smart' && view !== 'tag' ? 'page' : undefined}
-            className={[
-              'px-3 py-1.5 text-sm rounded-t font-medium',
-              view === key && view !== 'smart' && view !== 'tag'
-                ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                : 'text-[var(--muted)] hover:text-[var(--foreground)]',
-            ].join(' ')}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      {/* S2-4 (sole owner): the duplicate in-component view tab strip
+          (<nav aria-label="views">) is removed — All/Recents/Starred/Shared/
+          Trash are now reached from the global sidebar nav rows (Files/Trash via
+          route; Recents/Starred/Shared via `?view=` surfaced into `view` state
+          above). The files-page top is title + Sort + View toggle only. */}
 
       {/* View content */}
       {(view === 'all' || view === 'smart' || view === 'tag') && (

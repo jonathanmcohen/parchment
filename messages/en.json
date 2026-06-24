@@ -1,8 +1,11 @@
 {
   "nav": {
     "files": "Files",
+    "recents": "Recent",
     "templates": "Templates",
     "inbox": "Inbox",
+    "shared": "Shared",
+    "starred": "Starred",
     "trash": "Trash",
     "settings": "Settings",
     "primaryLabel": "Primary"
@@ -10,7 +13,18 @@
   "shell": {
     "appName": "Parchment",
     "skipToContent": "Skip to content",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "new": "New",
+    "blankDocument": "Blank document",
+    "fromTemplate": "From template",
+    "folder": "Folder",
+    "upload": "Upload",
+    "help": "Help",
+    "accountMenu": "Account",
+    "manageAccount": "Manage account",
+    "switchAccount": "Switch account",
+    "openNav": "Open navigation menu",
+    "closeNav": "Close navigation menu"
   },
   "actions": {
     "newDocument": "New document",

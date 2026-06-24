@@ -916,7 +916,12 @@ function DocActions({
   const isStarred = doc.starred ?? false
 
   return (
-    <div className="flex items-center gap-1 shrink-0">
+    // S5-4 Drive parity: the row action cluster is hidden until the row is
+    // hovered (`group-hover/row`) or any control inside it gains keyboard focus
+    // (`group-focus-within/row`) — matching Google Drive. The parent row
+    // applies `group/row`. focus-within keeps the keyboard path fully reachable
+    // (Tab into the row reveals the controls); `transition-opacity` softens it.
+    <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
       {/* Tag button + popover */}
       <div className="relative">
         <Tooltip label={`Edit tags for ${doc.title}`}>
@@ -1267,7 +1272,7 @@ function DocListRow({
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard users open via the <a> and select via the checkbox; the row click is a pointer convenience only */}
       <div
         className={[
-          'flex items-center justify-between py-2 gap-2 rounded px-1',
+          'group/row flex items-center justify-between py-2 gap-2 rounded px-1',
           selected ? 'bg-[var(--selection-bg)]' : '',
         ].join(' ')}
         onClick={(e) => {
@@ -1593,7 +1598,7 @@ function DocList({
               onOpen(doc.id)
             }}
             className={[
-              'border-b border-[var(--border)]',
+              'group/row border-b border-[var(--border)]',
               selected.has(doc.id) ? 'bg-[var(--selection-bg)]' : 'hover:bg-[var(--surface-hover)]',
             ].join(' ')}
           >
@@ -1681,7 +1686,7 @@ function AllViewDocRow({
     // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard users open via the <a> and select via the checkbox; the row click is a pointer convenience only
     <div
       className={[
-        'flex items-center justify-between py-2 gap-2 rounded px-1',
+        'group/row flex items-center justify-between py-2 gap-2 rounded px-1',
         selected ? 'bg-[var(--selection-bg)]' : '',
       ].join(' ')}
       onClick={(e) => {
@@ -1725,44 +1730,49 @@ function AllViewDocRow({
           timeStyle: 'short',
         }).format(new Date(doc.updatedAt))}
       </time>
-      <div className="relative shrink-0">
-        <Tooltip label={`Edit tags for ${doc.title}`}>
+      {/* S5-4 Drive parity: action controls hidden until row hover
+          (`group-hover/row`) or keyboard focus within the row
+          (`group-focus-within/row`), so they stay reachable via Tab. */}
+      <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+        <div className="relative shrink-0">
+          <Tooltip label={`Edit tags for ${doc.title}`}>
+            <button
+              type="button"
+              onClick={() => setShowTagPopover((v) => !v)}
+              aria-label={`Edit tags for ${doc.title}`}
+              className="px-interactive flex h-8 w-8 items-center justify-center text-[var(--muted)]"
+            >
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                label
+              </span>
+            </button>
+          </Tooltip>
+          {showTagPopover && (
+            <TagPopover
+              docId={doc.id}
+              docTitle={doc.title}
+              allTags={allTags}
+              onClose={() => setShowTagPopover(false)}
+            />
+          )}
+        </div>
+        {/* ⋯ More button */}
+        <Tooltip label={`Actions for ${doc.title}`} className="shrink-0">
           <button
             type="button"
-            onClick={() => setShowTagPopover((v) => !v)}
-            aria-label={`Edit tags for ${doc.title}`}
+            aria-label={`Actions for ${doc.title}`}
+            onClick={(e) => {
+              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+              setContextMenu({ x: rect.left, y: rect.bottom + 4 })
+            }}
             className="px-interactive flex h-8 w-8 items-center justify-center text-[var(--muted)]"
           >
             <span aria-hidden className="material-symbols-rounded text-[20px]">
-              label
+              more_horiz
             </span>
           </button>
         </Tooltip>
-        {showTagPopover && (
-          <TagPopover
-            docId={doc.id}
-            docTitle={doc.title}
-            allTags={allTags}
-            onClose={() => setShowTagPopover(false)}
-          />
-        )}
       </div>
-      {/* ⋯ More button */}
-      <Tooltip label={`Actions for ${doc.title}`} className="shrink-0">
-        <button
-          type="button"
-          aria-label={`Actions for ${doc.title}`}
-          onClick={(e) => {
-            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-            setContextMenu({ x: rect.left, y: rect.bottom + 4 })
-          }}
-          className="px-interactive flex h-8 w-8 items-center justify-center text-[var(--muted)]"
-        >
-          <span aria-hidden className="material-symbols-rounded text-[20px]">
-            more_horiz
-          </span>
-        </button>
-      </Tooltip>
       {contextMenu !== null && (
         <ContextMenu
           state={{ doc, x: contextMenu.x, y: contextMenu.y }}

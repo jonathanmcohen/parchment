@@ -568,6 +568,10 @@ body {
 .px-menu-item[aria-disabled="true"] {
   color: var(--muted);
   cursor: default;
+  /* S5-1/S5-3 disabled affordance: dim to 38% AND make pointer/keyboard inert
+   * (the disabled Share row renders here, not on .px-interactive). */
+  opacity: 0.38;
+  pointer-events: none;
 }
 .px-menu-item-icon {
   font-size: 20px;

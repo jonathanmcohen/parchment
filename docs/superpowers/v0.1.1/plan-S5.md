@@ -796,3 +796,45 @@ screenshot; axe on `/login` and the share viewer (public axe spec already exists
    floating editor surfaces (S5-12), and the comments/version drawers + public share
    viewer + login (S5-13). S5-3 is now the explicit OWNER of the shared dropdown
    shell (finding #16, Decision 6).
+
+---
+
+## Adversarial-review fix pass (branch `feat/S5-polish`)
+
+Two BLOCKING findings from adversarial review were fixed. No DB schema touched
+(both fixes are CSS + JSX `className` only — no migration needed).
+
+### Finding 1 [important] — disabled context-menu item lacked 38% opacity + pointer-events:none
+- **File:** `src/app/globals.css`. The shared
+  `.px-menu-item:disabled, .px-menu-item[aria-disabled="true"]` rule (was L567–571)
+  only set `color: var(--muted)` + `cursor: default`. The disabled Share row
+  (`context-actions.ts` `enabled:false` → rendered with `aria-disabled="true"` and
+  `className="px-menu-item px-menu-action"` at FileManager.tsx L844, **not**
+  `.px-interactive`) therefore got no dim and stayed pointer-/keyboard-live visually.
+- **Fix:** added `opacity: 0.38; pointer-events: none;` to that shared rule —
+  exactly the S5-3 CSS spec (`.px-menu-item[aria-disabled="true"] { opacity: .38;
+  pointer-events: none; }`). The Share row now renders at 38% opacity and ignores
+  clicks/keyboard. `:hover` is already excluded via
+  `:not(:disabled):not([aria-disabled="true"])`, and the accessible name (the
+  `aria-disabled` button text) is preserved, so authed `/files` axe is unaffected.
+
+### Finding 2 [important] — row action controls never hidden until row hover (no Drive parity)
+- **File:** `src/components/file-manager/FileManager.tsx`. The S5-4 accept criteria
+  require "⋯ hidden until row hover". No hover-reveal existed (`group-hover`,
+  `opacity-0`, `group/row`, `invisible` all returned zero).
+- **Fix:** implemented the Drive-parity hover-reveal with Tailwind v4 named groups:
+  - The `DocActions` cluster root `<div>` and the `AllViewDocRow` inline action
+    cluster (tag + ⋯) now carry
+    `opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100`.
+  - The three row containers that host those clusters were marked `group/row`:
+    `DocListRow`'s row `<div>` (L1275), the details-view `<tr>` (L1601), and the
+    `AllViewDocRow` root `<div>` (L1689).
+  - `group-focus-within/row:opacity-100` keeps the controls fully keyboard-reachable
+    (Tab into the row reveals them), so the controls are revealed on hover OR focus —
+    never permanently hidden from keyboard/AT, preserving the a11y boundary.
+
+### Gate (all green)
+- `pnpm biome check src` → 0 errors / 0 warnings (exit 0; only the npm engine WARN).
+- `tsc --noEmit` → 0 errors (exit 0).
+- `vitest run --exclude '**/integration/**'` → 114 files / 1245 tests passed (exit 0).
+- `pnpm build` → ✓ Compiled successfully; 34/34 static pages generated (exit 0).

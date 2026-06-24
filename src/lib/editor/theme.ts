@@ -38,22 +38,29 @@ export interface FontPair {
 }
 
 // System font stacks reused across pairs.
+// S4-1: retargeted to the Google-Docs face set — Roboto chrome / Arial body /
+// Roboto Mono code (faces self-hosted by S1-8). Google Sans is listed first for
+// users who have it locally and falls back to self-hosted Roboto. The document
+// BODY default is Arial (Docs lists Arial first in the font dropdown); the chrome
+// SANS is the Google/Roboto stack mirrored from --font-ui in tokens.css.
 const SYSTEM_SANS =
-  'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+  '"Google Sans", "Roboto", system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+const ARIAL_BODY = 'Arial, sans-serif'
 const SYSTEM_SERIF = 'Georgia, "Times New Roman", serif'
-const SYSTEM_MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+const SYSTEM_MONO = '"Roboto Mono", "Menlo", monospace'
 
 /** The selectable font pairings. Non-empty; each entry has a heading + body. */
+// S4-1: dropped the `inter` pair (Inter is gone). The default `system` pair pairs
+// a Roboto/Google-Sans heading with an Arial body — Google-Docs defaults.
 export const FONT_PAIRS: readonly FontPair[] = [
-  { key: 'system', name: 'System', heading: SYSTEM_SANS, body: SYSTEM_SANS },
+  { key: 'system', name: 'System', heading: SYSTEM_SANS, body: ARIAL_BODY },
   { key: 'serif', name: 'Serif', heading: SYSTEM_SERIF, body: SYSTEM_SERIF },
-  { key: 'inter', name: 'Inter', heading: `Inter, ${SYSTEM_SANS}`, body: `Inter, ${SYSTEM_SANS}` },
   { key: 'mono', name: 'Mono', heading: SYSTEM_MONO, body: SYSTEM_MONO },
   {
     key: 'classic',
     name: 'Classic',
     heading: `Georgia, ${SYSTEM_SERIF}`,
-    body: SYSTEM_SANS,
+    body: ARIAL_BODY,
   },
 ]
 

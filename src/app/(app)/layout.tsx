@@ -74,7 +74,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         }}
       />
 
-      <nav aria-label={t('nav.primaryLabel')} className="mt-2 flex flex-col gap-1">
+      {/* S4-4: sidebar nav gap reads the --space-1 (4px) spacing token. */}
+      <nav aria-label={t('nav.primaryLabel')} className="mt-2 flex flex-col gap-[var(--space-1)]">
         {nav.map((item) => (
           <NavRow key={item.href} href={item.href} icon={item.icon} label={t(`nav.${item.key}`)} />
         ))}

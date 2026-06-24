@@ -339,7 +339,7 @@ export function Toolbar({
   const overflowItems = [
     { label: 'Page setup', icon: 'settings_overscan', onSelect: onOpenPageSetup },
     { label: 'Watermark', icon: 'branding_watermark', onSelect: onOpenWatermark },
-    { label: 'Custom CSS', icon: 'code', onSelect: onOpenCustomCss },
+    { label: 'Custom CSS', icon: 'css', onSelect: onOpenCustomCss },
     { label: 'Reading mode', icon: 'menu_book', onSelect: onToggleReading },
     { label: 'Presenter mode', icon: 'slideshow', onSelect: onTogglePresenter },
   ] as const
@@ -459,7 +459,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
       >
-        •≡
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_list_bulleted
+        </span>
       </button>
       <button
         type="button"
@@ -469,7 +471,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       >
-        1≡
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_list_numbered
+        </span>
       </button>
       <button
         type="button"
@@ -479,7 +483,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleTaskList().run()}
       >
-        ☑
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          checklist
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -493,7 +499,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().setTextAlign('left').run()}
       >
-        ⬛L
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_align_left
+        </span>
       </button>
       <button
         type="button"
@@ -503,7 +511,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().setTextAlign('center').run()}
       >
-        ⬛C
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_align_center
+        </span>
       </button>
       <button
         type="button"
@@ -513,7 +523,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().setTextAlign('right').run()}
       >
-        ⬛R
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_align_right
+        </span>
       </button>
       <button
         type="button"
@@ -523,7 +535,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().setTextAlign('justify').run()}
       >
-        ⬛J
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_align_justify
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -537,7 +551,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleFirstLineIndent().run()}
       >
-        ¶→
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_indent_increase
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -551,7 +567,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleBold().run()}
       >
-        <strong>B</strong>
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_bold
+        </span>
       </button>
       <button
         type="button"
@@ -561,7 +579,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       >
-        <em>I</em>
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_italic
+        </span>
       </button>
       <button
         type="button"
@@ -571,7 +591,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
       >
-        <span style={{ textDecoration: 'underline' }}>U</span>
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_underlined
+        </span>
       </button>
       <button
         type="button"
@@ -581,7 +603,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       >
-        <span style={{ textDecoration: 'line-through' }}>S</span>
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_strikethrough
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -594,7 +618,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleSubscript().run()}
       >
-        X<sub>2</sub>
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          subscript
+        </span>
       </button>
       <button
         type="button"
@@ -604,7 +630,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleSuperscript().run()}
       >
-        X<sup>2</sup>
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          superscript
+        </span>
       </button>
       <button
         type="button"
@@ -614,7 +642,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
-        {'</>'}
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          code
+        </span>
       </button>
       <button
         type="button"
@@ -624,7 +654,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleHighlight().run()}
       >
-        <span style={{ background: 'var(--highlight)', padding: '0 2px' }}>H</span>
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          format_ink_highlighter
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -786,7 +818,9 @@ export function Toolbar({
           editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
         }
       >
-        ⊞
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          table
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -799,7 +833,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => onInsertImage()}
       >
-        🖼
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          image
+        </span>
       </button>
 
       {/* ── Crop image (enabled when an image node is selected) ───────── */}
@@ -811,7 +847,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => onCropImage()}
       >
-        ✂
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          crop
+        </span>
       </button>
 
       {/* ── Link (B6) ────────────────────────────────────────────────── */}
@@ -823,7 +861,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={onOpenLink}
       >
-        🔗
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          add_link
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -836,7 +876,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().insertToc().run()}
       >
-        ☰
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          toc
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -849,8 +891,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().insertFootnote().run()}
       >
-        fn
-        <sup style={{ fontSize: '0.6em', lineHeight: 1 }}>†</sup>
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          note_add
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -863,7 +906,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().insertPageBreak().run()}
       >
-        ⏎p
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          insert_page_break
+        </span>
       </button>
 
       {/* ── Insert section break (B13) ───────────────────────────────── */}
@@ -874,7 +919,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().insertSectionBreak().run()}
       >
-        §
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          newspaper
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -897,7 +944,9 @@ export function Toolbar({
               onOpenPageSetup()
             }}
           >
-            ☰⊞
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              settings_overscan
+            </span>
           </button>
 
           {/* ── G9: Watermark ────────────────────────────────────────────── */}
@@ -912,7 +961,9 @@ export function Toolbar({
               onOpenWatermark()
             }}
           >
-            ≋
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              branding_watermark
+            </span>
           </button>
 
           {/* ── G17: Custom CSS ─────────────────────────────────────────── */}
@@ -927,7 +978,9 @@ export function Toolbar({
               onOpenCustomCss()
             }}
           >
-            {'</>'}
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              css
+            </span>
           </button>
         </>
       )}
@@ -951,7 +1004,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={onToggleComments}
       >
-        💬
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          comment
+        </span>
       </button>
 
       {/* ── D3: Toggle version history panel ─────────────────────────── */}
@@ -963,7 +1018,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={onToggleVersionHistory}
       >
-        🕐
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          history
+        </span>
       </button>
 
       {/* ── F6: Toggle backlinks panel ───────────────────────────────── */}
@@ -975,7 +1032,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={onToggleBacklinks}
       >
-        🔙
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          call_received
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -992,7 +1051,9 @@ export function Toolbar({
           onToggleSuggestions()
         }}
       >
-        <span aria-hidden="true">✎?</span>
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          edit_note
+        </span>
         {s.suggesting && (
           <span className="parchment-suggesting-indicator" aria-hidden="true">
             ON
@@ -1012,7 +1073,9 @@ export function Toolbar({
           onMouseDown={keepSelection}
           onClick={onToggleGrammar}
         >
-          <span aria-hidden="true">📝</span>
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            fact_check
+          </span>
         </button>
       )}
 
@@ -1026,7 +1089,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={onOpenShare}
       >
-        🔗
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          share
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -1045,7 +1110,9 @@ export function Toolbar({
             onMouseDown={keepSelection}
             onClick={onToggleReading}
           >
-            📖
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              menu_book
+            </span>
           </button>
 
           {/* ── G16: Presenter mode toggle (F5 fallback) ─────────────────── */}
@@ -1058,7 +1125,9 @@ export function Toolbar({
             onMouseDown={keepSelection}
             onClick={onTogglePresenter}
           >
-            ▶
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              slideshow
+            </span>
           </button>
         </>
       )}
@@ -1078,7 +1147,9 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={onToggleSourceMode}
       >
-        {'</>'}
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          terminal
+        </span>
       </button>
 
       {/* ── S3-4: the standalone Export fieldset is removed. All formats now

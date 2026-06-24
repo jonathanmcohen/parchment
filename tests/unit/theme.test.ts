@@ -227,6 +227,27 @@ describe('FONT_PAIRS', () => {
       expect(p.body).toBeTruthy()
     }
   })
+
+  // S4-1: Inter is dropped — Google Docs uses Arial body / Roboto chrome.
+  it('has no inter pair (Inter dropped in S4)', () => {
+    expect(FONT_PAIRS.some((p) => p.key === 'inter')).toBe(false)
+  })
+
+  it("the default 'system' pair body is Arial-first (Docs body face)", () => {
+    const sys = FONT_PAIRS.find((p) => p.key === 'system')
+    expect(sys).toBeDefined()
+    expect(sys?.body.startsWith('Arial')).toBe(true)
+  })
+
+  it("the 'mono' pair body uses Roboto Mono", () => {
+    const mono = FONT_PAIRS.find((p) => p.key === 'mono')
+    expect(mono).toBeDefined()
+    expect(mono?.body).toContain('Roboto Mono')
+  })
+
+  it('exposes exactly the four S4 pairs (system, serif, mono, classic)', () => {
+    expect(FONT_PAIRS.map((p) => p.key)).toEqual(['system', 'serif', 'mono', 'classic'])
+  })
 })
 
 describe('ACCENT_SWATCHES', () => {

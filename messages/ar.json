@@ -3,6 +3,8 @@
     "files": "الملفات",
     "templates": "القوالب",
     "inbox": "صندوق الوارد",
+    "shared": "المشتركة",
+    "starred": "المميزة بنجمة",
     "trash": "المهملات",
     "settings": "الإعدادات",
     "primaryLabel": "التنقل الرئيسي"
@@ -10,7 +12,18 @@
   "shell": {
     "appName": "بارشمنت",
     "skipToContent": "تخطٍّ إلى المحتوى",
-    "signOut": "تسجيل الخروج"
+    "signOut": "تسجيل الخروج",
+    "new": "جديد",
+    "blankDocument": "مستند فارغ",
+    "fromTemplate": "من قالب",
+    "folder": "مجلد",
+    "upload": "رفع",
+    "help": "المساعدة",
+    "accountMenu": "الحساب",
+    "manageAccount": "إدارة الحساب",
+    "switchAccount": "تبديل الحساب",
+    "openNav": "فتح قائمة التنقل",
+    "closeNav": "إغلاق قائمة التنقل"
   },
   "actions": {
     "newDocument": "مستند جديد",

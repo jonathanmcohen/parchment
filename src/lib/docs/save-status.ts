@@ -3,7 +3,7 @@
 // Today the body save is a fire-and-forget `void fetch` with NO
 // isSaving/saved/lastSaved state anywhere. The doc title bar needs a small
 // in-flight → settled → idle state so the save-status slot can read
-// "Saving…" / "All changes saved to disk" / an idle label (the COPY itself is
+// "Saving…" / "All changes saved" / an idle label (the COPY itself is
 // S5-9; S3-1 owns the STATE). The save *path* is unchanged — this only observes
 // in-flight/settled around the existing save.
 //
@@ -13,6 +13,28 @@
 export type SaveStatus = 'idle' | 'saving' | 'saved'
 
 export type SaveEvent = 'save-start' | 'save-settle' | 'idle-timeout'
+
+// C3: which connection-aware tooltip COPY the save-status text shows. The STATE
+// machine above is untouched — this is a pure mapping from the live collab
+// connection state (online/syncing/offline) to a tooltip kind. The type is a
+// type-only import so this module pulls in NO client/runtime code from the
+// StatusBar (a 'use client' component); the union is erased at compile time.
+import type { ConnectionState } from '@/components/editor/StatusBar'
+
+export type SaveTooltipKind = 'synced' | 'offline'
+
+/**
+ * Map the live collab connection state to the save-status tooltip kind:
+ *   • 'online'  → 'synced'  — collab confirmed healthy; the disk-mirrored save is
+ *     also synced to the collab service.
+ *   • 'syncing' → 'offline' — connecting; not yet a confirmed-healthy link, so we
+ *     don't claim "synced" until the socket reports connected.
+ *   • 'offline' → 'offline' — collab unreachable.
+ * Only a CONFIRMED-online connection yields the synced copy.
+ */
+export function saveTooltipKind(connection: ConnectionState): SaveTooltipKind {
+  return connection === 'online' ? 'synced' : 'offline'
+}
 
 /**
  * Pure transition: given the current status and an event, return the next

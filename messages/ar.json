@@ -60,6 +60,14 @@
     "whatsNew": "الجديد",
     "welcomeTour": "جولة ترحيبية"
   },
+  "editor": {
+    "saveStatus": {
+      "saving": "جارٍ الحفظ…",
+      "saved": "تم حفظ جميع التغييرات",
+      "tooltipSynced": "محفوظ على القرص ومتزامن مع خدمة التعاون",
+      "tooltipOffline": "محفوظ على القرص · غير متصل — خدمة التعاون غير متاحة"
+    }
+  },
   "locale": {
     "switcherLabel": "اللغة",
     "en": "English",

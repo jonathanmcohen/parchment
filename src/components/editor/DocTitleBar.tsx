@@ -1,8 +1,10 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useCallback, useRef, useState } from 'react'
+import type { ConnectionState } from '@/components/editor/StatusBar'
 import { buildRenameRequest } from '@/lib/docs/rename-request'
-import type { SaveStatus } from '@/lib/docs/save-status'
+import { type SaveStatus, saveTooltipKind } from '@/lib/docs/save-status'
 
 // S3-1: the pinned doc title bar (NEW). A near-pure shell over EXISTING
 // Editor.tsx handlers, plus two small honestly-flagged NEW bits:
@@ -13,15 +15,18 @@ import type { SaveStatus } from '@/lib/docs/save-status'
 // star / move are visibly-disabled "coming soon" placeholders — no backing
 // files-side endpoint is reachable from the editor today (placeholder honesty).
 
-function saveStatusLabel(status: SaveStatus): string {
-  // S5-9 owns the final COPY; S3-1 ships the in-place strings that read its STATE.
+// C3: the COPY now routes through the editor.saveStatus i18n keys (en catalog;
+// other locales fall back to en). This maps the STATE to a key name only — the
+// actual string is resolved via useTranslations in the component. 'idle' has no
+// key (the slot renders nothing).
+function saveStatusKey(status: SaveStatus): 'saving' | 'saved' | null {
   switch (status) {
     case 'saving':
-      return 'Saving…'
+      return 'saving'
     case 'saved':
-      return 'All changes saved to disk'
+      return 'saved'
     default:
-      return ''
+      return null
   }
 }
 
@@ -75,6 +80,12 @@ export type DocTitleBarProps = {
   docId: string
   initialTitle: string
   saveStatus: SaveStatus
+  /**
+   * C3: live collab connection state (computed in Editor.tsx). Drives the
+   * connection-aware tooltip on the save-status text — synced copy when collab
+   * is healthy/online, offline copy when it is syncing/unreachable.
+   */
+  connection: ConnectionState
   onToggleComments: () => void
   onToggleVersionHistory: () => void
   onOpenShare: () => void
@@ -86,13 +97,20 @@ export function DocTitleBar({
   docId,
   initialTitle,
   saveStatus,
+  connection,
   onToggleComments,
   onToggleVersionHistory,
   onOpenShare,
   avatar,
 }: DocTitleBarProps) {
+  const t = useTranslations('editor.saveStatus')
   const [starred, setStarred] = useState(false)
-  const status = saveStatusLabel(saveStatus)
+  const statusKey = saveStatusKey(saveStatus)
+  const status = statusKey ? t(statusKey) : ''
+  // C3: the tooltip reflects the LIVE connection — only a confirmed-online link
+  // claims "synced to collab service"; syncing/offline show the offline copy.
+  const saveTooltip =
+    saveTooltipKind(connection) === 'synced' ? t('tooltipSynced') : t('tooltipOffline')
 
   return (
     // L2: the <header> is the full-bleed bg/border/sticky box; the inner
@@ -135,7 +153,12 @@ export function DocTitleBar({
         </button>
 
         {status && (
-          <span className="parchment-titlebar-savestatus" role="status" aria-live="polite">
+          <span
+            className="parchment-titlebar-savestatus"
+            role="status"
+            aria-live="polite"
+            title={saveTooltip}
+          >
             {status}
           </span>
         )}

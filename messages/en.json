@@ -60,6 +60,14 @@
     "whatsNew": "What's new",
     "welcomeTour": "Welcome tour"
   },
+  "editor": {
+    "saveStatus": {
+      "saving": "Saving…",
+      "saved": "All changes saved",
+      "tooltipSynced": "Saved to disk and synced to collab service",
+      "tooltipOffline": "Saved to disk · Offline — collab unavailable"
+    }
+  },
   "locale": {
     "switcherLabel": "Language",
     "en": "English",

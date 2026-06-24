@@ -124,7 +124,10 @@ jobs:
       - name: Build (Playwright webServer runs `pnpm start`)
         run: pnpm build
       - name: Run Playwright + axe a11y harness
-        run: pnpm test:e2e
+        # Only the chromium (axe) project. The S1-0 `visual` project is a
+        # controller-local gate (per-platform screenshot baselines committed for
+        # darwin); it is NOT run in CI to avoid cross-OS pixel drift.
+        run: pnpm exec playwright test --project=chromium
       - name: Upload a11y report
         if: always()
         uses: actions/upload-artifact@v4

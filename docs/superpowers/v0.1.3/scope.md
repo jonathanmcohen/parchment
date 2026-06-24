@@ -46,10 +46,10 @@ build decides; see [coverage-matrix.md](coverage-matrix.md).**
 | LT2-3 | Outline chevron 8px right pad | DONE | ☑ | deploy-pend | PR #116. chevron right 6→8px; verified
 | LT2-4 | Outline-top == page-top | PARTIAL-risk | ☐ | ☐ | already ~2px off; optional header-padding tweak |
 | LT3-1 | Title-bar left cluster spacing 12/16/24px | PARTIAL-risk | ☐ | ☐ | CSS+JSX; values terse, confirm against design |
-| LT3-2 | Save-status 13px medium | TODO | ☐ | ☐ | `.parchment-titlebar-savestatus` font 400 12→500 13 (`:496`) |
-| LT3-3 | Doc icon 32px | TODO | ☐ | ☐ | **already 32px** (`:444`) — confirm; glyph 24px inside |
-| LT3-4 | Title Google Sans 18px semibold | TODO | ☐ | ☐ | `.parchment-titlebar-title` 400→600 (`:458`) |
-| LT3-5 | Menu bar 24px left pad + 14px + gaps | TODO | ☐ | ☐ | `.parchment-menubar-inner` padding `0 8px`→`0 8px 0 24px` (`:537`) |
+| LT3-2 | Save-status 13px medium | DONE | ☑ | deploy-pend | PR #117. save-status 500/13px; verified
+| LT3-3 | Doc icon 32px | DONE | ☑ | deploy-pend | PR #117. doc icon already 32px; confirmed
+| LT3-4 | Title Google Sans 18px semibold | DONE | ☑ | deploy-pend | PR #117. title 600/18px; verified
+| LT3-5 | Menu bar 24px left pad + 14px + gaps | DONE | ☑ | deploy-pend | PR #117. menu pad-left 24px; verified
 | LT3-6 | Title-bar right cluster 8px + 16px before Share | PARTIAL-risk | ☐ | ☐ | `.parchment-titlebar-share` margin-left; confirm 8 vs 16 |
 
 ### LT4 — global sidebar

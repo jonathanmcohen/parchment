@@ -158,7 +158,9 @@ export function VoiceButton({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={handleClick}
       >
-        {recording ? '🔴' : '🎤'}
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          {recording ? 'stop_circle' : 'mic'}
+        </span>
       </button>
 
       {/* Live preview chip — shows interim (in-progress) transcription */}

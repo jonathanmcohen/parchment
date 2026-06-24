@@ -27,7 +27,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().addRowBefore().run()}
       >
-        ↑+
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          add_row_above
+        </span>
       </button>
       <button
         type="button"
@@ -36,7 +38,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().addRowAfter().run()}
       >
-        ↓+
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          add_row_below
+        </span>
       </button>
       <button
         type="button"
@@ -45,7 +49,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().deleteRow().run()}
       >
-        ↕✕
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          delete
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -58,7 +64,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().addColumnBefore().run()}
       >
-        ←+
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          add_column_left
+        </span>
       </button>
       <button
         type="button"
@@ -67,7 +75,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().addColumnAfter().run()}
       >
-        →+
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          add_column_right
+        </span>
       </button>
       <button
         type="button"
@@ -76,7 +86,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().deleteColumn().run()}
       >
-        ↔✕
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          delete
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -89,7 +101,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().mergeCells().run()}
       >
-        ⊞
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          cell_merge
+        </span>
       </button>
       <button
         type="button"
@@ -98,7 +112,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().splitCell().run()}
       >
-        ⊟
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          call_split
+        </span>
       </button>
       <button
         type="button"
@@ -107,7 +123,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleHeaderRow().run()}
       >
-        H↔
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          toggle_on
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -137,7 +155,9 @@ export function TableControls({ editor }: Props) {
           sortTableByColumn(editor, colIdx, 'asc')
         }}
       >
-        ↑Z
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          arrow_upward_alt
+        </span>
       </button>
       <button
         type="button"
@@ -159,7 +179,9 @@ export function TableControls({ editor }: Props) {
           sortTableByColumn(editor, colIdx, 'desc')
         }}
       >
-        ↓Z
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          arrow_downward_alt
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -172,7 +194,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => recomputeFormulas(editor)}
       >
-        Σ
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          functions
+        </span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />
@@ -185,7 +209,9 @@ export function TableControls({ editor }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().deleteTable().run()}
       >
-        ✕⊞
+        <span aria-hidden className="material-symbols-rounded text-[20px]">
+          grid_off
+        </span>
       </button>
     </fieldset>
   )

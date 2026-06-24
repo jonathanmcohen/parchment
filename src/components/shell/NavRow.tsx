@@ -32,8 +32,9 @@ export function NavRow({ href, icon, label }: { href: string; icon: string; labe
       aria-current={active ? 'page' : undefined}
       className={[
         // S4-4: row height driven by the --row-h spacing token (36px), not a bare
-        // h-9, so the sidebar/menu rows share one source of truth.
-        'flex h-[var(--row-h)] items-center gap-3 rounded-full px-3 text-sm',
+        // h-9, so the sidebar/menu rows share one source of truth; the icon→label
+        // gap + horizontal padding read the --space-3 (12px) grid token.
+        'flex h-[var(--row-h)] items-center gap-[var(--space-3)] rounded-full px-[var(--space-3)] text-sm',
         active
           ? 'bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
           : 'text-[var(--foreground)] hover:bg-[var(--surface-hover)]',

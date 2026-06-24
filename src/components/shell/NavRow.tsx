@@ -33,7 +33,7 @@ export function NavRow({ href, icon, label }: { href: string; icon: string; labe
       className={[
         'flex h-9 items-center gap-3 rounded-full px-3 text-sm',
         active
-          ? 'bg-[var(--primary-surface)] text-[var(--primary)]'
+          ? 'bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
           : 'text-[var(--foreground)] hover:bg-[var(--surface-hover)]',
       ].join(' ')}
     >

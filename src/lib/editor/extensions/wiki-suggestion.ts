@@ -3,6 +3,7 @@ import { PluginKey } from '@tiptap/pm/state'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import type { WikiDoc, WikiSuggestionMenuRef } from '@/components/editor/WikiSuggestionMenu'
+import { SUGGESTION_CONTAINER } from '@/lib/editor/extensions/suggestion-container'
 
 // Distinct plugin key — @tiptap/suggestion defaults to a single shared key, so
 // without this the `[[` suggestion plugin collides with the slash-menu `/`
@@ -27,6 +28,8 @@ export const WikiSuggestionExtension = Extension.create({
     return [
       Suggestion<WikiDoc>({
         editor: this.editor,
+        // V1b: mount inside the themed wrapper so dark-mode tokens resolve.
+        container: SUGGESTION_CONTAINER,
         pluginKey: wikiSuggestionPluginKey,
         char: '[[',
         startOfLine: false,

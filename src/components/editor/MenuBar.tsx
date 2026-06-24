@@ -1,6 +1,12 @@
 'use client'
 
 import type { Editor } from '@tiptap/core'
+import {
+  copySelection,
+  cutSelection,
+  pasteFromClipboard,
+  pasteWithoutFormatting,
+} from './clipboard-actions'
 import { Menu, type MenuItemConfig } from './menus/Menu'
 
 // S3-2: the editor menu bar (File · Edit · View · Insert · Format · Tools ·
@@ -98,6 +104,30 @@ export function MenuBar(props: MenuBarHandlers) {
       icon: 'redo',
       shortcut: '⌘Y',
       onSelect: () => editor.chain().focus().redo().run(),
+    },
+    { kind: 'separator' },
+    {
+      label: 'Cut',
+      icon: 'content_cut',
+      shortcut: '⌘X',
+      onSelect: () => cutSelection(editor),
+    },
+    {
+      label: 'Copy',
+      icon: 'content_copy',
+      shortcut: '⌘C',
+      onSelect: () => copySelection(editor),
+    },
+    {
+      label: 'Paste',
+      icon: 'content_paste',
+      shortcut: '⌘V',
+      onSelect: () => pasteFromClipboard(editor),
+    },
+    {
+      label: 'Paste without formatting',
+      shortcut: '⌘⇧V',
+      onSelect: () => pasteWithoutFormatting(editor),
     },
     { kind: 'separator' },
     { label: 'Select all', shortcut: '⌘A', onSelect: () => editor.commands.selectAll() },

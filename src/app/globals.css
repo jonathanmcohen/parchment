@@ -381,6 +381,21 @@ body {
   }
 }
 
+/* V7: collapse the empty top bar on the editor at desktop width.
+ * The editor supplies its own full-width chrome (title/menu/toolbar) and the
+ * user-menu avatar lives in that title bar (C1), so on the editor the global
+ * .parchment-topbar is empty at >=768px (the hamburger is mobile-only, the
+ * right slot unused) — leaving a ~48px gap above the doc chrome. Hiding it lets
+ * the sticky chrome stack sit flush at the viewport top (Google-Docs-like).
+ * Editor-only via :has(.parchment-editor-shell): the bar still carries the
+ * avatar on other routes and the hamburger below 768px. Verified live: chrome
+ * stack top 48px -> 0px, no overlap. */
+@media (min-width: 768px) {
+  .parchment-app-shell:has(.parchment-editor-shell) .parchment-topbar {
+    display: none;
+  }
+}
+
 /* ── S1-2: editor route gutter ───────────────────────────────────────────────
  * The full-bleed gray field (Docs #F1F3F4 / dark #202124) the white page floats
  * on. It is applied to the editor route's full-width shell ONLY (NOT the inner

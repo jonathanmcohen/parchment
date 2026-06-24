@@ -31,6 +31,8 @@ export default function NotFound() {
   const [state, setState] = useState<RecoverySearchState>({ status: 'ok', results: [] })
   const [searching, setSearching] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Monotonic request stamp — guards against out-of-order search responses.
+  const reqSeqRef = useRef(0)
 
   const runSearch = useCallback(async (q: string) => {
     const url = buildRecoverySearchUrl(q)
@@ -39,6 +41,10 @@ export default function NotFound() {
       setSearching(false)
       return
     }
+    // Request-ordering guard: stamp each request; ignore a response if a newer
+    // request has since been issued (a slow earlier fetch must not overwrite a
+    // faster later one with stale results).
+    const seq = (reqSeqRef.current += 1)
     try {
       const res = await fetch(url)
       let body: RecoverySearchBody | null = null
@@ -47,11 +53,13 @@ export default function NotFound() {
       } catch {
         body = null
       }
+      if (seq !== reqSeqRef.current) return
       setState(interpretRecoveryResponse(res.status, body))
     } catch {
+      if (seq !== reqSeqRef.current) return
       setState({ status: 'error' })
     } finally {
-      setSearching(false)
+      if (seq === reqSeqRef.current) setSearching(false)
     }
   }, [])
 
@@ -180,7 +188,11 @@ export default function NotFound() {
             )}
 
             {trimmed && !searching && results.length === 0 && state.status === 'ok' && (
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--muted)' }}>
+              <p
+                role="status"
+                aria-live="polite"
+                style={{ margin: 0, fontSize: '0.875rem', color: 'var(--muted)' }}
+              >
                 No matching documents.
               </p>
             )}
@@ -188,6 +200,8 @@ export default function NotFound() {
             {results.length > 0 && (
               <ul
                 aria-label="Matching documents"
+                aria-live="polite"
+                aria-atomic="true"
                 style={{
                   listStyle: 'none',
                   margin: 0,

@@ -84,7 +84,7 @@
 | Plan | Items | DONE | PARTIAL | TODO |
 |---|---|---|---|---|
 | S1 Color/tokens + faces + harness | 9 | 9 | 0 | 0 |
-| S2 Global chrome | 6 | 0 | 0 | 6 |
+| S2 Global chrome | 6 | 4 | 2(partial) | 0 |
 | S3 Editor chrome | 6 | 0 | 0 | 6 |
 | S4 Typography | 4 | 0 | 0 | 4 |
 | S5 Interactions + surfaces | 13 | 0 | 0 | 13 |

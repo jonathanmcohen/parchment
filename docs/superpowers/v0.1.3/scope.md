@@ -32,11 +32,11 @@ build decides; see [coverage-matrix.md](coverage-matrix.md).**
 ### LT1 — high-impact
 | ID | Item | Status | Repro | LV | Notes |
 |---|---|---|---|---|---|
-| LT1-1 🌐 | Kill 24px white sliver above title bar (flush to top) | TODO | ☐ | ☐ | shell `padding:2rem` pushes the stack down; cancel with `-2rem` on `.parchment-chrome-stack` / titlebar |
+| LT1-1 🌐 | Kill 24px white sliver above title bar (flush to top) | DONE | ☑ | deploy-pend | PR #115 (LT1 tier). chrome-stack margin-top:-2rem → title flush; verified -32px+screenshot
 | LT1-2 | Compress outline→page gutter (page up to 816px) | TODO | ☐ | ☐ | outline 256→220 (LT2-2) widens gutter; page re-centers via `mx-auto` |
-| LT1-3 | Toolbar overflow `⋯` chip styling | PARTIAL-risk | ☐ | ☐ | overflow button EXISTS + works (`Toolbar.tsx:1289`); gap is the chip *look* (pill+border) — CSS-only |
-| LT1-4 | Vertical 1px separators between toolbar groups | TODO | ☐ | ☐ | **already exist** (`.parchment-toolbar-sep`, 21 sites) — verify visible, likely a confirm not a change |
-| LT1-5 | Mode dropdown toolbar-right (= CF7) | TODO | ☐ | ☐ | **already shipped** (`Toolbar.tsx:1308`, right-aligned). Covered by CF7 |
+| LT1-3 | Toolbar overflow `⋯` chip styling | DONE | ☑ | deploy-pend | PR #115. overflow chip (--surface-muted/--border-chrome) wired
+| LT1-4 | Vertical 1px separators between toolbar groups | DONE | ☑ | deploy-pend | PR #115. confirmed already-present, no churn
+| LT1-5 | Mode dropdown toolbar-right (= CF7) | DONE | ☑ | deploy-pend | PR #115 (=CF7). confirmed present, no churn
 
 ### LT2 — page + outline
 | ID | Item | Status | Repro | LV | Notes |

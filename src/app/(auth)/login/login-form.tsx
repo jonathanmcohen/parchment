@@ -25,7 +25,7 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
-          className="rounded-lg border border-[var(--border)] bg-[var(--paper)] px-3 py-2"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
         />
       </div>
 
@@ -39,12 +39,12 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className="rounded-lg border border-[var(--border)] bg-[var(--paper)] px-3 py-2"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
         />
       </div>
 
       {state && 'error' in state ? (
-        <p role="alert" className="text-[var(--accent)] text-sm">
+        <p role="alert" className="text-[var(--error)] text-sm">
           {state.error}
         </p>
       ) : null}
@@ -52,7 +52,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-[var(--accent-contrast)] px-4 py-2 font-medium text-white disabled:opacity-60"
+        className="rounded-lg bg-[var(--primary)] px-4 py-2 font-medium text-[var(--on-primary)] disabled:opacity-60"
       >
         {pending ? 'Signing in…' : 'Sign in'}
       </button>
@@ -155,12 +155,12 @@ function SecondFactorStep({ hasTotp, hasPasskey }: { hasTotp: boolean; hasPasske
             placeholder={useRecovery ? 'xxxx-xxxx-xxxx-xxxx' : '123456'}
             // biome-ignore lint/a11y/noAutofocus: focus the only field on this step
             autoFocus
-            className="rounded-lg border border-[var(--border)] bg-[var(--paper)] px-3 py-2 tracking-widest"
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 tracking-widest"
           />
           <button
             type="submit"
             disabled={busy || code.trim().length === 0}
-            className="rounded-lg bg-[var(--accent-contrast)] px-4 py-2 font-medium text-white disabled:opacity-60"
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 font-medium text-[var(--on-primary)] disabled:opacity-60"
           >
             {busy ? 'Verifying…' : 'Verify'}
           </button>
@@ -179,7 +179,7 @@ function SecondFactorStep({ hasTotp, hasPasskey }: { hasTotp: boolean; hasPasske
       ) : null}
 
       {error ? (
-        <p role="alert" className="text-[var(--accent)] text-sm">
+        <p role="alert" className="text-[var(--error)] text-sm">
           {error}
         </p>
       ) : null}

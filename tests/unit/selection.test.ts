@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rangeBetween, toggle } from '@/lib/docs/selection'
+import { rangeBetween, selectOnly, toggle } from '@/lib/docs/selection'
 
 describe('rangeBetween', () => {
   const ids = ['a', 'b', 'c', 'd', 'e']
@@ -61,5 +61,27 @@ describe('toggle', () => {
     const s = new Set<string>()
     const next = toggle(s, 'x')
     expect(next.has('x')).toBe(true)
+  })
+})
+
+describe('selectOnly', () => {
+  it('returns a set containing exactly the given id', () => {
+    const next = selectOnly('b')
+    expect([...next]).toEqual(['b'])
+    expect(next.size).toBe(1)
+  })
+
+  it('discards any previously-selected ids (single-click semantics)', () => {
+    // selectOnly takes no prior set — the single-click gesture always collapses
+    // selection to the clicked row, so the result must be just that one id.
+    const next = selectOnly('only')
+    expect(next.has('only')).toBe(true)
+    expect(next.size).toBe(1)
+  })
+
+  it('returns a fresh Set each call', () => {
+    const a = selectOnly('x')
+    const b = selectOnly('x')
+    expect(a).not.toBe(b)
   })
 })

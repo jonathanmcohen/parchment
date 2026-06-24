@@ -3,7 +3,6 @@ import FileManager from '@/components/file-manager/FileManager'
 import { requireUser } from '@/lib/auth/guard'
 import { listFolders } from '@/lib/docs/folders-repo'
 import { listDocumentsInFolder } from '@/lib/docs/repo'
-import { newDocument } from './actions'
 
 export default async function FilesPage() {
   const user = await requireUser()
@@ -31,17 +30,10 @@ export default async function FilesPage() {
 
   return (
     <section className="mx-auto max-w-5xl h-full flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="font-semibold text-2xl tracking-tight">Files</h1>
-        <form action={newDocument}>
-          <button
-            type="submit"
-            className="rounded-md bg-[var(--primary)] px-3 py-1.5 font-medium text-sm text-[var(--on-primary)]"
-          >
-            + New document
-          </button>
-        </form>
-      </div>
+      {/* S5-7: the Drive hero — "My Drive" at 22px Google Sans 400 (.px-title).
+          S5-8: the standalone "+ New document" button is gone; "Blank document"
+          lives in the sidebar "+ New" mega-menu (S2-1). */}
+      <h1 className="px-title">My Drive</h1>
 
       <FileManager initialFolders={initialFolders} initialDocs={initialDocs} />
     </section>

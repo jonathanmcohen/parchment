@@ -599,6 +599,94 @@ body {
   color: var(--muted);
 }
 
+/* ── S5-3 (OWNER, DECISION 6): file-manager overlays adopt the shared shell ────
+ *  ContextMenu + TagPopover route through ui/Dropdown (`.px-menu`). The base
+ *  `.px-menu` above is `position: absolute`; the ContextMenu positions itself
+ *  with `position: fixed` (viewport coords) via inline style — this modifier
+ *  flips it so the shared elevation/radius/row tokens still apply. The
+ *  `.px-menu-action` row is the file-manager action button (full-width, start
+ *  aligned) consuming the same 36px / 14px Roboto / --surface-hover hover as
+ *  every other dropdown row. No purple hover anywhere. */
+.px-menu--fixed {
+  position: fixed;
+}
+.px-menu-action {
+  width: 100%;
+  text-align: start;
+}
+
+/* ── S5-1: unified interaction states (hover / pressed / disabled) ────────────
+ *  Every button / row / icon-button that opts in gets ONE interaction language,
+ *  token-driven (no hex literals):
+ *    hover    → 8px-radius pill, --surface-hover (#F1F3F4)
+ *    pressed  → --primary-surface (#E8F0FE) fill + --primary-surface-text ink
+ *               (the AA-safe blue; aria-pressed / aria-current="page" / :active)
+ *    disabled → 38% opacity, pointer-events: none (keeps the accessible name)
+ *  The pressed pill uses --primary-surface-text (not bare --primary) because
+ *  --primary on --primary-surface is only 4.23:1 — below AA (see tokens.css). */
+@layer components {
+  .px-interactive {
+    border-radius: 8px;
+    transition:
+      background-color 0.12s ease,
+      color 0.12s ease;
+  }
+  .px-interactive:hover {
+    background-color: var(--surface-hover);
+  }
+  .px-interactive:active,
+  .px-interactive[aria-pressed="true"],
+  .px-interactive[aria-current="page"] {
+    background-color: var(--primary-surface);
+    color: var(--primary-surface-text);
+  }
+  .px-interactive:disabled,
+  .px-interactive[aria-disabled="true"] {
+    opacity: 0.38;
+    pointer-events: none;
+  }
+}
+
+/* ── S5-2: tooltips (every icon-only control) ─────────────────────────────────
+ *  Presentational only — the wrapped control keeps its own aria-label as the
+ *  accessible name; this tooltip is supplementary (role="tooltip"). 12px Roboto,
+ *  --tooltip-bg (#3C4043), white text, 4px radius, 6×8 padding, 300ms reveal
+ *  delay, shown on hover OR keyboard focus-within. Tokens only. */
+.px-tip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.px-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--tooltip-bg);
+  color: #fff;
+  font: 12px / 1.4 var(--font-ui);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease 0.3s;
+}
+.px-tip-wrap:hover .px-tip,
+.px-tip-wrap:focus-within .px-tip {
+  opacity: 1;
+}
+
+/* ── S5-7: page title ramp ────────────────────────────────────────────────────
+ *  The files hero ("My Drive") and other page H1s read at 22px Google Sans 400
+ *  (the Drive title), --foreground ink. (S4 shipped the chrome type ramp but no
+ *  page-title class; S5-7 mints it here so the hero has a token-driven size.) */
+.px-title {
+  margin: 0;
+  font: 400 22px / 1.3 var(--font-ui);
+  color: var(--foreground);
+}
+
 /* ── S3-2/S3-6: Word count modal ── */
 .parchment-wordcount-dialog {
   min-width: 320px;
@@ -995,6 +1083,29 @@ body {
   margin: 0 4px;
 }
 
+/* S5-10: the Editing/Suggesting/Viewing mode dropdown sits at the toolbar's
+   trailing edge (after the overflow ⋯). The trigger shows an icon + label and
+   is auto-width (not the 32px icon box). */
+.parchment-toolbar-mode {
+  margin-inline-start: auto;
+  width: auto;
+  min-width: auto;
+  padding: 0 8px;
+  gap: 6px;
+}
+.parchment-toolbar-overflow + .parchment-toolbar-mode {
+  /* When the overflow ⋯ already claimed the auto margin, don't double it. */
+  margin-inline-start: 4px;
+}
+.parchment-toolbar-mode-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.parchment-toolbar-mode-label {
+  font: 400 14px / 1 var(--font-ui);
+}
+
 .parchment-toolbar-label {
   display: inline-flex;
   align-items: center;
@@ -1056,15 +1167,18 @@ body {
 
 /* ── Bubble menu (B2) ────────────────────────────────────────────────── */
 
+/* S5-12: Docs popover elevation — 8px radius + --shadow-dropdown (the same
+   canonical token every dropdown uses), white --surface bg (was the 6px /
+   inline `0 2px 8px` / --paper outlier). */
 .parchment-bubble-menu {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 4px 6px;
-  background: var(--paper);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+  background: var(--surface);
+  border: 1px solid var(--border-chrome);
+  border-radius: 8px;
+  box-shadow: var(--shadow-dropdown);
 }
 
 .parchment-bubble-btn {
@@ -1084,13 +1198,15 @@ body {
 }
 
 .parchment-bubble-btn:hover {
-  background: var(--border);
+  background: var(--surface-hover);
 }
 
+/* S5-12: pressed = the canonical blue pill (--primary-surface), matching every
+   other dropdown/toolbar pressed state — not a solid --primary fill. */
 .parchment-bubble-btn[aria-pressed="true"] {
-  background: var(--primary);
-  color: var(--on-primary);
-  border-color: var(--primary);
+  background: var(--primary-surface);
+  color: var(--primary-surface-text);
+  border-color: transparent;
 }
 
 /* ── Highlight mark (B2) ─────────────────────────────────────────────── */
@@ -1328,6 +1444,13 @@ body {
 
 /* ── Image dialog (B5) ────────────────────────────────────────────────── */
 
+/* ── S5-11: shared modal dialog shell → Google Material dialog ─────────────────
+ *  The ONE `.parchment-dialog*` shell that 10+ dialogs (Share / Image / Page
+ *  setup / Crop / Drawing / Custom CSS / GitHub embed / Embed / draw.io /
+ *  Section break / Link) consume — restyled once, all inherit. Material dialog:
+ *  --shadow-dialog elevation (S1 token, dark-aware; was an inline `0 8px 32px`
+ *  literal), white --surface, 24px content grid, Google-Sans header, 32px close
+ *  icon button. The scrim is a token-driven overlay. No per-dialog rewrite. */
 .parchment-dialog-overlay {
   position: fixed;
   inset: 0;
@@ -1339,16 +1462,16 @@ body {
 }
 
 .parchment-dialog {
-  background: var(--paper);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-chrome);
   border-radius: 8px;
-  box-shadow: 0 8px 32px rgb(0 0 0 / 0.2);
+  box-shadow: var(--shadow-dialog);
   width: min(480px, 96vw);
-  /* S4-4: 20/24/24 === --space-5/--space-6/--space-6 */
-  padding: var(--space-5) var(--space-6) var(--space-6);
+  /* S5-11: 24px content grid on all sides (Docs dialog padding). */
+  padding: var(--space-6);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4); /* 16px */
 }
 
 .parchment-dialog-header {
@@ -1357,26 +1480,31 @@ body {
   justify-content: space-between;
 }
 
+/* S5-11: Google-Sans 16px header (was 1.1rem/600). */
 .parchment-dialog-title {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font: 400 16px / 1.4 var(--font-ui);
   margin: 0;
   color: var(--foreground);
 }
 
+/* S5-11: 32px icon button close (the chrome icon-button box, --icon-btn). */
 .parchment-dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
   background: transparent;
   border: none;
   color: var(--muted);
   font-size: 1rem;
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 999px;
   line-height: 1;
 }
 
 .parchment-dialog-close:hover {
-  background: var(--border);
+  background: var(--surface-hover);
   color: var(--foreground);
 }
 
@@ -2594,15 +2722,17 @@ body {
 
 /* ── B12: Slash menu ──────────────────────────────────────────────────────── */
 
+/* S5-12: Docs popover elevation — white --surface, --shadow-dropdown (was the
+   --paper bg + non-token `0 4px 16px` shadow). Radius already 8px. */
 .parchment-slash-menu {
   display: flex;
   flex-direction: row;
   max-height: 320px;
   width: 360px;
-  background: var(--paper);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-chrome);
   border-radius: 8px;
-  box-shadow: 0 4px 16px 0 rgb(0 0 0 / 0.15);
+  box-shadow: var(--shadow-dropdown);
   overflow: hidden;
   z-index: 9999;
 }
@@ -2638,13 +2768,14 @@ body {
 }
 
 .parchment-slash-rail-btn:hover {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: var(--surface-hover);
   color: var(--foreground);
 }
 
+/* S5-12: pressed = canonical blue pill, matching every other popover. */
 .parchment-slash-rail-btn[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
+  background: var(--primary-surface);
+  color: var(--primary-surface-text);
   font-weight: 600;
 }
 
@@ -2674,12 +2805,14 @@ body {
 }
 
 .parchment-slash-item:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: var(--surface-hover);
 }
 
+/* S5-12: keyboard-active item = the blue --primary-surface pill (no purple). */
 .parchment-slash-item-active {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  outline: 2px solid var(--accent);
+  background: var(--primary-surface);
+  color: var(--primary-surface-text);
+  outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
 
@@ -3136,14 +3269,16 @@ body {
   margin: 0;
 }
 
-/* Public viewer (/share/[token]) — no app chrome. */
+/* S5-13: Public viewer (/share/[token]) — no app chrome. Docs framing: the
+   white page floats on the gray --editor-gutter field; the password gate uses
+   the S5-11 dialog elevation; the doc title reads in the UI face. */
 .parchment-share-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 48px 16px;
-  background: var(--background);
+  background: var(--editor-gutter);
 }
 
 .parchment-share-status {
@@ -3152,11 +3287,12 @@ body {
   margin: 0;
 }
 
+/* Password gate / invalid card — Docs dialog elevation (S5-11 token). */
 .parchment-share-card {
-  background: var(--paper);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-chrome);
   border-radius: 8px;
-  box-shadow: 0 8px 32px rgb(0 0 0 / 0.12);
+  box-shadow: var(--shadow-dialog);
   width: min(380px, 96vw);
   padding: 24px;
   display: flex;
@@ -3165,24 +3301,23 @@ body {
 }
 
 .parchment-share-heading {
-  font-size: 1.15rem;
-  font-weight: 600;
+  font: 400 18px / 1.4 var(--font-ui);
   margin: 0;
   color: var(--foreground);
 }
 
+/* The read-only page — a floating white sheet on the gutter. */
 .parchment-share-doc {
   width: min(820px, 100%);
-  background: var(--paper);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border-chrome);
   border-radius: 8px;
   padding: 48px 56px;
-  box-shadow: 0 2px 12px rgb(0 0 0 / 0.06);
+  box-shadow: var(--shadow-page);
 }
 
 .parchment-share-title {
-  font-size: 1.8rem;
-  font-weight: 600;
+  font: 400 28px / 1.25 var(--font-ui);
   letter-spacing: -0.01em;
   margin: 0 0 16px;
   color: var(--foreground);

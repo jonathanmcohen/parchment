@@ -31,3 +31,12 @@ export function toggle(selection: ReadonlySet<string>, id: string): Set<string> 
   }
   return next
 }
+
+/**
+ * The single-click-select reducer (S5-5): collapse selection to exactly `id`,
+ * discarding any prior selection. A plain left-click on a file row selects only
+ * that row (Drive semantics), so this takes no prior set. Returns a fresh Set.
+ */
+export function selectOnly(id: string): Set<string> {
+  return new Set([id])
+}

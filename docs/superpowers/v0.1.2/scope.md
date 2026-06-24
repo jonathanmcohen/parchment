@@ -25,7 +25,7 @@ F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = 
 | F7 | Settings ghosted sub-pages — ship-or-hide | DONE | ☑ | ☑ | PR #103. SHIPPED REAL (no PARTIAL): workspace-name GET/PUT /api/settings/workspace (no migration), removed bad stubs, About +version/license/github, Health real, Developer PAT honest. (implement-agent garbage → review+fix recovered)
 | F8 | Bottom status bar restored + pinned (24px, full-width) | DONE | ☑ | ☑ | PR #96 (=L3). position:fixed bottom:0, full-width 257→1425, centered 1024px, --sidebar-width token; live light
 | F9 | Share dialog completeness | DONE | ☑ | ☑ | PR #104. Link UX REAL: auto-link, Copy-link (origin-correct), Restricted/Anyone toggle (404 enforcement), role/expiry/password apply (revoke-recreate). Per-email = user-mandated v0.2 placeholder (named, not slippage). Live light+dark
-| F10 | Audit "Coming soon" menu rows — ship 3, hide rest | TODO | ☐ | ☐ | ship: Insert→Horizontal line (`setHorizontalRule` exists), Help→Keyboard shortcuts (HelpMenu dialog exists). Already-wired: Format→Clear formatting. **Page number HIDDEN** (no backing — section-break attr, not a trivial insert; user's "ship 4" reconciled to 3) + the rest of the placeholder set hidden |
+| F10 | Audit "Coming soon" menu rows — ship 3, hide rest | DONE | ☑ | ☑ | PR #105. Added Horizontal line + wired Keyboard shortcuts; removed all placeholders + Extensions menu; Page number hidden. Live: 0 "Coming soon" rows
 
 ## Plan L — layout fixes ([detail](plan-L.md))
 

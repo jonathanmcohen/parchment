@@ -33,7 +33,7 @@ build decides; see [coverage-matrix.md](coverage-matrix.md).**
 | ID | Item | Status | Repro | LV | Notes |
 |---|---|---|---|---|---|
 | LT1-1 🌐 | Kill 24px white sliver above title bar (flush to top) | DONE | ☑ | deploy-pend | PR #115 (LT1 tier). chrome-stack margin-top:-2rem → title flush; verified -32px+screenshot
-| LT1-2 | Compress outline→page gutter (page up to 816px) | TODO | ☐ | ☐ | outline 256→220 (LT2-2) widens gutter; page re-centers via `mx-auto` |
+| LT1-2 | Compress outline→page gutter (page up to 816px) | DONE | ☑ | deploy-pend | PR #116. page reaches 816px via outline shrink; verified pageWidth=816
 | LT1-3 | Toolbar overflow `⋯` chip styling | DONE | ☑ | deploy-pend | PR #115. overflow chip (--surface-muted/--border-chrome) wired
 | LT1-4 | Vertical 1px separators between toolbar groups | DONE | ☑ | deploy-pend | PR #115. confirmed already-present, no churn
 | LT1-5 | Mode dropdown toolbar-right (= CF7) | DONE | ☑ | deploy-pend | PR #115 (=CF7). confirmed present, no churn
@@ -41,9 +41,9 @@ build decides; see [coverage-matrix.md](coverage-matrix.md).**
 ### LT2 — page + outline
 | ID | Item | Status | Repro | LV | Notes |
 |---|---|---|---|---|---|
-| LT2-1 | Page top margin 120→96px | TODO | ☐ | ☐ | `.parchment-canvas-gutter` padding-top 24→0 (`globals.css:768`) |
-| LT2-2 | Outline width 256→220px | TODO | ☐ | ☐ | `.parchment-outline` width/min/max 256→220 (`:1926`) |
-| LT2-3 | Outline chevron 8px right pad | TODO | ☐ | ☐ | `.parchment-outline-toggle` right 6→8px (`:1951`) |
+| LT2-1 | Page top margin 120→96px | DONE | ☑ | deploy-pend | PR #116. canvas-gutter padding-top 24→0 (page-top ~96px); verified
+| LT2-2 | Outline width 256→220px | DONE | ☑ | deploy-pend | PR #116. outline 256→220px; verified (page→816px)
+| LT2-3 | Outline chevron 8px right pad | DONE | ☑ | deploy-pend | PR #116. chevron right 6→8px; verified
 | LT2-4 | Outline-top == page-top | PARTIAL-risk | ☐ | ☐ | already ~2px off; optional header-padding tweak |
 | LT3-1 | Title-bar left cluster spacing 12/16/24px | PARTIAL-risk | ☐ | ☐ | CSS+JSX; values terse, confirm against design |
 | LT3-2 | Save-status 13px medium | TODO | ☐ | ☐ | `.parchment-titlebar-savestatus` font 400 12→500 13 (`:496`) |

@@ -1,26 +1,29 @@
 'use client'
 
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { pickActiveShare, type ShareLinkRow } from '@/lib/docs/share-link'
 
-// G1 share-management dialog (owner side, in the editor). Lists the doc's
-// existing share links and creates new ones via the owner-scoped API. The public
-// viewer URL is /share/<token>. Permission stores view/comment/edit/suggest but
-// v0.1 renders read-only on the public route (write perms are a v0.2 GAP, noted
-// to the viewer). Per-email sharing is a disabled stub (single-owner now).
+// G1/F9 share-management dialog (owner side, in the editor). The link model: a
+// share row's existence == "Anyone with the link" ON; revoking deletes the row,
+// so NO active row == "Restricted". The public viewer URL is /share/<token>.
+//
+// F9 link-side UX (real, no new backend):
+//   • On open, auto-create a share when none is active so a ready-to-copy link is
+//     shown immediately; the primary button is "Copy link" (copies the real `url`
+//     from the API). A re-open reuses the existing active share — never dupes.
+//   • A Restricted ⇄ "Anyone with the link" toggle bound to the active-link state:
+//     Restricted revokes every share row (public route 404s); Anyone (re)creates a
+//     link with the chosen role. This is REAL enforcement on the existing
+//     POST/DELETE lifecycle — no schema change.
+//   • Permission stores view/comment/edit/suggest but v0.1 renders read-only on the
+//     public route (write perms are a v0.2 GAP, noted to the viewer).
+//
+// Per-email sharing stays a disabled v0.2 placeholder (a per-email grants table +
+// route is genuinely new feature logic — out of scope for F9).
 
 type Props = {
   docId: string
   onClose: () => void
-}
-
-type ShareRow = {
-  id: string
-  token: string
-  permission: string
-  hasPassword: boolean
-  expiresAt: string | null
-  createdAt: string
-  url: string
 }
 
 const PERMISSION_OPTIONS: { value: string; label: string }[] = [
@@ -32,36 +35,44 @@ const PERMISSION_OPTIONS: { value: string; label: string }[] = [
 
 export function ShareDialog({ docId, onClose }: Props) {
   const titleId = useId()
+  const accessId = useId()
   const permId = useId()
   const passwordId = useId()
   const expiryId = useId()
   const emailId = useId()
 
-  const [shares, setShares] = useState<ShareRow[]>([])
+  const [shares, setShares] = useState<ShareLinkRow[]>([])
   const [permission, setPermission] = useState('view')
   const [password, setPassword] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
-  const [creating, setCreating] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [copiedToken, setCopiedToken] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  // Guards the open-time auto-create so it runs at most once per mount even under
+  // React 18 StrictMode's double-invoke.
+  const autoCreatedRef = useRef(false)
 
-  const reload = useCallback(async () => {
+  // The active share backs the live "Anyone with the link" state. null ==
+  // Restricted (no active link). Newest non-expired wins — never a duplicate.
+  const activeShare = pickActiveShare(shares)
+  const isPublic = activeShare !== null
+
+  const reload = useCallback(async (): Promise<ShareLinkRow[]> => {
     try {
       const res = await fetch(`/api/docs/${docId}/shares`)
-      if (!res.ok) return
-      setShares((await res.json()) as ShareRow[])
+      if (!res.ok) return []
+      const rows = (await res.json()) as ShareLinkRow[]
+      setShares(rows)
+      return rows
     } catch {
       // best-effort list refresh
+      return []
     }
   }, [docId])
 
-  useEffect(() => {
-    void reload()
-  }, [reload])
-
-  const handleCreate = useCallback(async () => {
-    if (creating) return
-    setCreating(true)
+  // Create a share with the current role/password/expiry. Returns the new row's
+  // url (origin-correct, straight from the API) or null on failure.
+  const createShare = useCallback(async (): Promise<string | null> => {
     setError(null)
     try {
       const body: { permission: string; password?: string; expiresAt?: string } = { permission }
@@ -82,17 +93,93 @@ export function ShareDialog({ docId, onClose }: Props) {
             ? 'Pick a future expiry date.'
             : 'Could not create the link.',
         )
-        return
+        return null
       }
-      setPassword('')
-      setExpiresAt('')
+      const created = (await res.json()) as { id: string; token: string; url: string }
       await reload()
+      return created.url
     } catch {
       setError('Could not create the link.')
-    } finally {
-      setCreating(false)
+      return null
     }
-  }, [creating, docId, expiresAt, password, permission, reload])
+  }, [docId, expiresAt, password, permission, reload])
+
+  // Revoke every share row for this doc → Restricted (no active link).
+  const revokeAll = useCallback(
+    async (rows: readonly ShareLinkRow[]) => {
+      await Promise.all(
+        rows.map((row) =>
+          fetch(`/api/shares/${row.id}`, { method: 'DELETE' }).catch(() => undefined),
+        ),
+      )
+      await reload()
+    },
+    [reload],
+  )
+
+  // F9: on open, ensure a ready-to-copy link exists. Reuse the existing active
+  // share when present (re-open never duplicates); otherwise create one once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only auto-create; the autoCreatedRef guard keeps it once-per-open and createShare/reload identities are stable.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const rows = await reload()
+      if (cancelled || autoCreatedRef.current) return
+      autoCreatedRef.current = true
+      if (pickActiveShare(rows) === null) await createShare()
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Copy the active link's origin-correct url (straight from the API response),
+  // not a guessed string. Shows a transient "Link copied" toast.
+  const copyLink = useCallback(async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // clipboard may be unavailable (insecure context) — no-op
+    }
+  }, [])
+
+  // Primary action: copy the active link. If somehow none is active (e.g. the
+  // auto-create raced or failed), create one first, then copy its real url.
+  const handleCopyLink = useCallback(async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      if (activeShare) {
+        await copyLink(activeShare.url)
+      } else {
+        const url = await createShare()
+        if (url) await copyLink(url)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }, [activeShare, busy, copyLink, createShare])
+
+  // Toggle Restricted ⇄ Anyone with the link.
+  const setRestricted = useCallback(
+    async (restricted: boolean) => {
+      if (busy) return
+      if (restricted === !isPublic) return // already in this state
+      setBusy(true)
+      try {
+        if (restricted) {
+          await revokeAll(shares)
+        } else {
+          await createShare()
+        }
+      } finally {
+        setBusy(false)
+      }
+    },
+    [busy, createShare, isPublic, revokeAll, shares],
+  )
 
   const handleRevoke = useCallback(
     async (shareId: string) => {
@@ -106,15 +193,12 @@ export function ShareDialog({ docId, onClose }: Props) {
     [reload],
   )
 
-  const handleCopy = useCallback(async (row: ShareRow) => {
-    try {
-      await navigator.clipboard.writeText(row.url)
-      setCopiedToken(row.token)
-      setTimeout(() => setCopiedToken(null), 1500)
-    } catch {
-      // clipboard may be unavailable (insecure context) — no-op
-    }
-  }, [])
+  const handleCopyRow = useCallback(
+    async (url: string) => {
+      await copyLink(url)
+    },
+    [copyLink],
+  )
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') onClose()
@@ -150,16 +234,49 @@ export function ShareDialog({ docId, onClose }: Props) {
           </button>
         </div>
 
-        {/* ── Create a link ─────────────────────────────────────────────── */}
+        {/* ── Restricted ⇄ Anyone with the link ─────────────────────────── */}
+        <fieldset className="parchment-dialog-field parchment-share-fieldset">
+          <legend id={accessId} className="parchment-dialog-label">
+            General access
+          </legend>
+          <div className="parchment-share-toggle">
+            <button
+              type="button"
+              className="parchment-share-toggle-btn"
+              aria-pressed={!isPublic}
+              disabled={busy}
+              onClick={() => void setRestricted(true)}
+            >
+              Restricted
+            </button>
+            <button
+              type="button"
+              className="parchment-share-toggle-btn"
+              aria-pressed={isPublic}
+              disabled={busy}
+              onClick={() => void setRestricted(false)}
+            >
+              Anyone with the link
+            </button>
+          </div>
+          <p className="parchment-share-toggle-hint">
+            {isPublic
+              ? 'Anyone with the link can access this document.'
+              : 'Only people you share with directly can access this document.'}
+          </p>
+        </fieldset>
+
+        {/* Role picker — applies to the "Anyone with the link" grant. */}
         <div className="parchment-dialog-field">
           <label htmlFor={permId} className="parchment-dialog-label">
-            Anyone with the link
+            Link role
           </label>
           <select
             id={permId}
             value={permission}
             onChange={(e) => setPermission(e.target.value)}
             className="parchment-dialog-select"
+            disabled={!isPublic || busy}
           >
             {PERMISSION_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -181,6 +298,7 @@ export function ShareDialog({ docId, onClose }: Props) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="parchment-dialog-input"
+            disabled={busy}
           />
         </div>
 
@@ -194,19 +312,22 @@ export function ShareDialog({ docId, onClose }: Props) {
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
             className="parchment-dialog-input"
+            disabled={busy}
           />
         </div>
 
-        {/* Per-email sharing — disabled stub (single-owner v0.1). */}
+        {/* Per-email sharing — disabled v0.2 placeholder (needs a new grants
+            table + route; out of scope for F9). No dead Add button. */}
         <div className="parchment-dialog-field">
           <label htmlFor={emailId} className="parchment-dialog-label">
-            Invite by email (v0.2)
+            Add people, groups, calendar events (v0.2)
           </label>
           <input
             id={emailId}
             type="email"
-            placeholder="Coming in v0.2"
+            placeholder="Invite by email — coming in v0.2"
             disabled
+            aria-disabled="true"
             className="parchment-dialog-input"
           />
         </div>
@@ -218,13 +339,18 @@ export function ShareDialog({ docId, onClose }: Props) {
         )}
 
         <div className="parchment-dialog-actions">
+          {copied && (
+            <span className="parchment-share-toast" role="status">
+              Link copied
+            </span>
+          )}
           <button
             type="button"
             className="parchment-dialog-btn-primary"
-            onClick={handleCreate}
-            disabled={creating}
+            onClick={() => void handleCopyLink()}
+            disabled={busy || !isPublic}
           >
-            Create link
+            {copied ? 'Copied' : 'Copy link'}
           </button>
         </div>
 
@@ -247,14 +373,14 @@ export function ShareDialog({ docId, onClose }: Props) {
                   <button
                     type="button"
                     className="parchment-dialog-btn-secondary"
-                    onClick={() => handleCopy(row)}
+                    onClick={() => void handleCopyRow(row.url)}
                   >
-                    {copiedToken === row.token ? 'Copied' : 'Copy'}
+                    Copy
                   </button>
                   <button
                     type="button"
                     className="parchment-dialog-btn-secondary"
-                    onClick={() => handleRevoke(row.id)}
+                    onClick={() => void handleRevoke(row.id)}
                   >
                     Revoke
                   </button>

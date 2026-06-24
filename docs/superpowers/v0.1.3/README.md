@@ -2,11 +2,11 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  🟢  GO — EXECUTING (CF1+CF6 → CF2-5,CF7 → LT1 → LT2-7).                   ║
+║  🚀  RELEASED — v0.1.3 (2026-06-24).                                       ║
 ║                                                                            ║
-║  Plans fine-combed (5-lens review, 45 findings: deploy CONFIRMED v0.1.2,   ║
-║  reports REAL not stale; corrections applied). User gave GO. Deploy is     ║
-║  reachable; user redeploys the fixed build manually. One PR per item.      ║
+║  39 items: 36 DONE + 3 named PARTIAL (LT2-4/LT3-1/LT6-3). PRs #111–#119.   ║
+║  CI green (incl e2e-a11y); tagged v0.1.3. User redeploys manually          ║
+║  (set SECURE_COOKIES=true for CF1); deploy self-corrects share URLs (CF4). ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
 

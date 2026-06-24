@@ -18,6 +18,15 @@ export type ShareLinkRow = {
   url: string
 }
 
+/** CF4: build the public viewer URL for a share token from a FIXED base URL
+ *  (server config: `env.publicUrl`), never from the request origin. Behind a
+ *  reverse proxy the request origin is the internal bind (`0.0.0.0:3000`), so a
+ *  `req`-derived link leaks the wrong host. Pure + framework-free so the route
+ *  passes `env.publicUrl` and a unit test can prove the host comes from config. */
+export function buildShareUrl(baseUrl: string, token: string): string {
+  return new URL(`/share/${token}`, baseUrl).toString()
+}
+
 /** True when the share still grants access: no expiry, or an expiry in the
  *  future relative to `now`. Mirrors shares-repo `isExpired`, on the client
  *  string shape. */

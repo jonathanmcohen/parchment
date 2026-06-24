@@ -205,15 +205,19 @@ export function MenuBar(props: MenuBarHandlers) {
   ]
 
   return (
+    // L2: the <nav> is the full-bleed bg/border/sticky box; the inner
+    // .parchment-menubar-inner re-centers the menu items at the body max-width.
     <nav className="parchment-menubar" aria-label="Editor menu bar">
-      <Menu label="File" items={fileMenu} />
-      <Menu label="Edit" items={editMenu} />
-      <Menu label="View" items={viewMenu} />
-      <Menu label="Insert" items={insertMenu} />
-      <Menu label="Format" items={formatMenu} />
-      <Menu label="Tools" items={toolsMenu} />
-      <Menu label="Extensions" items={extensionsMenu} />
-      <Menu label="Help" items={helpMenu} />
+      <div className="parchment-menubar-inner mx-auto max-w-5xl">
+        <Menu label="File" items={fileMenu} />
+        <Menu label="Edit" items={editMenu} />
+        <Menu label="View" items={viewMenu} />
+        <Menu label="Insert" items={insertMenu} />
+        <Menu label="Format" items={formatMenu} />
+        <Menu label="Tools" items={toolsMenu} />
+        <Menu label="Extensions" items={extensionsMenu} />
+        <Menu label="Help" items={helpMenu} />
+      </div>
     </nav>
   )
 }

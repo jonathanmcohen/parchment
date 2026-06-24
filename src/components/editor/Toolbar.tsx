@@ -383,869 +383,880 @@ export function Toolbar({
   ] as const
 
   return (
-    <div ref={toolbarRef} className="parchment-toolbar" role="toolbar" aria-label="Formatting">
-      {/* ── S3-3: leading actions (Undo · Redo · Print) + ⊘ placeholders ──
+    // L1: .parchment-toolbar-bleed is the full-bleed bg/border/sticky box; the
+    // inner .parchment-toolbar keeps role="toolbar" + toolbarRef (the overflow
+    // ResizeObserver measures THIS centered element's width, not the viewport)
+    // and re-centers the controls at the body max-width.
+    <div className="parchment-toolbar-bleed">
+      <div
+        ref={toolbarRef}
+        className="parchment-toolbar mx-auto max-w-5xl"
+        role="toolbar"
+        aria-label="Formatting"
+      >
+        {/* ── S3-3: leading actions (Undo · Redo · Print) + ⊘ placeholders ──
           Undo/Redo/Print are EXISTING actions; Spell check / Format painter /
           Zoom do NOT exist in the code and ship as visibly-disabled "coming
           soon" placeholders (finding #21), NOT real controls. ─────────────── */}
-      <button
-        type="button"
-        aria-label="Undo"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().undo().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          undo
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Redo"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().redo().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          redo
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Print"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={onExportPdf}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          print
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Spell check"
-        aria-disabled="true"
-        disabled
-        title="Spell check (coming soon)"
-        className="parchment-toolbar-btn"
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          spellcheck
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Format painter"
-        aria-disabled="true"
-        disabled
-        title="Format painter (coming soon)"
-        className="parchment-toolbar-btn"
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_paint
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Zoom"
-        aria-disabled="true"
-        disabled
-        title="Zoom (coming soon)"
-        className="parchment-toolbar-btn"
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          zoom_in
-        </span>
-      </button>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      {/* ── Block type selector ───────────────────────────────────────── */}
-      <label className="parchment-toolbar-label" htmlFor="toolbar-block-type">
-        Block
-        <select
-          id="toolbar-block-type"
-          aria-label="Block type"
-          value={activeBlockType}
-          onChange={(e) => {
-            handleBlockTypeChange(e.target.value)
-            e.target.focus()
-          }}
-          className="parchment-toolbar-select"
-        >
-          {BLOCK_TYPES.map((bt) => (
-            <option key={bt.value} value={bt.value}>
-              {bt.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      {/* ── G3: Named styles dropdown ─────────────────────────────────── */}
-      <StylesMenu editor={editor} />
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      {/* ── List buttons ─────────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Bullet list"
-        aria-pressed={s.bulletList}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_list_bulleted
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Numbered list"
-        aria-pressed={s.orderedList}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_list_numbered
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Task list"
-        aria-pressed={s.taskList}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleTaskList().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          checklist
-        </span>
-      </button>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      {/* ── Text alignment buttons ────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Align left"
-        aria-pressed={s.alignLeft}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().setTextAlign('left').run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_align_left
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Align center"
-        aria-pressed={s.alignCenter}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().setTextAlign('center').run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_align_center
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Align right"
-        aria-pressed={s.alignRight}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().setTextAlign('right').run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_align_right
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Justify"
-        aria-pressed={s.alignJustify}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_align_justify
-        </span>
-      </button>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      {/* ── First-line indent ─────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="First-line indent"
-        aria-pressed={s.firstLineIndent}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleFirstLineIndent().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_indent_increase
-        </span>
-      </button>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      {/* ── Inline marks ─────────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Bold"
-        aria-pressed={s.bold}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleBold().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_bold
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Italic"
-        aria-pressed={s.italic}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_italic
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Underline"
-        aria-pressed={s.underline}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleUnderline().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_underlined
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Strikethrough"
-        aria-pressed={s.strike}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleStrike().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_strikethrough
-        </span>
-      </button>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      <button
-        type="button"
-        aria-label="Subscript"
-        aria-pressed={s.subscript}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleSubscript().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          subscript
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Superscript"
-        aria-pressed={s.superscript}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleSuperscript().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          superscript
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Inline code"
-        aria-pressed={s.code}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleCode().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          code
-        </span>
-      </button>
-      <button
-        type="button"
-        aria-label="Highlight"
-        aria-pressed={s.highlight}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().toggleHighlight().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          format_ink_highlighter
-        </span>
-      </button>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      <label className="parchment-toolbar-label" htmlFor="toolbar-color">
-        Color
-        <input
-          id="toolbar-color"
-          type="color"
-          aria-label="Text color"
-          value={s.color ?? '#000000'}
-          onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
-          className="parchment-color-input"
-        />
-      </label>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      <label className="parchment-toolbar-label" htmlFor="toolbar-font-family">
-        Font
-        <select
-          id="toolbar-font-family"
-          aria-label="Font family"
-          value={s.fontFamily ?? ''}
-          onChange={(e) =>
-            e.target.value === ''
-              ? editor.chain().focus().unsetFontFamily().run()
-              : editor.chain().focus().setFontFamily(e.target.value).run()
-          }
-          className="parchment-toolbar-select"
-        >
-          {FONT_FAMILIES.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      <label className="parchment-toolbar-label" htmlFor="toolbar-font-size">
-        Size
-        <input
-          id="toolbar-font-size"
-          type="number"
-          aria-label="Font size"
-          min={1}
-          max={999}
-          value={sizeValue}
-          onChange={(e) => {
-            const v = Number.parseInt(e.target.value, 10)
-            if (!Number.isNaN(v) && v > 0) applySize(v, sizeUnit)
-          }}
-          className="parchment-size-input"
-        />
         <button
           type="button"
-          aria-label={`Font size unit: ${sizeUnit}, click to toggle`}
-          className="parchment-unit-btn"
+          aria-label="Undo"
+          className="parchment-toolbar-btn"
           onMouseDown={keepSelection}
-          onClick={() => applySize(sizeValue, sizeUnit === 'pt' ? 'px' : 'pt')}
+          onClick={() => editor.chain().focus().undo().run()}
         >
-          {sizeUnit}
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            undo
+          </span>
         </button>
-      </label>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      <label className="parchment-toolbar-label" htmlFor="toolbar-line-height">
-        Line
-        <select
-          id="toolbar-line-height"
-          aria-label="Line height"
-          value={s.lineHeight ?? ''}
-          onChange={(e) =>
-            e.target.value === ''
-              ? editor.chain().focus().unsetLineHeight().run()
-              : editor.chain().focus().setLineHeight(e.target.value).run()
-          }
-          className="parchment-toolbar-select"
+        <button
+          type="button"
+          aria-label="Redo"
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().redo().run()}
         >
-          <option value="">Default</option>
-          {LINE_HEIGHTS.map((lh) => (
-            <option key={lh.value} value={lh.value}>
-              {lh.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      <label className="parchment-toolbar-label" htmlFor="toolbar-letter-spacing">
-        Spacing
-        <select
-          id="toolbar-letter-spacing"
-          aria-label="Letter spacing"
-          value={s.letterSpacing ?? ''}
-          onChange={(e) =>
-            e.target.value === ''
-              ? editor.chain().focus().unsetLetterSpacing().run()
-              : editor.chain().focus().setLetterSpacing(e.target.value).run()
-          }
-          className="parchment-toolbar-select"
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            redo
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Print"
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={onExportPdf}
         >
-          <option value="">Default</option>
-          {LETTER_SPACINGS.map((ls) => (
-            <option key={ls.value} value={ls.value}>
-              {ls.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            print
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Spell check"
+          aria-disabled="true"
+          disabled
+          title="Spell check (coming soon)"
+          className="parchment-toolbar-btn"
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            spellcheck
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Format painter"
+          aria-disabled="true"
+          disabled
+          title="Format painter (coming soon)"
+          className="parchment-toolbar-btn"
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_paint
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom"
+          aria-disabled="true"
+          disabled
+          title="Zoom (coming soon)"
+          className="parchment-toolbar-btn"
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            zoom_in
+          </span>
+        </button>
 
-      {/* ── Code block language picker (visible only when codeBlock is active) ── */}
-      {s.codeBlock && (
-        <>
-          <span className="parchment-toolbar-sep" aria-hidden="true" />
-          <label className="parchment-toolbar-label" htmlFor="toolbar-code-language">
-            Lang
-            <select
-              id="toolbar-code-language"
-              aria-label="Code block language"
-              value={s.codeLanguage ?? ''}
-              onChange={(e) => {
-                const chosen = e.target.value
-                if (chosen === AUTO_DETECT_VALUE) {
-                  // Read active code block text and detect its language.
-                  const text = getActiveCodeBlockText(editor) ?? ''
-                  const { language } = detectLanguage(text)
-                  editor.chain().focus().updateAttributes('codeBlock', { language }).run()
-                } else {
-                  editor.chain().focus().updateAttributes('codeBlock', { language: chosen }).run()
-                }
-              }}
-              className="parchment-toolbar-select"
-            >
-              {CODE_LANGUAGES.map((lang) => (
-                <option key={lang.value} value={lang.value}>
-                  {lang.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </>
-      )}
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
+        {/* ── Block type selector ───────────────────────────────────────── */}
+        <label className="parchment-toolbar-label" htmlFor="toolbar-block-type">
+          Block
+          <select
+            id="toolbar-block-type"
+            aria-label="Block type"
+            value={activeBlockType}
+            onChange={(e) => {
+              handleBlockTypeChange(e.target.value)
+              e.target.focus()
+            }}
+            className="parchment-toolbar-select"
+          >
+            {BLOCK_TYPES.map((bt) => (
+              <option key={bt.value} value={bt.value}>
+                {bt.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
-      {/* ── Insert table (B4) ────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Insert table"
-        aria-pressed={s.table}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() =>
-          editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
-        }
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          table
-        </span>
-      </button>
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
+        {/* ── G3: Named styles dropdown ─────────────────────────────────── */}
+        <StylesMenu editor={editor} />
 
-      {/* ── Insert image (B5) ────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Insert image"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => onInsertImage()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          image
-        </span>
-      </button>
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* ── Crop image (enabled when an image node is selected) ───────── */}
-      <button
-        type="button"
-        aria-label="Crop image"
-        className="parchment-toolbar-btn"
-        disabled={!s.image}
-        onMouseDown={keepSelection}
-        onClick={() => onCropImage()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          crop
-        </span>
-      </button>
+        {/* ── List buttons ─────────────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Bullet list"
+          aria-pressed={s.bulletList}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_list_bulleted
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Numbered list"
+          aria-pressed={s.orderedList}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_list_numbered
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Task list"
+          aria-pressed={s.taskList}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleTaskList().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            checklist
+          </span>
+        </button>
 
-      {/* ── Link (B6) ────────────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Link"
-        aria-pressed={s.link}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={onOpenLink}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          add_link
-        </span>
-      </button>
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
+        {/* ── Text alignment buttons ────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Align left"
+          aria-pressed={s.alignLeft}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().setTextAlign('left').run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_align_left
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Align center"
+          aria-pressed={s.alignCenter}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().setTextAlign('center').run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_align_center
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Align right"
+          aria-pressed={s.alignRight}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().setTextAlign('right').run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_align_right
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Justify"
+          aria-pressed={s.alignJustify}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_align_justify
+          </span>
+        </button>
 
-      {/* ── Insert table of contents (B7) ────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Insert table of contents"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().insertToc().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          toc
-        </span>
-      </button>
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
+        {/* ── First-line indent ─────────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="First-line indent"
+          aria-pressed={s.firstLineIndent}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleFirstLineIndent().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_indent_increase
+          </span>
+        </button>
 
-      {/* ── Insert footnote (B8) ─────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Insert footnote"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().insertFootnote().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          note_add
-        </span>
-      </button>
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
+        {/* ── Inline marks ─────────────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Bold"
+          aria-pressed={s.bold}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_bold
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Italic"
+          aria-pressed={s.italic}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_italic
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Underline"
+          aria-pressed={s.underline}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_underlined
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Strikethrough"
+          aria-pressed={s.strike}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_strikethrough
+          </span>
+        </button>
 
-      {/* ── Insert page break (B13) ──────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Insert page break"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().insertPageBreak().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          insert_page_break
-        </span>
-      </button>
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* ── Insert section break (B13) ───────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Insert section break"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={() => editor.chain().focus().insertSectionBreak().run()}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          newspaper
-        </span>
-      </button>
+        <button
+          type="button"
+          aria-label="Subscript"
+          aria-pressed={s.subscript}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleSubscript().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            subscript
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Superscript"
+          aria-pressed={s.superscript}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleSuperscript().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            superscript
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Inline code"
+          aria-pressed={s.code}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleCode().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            code
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Highlight"
+          aria-pressed={s.highlight}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().toggleHighlight().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            format_ink_highlighter
+          </span>
+        </button>
 
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* ── S3-3: Page setup / Watermark / Custom CSS — secondary actions
+        <label className="parchment-toolbar-label" htmlFor="toolbar-color">
+          Color
+          <input
+            id="toolbar-color"
+            type="color"
+            aria-label="Text color"
+            value={s.color ?? '#000000'}
+            onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+            className="parchment-color-input"
+          />
+        </label>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        <label className="parchment-toolbar-label" htmlFor="toolbar-font-family">
+          Font
+          <select
+            id="toolbar-font-family"
+            aria-label="Font family"
+            value={s.fontFamily ?? ''}
+            onChange={(e) =>
+              e.target.value === ''
+                ? editor.chain().focus().unsetFontFamily().run()
+                : editor.chain().focus().setFontFamily(e.target.value).run()
+            }
+            className="parchment-toolbar-select"
+          >
+            {FONT_FAMILIES.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        <label className="parchment-toolbar-label" htmlFor="toolbar-font-size">
+          Size
+          <input
+            id="toolbar-font-size"
+            type="number"
+            aria-label="Font size"
+            min={1}
+            max={999}
+            value={sizeValue}
+            onChange={(e) => {
+              const v = Number.parseInt(e.target.value, 10)
+              if (!Number.isNaN(v) && v > 0) applySize(v, sizeUnit)
+            }}
+            className="parchment-size-input"
+          />
+          <button
+            type="button"
+            aria-label={`Font size unit: ${sizeUnit}, click to toggle`}
+            className="parchment-unit-btn"
+            onMouseDown={keepSelection}
+            onClick={() => applySize(sizeValue, sizeUnit === 'pt' ? 'px' : 'pt')}
+          >
+            {sizeUnit}
+          </button>
+        </label>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        <label className="parchment-toolbar-label" htmlFor="toolbar-line-height">
+          Line
+          <select
+            id="toolbar-line-height"
+            aria-label="Line height"
+            value={s.lineHeight ?? ''}
+            onChange={(e) =>
+              e.target.value === ''
+                ? editor.chain().focus().unsetLineHeight().run()
+                : editor.chain().focus().setLineHeight(e.target.value).run()
+            }
+            className="parchment-toolbar-select"
+          >
+            <option value="">Default</option>
+            {LINE_HEIGHTS.map((lh) => (
+              <option key={lh.value} value={lh.value}>
+                {lh.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        <label className="parchment-toolbar-label" htmlFor="toolbar-letter-spacing">
+          Spacing
+          <select
+            id="toolbar-letter-spacing"
+            aria-label="Letter spacing"
+            value={s.letterSpacing ?? ''}
+            onChange={(e) =>
+              e.target.value === ''
+                ? editor.chain().focus().unsetLetterSpacing().run()
+                : editor.chain().focus().setLetterSpacing(e.target.value).run()
+            }
+            className="parchment-toolbar-select"
+          >
+            <option value="">Default</option>
+            {LETTER_SPACINGS.map((ls) => (
+              <option key={ls.value} value={ls.value}>
+                {ls.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* ── Code block language picker (visible only when codeBlock is active) ── */}
+        {s.codeBlock && (
+          <>
+            <span className="parchment-toolbar-sep" aria-hidden="true" />
+            <label className="parchment-toolbar-label" htmlFor="toolbar-code-language">
+              Lang
+              <select
+                id="toolbar-code-language"
+                aria-label="Code block language"
+                value={s.codeLanguage ?? ''}
+                onChange={(e) => {
+                  const chosen = e.target.value
+                  if (chosen === AUTO_DETECT_VALUE) {
+                    // Read active code block text and detect its language.
+                    const text = getActiveCodeBlockText(editor) ?? ''
+                    const { language } = detectLanguage(text)
+                    editor.chain().focus().updateAttributes('codeBlock', { language }).run()
+                  } else {
+                    editor.chain().focus().updateAttributes('codeBlock', { language: chosen }).run()
+                  }
+                }}
+                className="parchment-toolbar-select"
+              >
+                {CODE_LANGUAGES.map((lang) => (
+                  <option key={lang.value} value={lang.value}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── Insert table (B4) ────────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Insert table"
+          aria-pressed={s.table}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() =>
+            editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+          }
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            table
+          </span>
+        </button>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── Insert image (B5) ────────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Insert image"
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => onInsertImage()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            image
+          </span>
+        </button>
+
+        {/* ── Crop image (enabled when an image node is selected) ───────── */}
+        <button
+          type="button"
+          aria-label="Crop image"
+          className="parchment-toolbar-btn"
+          disabled={!s.image}
+          onMouseDown={keepSelection}
+          onClick={() => onCropImage()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            crop
+          </span>
+        </button>
+
+        {/* ── Link (B6) ────────────────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Link"
+          aria-pressed={s.link}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={onOpenLink}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            add_link
+          </span>
+        </button>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── Insert table of contents (B7) ────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Insert table of contents"
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().insertToc().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            toc
+          </span>
+        </button>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── Insert footnote (B8) ─────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Insert footnote"
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().insertFootnote().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            note_add
+          </span>
+        </button>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── Insert page break (B13) ──────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Insert page break"
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().insertPageBreak().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            insert_page_break
+          </span>
+        </button>
+
+        {/* ── Insert section break (B13) ───────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Insert section break"
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={() => editor.chain().focus().insertSectionBreak().run()}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            newspaper
+          </span>
+        </button>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── S3-3: Page setup / Watermark / Custom CSS — secondary actions
           that move into the `⋯` overflow menu when the toolbar is narrow.
           Rendered inline ONLY when not overflowed (each appears exactly once,
           inline OR in `⋯`). ──────────────────────────────────────────────── */}
-      {!overflowed && (
-        <>
-          {/* ── Page setup (B14) ─────────────────────────────────────────── */}
-          <button
-            type="button"
-            aria-label="Page setup"
-            data-toolbar-secondary
-            className="parchment-toolbar-btn"
-            onMouseDown={keepSelection}
-            onClick={(e) => {
-              e.preventDefault()
-              onOpenPageSetup()
-            }}
-          >
-            <span aria-hidden className="material-symbols-rounded text-[20px]">
-              settings_overscan
-            </span>
-          </button>
+        {!overflowed && (
+          <>
+            {/* ── Page setup (B14) ─────────────────────────────────────────── */}
+            <button
+              type="button"
+              aria-label="Page setup"
+              data-toolbar-secondary
+              className="parchment-toolbar-btn"
+              onMouseDown={keepSelection}
+              onClick={(e) => {
+                e.preventDefault()
+                onOpenPageSetup()
+              }}
+            >
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                settings_overscan
+              </span>
+            </button>
 
-          {/* ── G9: Watermark ────────────────────────────────────────────── */}
-          <button
-            type="button"
-            aria-label="Watermark"
-            data-toolbar-secondary
-            className="parchment-toolbar-btn"
-            onMouseDown={keepSelection}
-            onClick={(e) => {
-              e.preventDefault()
-              onOpenWatermark()
-            }}
-          >
-            <span aria-hidden className="material-symbols-rounded text-[20px]">
-              branding_watermark
-            </span>
-          </button>
+            {/* ── G9: Watermark ────────────────────────────────────────────── */}
+            <button
+              type="button"
+              aria-label="Watermark"
+              data-toolbar-secondary
+              className="parchment-toolbar-btn"
+              onMouseDown={keepSelection}
+              onClick={(e) => {
+                e.preventDefault()
+                onOpenWatermark()
+              }}
+            >
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                branding_watermark
+              </span>
+            </button>
 
-          {/* ── G17: Custom CSS ─────────────────────────────────────────── */}
-          <button
-            type="button"
-            aria-label="Custom CSS"
-            data-toolbar-secondary
-            className="parchment-toolbar-btn"
-            onMouseDown={keepSelection}
-            onClick={(e) => {
-              e.preventDefault()
-              onOpenCustomCss()
-            }}
-          >
-            <span aria-hidden className="material-symbols-rounded text-[20px]">
-              css
-            </span>
-          </button>
-        </>
-      )}
-
-      {/* ── Table context controls (visible when cursor is in a table) ── */}
-      {s.table && (
-        <>
-          <span className="parchment-toolbar-sep" aria-hidden="true" />
-          <TableControls editor={editor} />
-        </>
-      )}
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      {/* ── D1: Toggle comments sidebar ───────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Toggle comments"
-        aria-pressed={commentsSidebarOpen}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={onToggleComments}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          comment
-        </span>
-      </button>
-
-      {/* ── D3: Toggle version history panel ─────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Version history"
-        aria-pressed={versionHistoryOpen}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={onToggleVersionHistory}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          history
-        </span>
-      </button>
-
-      {/* ── F6: Toggle backlinks panel ───────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Backlinks"
-        aria-pressed={backlinksOpen}
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={onToggleBacklinks}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          call_received
-        </span>
-      </button>
-
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-      {/* ── D2: Suggesting mode toggle ────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Suggesting mode"
-        aria-pressed={suggestionsOpen}
-        className={`parchment-toolbar-btn${s.suggesting ? ' parchment-toolbar-btn--suggesting' : ''}`}
-        onMouseDown={keepSelection}
-        onClick={() => {
-          editor.chain().focus().toggleSuggesting().run()
-          onToggleSuggestions()
-        }}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          edit_note
-        </span>
-        {s.suggesting && (
-          <span className="parchment-suggesting-indicator" aria-hidden="true">
-            ON
-          </span>
+            {/* ── G17: Custom CSS ─────────────────────────────────────────── */}
+            <button
+              type="button"
+              aria-label="Custom CSS"
+              data-toolbar-secondary
+              className="parchment-toolbar-btn"
+              onMouseDown={keepSelection}
+              onClick={(e) => {
+                e.preventDefault()
+                onOpenCustomCss()
+              }}
+            >
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                css
+              </span>
+            </button>
+          </>
         )}
-      </button>
 
-      {/* ── K7: Grammar check toggle (LanguageTool) ─────────────────────
-          Rendered ONLY when LanguageTool is enabled server-side; absent
-          entirely otherwise so a disabled instance shows no grammar action. */}
-      {grammarEnabled && onToggleGrammar && (
+        {/* ── Table context controls (visible when cursor is in a table) ── */}
+        {s.table && (
+          <>
+            <span className="parchment-toolbar-sep" aria-hidden="true" />
+            <TableControls editor={editor} />
+          </>
+        )}
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── D1: Toggle comments sidebar ───────────────────────────────── */}
         <button
           type="button"
-          aria-label="Grammar check"
-          aria-pressed={grammarOpen}
+          aria-label="Toggle comments"
+          aria-pressed={commentsSidebarOpen}
           className="parchment-toolbar-btn"
           onMouseDown={keepSelection}
-          onClick={onToggleGrammar}
+          onClick={onToggleComments}
         >
           <span aria-hidden className="material-symbols-rounded text-[20px]">
-            fact_check
+            comment
           </span>
         </button>
-      )}
 
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
+        {/* ── D3: Toggle version history panel ─────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Version history"
+          aria-pressed={versionHistoryOpen}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={onToggleVersionHistory}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            history
+          </span>
+        </button>
 
-      {/* ── G1: Share document ────────────────────────────────────────── */}
-      <button
-        type="button"
-        aria-label="Share"
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={onOpenShare}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          share
-        </span>
-      </button>
+        {/* ── F6: Toggle backlinks panel ───────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Backlinks"
+          aria-pressed={backlinksOpen}
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={onToggleBacklinks}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            call_received
+          </span>
+        </button>
 
-      <span className="parchment-toolbar-sep" aria-hidden="true" />
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-      {/* ── S3-3: Reading / Presenter — secondary actions; inline only when not
+        {/* ── D2: Suggesting mode toggle ────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Suggesting mode"
+          aria-pressed={suggestionsOpen}
+          className={`parchment-toolbar-btn${s.suggesting ? ' parchment-toolbar-btn--suggesting' : ''}`}
+          onMouseDown={keepSelection}
+          onClick={() => {
+            editor.chain().focus().toggleSuggesting().run()
+            onToggleSuggestions()
+          }}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            edit_note
+          </span>
+          {s.suggesting && (
+            <span className="parchment-suggesting-indicator" aria-hidden="true">
+              ON
+            </span>
+          )}
+        </button>
+
+        {/* ── K7: Grammar check toggle (LanguageTool) ─────────────────────
+          Rendered ONLY when LanguageTool is enabled server-side; absent
+          entirely otherwise so a disabled instance shows no grammar action. */}
+        {grammarEnabled && onToggleGrammar && (
+          <button
+            type="button"
+            aria-label="Grammar check"
+            aria-pressed={grammarOpen}
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={onToggleGrammar}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              fact_check
+            </span>
+          </button>
+        )}
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── G1: Share document ────────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Share"
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={onOpenShare}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            share
+          </span>
+        </button>
+
+        <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── S3-3: Reading / Presenter — secondary actions; inline only when not
           overflowed (otherwise they live in the `⋯` menu, once each). ─────── */}
-      {!overflowed && (
-        <>
-          {/* ── G15: Reading mode toggle ─────────────────────────────────── */}
-          <button
-            type="button"
-            aria-label="Reading mode"
-            aria-pressed={readingOpen}
-            data-toolbar-secondary
-            className="parchment-toolbar-btn"
-            onMouseDown={keepSelection}
-            onClick={onToggleReading}
-          >
-            <span aria-hidden className="material-symbols-rounded text-[20px]">
-              menu_book
-            </span>
-          </button>
+        {!overflowed && (
+          <>
+            {/* ── G15: Reading mode toggle ─────────────────────────────────── */}
+            <button
+              type="button"
+              aria-label="Reading mode"
+              aria-pressed={readingOpen}
+              data-toolbar-secondary
+              className="parchment-toolbar-btn"
+              onMouseDown={keepSelection}
+              onClick={onToggleReading}
+            >
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                menu_book
+              </span>
+            </button>
 
-          {/* ── G16: Presenter mode toggle (F5 fallback) ─────────────────── */}
-          <button
-            type="button"
-            aria-label="Presenter mode"
-            aria-pressed={presenterOpen}
-            data-toolbar-secondary
-            className="parchment-toolbar-btn"
-            onMouseDown={keepSelection}
-            onClick={onTogglePresenter}
-          >
-            <span aria-hidden className="material-symbols-rounded text-[20px]">
-              slideshow
-            </span>
-          </button>
-        </>
-      )}
+            {/* ── G16: Presenter mode toggle (F5 fallback) ─────────────────── */}
+            <button
+              type="button"
+              aria-label="Presenter mode"
+              aria-pressed={presenterOpen}
+              data-toolbar-secondary
+              className="parchment-toolbar-btn"
+              onMouseDown={keepSelection}
+              onClick={onTogglePresenter}
+            >
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                slideshow
+              </span>
+            </button>
+          </>
+        )}
 
-      {/* ── I2 Part 3: Vim markdown source mode toggle ───────────────── */}
-      <button
-        type="button"
-        aria-label="Vim source mode"
-        aria-pressed={sourceModeOpen}
-        disabled={sourceModeDisabled}
-        title={
-          sourceModeDisabled
-            ? 'Source mode is unavailable while collaborating with others'
-            : 'Edit Markdown source (Vim)'
-        }
-        className="parchment-toolbar-btn"
-        onMouseDown={keepSelection}
-        onClick={onToggleSourceMode}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          terminal
-        </span>
-      </button>
+        {/* ── I2 Part 3: Vim markdown source mode toggle ───────────────── */}
+        <button
+          type="button"
+          aria-label="Vim source mode"
+          aria-pressed={sourceModeOpen}
+          disabled={sourceModeDisabled}
+          title={
+            sourceModeDisabled
+              ? 'Source mode is unavailable while collaborating with others'
+              : 'Edit Markdown source (Vim)'
+          }
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={onToggleSourceMode}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            terminal
+          </span>
+        </button>
 
-      {/* ── S3-4: the standalone Export fieldset is removed. All formats now
+        {/* ── S3-4: the standalone Export fieldset is removed. All formats now
           live under File → Download in the menu bar (S3-2), which reuses the
           SAME export hrefs + onExportPdf wiring this strip used. No export logic
           changed — the v0.1.0 export registry is untouched. ──────────────── */}
 
-      {/* ── G10: Voice typing ─────────────────────────────────────────── */}
-      <VoiceButton editor={editor} />
+        {/* ── G10: Voice typing ─────────────────────────────────────────── */}
+        <VoiceButton editor={editor} />
 
-      {/* ── S3-3: overflow `⋯` — holds the secondary actions hidden at narrow
+        {/* ── S3-3: overflow `⋯` — holds the secondary actions hidden at narrow
           widths (the SAME items removed from inline above; once each). Reuses
           the shared S3-2 Menu primitive. ────────────────────────────────── */}
-      {overflowed && (
-        <Menu
-          label="More"
-          items={[...overflowItems]}
-          triggerClassName="parchment-toolbar-btn parchment-toolbar-overflow"
-          triggerAriaLabel="More tools"
-          triggerContent={
-            <span aria-hidden className="material-symbols-rounded text-[20px]">
-              more_horiz
-            </span>
-          }
-        />
-      )}
+        {overflowed && (
+          <Menu
+            label="More"
+            items={[...overflowItems]}
+            triggerClassName="parchment-toolbar-btn parchment-toolbar-overflow"
+            triggerAriaLabel="More tools"
+            triggerContent={
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                more_horiz
+              </span>
+            }
+          />
+        )}
 
-      {/* ── S5-10: Editing / Suggesting / Viewing mode dropdown (right end).
+        {/* ── S5-10: Editing / Suggesting / Viewing mode dropdown (right end).
           Reuses the shared `.px-menu` Menu primitive (S5-3). Each row flips an
           EXISTING flag — Suggesting → the D2 track-changes plugin, Viewing →
           editor.setEditable(false). No new editing logic. The trailing margin
           pushes it to the right edge (after the overflow ⋯ when present). */}
-      <Menu
-        label={modeLabel}
-        triggerClassName="parchment-toolbar-btn parchment-toolbar-mode"
-        triggerAriaLabel={`Editing mode: ${modeLabel}`}
-        triggerContent={
-          <span className="parchment-toolbar-mode-trigger">
-            <span aria-hidden className="material-symbols-rounded text-[20px]">
-              {modeIcon}
+        <Menu
+          label={modeLabel}
+          triggerClassName="parchment-toolbar-btn parchment-toolbar-mode"
+          triggerAriaLabel={`Editing mode: ${modeLabel}`}
+          triggerContent={
+            <span className="parchment-toolbar-mode-trigger">
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                {modeIcon}
+              </span>
+              <span className="parchment-toolbar-mode-label">{modeLabel}</span>
             </span>
-            <span className="parchment-toolbar-mode-label">{modeLabel}</span>
-          </span>
-        }
-        items={(
-          [
-            { label: 'Editing', icon: 'edit', mode: 'editing' as const },
-            { label: 'Suggesting', icon: 'edit_note', mode: 'suggesting' as const },
-            { label: 'Viewing', icon: 'visibility', mode: 'viewing' as const },
-          ] satisfies { label: string; icon: string; mode: typeof activeMode }[]
-        ).map(({ label, icon, mode }) => ({
-          label,
-          icon,
-          // Only attach `hint` when this is the current mode (exactOptionalPropertyTypes).
-          ...(activeMode === mode ? { hint: 'Current' } : {}),
-          onSelect: () => selectMode(mode),
-        }))}
-      />
+          }
+          items={(
+            [
+              { label: 'Editing', icon: 'edit', mode: 'editing' as const },
+              { label: 'Suggesting', icon: 'edit_note', mode: 'suggesting' as const },
+              { label: 'Viewing', icon: 'visibility', mode: 'viewing' as const },
+            ] satisfies { label: string; icon: string; mode: typeof activeMode }[]
+          ).map(({ label, icon, mode }) => ({
+            label,
+            icon,
+            // Only attach `hint` when this is the current mode (exactOptionalPropertyTypes).
+            ...(activeMode === mode ? { hint: 'Current' } : {}),
+            onSelect: () => selectMode(mode),
+          }))}
+        />
+      </div>
     </div>
   )
 }

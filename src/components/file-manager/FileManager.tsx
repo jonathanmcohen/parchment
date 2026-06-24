@@ -1273,7 +1273,12 @@ function DocListRow({
       <div
         className={[
           'group/row flex items-center justify-between py-2 gap-2 rounded px-1',
-          selected ? 'bg-[var(--selection-bg)]' : '',
+          // LT6-1: active/selected row = the --primary-surface pill (matches the
+          // sidebar NavRow active pill); AA in light + dark via
+          // --primary-surface-text. LT6-2: idle rows hover to --surface-hover.
+          selected
+            ? 'bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
+            : 'group-hover/row:bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)]',
         ].join(' ')}
         onClick={(e) => {
           // Ignore clicks that originate on the interactive children (checkbox,
@@ -1487,8 +1492,9 @@ function DocList({
                 onDoubleClick={() => onOpen(doc.id)}
                 className={[
                   'flex flex-col gap-1 p-3 pl-8 border rounded-lg transition-colors h-full',
+                  // LT6-1: active grid card = --primary-surface pill (AA light + dark).
                   selected.has(doc.id)
-                    ? 'border-[var(--primary)] bg-[var(--selection-bg)]'
+                    ? 'border-[var(--primary)] bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
                     : 'border-[var(--border)] bg-[var(--paper)] hover:border-[var(--primary)]',
                 ].join(' ')}
               >
@@ -1599,7 +1605,10 @@ function DocList({
             }}
             className={[
               'group/row border-b border-[var(--border)]',
-              selected.has(doc.id) ? 'bg-[var(--selection-bg)]' : 'hover:bg-[var(--surface-hover)]',
+              // LT6-1: active details row = --primary-surface pill (AA light + dark).
+              selected.has(doc.id)
+                ? 'bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
+                : 'hover:bg-[var(--surface-hover)]',
             ].join(' ')}
           >
             <td className="py-2 pr-2">
@@ -1623,10 +1632,12 @@ function DocList({
                 <span className="truncate">{doc.title}</span>
               </a>
             </td>
-            <td className="py-2 pr-3 text-[var(--muted)] text-xs whitespace-nowrap">
+            {/* LT6-5: fixed-width (w-24 / 96px) left-aligned date columns so the
+                Modified/Created columns don't jitter as dates vary in length. */}
+            <td className="w-24 py-2 pr-3 text-left text-[var(--muted)] text-xs whitespace-nowrap">
               <time dateTime={doc.updatedAt}>{fmt.format(new Date(doc.updatedAt))}</time>
             </td>
-            <td className="py-2 pr-3 text-[var(--muted)] text-xs whitespace-nowrap">
+            <td className="w-24 py-2 pr-3 text-left text-[var(--muted)] text-xs whitespace-nowrap">
               <time dateTime={doc.createdAt}>{fmt.format(new Date(doc.createdAt))}</time>
             </td>
             <td className="py-2 pr-3 text-[var(--muted)] text-xs" aria-label={`${doc.size} chars`}>
@@ -1687,7 +1698,11 @@ function AllViewDocRow({
     <div
       className={[
         'group/row flex items-center justify-between py-2 gap-2 rounded px-1',
-        selected ? 'bg-[var(--selection-bg)]' : '',
+        // LT6-1: active all-view row = --primary-surface pill (AA light + dark).
+        // LT6-2: idle rows hover to --surface-hover (was no hover bg).
+        selected
+          ? 'bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
+          : 'group-hover/row:bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)]',
       ].join(' ')}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest('a,button,input')) return

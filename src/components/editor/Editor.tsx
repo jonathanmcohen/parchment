@@ -999,18 +999,29 @@ export function Editor({
   // selection changes without extra state variables.
   const counts = useEditorState({
     editor,
-    selector: (ctx): { full: Counts; selection: Counts | null } => {
-      if (!ctx.editor) return { full: { words: 0, chars: 0 }, selection: null }
+    selector: (
+      ctx,
+    ): { full: Counts; selection: Counts | null; mode: 'editing' | 'suggesting' | 'viewing' } => {
+      if (!ctx.editor) return { full: { words: 0, chars: 0 }, selection: null, mode: 'editing' }
       const full = countText(ctx.editor.getText())
       const { from, to } = ctx.editor.state.selection
       const selectionText = from === to ? null : ctx.editor.state.doc.textBetween(from, to, ' ')
       const selection = selectionText !== null ? countText(selectionText) : null
-      return { full, selection }
+      // LT5-2: derive the live editing mode the same way the Toolbar dropdown
+      // does (Toolbar.tsx:249) — non-editable → viewing, D2 suggesting plugin
+      // enabled → suggesting, else editing. No new mode state is introduced.
+      const mode: 'editing' | 'suggesting' | 'viewing' = !ctx.editor.isEditable
+        ? 'viewing'
+        : ctx.editor.storage.suggesting?.enabled === true
+          ? 'suggesting'
+          : 'editing'
+      return { full, selection, mode }
     },
   })
 
   const full: Counts = counts?.full ?? { words: 0, chars: 0 }
   const selection: Counts | null = counts?.selection ?? null
+  const editorMode: 'editing' | 'suggesting' | 'viewing' = counts?.mode ?? 'editing'
 
   // S3-6: the connection state (online/syncing/offline) that the standalone
   // OfflineIndicator pill used to render — now a dot in the status bar's right
@@ -1641,6 +1652,7 @@ export function Editor({
           selection={selection}
           readers={readers.map((r) => r.user)}
           connection={connection}
+          mode={editorMode}
           onOpenWordCount={() => setWordCountOpen(true)}
         />
 

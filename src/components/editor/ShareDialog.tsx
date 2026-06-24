@@ -264,12 +264,17 @@ export function ShareDialog({ docId, onClose }: Props) {
     [reload],
   )
 
-  const handleCopyRow = useCallback(
-    async (url: string) => {
-      await copyLink(url)
-    },
-    [copyLink],
-  )
+  // LT7-1: select the whole URL on click via the Selection API (NOT the
+  // deprecated execCommand) so the user can copy it with the keyboard. Operates
+  // on the clicked <code> element directly — no document.execCommand('selectAll').
+  const handleSelectUrl = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    const selection = window.getSelection()
+    if (!selection) return
+    const range = document.createRange()
+    range.selectNodeContents(e.currentTarget)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }, [])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') onClose()
@@ -459,7 +464,18 @@ export function ShareDialog({ docId, onClose }: Props) {
             {shares.map((row) => (
               <li key={row.id} className="parchment-share-list-item">
                 <div className="parchment-share-list-meta">
-                  <code className="parchment-share-list-url">{row.url}</code>
+                  {/* LT7-1: click selects the whole URL (Selection API) so it can
+                      be copied with the keyboard. LT7-2: the per-row Copy button
+                      is gone — the single primary "Copy link" above is the one
+                      Copy affordance; this row keeps status + Revoke only. */}
+                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: select-all is a pointer convenience; the URL text is also keyboard-selectable natively and the primary "Copy link" button is the keyboard-accessible copy path */}
+                  <code
+                    className="parchment-share-list-url cursor-pointer"
+                    onClick={handleSelectUrl}
+                    title="Click to select the full link"
+                  >
+                    {row.url}
+                  </code>
                   <span className="parchment-share-list-tags">
                     {row.permission}
                     {row.hasPassword ? ' · password' : ''}
@@ -469,13 +485,6 @@ export function ShareDialog({ docId, onClose }: Props) {
                   </span>
                 </div>
                 <div className="parchment-share-list-actions">
-                  <button
-                    type="button"
-                    className="parchment-dialog-btn-secondary"
-                    onClick={() => void handleCopyRow(row.url)}
-                  >
-                    Copy
-                  </button>
                   <button
                     type="button"
                     className="parchment-dialog-btn-secondary"

@@ -27,6 +27,17 @@
   --muted: #5f6368;
   --paper: #ffffff;
 
+  /* F2: page-scoped ink — contrasts the PAGE canvas (white/sepia sheet), NOT the
+     chrome scheme. The page stays a light sheet in light AND dark chrome (pageBg
+     defaults to white and is NOT flipped by colorScheme), so prose ink must stay
+     DARK. Deliberately NOT overridden in the dark/system-dark blocks below: page
+     ink is scheme-INDEPENDENT for the normal schemes. Only the HC blocks (whose
+     --page-bg actually flips to black) re-point it. The chrome --foreground
+     (#E8EAED in dark) is the LIGHT ink for a dark background — using it on the
+     white page produced unreadable light-grey-on-white prose (the F2 bug). */
+  --page-ink: #202124;
+  --page-ink-muted: #5f6368;
+
   /* FIXED brand — chrome only; the picker can NEVER repaint these */
   --primary: #1a73e8;
   --primary-hover: #1765cc;
@@ -228,6 +239,9 @@
   --border: #000000;
   --border-chrome: #000000;
   --page-bg: #ffffff;
+  /* F2: HC-light page is white → keep black ink (AAA). */
+  --page-ink: #000000;
+  --page-ink-muted: #1a1a1a;
 }
 
 /* Dark high-contrast — forced dark, or system + OS dark. */
@@ -249,6 +263,9 @@
   --border: #ffffff;
   --border-chrome: #ffffff;
   --page-bg: #000000;
+  /* F2: HC-dark page is BLACK → ink must flip WHITE (AAA). */
+  --page-ink: #ffffff;
+  --page-ink-muted: #e8e8e8;
 }
 @media (prefers-color-scheme: dark) {
   [data-high-contrast="true"][data-color-scheme="system"] {
@@ -269,6 +286,9 @@
     --border: #ffffff;
     --border-chrome: #ffffff;
     --page-bg: #000000;
+    /* F2: HC-dark page is BLACK → ink must flip WHITE (AAA). */
+    --page-ink: #ffffff;
+    --page-ink-muted: #e8e8e8;
   }
 }
 

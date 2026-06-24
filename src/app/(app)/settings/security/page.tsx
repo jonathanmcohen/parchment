@@ -1,3 +1,5 @@
+import { PasswordChangeForm } from '@/components/settings/PasswordChangeForm'
+import { SessionsList } from '@/components/settings/SessionsList'
 import { MfaSection } from './mfa-section'
 
 export default function SecuritySettingsPage() {
@@ -15,32 +17,7 @@ export default function SecuritySettingsPage() {
         <p className="mt-1 text-[var(--muted)] text-sm">
           Update the password used to sign in to your account.
         </p>
-        <div className="mt-4 flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="security-current-password" className="font-medium text-sm">
-              Current password
-            </label>
-            <input
-              id="security-current-password"
-              name="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="security-new-password" className="font-medium text-sm">
-              New password
-            </label>
-            <input
-              id="security-new-password"
-              name="newPassword"
-              type="password"
-              autoComplete="new-password"
-              className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm"
-            />
-          </div>
-        </div>
+        <PasswordChangeForm />
       </section>
 
       <section aria-labelledby="security-mfa" className="mt-8">
@@ -58,8 +35,9 @@ export default function SecuritySettingsPage() {
           Sessions
         </h2>
         <p className="mt-1 text-[var(--muted)] text-sm">
-          Review the devices currently signed in and sign out the ones you do not recognize.
+          Review the sessions currently signed in to your account.
         </p>
+        <SessionsList />
       </section>
     </section>
   )

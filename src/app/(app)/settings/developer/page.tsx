@@ -1,3 +1,4 @@
+import { PATManager } from '@/components/settings/PATManager'
 import { WebhooksManager } from '@/components/settings/WebhooksManager'
 
 export default function DeveloperSettingsPage() {
@@ -13,9 +14,11 @@ export default function DeveloperSettingsPage() {
           Personal access tokens
         </h2>
         <p className="mt-1 text-[var(--muted)] text-sm">
-          Tokens authenticate API requests on your behalf. In-app token creation and management is
-          coming in a future release; for now, webhooks below cover most integration needs.
+          Tokens authenticate API requests on your behalf. Send a token as an{' '}
+          <code>Authorization: Bearer …</code> header. A token is shown only once when created —
+          store it securely.
         </p>
+        <PATManager />
       </section>
 
       <section aria-labelledby="developer-webhooks" className="mt-8">

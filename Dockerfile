@@ -13,15 +13,25 @@ RUN pnpm install --frozen-lockfile
 FROM node:24-bookworm-slim AS builder
 WORKDIR /app
 RUN corepack enable
-ENV NEXT_TELEMETRY_DISABLED=1
+# CF2: the git commit this image is built from. Passed as a build-arg by the
+# release workflow (`build-args: GIT_SHA=${{ github.sha }}`); defaults to
+# 'unknown' for an arg-less local build. Promoted to ENV so `pnpm build` (and any
+# SSR during build) sees process.env.GIT_SHA → version.ts BUILD_SHA.
+ARG GIT_SHA=unknown
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    GIT_SHA=$GIT_SHA
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build
 
 # ─── runner (single container) ───
 FROM node:24-bookworm-slim AS runner
+# CF2: carry the build-arg into the runner's runtime env so the /whats-new About
+# page (a server component rendered per-request) reports the real commit SHA.
+ARG GIT_SHA=unknown
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
+    GIT_SHA=$GIT_SHA \
     PGDATA=/var/lib/postgresql/data \
     DATABASE_URL=postgres://parchment:parchment@localhost:5432/parchment \
     COLLAB_PORT=1234 \

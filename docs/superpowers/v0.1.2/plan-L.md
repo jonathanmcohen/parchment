@@ -1,7 +1,8 @@
 # Plan L — layout fixes (toolbar / title / menu / status bar / outline / page)
 
-> ⛔ **HOLD.** No code until GO on F1+F2. Grounded against the v0.1.1 code. **Pure
-> layout/CSS — no new feature logic, no handler changes.** Every chrome component
+> 🟢 **GO — executing.** Plans verified (5-lens review, findings fixed 2026-06-24).
+> Grounded against the v0.1.1 code. **Pure layout/CSS — no new feature logic, no
+> handler changes.** Every chrome component
 > already exists and is fully wired; L only re-positions them: full-width chrome,
 > left-anchored outline, centered page in its own gutter, sticky top stack, pinned
 > status bar. All colors are S1 tokens.
@@ -39,10 +40,11 @@ toolbar mount 1454-1484); `globals.css:1017-1033` (`.parchment-toolbar`).
 **Current → Target:**
 - Current: the 48px toolbar renders inside `mx-auto max-w-5xl`, so its bg + bottom
   border stop at ~1024px with dark gutter beyond; it is **not sticky.**
-- Target: pinned **`position:sticky; top:56px`** (below the title bar), background +
-  `--border-chrome` bottom border **edge-to-edge** of the main content area (from the
-  right edge of the global sidebar to the viewport's right edge); the controls stay in
-  a centered max-width inner container.
+- Target: pinned **`position:sticky; top:88px`** (below the title bar **and** the menu
+  bar — 56+32; see L7's stack math), background + `--border-chrome` bottom border
+  **edge-to-edge** of the main content area (from the right edge of the global sidebar
+  to the viewport's right edge); the controls stay in a centered max-width inner
+  container.
 
 **Change:** lift the toolbar's bg/border to a full-bleed row; wrap the controls in a
 centered inner div; add sticky + z-index (see L7 stack). **No handler changes** — all
@@ -53,7 +55,8 @@ the title bar on scroll; controls remain centered/legible. **Proves it:** surfac
 (toolbar full-width)** baseline (light + dark); scroll — the toolbar stays pinned.
 
 **Steps:** 1) RED #2 (centered ~865px toolbar). 2) Full-bleed bg + centered inner +
-sticky `top:56px` + z-index. 3) Live-verify scroll + width. 4) Update #2 baseline.
+sticky `top:88px` (below title+menu) + z-index (L7 stack). 3) Live-verify scroll +
+width. 4) Update #2 baseline.
 
 ---
 

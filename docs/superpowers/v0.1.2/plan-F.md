@@ -1,7 +1,8 @@
 # Plan F — function gaps caught in the live sweep
 
-> ⛔ **HOLD.** No code until GO on F1+F2. Grounded against the v0.1.1 code
-> (`release/v0.1.2` = `main` @ `v0.1.1`). **Read the deploy-state caveat in
+> 🟢 **GO — executing.** Plans verified (5-lens review, findings fixed 2026-06-24).
+> Grounded against the v0.1.1 code (`release/v0.1.2` = `main` @ `v0.1.1`). **Read the
+> deploy-state caveat in
 > [README](README.md):** the sweep likely hit the stale v0.1.0 deploy, so F2 / F5
 > / F8 / F10 reported gaps are partly already-closed in code — each carries a
 > reproduce-first Step 1. **No new feature logic** except where explicitly named
@@ -108,9 +109,13 @@ highlight extension under `src/lib/editor/extensions/`.
 
 **Current → Target (grounded — 7 of 8 already exist):**
 - **Font family:** exists but only 6 entries (System/Serif/Mono/Arial/Times/Courier)
-  and no "More fonts…". → expand `FONT_FAMILIES` to the 10 required (Arial, Calibri,
-  Cambria, Comic Sans MS, Courier New, Georgia, Helvetica, Times New Roman, Trebuchet
-  MS, Verdana) + a "More fonts…" entry. **Pure data — `setFontFamily` already exists.**
+  and no "More fonts…". → **replace** the 6 generic entries with the **exact 10 Google-
+  Docs families**, in this order: **Arial** (default) · Calibri · Cambria · Comic Sans
+  MS · Courier New · Georgia · Helvetica · Times New Roman · Trebuchet MS · Verdana —
+  plus a trailing **"More fonts…"** entry (a disabled "coming soon" affordance; a real
+  font-picker dialog is out of scope). The generic System/Serif/Mono are dropped (Arial/
+  Times New Roman/Courier New cover them). Final list = exactly 10 named families + "More
+  fonts…". **Pure data — `setFontFamily` already exists.**
 - **Font size:** numeric input + pt/px unit exists; **missing −/+ chips.** → add two
   buttons calling `applySize(value ∓ 1, unit)` (handler exists), preserving the unit.
 - **Text color:** exists (704). No change.
@@ -130,10 +135,11 @@ the **named PARTIAL gap** if they cannot land cleanly: either land them on the D
 highlight extension, or render the highlight-color swatch + comment button as
 `aria-disabled` "coming soon" and log `F3 PARTIAL (n%)` with exactly these two.
 
-**Accept:** the toolbar shows all 10 fonts + "More fonts…", a working font-size −/+
-that preserves the unit, and either a working highlight-color picker + insert-comment
-OR honest disabled placeholders for those two (logged). Every shipped control applies
-to the selection live. **Proves it:** surface **#2 (toolbar full-width with controls)**
+**Accept:** the toolbar font dropdown shows **exactly** the 10 named families (Arial
+default) + a "More fonts…" affordance (generics gone), a working font-size −/+ that
+preserves the unit, and either a working highlight-color picker + insert-comment OR
+honest disabled placeholders for those two (logged). Every shipped control applies to
+the selection live. **Proves it:** surface **#2 (toolbar full-width with controls)**
 baseline (light + dark); axe on the toolbar (every icon labelled).
 
 **Steps:**
@@ -153,30 +159,44 @@ baseline (light + dark); axe on the toolbar (every icon labelled).
 `src/components/editor/StylesMenu.tsx:19-99` (fetch `/api/settings/styles`,
 `applyStyleProps` 79-99).
 
-**Current → Target:**
-- Current: TWO adjacent controls — a "Block" `<select>` (Paragraph/H1–6/Blockquote/
-  Code) and a separate "Styles" menu (named character/paragraph styles from the
-  workspace config).
-- Target: ONE dropdown labelled **"Styles"** listing **Normal text · Title · Subtitle ·
-  Heading 1–6** (the block types) followed by the named styles; drop the "Block" label.
+**Current → Target (grounded — "Title/Subtitle" are NOT block types):**
+- Current: TWO adjacent controls — a "Block" `<select>` (`BLOCK_TYPES`: Paragraph/H1–6/
+  Blockquote/Code) and a separate "Styles" menu (named paragraph/character styles from
+  the workspace config; `DEFAULT_STYLES` in `src/lib/editor/styles.ts` = **Body, Title,
+  Emphasis, Code** — note **Title is a named style, NOT a block type, and Subtitle does
+  not exist**).
+- Target: ONE dropdown labelled **"Styles"**, drop the "Block" label, listing the
+  user's requested set, each mapped to its real source:
+  - **Normal text** = the `paragraph` block type (relabel "Paragraph" → "Normal text" in
+    the dropdown's display name only).
+  - **Heading 1–6** = the `heading` block types (exist in `BLOCK_TYPES`).
+  - **Title** = the existing **named style** `Title` (`DEFAULT_STYLES`).
+  - **Subtitle** = a **new named-style data entry** added to `DEFAULT_STYLES` (a paragraph
+    style: larger, `--muted` ink — **data, not logic**; honestly flagged as the one new
+    addition, ~1 line in the styles seed).
 
-**Change:** **wiring/merge — no new logic.** Combine into a single `onChange` that
-routes a block-type choice through `handleBlockTypeChange` and a named-style choice
-through `applyStyleProps`. Render `BLOCK_TYPES` as the first group (unlabelled or
-"Text styles"), then the fetched named styles (reuse `StylesMenu`'s fetch). Keep the
-existing `activeBlockType` derivation (258-268) so the control reflects the cursor's
-block. Rename the label (465) "Block" → "Styles".
+**Change:** **wiring/merge + one data entry — no new component logic.** Combine into a
+single `onChange` that routes a block-type choice through `handleBlockTypeChange` and a
+named-style choice through `applyStyleProps`. Render the block types first (Normal text,
+Heading 1–6 — keep Blockquote/Code available), then the named styles (Title, Subtitle,
+Body, Emphasis, Code) from the existing `StylesMenu` fetch. Add the **Subtitle** entry to
+`DEFAULT_STYLES` (data). Keep the `activeBlockType` derivation (258-268) so the control
+reflects the cursor's block. Rename the display label (465) "Block" → "Styles".
 
-**Accept:** one "Styles" dropdown lists Normal/Title/Subtitle/H1–6 + named styles;
-selecting any applies it and the active state reflects the cursor's block; no "Block"
-label remains. **Proves it:** surface **#2** baseline shows one dropdown; live-apply
-each of Normal/H1/H2 and a named style.
+**Accept:** one "Styles" dropdown lists **Normal text · Title · Subtitle · Heading 1–6**
+(+ Body/Emphasis/Code/Blockquote) — Normal text/H1–6 are block types, Title/Subtitle are
+named styles, all in one control; selecting any applies it; the active state reflects the
+cursor's block; no "Block" label remains. **Proves it:** surface **#2** baseline shows
+one dropdown; live-apply Normal-text, H1, Title, and Subtitle (the new named style).
 
 **Steps:**
 1. RED: surface #2 with the two adjacent dropdowns.
-2. Build the merged control + single onChange; preserve `activeBlockType`.
-3. Live-verify block types + a named style apply; empty styles list still shows blocks.
-4. Update #2 baseline.
+2. Add the `Subtitle` named-style entry to `DEFAULT_STYLES` (data).
+3. Build the merged control + single onChange; relabel paragraph→"Normal text";
+   preserve `activeBlockType`.
+4. Live-verify block types (Normal text/H1) + named styles (Title/Subtitle) apply; an
+   empty workspace-styles fetch still shows the block types + the `DEFAULT_STYLES`.
+5. Update #2 baseline.
 
 ---
 
@@ -193,25 +213,29 @@ each of Normal/H1/H2 and a named style.
 - Target: Edit menu = Undo · Redo · ─ · Cut · Copy · Paste · Paste without formatting ·
   ─ · Select all · ─ · Find · Find and replace.
 
-**Change:** **wiring** for Cut/Copy/Paste via native clipboard
-(`document.execCommand('cut'|'copy'|'paste')` in the contenteditable, or the async
-Clipboard API with a focus guard). **Paste-without-formatting has no native backing**
-→ either a small handler that strips marks before insert (`editor.chain().focus()
-.insertContent(plainText)`), or an honest `aria-disabled` placeholder — decide at
-implementation, log if placeholdered. Reuse the same `Menu` component the other menus
-use (so it can't "open nothing").
+**Change (DECIDED — small new clipboard logic, all four ship as real rows; NOT pure
+wiring):** Cut/Copy/Paste via the clipboard — `document.execCommand('cut'|'copy'|'paste')`
+in the focused contenteditable, with the async Clipboard API + focus guard as the
+fallback. **Paste-without-formatting ships as a real strip-marks handler** (not a
+placeholder): read `navigator.clipboard.readText()` and
+`editor.chain().focus().insertContent(plainText).run()` so marks/styles are dropped (the
+ProseMirror selection is replaced with plain text). Reuse the same `Menu` component the
+other menus use (so it can't "open nothing"). This is **small new logic**, reclassified
+from "wiring" in coverage-matrix — honestly flagged, but it lands fully (no placeholder).
 
 **Accept:** Edit opens a dropdown with all rows; Cut/Copy/Paste act on the selection;
-paste-without-formatting strips formatting (or is a labelled placeholder); the
-"opens nothing" symptom does not reproduce on the fresh build. **Proves it:** surface
-**#3 (Edit menu open)** baseline (light + dark); axe + keyboard walk of the menu.
+**paste-without-formatting inserts plain text with all formatting stripped** (verified by
+copying a bold/coloured run elsewhere and pasting it unformatted); the "opens nothing"
+symptom does not reproduce on the fresh build. **Proves it:** surface **#3 (Edit menu
+open)** baseline (light + dark); axe + keyboard walk; a live unformatted-paste check.
 
 **Steps:**
 1. **Reproduce-first:** fresh build, click Edit — confirm it opens with the existing
    5 rows (if it truly opens nothing, fix the render bug first).
-2. Add Cut/Copy/Paste rows → clipboard; add paste-without-formatting (strip) or
-   placeholder.
-3. Live-verify each row on a selection; keyboard-walk (↑↓/Esc/focus-restore).
+2. Add Cut/Copy/Paste rows → clipboard; add paste-without-formatting → the strip-marks
+   handler (`insertContent(plainText)`).
+3. Live-verify each row on a selection (incl. an unformatted-paste of a styled run);
+   keyboard-walk (↑↓/Esc/focus-restore).
 4. Capture surface #3 baseline + axe.
 
 ---
@@ -278,8 +302,11 @@ literals (must be zero); axe clean.
 
 **Accept:** every visible Settings control either works or is clearly disabled-with-
 reason; Admin → Health shows live pills; About shows version + license + GitHub. No
-ghosted/dim sub-page reads as broken. **Proves it:** surface **#7-family** screenshots
-of Account + Workspace + Admin→Health + About (light + dark); axe clean.
+ghosted/dim sub-page reads as broken. **Proves it:** **surface #7 (settings → Account)**
+is the gated visual-regression baseline (light + dark); the **other three settings pages
+touched (Workspace · Admin→Health · About) are captured as per-PR live-deploy artifacts**
+(light + dark) but are NOT added to the 9-surface regression gate — F1 owns the Account
+theme control on #7, F7 owns the rest as live shots. axe clean on each.
 
 **Steps:**
 1. Audit each sub-page; list every uncontrolled input.
@@ -369,12 +396,21 @@ live copy → clipboard contains the real `url` from the POST response (origin-c
 
 ---
 
-### F10 — Audit "Coming soon" menu rows — ship 4, hide the rest
+### F10 — Audit "Coming soon" menu rows — ship 3, hide the rest (incl. Page number)
 
 **Files:** `src/components/editor/MenuBar.tsx` (placeholders at 81-86, 112-115, 143-145,
 178-179, 188-190, 193, 202-204; `placeholder()` helper at 35-37); the insert menu
 around 140-142; `src/lib/editor/extensions/slash-menu.ts:93` (`setHorizontalRule`);
 `HelpMenu.tsx:215` (Keyboard-shortcuts dialog).
+
+**Reconciliation with the user's "ship the four named" (grounded):** the user named
+**4** trivial rows to ship — Insert→Page number, Insert→Horizontal line, Format→Clear
+formatting, Help→Keyboard shortcuts. Grounding shows only **3** are actually shippable;
+**Page number is NOT trivial** — page numbers are attributes on `sectionBreak` nodes set
+via the section-break dialog, there is **no standalone "insert page number" command**, so
+shipping it would be genuinely new feature logic (out of scope). Per the user's own rule
+("hide for any that won't fit"), **Page number is hidden**, not shipped. Net: **ship 3,
+hide the rest.**
 
 **Current → Target (grounded):**
 - Ship (backing exists):
@@ -385,7 +421,8 @@ around 140-142; `src/lib/editor/extensions/slash-menu.ts:93` (`setHorizontalRule
 - Already wired (no change): **Format → Clear formatting** (`unsetAllMarks().clearNodes()`
   at 173-176) — confirm live.
 - **Insert → Page number** — **no backing** (page numbers are section-break attrs, not a
-  standalone insert). → **hide** (or keep disabled with a clear reason).
+  standalone insert; new logic, out of scope). → **HIDE** (the user's "trivial" was
+  wrong; do not ship a Page-number insert in v0.1.2).
 - **Hide** the remaining placeholder rows that won't ship in v0.1.2 (File New/Open/Copy/
   Move/Trash/Email; View Print-layout/Pageless/Ruler/Full-screen; Insert Chart/Special-
   chars/Headers-footers; Format Columns/Page-numbers; Tools Spell-check/Dictionary/

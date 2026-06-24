@@ -2,10 +2,10 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  ⛔  HOLD — SCOPE LOCKED, EXECUTION GATED.                                 ║
+║  🟢  GO — EXECUTING (Plan F1+F2 → L → F3–F10 → C).                         ║
 ║                                                                            ║
-║  Do NOT branch a feature, write code, or open a PR until the user replies  ║
-║  "GO" on Plan F1+F2. On GO, this banner is replaced with "🟢 GO — F1+F2".  ║
+║  Plans verified via a 5-lens adversarial review (2 blocking + 5 important  ║
+║  + 2 minor findings, all fixed 2026-06-24). User gave GO. One PR per item. ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
 

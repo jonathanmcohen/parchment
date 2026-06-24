@@ -29,11 +29,12 @@ layout/wording work in the same item.
 | Type | Items | Meaning |
 |---|---|---|
 | Pure restyle / CSS | F2, L1, L2, L4, L5, L6, L7, (C2 verify) | no logic; snapshot-gated |
-| Wiring (reuse existing handlers/endpoints) | F1, F4, F5, F10, C1, C3 | connect existing pieces |
+| Wiring (reuse existing handlers/endpoints) | F1, F4, F10, C3 | connect existing pieces (F4 also adds one `DEFAULT_STYLES` data entry: Subtitle) |
 | Layout reposition | F8/L3 | pin the existing status bar |
 | New view over existing endpoints | F6 (404 → `/api/search`) | new file, no new backend |
 | Ship-or-hide audit | F7, F10 | no half-built state |
-| New feature logic (PARTIAL-risk, named) | F3 (highlight-color, insert-comment), F7 (workspace persist), F9 (per-email + Restricted), C4 (star persist), C5 (min-delay) | scoped + honestly flagged |
+| Small new logic (ships fully, not PARTIAL) | F5 (clipboard Cut/Copy/Paste + paste-without-formatting strip handler), C1 (theme-submenu UI reusing F1's path), C5 (min-visible save delay) | new but bounded; lands complete |
+| New feature logic (PARTIAL-risk, named) | F3 (highlight-color, insert-comment), F7 (workspace persist), F9 (per-email + Restricted), C4 (star persist) | scoped + honestly flagged |
 
 ## C. PARTIAL-risk audit (named gaps — the v0.1.1 lesson applied)
 v0.1.1 shipped 6 PARTIAL items whose gaps weren't named up front. v0.1.2 names each

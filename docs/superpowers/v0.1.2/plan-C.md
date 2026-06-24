@@ -1,7 +1,8 @@
 # Plan C — chrome consolidation
 
-> ⛔ **HOLD.** No code until GO on F1+F2. Grounded against the v0.1.1 code. Mostly
-> wiring + one stale-deploy verify + one small timing change. **No new feature logic
+> 🟢 **GO — executing.** Plans verified (5-lens review, findings fixed 2026-06-24).
+> Grounded against the v0.1.1 code. Mostly wiring + one stale-deploy verify + one
+> small timing change. **No new feature logic
 > except C4 star-persistence (named PARTIAL-risk) and C5 min-delay (small new timing).**
 > All colors are S1 tokens.
 

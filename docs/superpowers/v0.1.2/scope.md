@@ -1,7 +1,8 @@
 # Parchment v0.1.2 — scope tracker
 
-> ⛔ **HOLD — scope locked, execution gated.** No code until the user replies
-> "GO" on Plan F1+F2. See [README](README.md). Status legend: `TODO` · `WIP` ·
+> 🟢 **GO — executing.** Plans verified (5-lens review, all findings fixed
+> 2026-06-24); user gave GO. One PR per item. See [README](README.md). Status
+> legend: `TODO` · `WIP` ·
 > `PARTIAL (n%)` · `DONE`. `Cov` = covered by a per-PR visual-snapshot (+axe)
 > artifact. `LV` = live-deploy verified **in light AND dark**.
 
@@ -23,7 +24,7 @@ F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = 
 | F7 | Settings ghosted sub-pages — ship-or-hide | PARTIAL-risk | ☐ | ☐ | **no half-built state.** Sub-pages render but Workspace inputs have **no backing endpoint**. Decision per coverage-matrix: ship Admin→Health (exists) + About(/whats-new, exists); Workspace-name needs a new `/api/settings/workspace` route OR disable+"v0.2" label |
 | F8 | Bottom status bar restored + pinned (24px, full-width) | TODO | ☐ | ☐ | `StatusBar` already rendered+wired (`Editor.tsx:1577`); only **pin** `position:fixed; bottom:0` full-width (overlaps L3) |
 | F9 | Share dialog completeness | PARTIAL-risk | ☐ | ☐ | **PARTIAL-risk** — link-side (auto-link on open, "Copy link" primary, Restricted/Anyone toggle) is in-scope; **per-email "Add people" + roles needs new API+schema** → ship the link UX, keep "Invite by email (v0.2)" as the honest placeholder; Restricted toggle needs a `mode` field decision |
-| F10 | Audit "Coming soon" menu rows — ship 4, hide rest | TODO | ☐ | ☐ | ship: Insert→Horizontal line (`setHorizontalRule` exists), Help→Keyboard shortcuts (HelpMenu dialog exists). Already-wired: Format→Clear formatting. No backing → **hide**: Insert→Page number + the rest of the placeholder set |
+| F10 | Audit "Coming soon" menu rows — ship 3, hide rest | TODO | ☐ | ☐ | ship: Insert→Horizontal line (`setHorizontalRule` exists), Help→Keyboard shortcuts (HelpMenu dialog exists). Already-wired: Format→Clear formatting. **Page number HIDDEN** (no backing — section-break attr, not a trivial insert; user's "ship 4" reconciled to 3) + the rest of the placeholder set hidden |
 
 ## Plan L — layout fixes ([detail](plan-L.md))
 

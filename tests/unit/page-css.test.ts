@@ -83,4 +83,25 @@ describe('pageCss', () => {
     })
     expect(css).toContain('size: 11in 8.5in')
   })
+
+  // S4-4: the default @page rule is 1in margins; the A4 preset (96px margins)
+  // resolves to the same 1in — and 1in ≡ 2.54cm, so the on-screen --page-pad (96px)
+  // and the printed @page margin agree across Letter and A4.
+  it('default rule (no margins) → margin: 1in 1in 1in 1in', () => {
+    // biome-ignore lint/suspicious/noExplicitAny: exercising the no-setup default path
+    expect(pageCss(null as any)).toContain('margin: 1in 1in 1in 1in')
+  })
+
+  it('A4 preset with 96px (1in) margins → 1in, which equals 2.54cm', () => {
+    const css = pageCss({
+      ...base,
+      size: 'A4',
+      orientation: 'portrait',
+      margins: { top: 96, right: 96, bottom: 96, left: 96 },
+    })
+    expect(css).toContain('size: 210mm 297mm')
+    expect(css).toContain('margin: 1in 1in 1in 1in')
+    // 96px @ 96dpi = 1in; 1in * 2.54 = 2.54cm — the screen/print margins coincide.
+    expect((96 / 96) * 2.54).toBeCloseTo(2.54, 10)
+  })
 })

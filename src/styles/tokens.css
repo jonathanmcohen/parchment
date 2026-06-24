@@ -70,15 +70,35 @@
   --success: #188038;
   --info: #1a73e8;
 
-  /* G3: workspace theme font pair (overridden by the app layout per-user). */
-  --font-body:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* G3: workspace theme font pair (overridden by the app layout per-user).
+     S4-1: the DOCUMENT body default is Arial (Google-Docs body face); chrome
+     reads --font-ui (Roboto) so the two stay independent (see globals body rule). */
+  --font-body: Arial, sans-serif;
   --font-heading: var(--font-body);
   /* S1-8: font/icon FACE defaults (S4 owns the ramp/sizing/weight). */
   --font-ui: "Google Sans", "Roboto", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "Roboto Mono", "Menlo", monospace;
 
-  /* Page canvas (B1) */
+  /* ── S4-4: spacing grid + control sizing ──────────────────────────────────
+   *  A 4/8/12/16/20/24/32/40/56 step scale plus the row/icon-button constants.
+   *  Scheme-independent (sizes, not colors) — declared here once so chrome reads
+   *  one source. Key surfaces adopt them (toolbar buttons, sidebar rows); a full
+   *  sweep of every ad-hoc gap is out of scope (tracked, not silently dropped). */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-14: 56px;
+  --row-h: 36px; /* sidebar / menu rows */
+  --icon-btn: 32px; /* toolbar/menu icon-button box (S4-3) */
+  --icon-size: 20px; /* Material Symbols glyph inside it (S4-3) */
+
+  /* Page canvas (B1). --page-pad = 1in @ 96dpi mirrors the print @page margin
+     (page-css.ts DEFAULT_RULE = margin: 1in; A4 preset = 2.54cm = 1in). */
   --page-pad: 96px;
   /* I1: page/paper background — overridden by theme's pageBg via themeCssVars. */
   --page-bg: var(--paper);

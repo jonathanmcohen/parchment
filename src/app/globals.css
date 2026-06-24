@@ -45,6 +45,10 @@
      graceful fallback if the bundled woff2 is unavailable. */
   --font-body: "OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Verdana, sans-serif;
   --font-heading: var(--font-body);
+  /* S4-1: chrome classes (titlebar/menubar/toolbar) set var(--font-ui) explicitly,
+     so the wrapper font-family below can't reach them — redirect --font-ui to the
+     dyslexic stack too, or those chrome surfaces would stay on Roboto. */
+  --font-ui: "OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Verdana, sans-serif;
   /* The var override alone is inert for the UI chrome: only `body` declares
      `font-family: var(--font-body)`, and `body` is the PARENT of this theme
      wrapper, so it resolves the var from :root (system) rather than this rule.
@@ -159,8 +163,14 @@ html,
 body {
   background: var(--background);
   color: var(--foreground);
-  /* G3: body text follows the workspace theme's body font. */
-  font-family: var(--font-body);
+  /* S4-1: chrome defaults to the UI face (Google Sans → Roboto). The DOCUMENT
+     body face (Arial, var(--font-body)) is applied on .parchment-prose only, so
+     chrome and document stay independent (chrome = Roboto, document = Arial).
+     Chrome containers that need it already set var(--font-ui) explicitly; this
+     base just keeps un-classed chrome on Roboto rather than Arial.
+     Dyslexic mode still wins: the [data-font="dyslexic"] rule sets font-family to
+     the OpenDyslexic stack on the theme wrapper, overriding this base. */
+  font-family: var(--font-ui);
 }
 
 /* ── S1-5: text selection ────────────────────────────────────────────────────
@@ -930,20 +940,28 @@ body {
   scrollbar-width: thin;
 }
 
+/* S4-3/S4-4: 32×32 icon-button box (var(--icon-btn)) with 14px Roboto text and a
+   20px glyph (var(--icon-size)). The Material Symbols glyph itself is sized on the
+   inline .material-symbols-rounded span (text-[20px]); this sets the box + text. */
 .parchment-toolbar-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 32px;
+  min-width: var(--icon-btn);
+  height: var(--icon-btn);
   padding: 0 4px;
-  font-size: 0.85rem;
+  font: 400 14px / 1 var(--font-ui);
   background: transparent;
   color: var(--foreground);
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.1s;
+}
+/* S4-3: normalize any inline Material Symbols glyph inside a toolbar button to the
+   token icon size, so a button without an explicit text-[20px] still gets 20px. */
+.parchment-toolbar-btn .material-symbols-rounded {
+  font-size: var(--icon-size);
 }
 
 .parchment-toolbar-btn:hover {
@@ -981,7 +999,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.78rem;
+  font: 400 14px / 1 var(--font-ui);
   color: var(--muted);
   cursor: default;
 }
@@ -989,7 +1007,7 @@ body {
 .parchment-toolbar-select {
   height: 26px;
   padding: 0 4px;
-  font-size: 0.8rem;
+  font: 400 14px / 1 var(--font-ui);
   background: var(--paper);
   color: var(--foreground);
   border: 1px solid var(--border);
@@ -1087,7 +1105,7 @@ body {
 /* ── Inline code (B2 polish) ─────────────────────────────────────────── */
 /* Base monospace font for all code — lower specificity, comes first. */
 .parchment-prose code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
 }
 /* Extra decoration only for inline code (not code inside <pre>). */
@@ -1912,11 +1930,20 @@ body {
   opacity: 1;
 }
 
-/* Editor content (B0 baseline; page canvas styling lands in B1). */
+/* Editor content (B0 baseline; page canvas styling lands in B1).
+ * ── S4-2: Google-Docs type ramp (presentation only — NO doc-model change) ────
+ *  Sizes authored in pt so the spec value IS the rule (1pt = 1.3333px). Body is
+ *  Arial 11pt / line-height 1.15; headings are bold pt steps. Colors stay the S1
+ *  ink tokens (--foreground #202124 / --muted #5F6368). H4–H6 already exist as
+ *  StarterKit heading levels — these rules only add the missing CSS. The markdown
+ *  serializer round-trip is unaffected (proven by markdown-roundtrip.test.ts). */
 .parchment-prose {
   min-height: 60vh;
   outline: none;
-  line-height: 1.6;
+  font-family: var(--font-body);
+  font-size: 11pt;
+  line-height: 1.15;
+  color: var(--foreground);
 }
 /* G3: headings follow the workspace theme's heading font. */
 .parchment-prose h1,
@@ -1926,21 +1953,49 @@ body {
 .parchment-prose h5,
 .parchment-prose h6 {
   font-family: var(--font-heading);
+  color: var(--foreground);
 }
 .parchment-prose h1 {
-  font-size: 1.75rem;
-  font-weight: 600;
-  margin: 1.2em 0 0.4em;
+  font-size: 20pt;
+  font-weight: 700;
+  margin: 20px 0 6px;
 }
 .parchment-prose h2 {
-  font-size: 1.4rem;
-  font-weight: 600;
-  margin: 1.1em 0 0.4em;
+  font-size: 16pt;
+  font-weight: 700;
+  margin: 18px 0 6px;
 }
 .parchment-prose h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 1em 0 0.3em;
+  font-size: 14pt;
+  font-weight: 700;
+  margin: 16px 0 4px;
+}
+.parchment-prose h4 {
+  font-size: 12pt;
+  font-weight: 700;
+}
+.parchment-prose h5 {
+  font-size: 12pt;
+  font-style: italic;
+  font-weight: 400;
+}
+.parchment-prose h6 {
+  font-size: 12pt;
+  font-weight: 400;
+}
+/* Doc Title / Subtitle are chrome surfaces (not prose nodes); the live title bar
+   uses .parchment-titlebar-title. These classes provide the Docs Title/Subtitle
+   ramp for any in-document title/subtitle surface — size/weight only, ink stays
+   the canonical S1 token. */
+.parchment-doc-title {
+  font: 700 26pt / 1.2 var(--font-body);
+  color: var(--foreground);
+  margin: 12px 0 8px;
+  letter-spacing: -0.01em;
+}
+.parchment-doc-subtitle {
+  font: 400 16pt var(--font-body);
+  color: var(--muted);
 }
 .parchment-prose p {
   margin: 0.5em 0;
@@ -1972,7 +2027,7 @@ body {
   border-radius: 0.4rem;
   padding: 0.75em 1em;
   overflow-x: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   /* Prevent the default inherit from washing out Shiki inline token colours. */
   color: inherit;
 }
@@ -2008,7 +2063,7 @@ body {
   padding: 0.25rem 0.5rem;
   background: color-mix(in srgb, var(--border) 40%, transparent);
   border-bottom: 1px solid var(--border);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   user-select: none;
   /* Always visible — hosts editing controls */
@@ -2107,7 +2162,7 @@ body {
   border-radius: 0;
   padding: 0.75em 1em;
   overflow-x: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   color: inherit;
 }
 
@@ -3210,7 +3265,7 @@ body {
 
 /* G4: math editor popover (mirrors the dialog primitives). */
 .parchment-math-textarea {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   resize: vertical;
   min-height: 72px;
 }

@@ -391,6 +391,9 @@ body {
   background: var(--editor-gutter);
   margin: -2rem;
   padding: 2rem;
+  /* F8+L3: reserve the pinned status bar's 24px so a long doc's last line is
+     never hidden behind the fixed bottom bar (on top of the base 2rem). */
+  padding-bottom: calc(2rem + 24px);
   min-height: 100vh;
 }
 
@@ -934,22 +937,50 @@ body {
   white-space: nowrap;
 }
 
-/* S3-6: slim 24px white footer, three slots (left/center/right), top chrome
+/* S3-6 / F8+L3: slim 24px footer, three slots (left/center/right), top chrome
    border. "min read" dropped from the default view (surfaced in Tools → Word
-   count); the connection dot lives in the right slot. */
+   count); the connection dot lives in the right slot.
+
+   F8+L3: pinned full-width to the viewport bottom (fixed; bottom:0; right:0).
+   The left edge clears the global sidebar so the bar matches the chrome stack's
+   horizontal extent (sidebar is 256px = 16rem >= 768px; below that it becomes an
+   off-canvas drawer and the bar goes full-width — see the narrow block below).
+   --surface is scheme-aware (white light / dark in dark chrome) so no per-scheme
+   override is needed. z-index sits above the canvas; as a bottom-pinned footer it
+   never overlaps the top-pinned chrome stack. The bg bleeds edge-to-edge while the
+   inner .parchment-status-inner (mx-auto max-w-5xl) re-centers the three slots. */
 .parchment-status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 16rem;
+  right: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   height: 24px;
-  width: 100%;
-  margin-top: 0;
-  padding: 0 16px;
   background: var(--surface);
   border-top: 1px solid var(--border-chrome);
   font-size: 12px;
   color: var(--muted);
   user-select: none;
+}
+
+/* F8+L3: re-center the bar's content at the body max-width (same pattern as the
+   chrome stack's .parchment-*-inner wrappers). The horizontal padding that used
+   to live on the bar moves here. */
+.parchment-status-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 16px;
+}
+
+@media (max-width: 767px) {
+  /* The sidebar is an off-canvas drawer below 768px → the bar spans full-width. */
+  .parchment-status-bar {
+    left: 0;
+  }
 }
 
 .parchment-status-slot {

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { RELEASE_NOTES } from '@/lib/help/content'
-import { APP_VERSION } from '@/lib/version'
+import { APP_LICENSE_URL, APP_REPO_URL, APP_VERSION } from '@/lib/version'
 
 // L5: dedicated, linkable "What's new" page. Reuses I9's RELEASE_NOTES (single
 // source of truth for the version + highlights) — the Help-menu drawer renders
@@ -29,6 +29,43 @@ export default function WhatsNewPage() {
           <li key={highlight}>{highlight}</li>
         ))}
       </ul>
+
+      {/* F7: About facts — version, source link, and a license line. */}
+      <h2 className="mt-8 font-medium text-lg">About</h2>
+      <dl className="mt-2 space-y-1 text-sm">
+        <div className="flex gap-2">
+          <dt className="font-medium">Version</dt>
+          <dd className="text-[var(--muted)]">v{APP_VERSION}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="font-medium">Source</dt>
+          <dd>
+            <a
+              href={APP_REPO_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--primary)] underline"
+            >
+              github.com/jonathanmcohen/parchment
+            </a>
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="font-medium">License</dt>
+          <dd className="text-[var(--muted)]">
+            See the{' '}
+            <a
+              href={APP_LICENSE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[var(--primary)] underline"
+            >
+              LICENSE
+            </a>{' '}
+            in the source repository.
+          </dd>
+        </div>
+      </dl>
     </section>
   )
 }

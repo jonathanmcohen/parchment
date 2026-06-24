@@ -5,6 +5,11 @@ import {
   clampAutosaveMs,
   DEFAULT_AUTOSAVE_MS,
 } from '@/lib/docs/autosave-config'
+import {
+  DEFAULT_WORKSPACE_NAME,
+  normalizeWorkspaceName,
+  WORKSPACE_NAME_KEY,
+} from '@/lib/docs/workspace-config'
 import { DEFAULT_STYLES, type NamedStyle, parseStyles } from '@/lib/editor/styles'
 import { DEFAULT_THEME, parseTheme, type WorkspaceTheme } from '@/lib/editor/theme'
 
@@ -21,6 +26,16 @@ export const DOC_STYLES_KEY = 'docStyles'
 // default). Reuses this settings store; no migration.
 export const SPELLCHECK_KEY = 'spellcheckEnabled'
 export const DEFAULT_SPELLCHECK_ENABLED = true
+
+// F7: workspace display name. Reuses this generic settings store under a new
+// KEY — no DB migration. Constants + the pure normalize helper live in the
+// client-safe split so the route and the client island share one source.
+export {
+  DEFAULT_WORKSPACE_NAME,
+  MAX_WORKSPACE_NAME_LEN,
+  normalizeWorkspaceName,
+  WORKSPACE_NAME_KEY,
+} from '@/lib/docs/workspace-config'
 
 /** Return the stored value for (ownerId, key), or `fallback` if unset. */
 export async function getSetting<T>(ownerId: string, key: string, fallback: T): Promise<T> {
@@ -100,6 +115,19 @@ export async function getSpellcheckEnabled(ownerId: string): Promise<boolean> {
 /** Persist the owner's native-spellcheck preference (coerced to a boolean). */
 export async function setSpellcheckEnabled(ownerId: string, enabled: boolean): Promise<void> {
   await setSetting(ownerId, SPELLCHECK_KEY, !!enabled)
+}
+
+/** F7: Read the owner's workspace name (normalized; '' when unset/malformed). */
+export async function getWorkspaceName(ownerId: string): Promise<string> {
+  const raw = await getSetting<unknown>(ownerId, WORKSPACE_NAME_KEY, DEFAULT_WORKSPACE_NAME)
+  return normalizeWorkspaceName(raw)
+}
+
+/** F7: Persist the owner's workspace name (normalized). Returns the stored value. */
+export async function setWorkspaceName(ownerId: string, name: unknown): Promise<string> {
+  const normalized = normalizeWorkspaceName(name)
+  await setSetting(ownerId, WORKSPACE_NAME_KEY, normalized)
+  return normalized
 }
 
 /** Read the owner's named styles, or the built-in defaults if unset. */

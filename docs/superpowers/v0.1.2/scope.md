@@ -43,7 +43,7 @@ F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = 
 
 | ID | Item | Status | Cov | LV | Notes |
 |---|---|---|---|---|---|
-| C1 | Top-right floating avatar → into title bar; wire account menu | TODO | ☐ | ☐ | wiring: `UserCluster` already wired (Manage account/Sign out); `DocTitleBar` already accepts an `avatar` prop. Move `UserCluster` into the title-bar slot; drop the floating layout-topbar copy |
+| C1 | Top-right floating avatar → into title bar; wire account menu | DONE | ☑ | ☑ | PR #106. Title-bar avatar = wired account menu (Manage/Theme submenu/Sign out); one avatar; Theme submenu reuses F1 path. Live-verified
 | C2 | Files middle column ("Import/Root/Guide/Smart folders/Tags") — fix or remove | TODO | ☐ | ☐ | **reproduce-first** — grounding found no opacity/disabled dimming in code (`FileManager.tsx:2326`); drag-drop wired. Likely stale deploy; confirm live then close or polish |
 | C3 | Save wording "All changes saved to disk" → "All changes saved" + hover detail | TODO | ☐ | ☐ | text change in `saveStatusLabel` (`DocTitleBar.tsx:22`) + tooltip driven by `useConnectionState` (already imported `Editor.tsx:45`) |
 | C4 | Title-bar icons (star/move/comments/history) — tooltips + working clicks | PARTIAL-risk | ☐ | ☐ | comments/history wired; **star is local-state only, no persist endpoint** → wire to existing `POST /api/docs/{id}/star` (used by FileManager) OR keep disabled+"coming soon"; add missing tooltips |

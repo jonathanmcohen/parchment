@@ -418,7 +418,11 @@ body {
  * toolbar top:88px), with z-index title 30 > menu 20 > toolbar 10 so the title
  * wins on any overlap. */
 .parchment-chrome-stack {
-  margin: 0 -2rem; /* cancel the shell's horizontal padding → full-bleed bars */
+  /* LT1-1: cancel the shell's horizontal padding (full-bleed bars) AND its 2rem
+     TOP padding, so the sticky title bar sits flush at the viewport top with no
+     24px white sliver. Horizontal centering (via each *-inner mx-auto) and the
+     sticky-stack offsets (title 0 / menu 56 / toolbar 88) are unaffected. */
+  margin: -2rem -2rem 0 -2rem;
 }
 
 /* ── S3-1: doc title bar (L2: full-bleed bg/border, sticky top:0) ── */
@@ -1171,6 +1175,15 @@ body {
 /* S3-3: the overflow `⋯` trigger pushes to the trailing edge. */
 .parchment-toolbar-overflow {
   margin-inline-start: auto;
+}
+
+/* LT1-3: when the overflow `⋯` appears (narrow viewports), give it a chip look
+   so it reads as a distinct affordance, not a bare icon button. CSS-only — the
+   S3-3 overflow partition logic is untouched. Keeps the shared 32px height. */
+.parchment-toolbar-overflow-btn {
+  background: var(--surface-muted);
+  border: 1px solid var(--border-chrome);
+  border-radius: 6px;
 }
 
 .parchment-toolbar-sep {

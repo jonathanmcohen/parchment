@@ -1290,7 +1290,7 @@ export function Toolbar({
           <Menu
             label="More"
             items={[...overflowItems]}
-            triggerClassName="parchment-toolbar-btn parchment-toolbar-overflow"
+            triggerClassName="parchment-toolbar-btn parchment-toolbar-overflow parchment-toolbar-overflow-btn"
             triggerAriaLabel="More tools"
             triggerContent={
               <span aria-hidden className="material-symbols-rounded text-[20px]">

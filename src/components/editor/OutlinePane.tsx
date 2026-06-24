@@ -194,7 +194,7 @@ export function OutlinePane({ editor, open, onToggle }: Props) {
       </button>
 
       {paneOpen && (
-        <nav aria-label="Document outline">
+        <nav className="parchment-outline-nav" aria-label="Document outline">
           <div className="parchment-outline-header">
             <span className="parchment-outline-title">Outline</span>
           </div>

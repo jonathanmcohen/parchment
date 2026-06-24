@@ -13,9 +13,8 @@ export default function DeveloperSettingsPage() {
           Personal access tokens
         </h2>
         <p className="mt-1 text-[var(--muted)] text-sm">
-          Tokens authenticate API requests on your behalf. In-app token creation and
-          management is coming in a future release; for now, webhooks below cover most
-          integration needs.
+          Tokens authenticate API requests on your behalf. In-app token creation and management is
+          coming in a future release; for now, webhooks below cover most integration needs.
         </p>
       </section>
 

@@ -3422,6 +3422,74 @@ body {
   margin: 0;
 }
 
+/* F9: Restricted ⇄ "Anyone with the link" segmented toggle + copy toast. */
+/* Reset the <fieldset> chrome so it matches the other .parchment-dialog-field. */
+.parchment-share-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.parchment-share-fieldset > .parchment-dialog-label {
+  padding: 0;
+}
+
+.parchment-share-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-chrome);
+  border-radius: 6px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.parchment-share-toggle-btn {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 0.85rem;
+  background: var(--surface);
+  color: var(--muted);
+  border: none;
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    color 0.1s;
+}
+
+.parchment-share-toggle-btn + .parchment-share-toggle-btn {
+  border-left: 1px solid var(--border-chrome);
+}
+
+.parchment-share-toggle-btn:hover:not([aria-pressed="true"]):not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+
+.parchment-share-toggle-btn[aria-pressed="true"] {
+  background: var(--primary-surface);
+  color: var(--primary-surface-text);
+  font-weight: 500;
+}
+
+.parchment-share-toggle-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.parchment-share-toggle-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+.parchment-share-toast {
+  align-self: center;
+  font-size: 0.8rem;
+  color: var(--primary);
+  margin-right: auto;
+}
+
 /* S5-13: Public viewer (/share/[token]) — no app chrome. Docs framing: the
    white page floats on the gray --editor-gutter field; the password gate uses
    the S5-11 dialog elevation; the doc title reads in the UI face. */

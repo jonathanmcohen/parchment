@@ -87,4 +87,20 @@ describe('F1 — applyColorScheme', () => {
     ).rejects.toThrow()
     expect(router.refresh).not.toHaveBeenCalled()
   })
+
+  // CF1: the thrown error must carry the HTTP status so the component can
+  // surface a deploy-time failure (e.g. a 401 behind a proxy) instead of an
+  // opaque "try again". This guards the diagnosability fix.
+  it('throws an error carrying the HTTP status on a non-2xx PUT', async () => {
+    for (const status of [400, 401, 500] as const) {
+      const fetchMock = vi.fn(async () => new Response(null, { status }))
+      const router = { refresh: vi.fn() }
+      await expect(
+        applyColorScheme(DEFAULT_THEME, 'dark', {
+          fetch: fetchMock as unknown as typeof fetch,
+          router,
+        }),
+      ).rejects.toThrow(`HTTP ${status}`)
+    }
+  })
 })

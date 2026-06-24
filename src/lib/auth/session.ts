@@ -34,7 +34,11 @@ function setSessionCookie(token: string, expiresAt: Date, maxAge: number): Promi
   return cookies().then((store) => {
     store.set(SESSION_COOKIE, token, {
       httpOnly: true,
-      secure: env.nodeEnv === 'production',
+      // CF1: Secure in production, OR when the operator opts in via
+      // SECURE_COOKIES=true (e.g. the homelab deploy behind TLS where the
+      // container does not set NODE_ENV=production). Never a hard `true` — that
+      // would drop the cookie on local http dev.
+      secure: env.nodeEnv === 'production' || env.secureCookies,
       sameSite: 'lax',
       path: '/',
       maxAge,

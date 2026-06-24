@@ -35,7 +35,9 @@ export async function applyColorScheme(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(next),
   })
-  if (!res.ok) throw new Error('save failed')
+  // CF1: surface the HTTP status so a deploy-time failure is visible in the UI
+  // (not just an opaque "try again"). The component renders this message.
+  if (!res.ok) throw new Error(`save failed (HTTP ${res.status})`)
   // router.refresh() is mandatory: themeCssVars + data-color-scheme are
   // server-rendered, so the new scheme only takes effect after the RSC re-fetch
   // (NOT a client-only class toggle).

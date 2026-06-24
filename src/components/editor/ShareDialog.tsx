@@ -15,6 +15,13 @@ import { pickActiveShare, type ShareLinkRow } from '@/lib/docs/share-link'
 //     Restricted revokes every share row (public route 404s); Anyone (re)creates a
 //     link with the chosen role. This is REAL enforcement on the existing
 //     POST/DELETE lifecycle — no schema change.
+//   • Role / password / expiry are LIVE controls while a link is active: changing
+//     any of them re-applies to the live link by revoking it and creating a fresh
+//     one with the chosen settings (there is no PATCH endpoint — the G1 lifecycle
+//     is create/revoke, so "edit a link" == revoke-and-recreate). Exactly one
+//     active link is kept (no dupes); the new `url` is origin-correct from the API.
+//     This makes the brief's "Anyone (re)creates a link with the chosen role" the
+//     real behaviour and leaves no dead control.
 //   • Permission stores view/comment/edit/suggest but v0.1 renders read-only on the
 //     public route (write perms are a v0.2 GAP, noted to the viewer).
 //
@@ -32,6 +39,11 @@ const PERMISSION_OPTIONS: { value: string; label: string }[] = [
   { value: 'edit', label: 'Can edit' },
   { value: 'suggest', label: 'Can suggest' },
 ]
+
+// The link settings a create/re-apply applies. Passed explicitly (not read from
+// state) so a change handler can re-apply the just-chosen value without waiting
+// for a state flush.
+type LinkSettings = { permission: string; password: string; expiresAt: string }
 
 export function ShareDialog({ docId, onClose }: Props) {
   const titleId = useId()
@@ -51,11 +63,19 @@ export function ShareDialog({ docId, onClose }: Props) {
   // Guards the open-time auto-create so it runs at most once per mount even under
   // React 18 StrictMode's double-invoke.
   const autoCreatedRef = useRef(false)
+  // The password value the live link currently carries (cleartext can't be read
+  // back from the API, so we track what we last sent). Lets the password field
+  // re-apply on blur ONLY when it actually changed — no needless token rotation.
+  const appliedPasswordRef = useRef('')
 
   // The active share backs the live "Anyone with the link" state. null ==
   // Restricted (no active link). Newest non-expired wins — never a duplicate.
   const activeShare = pickActiveShare(shares)
   const isPublic = activeShare !== null
+  // Tracks the share whose settings we last mirrored into the controls, so the
+  // role/expiry pickers always reflect the LIVE link (e.g. re-opening an existing
+  // 'edit' link shows "Can edit") without clobbering a value mid-edit on re-render.
+  const syncedShareIdRef = useRef<string | null>(null)
 
   const reload = useCallback(async (): Promise<ShareLinkRow[]> => {
     try {
@@ -70,39 +90,51 @@ export function ShareDialog({ docId, onClose }: Props) {
     }
   }, [docId])
 
-  // Create a share with the current role/password/expiry. Returns the new row's
-  // url (origin-correct, straight from the API) or null on failure.
-  const createShare = useCallback(async (): Promise<string | null> => {
-    setError(null)
-    try {
-      const body: { permission: string; password?: string; expiresAt?: string } = { permission }
-      if (password.length > 0) body.password = password
-      // <input type="date"> gives YYYY-MM-DD; expand to end-of-day ISO so "today"
-      // isn't already-expired and the API's future-date check passes.
-      if (expiresAt.length > 0) body.expiresAt = new Date(`${expiresAt}T23:59:59`).toISOString()
+  // Create a share with the given settings (defaulting to the current control
+  // values). Returns the new row's url (origin-correct, straight from the API) or
+  // null on failure. Settings are passed explicitly so a change handler can apply
+  // the just-chosen value without waiting for a React state flush.
+  const createShare = useCallback(
+    async (settings?: LinkSettings): Promise<string | null> => {
+      const s: LinkSettings = settings ?? { permission, password, expiresAt }
+      setError(null)
+      try {
+        const body: { permission: string; password?: string; expiresAt?: string } = {
+          permission: s.permission,
+        }
+        if (s.password.length > 0) body.password = s.password
+        // <input type="date"> gives YYYY-MM-DD; expand to end-of-day ISO so "today"
+        // isn't already-expired and the API's future-date check passes.
+        if (s.expiresAt.length > 0)
+          body.expiresAt = new Date(`${s.expiresAt}T23:59:59`).toISOString()
 
-      const res = await fetch(`/api/docs/${docId}/shares`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string }
-        setError(
-          data.error === 'invalid_expiry'
-            ? 'Pick a future expiry date.'
-            : 'Could not create the link.',
-        )
+        const res = await fetch(`/api/docs/${docId}/shares`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string }
+          setError(
+            data.error === 'invalid_expiry'
+              ? 'Pick a future expiry date.'
+              : 'Could not create the link.',
+          )
+          return null
+        }
+        const created = (await res.json()) as { id: string; token: string; url: string }
+        // Remember the cleartext we just applied (the API never returns it) so a
+        // later role/expiry change can preserve the password without re-typing.
+        appliedPasswordRef.current = s.password
+        await reload()
+        return created.url
+      } catch {
+        setError('Could not create the link.')
         return null
       }
-      const created = (await res.json()) as { id: string; token: string; url: string }
-      await reload()
-      return created.url
-    } catch {
-      setError('Could not create the link.')
-      return null
-    }
-  }, [docId, expiresAt, password, permission, reload])
+    },
+    [docId, expiresAt, password, permission, reload],
+  )
 
   // Revoke every share row for this doc → Restricted (no active link).
   const revokeAll = useCallback(
@@ -115,6 +147,28 @@ export function ShareDialog({ docId, onClose }: Props) {
       await reload()
     },
     [reload],
+  )
+
+  // Re-apply link settings to the live "Anyone with the link" link. The G1
+  // lifecycle has no PATCH — editing a link == revoke the active row(s) and
+  // create a fresh one with the chosen settings (keeps exactly one active link,
+  // origin-correct url). No-op (just local state) when no link is active. The new
+  // settings are passed explicitly so the just-chosen value is applied even before
+  // its setState has flushed.
+  const reapplyLink = useCallback(
+    async (settings: LinkSettings) => {
+      if (busy) return
+      if (pickActiveShare(shares) === null) return // Restricted: nothing live to update
+      setBusy(true)
+      try {
+        const rows = await reload()
+        await revokeAll(rows)
+        await createShare(settings)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [busy, createShare, reload, revokeAll, shares],
   )
 
   // F9: on open, ensure a ready-to-copy link exists. Reuse the existing active
@@ -132,6 +186,23 @@ export function ShareDialog({ docId, onClose }: Props) {
       cancelled = true
     }
   }, [])
+
+  // Mirror the LIVE link's role/expiry into the controls so the pickers are
+  // truthful (a re-opened 'edit' link shows "Can edit", etc.). Keyed on the active
+  // share id so it runs once per distinct active link — it never overwrites the
+  // user's in-progress choice on an unrelated re-render. Password is write-only
+  // (the API returns only `hasPassword`, never the cleartext), so it isn't mirrored.
+  useEffect(() => {
+    if (activeShare === null) {
+      syncedShareIdRef.current = null
+      return
+    }
+    if (syncedShareIdRef.current === activeShare.id) return
+    syncedShareIdRef.current = activeShare.id
+    setPermission(activeShare.permission)
+    // expiresAt comes back as an ISO string; the date input wants YYYY-MM-DD.
+    setExpiresAt(activeShare.expiresAt ? activeShare.expiresAt.slice(0, 10) : '')
+  }, [activeShare])
 
   // Copy the active link's origin-correct url (straight from the API response),
   // not a guessed string. Shows a transient "Link copied" toast.
@@ -274,7 +345,17 @@ export function ShareDialog({ docId, onClose }: Props) {
           <select
             id={permId}
             value={permission}
-            onChange={(e) => setPermission(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value
+              setPermission(next)
+              // Live link: re-apply the chosen role immediately (revoke+recreate),
+              // preserving the in-session password and current expiry.
+              void reapplyLink({
+                permission: next,
+                password: password.length > 0 ? password : appliedPasswordRef.current,
+                expiresAt,
+              })
+            }}
             className="parchment-dialog-select"
             disabled={!isPublic || busy}
           >
@@ -294,11 +375,18 @@ export function ShareDialog({ docId, onClose }: Props) {
             id={passwordId}
             type="password"
             autoComplete="new-password"
-            placeholder="No password"
+            placeholder={activeShare?.hasPassword ? 'Password set — type to change' : 'No password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            // Apply on blur (not per keystroke) when a live link exists and the
+            // value actually changed — avoids rotating the token on every key.
+            onBlur={() => {
+              if (!isPublic) return
+              if (password === appliedPasswordRef.current) return
+              void reapplyLink({ permission, password, expiresAt })
+            }}
             className="parchment-dialog-input"
-            disabled={busy}
+            disabled={!isPublic || busy}
           />
         </div>
 
@@ -310,9 +398,20 @@ export function ShareDialog({ docId, onClose }: Props) {
             id={expiryId}
             type="date"
             value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value
+              setExpiresAt(next)
+              // Live link: re-apply the chosen expiry immediately (revoke+recreate),
+              // preserving role and the in-session password.
+              if (isPublic)
+                void reapplyLink({
+                  permission,
+                  password: password.length > 0 ? password : appliedPasswordRef.current,
+                  expiresAt: next,
+                })
+            }}
             className="parchment-dialog-input"
-            disabled={busy}
+            disabled={!isPublic || busy}
           />
         </div>
 

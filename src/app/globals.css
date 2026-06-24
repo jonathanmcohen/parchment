@@ -769,7 +769,10 @@ body {
  * Desktop-only — the S2-6 mobile --page-scale path (≤768px) is untouched. */
 .parchment-canvas-gutter {
   overflow-x: auto;
-  padding-top: 24px;
+  /* LT2-1: page top margin ≈96px (1in @96dpi). The shell's 2rem top + the 56/32/48
+     chrome already seat the page; drop the extra top breathing room (was 24px) so the
+     page-top lands at the spec 96px. Bottom keeps 24px so the last page isn't flush. */
+  padding-top: 0;
   padding-bottom: 24px;
 }
 
@@ -1936,9 +1939,11 @@ body {
   align-self: flex-start;
   display: flex;
   flex-direction: column;
-  width: 256px;
-  min-width: 256px;
-  max-width: 256px;
+  /* LT2-2: 220px (was 256) — tighter rail widens the page gutter so the page can reach
+     816px @100%; the page re-centers via its mx-auto. */
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
   max-height: calc(100vh - 136px);
   border-right: 1px solid var(--border-chrome);
   background: var(--surface-muted);
@@ -1961,7 +1966,8 @@ body {
 .parchment-outline-toggle {
   position: absolute;
   top: 8px;
-  right: 6px;
+  /* LT2-3: 8px right pad so the chevron doesn't kiss the divider line. */
+  right: 8px;
   z-index: 10;
   display: flex;
   align-items: center;

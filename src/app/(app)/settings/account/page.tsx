@@ -1,3 +1,5 @@
+import { AccountThemeSelect } from '@/components/settings/AccountThemeSelect'
+
 export default function AccountSettingsPage() {
   return (
     <section className="max-w-2xl">
@@ -48,21 +50,7 @@ export default function AccountSettingsPage() {
         <p className="mt-1 text-[var(--muted)] text-sm">
           Choose how Parchment looks. Matches your system by default (Plan I1).
         </p>
-        <div className="mt-4 flex flex-col gap-1.5">
-          <label htmlFor="account-theme-select" className="font-medium text-sm">
-            Appearance
-          </label>
-          <select
-            id="account-theme-select"
-            name="theme"
-            defaultValue="system"
-            className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm"
-          >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </div>
+        <AccountThemeSelect />
       </section>
 
       <section aria-labelledby="account-language" className="mt-8">

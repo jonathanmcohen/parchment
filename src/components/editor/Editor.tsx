@@ -1453,6 +1453,7 @@ export function Editor({
           docId={docId}
           initialTitle={initialTitle}
           saveStatus={saveStatus}
+          connection={connection}
           onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
           onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
           onOpenShare={() => setShareDialogOpen(true)}

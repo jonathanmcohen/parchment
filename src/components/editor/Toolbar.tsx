@@ -101,17 +101,9 @@ const LETTER_SPACINGS = [
   { label: 'Widest (0.2em)', value: '0.2em' },
 ]
 
-const BLOCK_TYPES = [
-  { label: 'Paragraph', value: 'paragraph' },
-  { label: 'Heading 1', value: 'heading1' },
-  { label: 'Heading 2', value: 'heading2' },
-  { label: 'Heading 3', value: 'heading3' },
-  { label: 'Heading 4', value: 'heading4' },
-  { label: 'Heading 5', value: 'heading5' },
-  { label: 'Heading 6', value: 'heading6' },
-  { label: 'Blockquote', value: 'blockquote' },
-  { label: 'Code block', value: 'codeBlock' },
-]
+// F4: the block-type list now lives in StylesMenu (merged "Styles" dropdown).
+// Toolbar keeps the activeBlockType derivation + handleBlockTypeChange handler,
+// which StylesMenu calls for a block-type choice.
 
 /** Sentinel value for the "Auto-detect" option — not persisted to the node attribute. */
 const AUTO_DETECT_VALUE = '__auto__'
@@ -501,31 +493,17 @@ export function Toolbar({
 
         <span className="parchment-toolbar-sep" aria-hidden="true" />
 
-        {/* ── Block type selector ───────────────────────────────────────── */}
-        <label className="parchment-toolbar-label" htmlFor="toolbar-block-type">
-          Block
-          <select
-            id="toolbar-block-type"
-            aria-label="Block type"
-            value={activeBlockType}
-            onChange={(e) => {
-              handleBlockTypeChange(e.target.value)
-              e.target.focus()
-            }}
-            className="parchment-toolbar-select"
-          >
-            {BLOCK_TYPES.map((bt) => (
-              <option key={bt.value} value={bt.value}>
-                {bt.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <span className="parchment-toolbar-sep" aria-hidden="true" />
-
-        {/* ── G3: Named styles dropdown ─────────────────────────────────── */}
-        <StylesMenu editor={editor} />
+        {/* ── F4: single "Styles" dropdown — merges the former Block selector
+          and the G3 named-styles menu. Block types (Normal text, Heading 1–6,
+          Blockquote, Code block) route through handleBlockTypeChange; named
+          styles (Title, Subtitle, Body, Emphasis, Code, + workspace styles) go
+          through applyStyleProps inside StylesMenu. The value tracks the
+          cursor's activeBlockType. ──────────────────────────────────────── */}
+        <StylesMenu
+          editor={editor}
+          activeBlockType={activeBlockType}
+          onBlockTypeChange={handleBlockTypeChange}
+        />
 
         <span className="parchment-toolbar-sep" aria-hidden="true" />
 

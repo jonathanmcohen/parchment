@@ -85,7 +85,7 @@
 |---|---|---|---|---|
 | S1 Color/tokens + faces + harness | 9 | 9 | 0 | 0 |
 | S2 Global chrome | 6 | 4 | 2(partial) | 0 |
-| S3 Editor chrome | 6 | 0 | 0 | 6 |
+| S3 Editor chrome | 6 | 4 | 2(partial) | 0 |
 | S4 Typography | 4 | 0 | 0 | 4 |
 | S5 Interactions + surfaces | 13 | 0 | 0 | 13 |
 | **Total** | **38** | **9** | **0** | **29** |

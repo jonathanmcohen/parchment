@@ -91,7 +91,7 @@ export function AutosaveSlider() {
         aria-valuemax={MAX_AUTOSAVE_MS}
         aria-valuenow={ms}
         aria-valuetext={label}
-        className="w-full accent-[var(--accent-contrast)]"
+        className="w-full accent-[var(--primary)]"
       />
       <div className="flex justify-between text-[var(--muted)] text-xs">
         <span>5s</span>

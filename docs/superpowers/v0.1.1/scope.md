@@ -5,7 +5,7 @@
 > `PARTIAL (n%)` · `DONE`. `Cov` = covered by a per-PR snapshot+axe artifact.
 > `LV` = live-deploy verified.
 
-**37 items · single tag `v0.1.1` · no deferrals.**
+**38 items (incl. S1-0 harness) · single tag `v0.1.1` · no deferrals.**
 
 > **Revised 2026-06-23 after adversarial review** (22 blocking/important + 9 minor
 > findings, all closed — see [coverage-matrix.md](coverage-matrix.md)). New items
@@ -18,14 +18,17 @@
 
 | ID | Item | Status | Cov | LV | Notes |
 |---|---|---|---|---|---|
-| S1-1 | FIXED `--primary*` brand (chrome blue); keep `--accent` as user picker | TODO | ☐ | ☐ | chrome ≠ accent (finding #13) |
-| S1-2 | Page-outside bg `#F1F3F4` (`--editor-gutter` on full-width `<main>`) | TODO | ☐ | ☐ | |
-| S1-3 | Page canvas pure white + Docs shadow (`--shadow-page`) | TODO | ☐ | ☐ | |
-| S1-4 | Drop cream surfaces (white / `#F8F9FA`) | TODO | ☐ | ☐ | |
-| S1-5 | Selection `#D2E3FC`; collab cursors accent blue + per-user hue | TODO | ☐ | ☐ | |
-| S1-6 | Focus ring `2px #1A73E8` offset 2px on all focusables | TODO | ☐ | ☐ | |
-| S1-7 | Token file `src/styles/tokens.css` — full canonical vocabulary | TODO | ☐ | ☐ | mints ALL tokens; light/dark |
-| S1-8 | Font + icon FACE loading (Roboto/Roboto Mono/Material Symbols) | TODO | ☐ | ☐ | moved from S4 (finding #17) |
+| S1-0 | Visual-regression harness (7-surface `toHaveScreenshot` + S1-6 focus-ring spec) | DONE | ☑ | ☑ | playwright `visual` project; darwin baselines committed; 15 visual + axe 20 green |
+| S1-1 | FIXED `--primary*` brand (chrome blue); keep `--accent` as user picker | DONE | ☑ | ☑ | chrome→--primary across 34 refs; non-default accent stays blue-chrome (#13) |
+| S1-2 | Page-outside bg `#F1F3F4` (`--editor-gutter` on full-width `<main>`) | DONE | ☑ | ☑ | baseline #4 shows gray gutter |
+| S1-3 | Page canvas pure white + Docs shadow (`--shadow-page`) | DONE | ☑ | ☑ | |
+| S1-4 | Drop cream surfaces (white / `#F8F9FA`) | DONE | ☑ | ☑ | residue grep clean |
+| S1-5 | Selection `#D2E3FC`; collab cursors accent blue + per-user hue | DONE | ☑ | ☑ | blue caret in baseline #4 |
+| S1-6 | Focus ring `2px #1A73E8` offset 2px on all focusables | DONE | ☑ | ☑ | focus-ring spec 8/8 (light+dark) |
+| S1-7 | Token file `src/styles/tokens.css` — full canonical vocabulary | DONE | ☑ | ☑ | mints ALL tokens; light/dark |
+| S1-8 | Font + icon FACE loading (Roboto/Roboto Mono/Material Symbols) | DONE | ☑ | ☑ | self-hosted woff2, no CDN |
+
+**Plan S1 COMPLETE (9/9 incl. S1-0).** Tokens + harness on `feat/S1-tokens`; baselines are the post-S1 reference for S2+ RED/GREEN.
 
 ## Plan S2 — Global chrome ([detail](plan-S2.md))
 
@@ -80,12 +83,12 @@
 
 | Plan | Items | DONE | PARTIAL | TODO |
 |---|---|---|---|---|
-| S1 Color/tokens + faces | 8 | 0 | 0 | 8 |
+| S1 Color/tokens + faces + harness | 9 | 9 | 0 | 0 |
 | S2 Global chrome | 6 | 0 | 0 | 6 |
 | S3 Editor chrome | 6 | 0 | 0 | 6 |
 | S4 Typography | 4 | 0 | 0 | 4 |
 | S5 Interactions + surfaces | 13 | 0 | 0 | 13 |
-| **Total** | **37** | **0** | **0** | **37** |
+| **Total** | **38** | **9** | **0** | **29** |
 
 **Known PARTIAL-risk items** (will not flip to DONE while a sub-part is a
 placeholder/deferred): S2-4 (routeless views), **S2-6** (editor-chrome reflow),

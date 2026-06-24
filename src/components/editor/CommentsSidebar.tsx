@@ -43,7 +43,7 @@ function renderBody(body: string) {
   return parts.map((part, i) =>
     part.startsWith('@') ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: split parts have no stable id; index is safe here
-      <em key={i} style={{ color: 'var(--accent, #7c3aed)', fontStyle: 'normal', fontWeight: 600 }}>
+      <em key={i} style={{ color: 'var(--accent)', fontStyle: 'normal', fontWeight: 600 }}>
         {part}
       </em>
     ) : (
@@ -302,7 +302,7 @@ export function CommentsSidebar({ docId, editor, currentUserId }: Props) {
                 fontSize: 11,
                 wordBreak: 'break-all',
                 color: 'var(--text, #111827)',
-                background: 'var(--surface-hover, #f9fafb)',
+                background: 'var(--surface-hover, #F8F9FA)',
                 padding: '2px 4px',
                 borderRadius: 4,
               }}
@@ -392,7 +392,7 @@ export function CommentsSidebar({ docId, editor, currentUserId }: Props) {
               padding: '2px 8px',
               borderRadius: 4,
               border: '1px solid var(--border, #e5e7eb)',
-              background: filter === f ? 'var(--accent, #7c3aed)' : 'transparent',
+              background: filter === f ? 'var(--accent)' : 'transparent',
               color: filter === f ? 'var(--accent-contrast, #fff)' : 'inherit',
               cursor: 'pointer',
               textTransform: 'capitalize',
@@ -428,9 +428,9 @@ export function CommentsSidebar({ docId, editor, currentUserId }: Props) {
                 style={{
                   padding: '10px 12px',
                   borderBottom: '1px solid var(--border, #e5e7eb)',
-                  background: isFocused ? 'var(--surface-hover, #f9fafb)' : 'transparent',
+                  background: isFocused ? 'var(--surface-hover, #F8F9FA)' : 'transparent',
                   cursor: 'pointer',
-                  outline: isFocused ? '2px solid var(--accent, #7c3aed)' : 'none',
+                  outline: isFocused ? '2px solid var(--accent)' : 'none',
                   outlineOffset: -2,
                 }}
               >

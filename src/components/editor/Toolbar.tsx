@@ -465,7 +465,7 @@ export function Toolbar({
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleHighlight().run()}
       >
-        <span style={{ background: '#fef08a', padding: '0 2px' }}>H</span>
+        <span style={{ background: 'var(--highlight)', padding: '0 2px' }}>H</span>
       </button>
 
       <span className="parchment-toolbar-sep" aria-hidden="true" />

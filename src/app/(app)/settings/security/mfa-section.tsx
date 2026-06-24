@@ -159,7 +159,7 @@ function TotpPanel({
             <button
               type="submit"
               disabled={busy || code.trim().length === 0}
-              className="rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 text-sm text-white disabled:opacity-60"
+              className="rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm text-[var(--on-primary)] disabled:opacity-60"
             >
               Confirm
             </button>
@@ -174,7 +174,7 @@ function TotpPanel({
             type="button"
             onClick={begin}
             disabled={busy}
-            className="rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 text-sm text-white disabled:opacity-60"
+            className="rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm text-[var(--on-primary)] disabled:opacity-60"
           >
             Set up
           </button>
@@ -250,7 +250,7 @@ function PasskeyPanel({
           type="button"
           onClick={register}
           disabled={busy}
-          className="rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 text-sm text-white disabled:opacity-60"
+          className="rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm text-[var(--on-primary)] disabled:opacity-60"
         >
           Add passkey
         </button>

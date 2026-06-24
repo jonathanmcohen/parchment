@@ -130,7 +130,7 @@ export function GrammarPanel({ editor, onClose }: Props) {
           type="button"
           onClick={() => void runCheck()}
           disabled={status === 'loading'}
-          className="rounded-md bg-[var(--accent-contrast)] px-2.5 py-1 font-medium text-white text-xs disabled:opacity-60"
+          className="rounded-md bg-[var(--primary)] px-2.5 py-1 font-medium text-[var(--on-primary)] text-xs disabled:opacity-60"
         >
           {status === 'loading' ? 'Checking…' : 'Re-check'}
         </button>

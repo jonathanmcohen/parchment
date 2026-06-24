@@ -195,6 +195,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.5.0
         version: 2.5.0
+      '@material-symbols/svg-400':
+        specifier: ^0.45.2
+        version: 0.45.2
       '@playwright/test':
         specifier: 1.61.0
         version: 1.61.0
@@ -1345,6 +1348,9 @@ packages:
 
   '@marijn/find-cluster-break@1.0.2':
     resolution: {integrity: sha512-l0h88YhZFyKdXIFNfSWpyjStDjGHwZ/U7iobcK1cQQD8sejsONdQtTVU+1wVN1PBw40PiiHB1vA5S7VTfQiP9g==}
+
+  '@material-symbols/svg-400@0.45.2':
+    resolution: {integrity: sha512-O9VNGQS5vGohyeS3NUCBx2PhEBKwEutpSPUJYu6UoyIjB2g8fB7PQcj/a9ndb4T70Ut3/9b7CGmXo+Jll4KlNg==}
 
   '@mermaid-js/parser@0.6.3':
     resolution: {integrity: sha512-lnjOhe7zyHjc+If7yT4zoedx2vo4sHaTmtkl1+or8BRTnCtDmcTpAjpzDSfCZrshM5bCoz0GyidzadJAH1xobA==}
@@ -6260,6 +6266,8 @@ snapshots:
   '@lifeomic/attempt@3.1.0': {}
 
   '@marijn/find-cluster-break@1.0.2': {}
+
+  '@material-symbols/svg-400@0.45.2': {}
 
   '@mermaid-js/parser@0.6.3':
     dependencies:

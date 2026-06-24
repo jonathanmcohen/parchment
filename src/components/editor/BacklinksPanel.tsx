@@ -79,7 +79,7 @@ export function BacklinksPanel({ docId }: Props) {
                   display: 'block',
                   padding: '8px 12px',
                   fontSize: 13,
-                  color: 'var(--accent, #7c3aed)',
+                  color: 'var(--accent)',
                   textDecoration: 'none',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',

@@ -17,7 +17,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#7c5cff',
+  // S1-1: Google-Docs brand blue (static manifest value, outside the CSS-var system).
+  themeColor: '#1A73E8',
   width: 'device-width',
   initialScale: 1,
   // G12: pinch-zoom is intentionally NOT disabled — maximumScale and

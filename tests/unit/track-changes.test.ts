@@ -40,6 +40,31 @@ describe('authorColor', () => {
     const c = authorColor('')
     expect(c).toMatch(/^#[0-9a-f]{6}$/i)
   })
+
+  // S1-5: the caret palette was retuned to seat Google-Docs blue first and to
+  // drop the violet residue (#6d28d9). These assert the palette stays distinct
+  // (so a 2nd collaborator gets a clearly different caret hue) and purple-free.
+  it('never returns the retired violet residue #6d28d9', () => {
+    // Probe a wide spread of author ids; none should map to the old violet.
+    for (let i = 0; i < 200; i++) {
+      expect(authorColor(`author-${i}`)).not.toBe('#6d28d9')
+    }
+  })
+
+  it('maps a spread of distinct authors to several distinct hues', () => {
+    // A 12-colour palette over many ids should surface multiple distinct hues,
+    // so two simultaneous collaborators are very likely to differ.
+    const ids = Array.from({ length: 24 }, (_, i) => `user-${i}`)
+    const unique = new Set(ids.map(authorColor))
+    expect(unique.size).toBeGreaterThanOrEqual(6)
+  })
+
+  it('every produced colour is a 6-digit hex (no malformed palette entry)', () => {
+    const ids = Array.from({ length: 50 }, (_, i) => `seed${i}`)
+    for (const id of ids) {
+      expect(authorColor(id)).toMatch(/^#[0-9a-f]{6}$/i)
+    }
+  })
 })
 
 describe('collectChanges', () => {

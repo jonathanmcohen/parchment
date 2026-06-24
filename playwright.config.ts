@@ -19,7 +19,26 @@ export default defineConfig({
     storageState: 'tests/e2e/.auth/state.json',
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // S1-0: visual-regression gate. Baselines are per-platform (OS font rendering
+  // differs), stored under tests/e2e/visual/__screenshots__/{platform}/. The
+  // controller runs this suite locally to capture the per-PR RED/GREEN artifacts
+  // every S1–S5 item needs; CI keeps the axe a11y gate. caret hidden + animations
+  // off so a re-run on unchanged UI is byte-stable.
+  expect: {
+    timeout: 10_000,
+    toHaveScreenshot: { maxDiffPixelRatio: 0.02, animations: 'disabled', caret: 'hide' },
+  },
+  snapshotPathTemplate: 'tests/e2e/visual/__screenshots__/{platform}/{testFileName}/{arg}{ext}',
+  projects: [
+    // K4 axe a11y harness — excludes the visual specs.
+    { name: 'chromium', testIgnore: '**/visual/**', use: { ...devices['Desktop Chrome'] } },
+    // S1-0 visual-regression — deterministic 1440×900 viewport.
+    {
+      name: 'visual',
+      testMatch: '**/visual/**',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+    },
+  ],
   webServer: {
     command: 'pnpm start',
     port: 3000,

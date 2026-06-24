@@ -74,7 +74,7 @@ export function BubbleMenu({ editor, aiEnabled = false }: Props) {
         onMouseDown={keepSelection}
         onClick={() => editor.chain().focus().toggleHighlight().run()}
       >
-        <span style={{ background: '#fef08a', padding: '0 2px' }}>H</span>
+        <span style={{ background: 'var(--highlight)', padding: '0 2px' }}>H</span>
       </button>
       {aiEnabled && <AiMenu editor={editor} aiEnabled={aiEnabled} />}
     </TiptapBubbleMenu>

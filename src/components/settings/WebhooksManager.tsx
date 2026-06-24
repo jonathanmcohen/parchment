@@ -277,7 +277,7 @@ function NewWebhookForm({
       <button
         type="submit"
         disabled={busy || url.trim().length === 0 || events.length === 0}
-        className="mt-3 rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 text-sm text-white disabled:opacity-60"
+        className="mt-3 rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm text-[var(--on-primary)] disabled:opacity-60"
       >
         Add webhook
       </button>

@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Markdown-first writing, page-bounded canvas, self-hosted.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#f7f6f3',
-    theme_color: '#7c5cff',
+    background_color: '#FFFFFF',
+    theme_color: '#1A73E8',
     icons: [
       {
         src: '/icons/icon-192.png',

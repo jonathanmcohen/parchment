@@ -272,7 +272,7 @@ export function StylesManager() {
           <button
             type="button"
             onClick={addStyle}
-            className="rounded-md bg-[var(--accent-contrast)] px-3 py-2 font-medium text-sm text-white"
+            className="rounded-md bg-[var(--primary)] px-3 py-2 font-medium text-sm text-[var(--on-primary)]"
           >
             Add style
           </button>

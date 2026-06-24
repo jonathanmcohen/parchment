@@ -17,9 +17,15 @@ export interface TrackedChange {
 
 // ── Author colour palette ──────────────────────────────────────────────────
 
-/** 12 WCAG-AA-safe colours (checked against white at 4.5:1). */
+/**
+ * 12 WCAG-AA-safe collaborator caret colours (checked against white at 4.5:1).
+ * S1-5: seeded with the Google-Docs blue family first so the default/first caret
+ * reads as Google Blue; the violet-700 residue (#6d28d9) was swapped for a Docs
+ * purple (#9334e6). Entries stay visually distinct so a 2nd client gets a clearly
+ * different caret + label hue on white.
+ */
 const PALETTE = [
-  '#1d4ed8', // blue-700
+  '#1a73e8', // google blue
   '#15803d', // green-700
   '#b45309', // amber-700
   '#9333ea', // purple-600
@@ -30,7 +36,7 @@ const PALETTE = [
   '#0369a1', // sky-700
   '#047857', // emerald-700
   '#c2410c', // orange-700
-  '#6d28d9', // violet-700
+  '#9334e6', // docs purple (was violet-700 #6d28d9)
 ]
 
 /** Simple deterministic hash: djb2. */

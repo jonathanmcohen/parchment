@@ -89,7 +89,7 @@ export default function TemplateGallery({ bundled, initialUserTemplates }: Props
                 type="button"
                 disabled={busyKey !== null}
                 onClick={() => instantiate(`builtin:${t.key}`, { builtinKey: t.key })}
-                className="self-start rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 font-medium text-sm text-white disabled:opacity-50"
+                className="self-start rounded-md bg-[var(--primary)] px-3 py-1.5 font-medium text-sm text-[var(--on-primary)] disabled:opacity-50"
               >
                 {busyKey === `builtin:${t.key}` ? 'Creating…' : 'Use template'}
               </button>
@@ -135,7 +135,7 @@ export default function TemplateGallery({ bundled, initialUserTemplates }: Props
                   type="button"
                   disabled={busyKey !== null}
                   onClick={() => instantiate(`user:${t.id}`, { templateId: t.id })}
-                  className="self-start rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 font-medium text-sm text-white disabled:opacity-50"
+                  className="self-start rounded-md bg-[var(--primary)] px-3 py-1.5 font-medium text-sm text-[var(--on-primary)] disabled:opacity-50"
                 >
                   {busyKey === `user:${t.id}` ? 'Creating…' : 'Use template'}
                 </button>

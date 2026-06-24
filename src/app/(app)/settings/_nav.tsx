@@ -28,7 +28,7 @@ export function SettingsNav() {
             aria-current={active ? 'page' : undefined}
             className={
               active
-                ? 'rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 font-medium text-sm text-white'
+                ? 'rounded-md bg-[var(--primary)] px-3 py-1.5 font-medium text-sm text-[var(--on-primary)]'
                 : 'rounded-md px-3 py-1.5 text-[var(--foreground)] text-sm hover:bg-[var(--paper)]'
             }
           >

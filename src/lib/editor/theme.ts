@@ -176,10 +176,14 @@ const DYSLEXIC_FONT_STACK = '"OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Ve
 export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
   const pair = findPair(theme.fontPair)
   return {
-    // Both accent tokens track the picker: `--accent-contrast` drives buttons,
-    // focus rings and primary fills, while the bare `--accent` recolors links,
-    // selections, code-block highlights and the many color-mix accent surfaces.
-    // Emitting only one leaves a large share of the accent UI on the default.
+    // S1-1: both accent tokens track the per-workspace picker and drive
+    // IN-DOCUMENT accent ONLY — never chrome. Chrome (primary buttons, active
+    // nav/toolbar pills, selected rows, the Share button, focus rings) reads the
+    // FIXED `--primary*` tokens from tokens.css, which the picker can never
+    // repaint, so a non-default accent swatch keeps Google-Blue chrome. The bare
+    // `--accent` recolors prose links/marks, selections and color-mix accent
+    // surfaces; `--accent-contrast` is the readable text shown ON an `--accent`
+    // fill (e.g. the version-history diff toggle, comments filter pill).
     '--accent': theme.accent,
     '--accent-contrast': theme.accent,
     '--font-heading': theme.dyslexicFont ? DYSLEXIC_FONT_STACK : pair.heading,

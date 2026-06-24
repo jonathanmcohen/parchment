@@ -294,7 +294,7 @@ export function ShortcutsSettings() {
           type="button"
           onClick={save}
           disabled={saving}
-          className="rounded-md bg-[var(--accent-contrast)] px-4 py-2 font-medium text-sm text-white disabled:opacity-50"
+          className="rounded-md bg-[var(--primary)] px-4 py-2 font-medium text-sm text-[var(--on-primary)] disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save shortcuts'}
         </button>

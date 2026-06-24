@@ -102,7 +102,7 @@ export function AppearanceSettings() {
                 className={[
                   'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm',
                   checked
-                    ? 'border-[var(--accent-contrast)] bg-[color-mix(in_srgb,var(--accent-contrast)_10%,transparent)] font-medium'
+                    ? 'border-[var(--primary)] bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] font-medium'
                     : 'border-[var(--border)] hover:bg-[var(--background)]',
                 ]
                   .filter(Boolean)
@@ -115,7 +115,7 @@ export function AppearanceSettings() {
                   checked={checked}
                   disabled={saving}
                   onChange={() => save({ ...theme, colorScheme: opt.value })}
-                  className="accent-[var(--accent-contrast)]"
+                  className="accent-[var(--primary)]"
                 />
                 {opt.label}
               </label>
@@ -140,7 +140,7 @@ export function AppearanceSettings() {
                 onClick={() => save({ ...theme, accent: swatch })}
                 style={{ backgroundColor: swatch }}
                 className={[
-                  'h-7 w-7 rounded-full border-2 transition-transform focus-visible:outline-2 focus-visible:outline-[var(--accent-contrast)] focus-visible:outline-offset-2',
+                  'h-7 w-7 rounded-full border-2 transition-transform focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-2',
                   selected ? 'scale-110 border-white shadow-md' : 'border-transparent',
                 ]
                   .filter(Boolean)
@@ -187,7 +187,7 @@ export function AppearanceSettings() {
                 className={[
                   'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm',
                   selected
-                    ? 'border-[var(--accent-contrast)] bg-[color-mix(in_srgb,var(--accent-contrast)_10%,transparent)] font-medium'
+                    ? 'border-[var(--primary)] bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] font-medium'
                     : 'border-[var(--border)] hover:bg-[var(--background)]',
                 ]
                   .filter(Boolean)
@@ -200,7 +200,7 @@ export function AppearanceSettings() {
                   checked={selected}
                   disabled={saving}
                   onChange={() => save({ ...theme, pageBg: preset.value })}
-                  className="accent-[var(--accent-contrast)]"
+                  className="accent-[var(--primary)]"
                 />
                 {preset.label}
               </label>
@@ -247,9 +247,9 @@ export function AppearanceSettings() {
                 disabled={saving}
                 onClick={() => save({ ...theme, fontPair: pair.key })}
                 className={[
-                  'flex flex-col rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent-contrast)] focus-visible:outline-offset-2',
+                  'flex flex-col rounded-md border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-2',
                   selected
-                    ? 'border-[var(--accent-contrast)] bg-[color-mix(in_srgb,var(--accent-contrast)_10%,transparent)]'
+                    ? 'border-[var(--primary)] bg-[color-mix(in_srgb,var(--primary)_10%,transparent)]'
                     : 'border-[var(--border)] hover:bg-[var(--background)]',
                 ]
                   .filter(Boolean)
@@ -289,7 +289,7 @@ export function AppearanceSettings() {
               checked={theme.highContrast}
               disabled={saving}
               onChange={(e) => save({ ...theme, highContrast: e.target.checked })}
-              className="mt-0.5 h-4 w-4 accent-[var(--accent-contrast)]"
+              className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
             />
             <span className="flex flex-col">
               <span className="font-medium">High contrast</span>
@@ -305,7 +305,7 @@ export function AppearanceSettings() {
               checked={theme.dyslexicFont}
               disabled={saving}
               onChange={(e) => save({ ...theme, dyslexicFont: e.target.checked })}
-              className="mt-0.5 h-4 w-4 accent-[var(--accent-contrast)]"
+              className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
             />
             <span className="flex flex-col">
               <span className="font-medium">Dyslexia-friendly font (OpenDyslexic)</span>

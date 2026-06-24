@@ -181,7 +181,7 @@ function SmartFolderCreateForm({ onCreated, onCancel }: SmartFolderCreateFormPro
       <div className="flex gap-2 mt-1">
         <button
           type="submit"
-          className="px-3 py-1 text-xs rounded bg-[var(--accent-contrast)] text-white font-medium"
+          className="px-3 py-1 text-xs rounded bg-[var(--primary)] text-[var(--on-primary)] font-medium"
         >
           Create
         </button>
@@ -271,7 +271,7 @@ function TagCreateForm({ onCreated, onCancel }: TagCreateFormProps) {
       <div className="flex gap-2 mt-1">
         <button
           type="submit"
-          className="px-3 py-1 text-xs rounded bg-[var(--accent-contrast)] text-white font-medium"
+          className="px-3 py-1 text-xs rounded bg-[var(--primary)] text-[var(--on-primary)] font-medium"
         >
           Create
         </button>
@@ -537,10 +537,10 @@ function FolderTreeItem({
             className={[
               'flex w-full items-center text-left px-2 py-1 text-sm rounded truncate',
               over
-                ? 'bg-[var(--accent-contrast)] text-white'
+                ? 'bg-[var(--primary)] text-[var(--on-primary)]'
                 : isActive
-                  ? 'font-semibold text-[var(--accent-contrast)]'
-                  : 'text-[var(--foreground)] hover:text-[var(--accent-contrast)]',
+                  ? 'font-semibold text-[var(--primary)]'
+                  : 'text-[var(--foreground)] hover:text-[var(--primary)]',
             ].join(' ')}
           >
             📁 {node.name}
@@ -607,7 +607,7 @@ function SortViewToolbar({
           type="button"
           onClick={() => onSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
           aria-label={sortDir === 'asc' ? 'Sort descending' : 'Sort ascending'}
-          className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)] hover:text-[var(--accent-contrast)]"
+          className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)] hover:text-[var(--primary)]"
         >
           {sortDir === 'asc' ? '↑ Asc' : '↓ Desc'}
         </button>
@@ -624,7 +624,7 @@ function SortViewToolbar({
             className={[
               'px-2 py-1 text-xs capitalize',
               viewMode === mode
-                ? 'bg-[var(--accent-contrast)] text-white'
+                ? 'bg-[var(--primary)] text-[var(--on-primary)]'
                 : 'bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]',
             ].join(' ')}
           >
@@ -811,7 +811,7 @@ function ContextMenu({ state, onClose, onRefresh, navigateTo, onSetView }: Conte
           className={[
             'text-left px-3 py-1.5 text-sm',
             item.enabled
-              ? 'text-[var(--foreground)] hover:bg-[var(--accent-contrast)] hover:text-white cursor-pointer'
+              ? 'text-[var(--foreground)] hover:bg-[var(--primary)] hover:text-[var(--on-primary)] cursor-pointer'
               : 'text-[var(--muted)] cursor-default',
           ].join(' ')}
         >
@@ -895,7 +895,7 @@ function DocActions({
           type="button"
           onClick={() => setShowTagPopover((v) => !v)}
           aria-label={`Edit tags for ${doc.title}`}
-          className="text-sm px-1 text-[var(--muted)] hover:text-[var(--accent-contrast)]"
+          className="text-sm px-1 text-[var(--muted)] hover:text-[var(--primary)]"
         >
           🏷
         </button>
@@ -918,7 +918,7 @@ function DocActions({
             type="button"
             onClick={handleStar}
             aria-label={isStarred ? `Unstar ${doc.title}` : `Star ${doc.title}`}
-            className="text-base leading-none px-1 hover:text-[var(--accent-contrast)]"
+            className="text-base leading-none px-1 hover:text-[var(--primary)]"
           >
             {isStarred ? '★' : '☆'}
           </button>
@@ -937,7 +937,7 @@ function DocActions({
           type="button"
           onClick={handleRestore}
           aria-label={`Restore ${doc.title}`}
-          className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--accent-contrast)] hover:border-[var(--accent-contrast)]"
+          className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--primary)] hover:border-[var(--primary)]"
         >
           Restore
         </button>
@@ -1070,7 +1070,7 @@ function BulkActionBar({
   return (
     <section
       aria-label="Bulk actions"
-      className="flex items-center gap-3 px-3 py-2 mb-3 rounded-md border border-[var(--accent-contrast)] bg-[var(--paper)] flex-wrap"
+      className="flex items-center gap-3 px-3 py-2 mb-3 rounded-md border border-[var(--primary)] bg-[var(--paper)] flex-wrap"
     >
       <span className="text-sm font-medium text-[var(--foreground)] shrink-0">
         {count} selected
@@ -1217,7 +1217,7 @@ function DocListRow({
         />
         <a
           href={`/d/${doc.id}`}
-          className="flex-1 font-medium hover:text-[var(--accent-contrast)] truncate"
+          className="flex-1 font-medium hover:text-[var(--primary)] truncate"
         >
           📄 {doc.title}
         </a>
@@ -1378,8 +1378,8 @@ function DocList({
                 href={`/d/${doc.id}`}
                 aria-label={doc.title}
                 className={[
-                  'flex flex-col gap-1 p-3 pl-8 border border-[var(--border)] rounded-lg bg-[var(--paper)] hover:border-[var(--accent-contrast)] transition-colors h-full',
-                  selected.has(doc.id) ? 'border-[var(--accent-contrast)]' : '',
+                  'flex flex-col gap-1 p-3 pl-8 border border-[var(--border)] rounded-lg bg-[var(--paper)] hover:border-[var(--primary)] transition-colors h-full',
+                  selected.has(doc.id) ? 'border-[var(--primary)]' : '',
                 ].join(' ')}
               >
                 <span className="text-2xl" aria-hidden="true">
@@ -1493,7 +1493,7 @@ function DocList({
             <td className="py-2 pr-3">
               <a
                 href={`/d/${doc.id}`}
-                className="font-medium hover:text-[var(--accent-contrast)] truncate block max-w-xs"
+                className="font-medium hover:text-[var(--primary)] truncate block max-w-xs"
               >
                 📄 {doc.title}
               </a>
@@ -1575,7 +1575,7 @@ function AllViewDocRow({
           e.dataTransfer.setData('application/json', JSON.stringify({ type: 'doc', id: doc.id }))
           e.dataTransfer.effectAllowed = 'move'
         }}
-        className="flex-1 font-medium hover:text-[var(--accent-contrast)]"
+        className="flex-1 font-medium hover:text-[var(--primary)]"
       >
         📄 {doc.title}
       </a>
@@ -1590,7 +1590,7 @@ function AllViewDocRow({
           type="button"
           onClick={() => setShowTagPopover((v) => !v)}
           aria-label={`Edit tags for ${doc.title}`}
-          className="text-sm px-1 text-[var(--muted)] hover:text-[var(--accent-contrast)]"
+          className="text-sm px-1 text-[var(--muted)] hover:text-[var(--primary)]"
         >
           🏷
         </button>
@@ -2099,7 +2099,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
             className={[
               'px-3 py-1.5 text-sm rounded-t font-medium',
               view === key && view !== 'smart' && view !== 'tag'
-                ? 'text-[var(--accent-contrast)] border-b-2 border-[var(--accent-contrast)]'
+                ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
                 : 'text-[var(--muted)] hover:text-[var(--foreground)]',
             ].join(' ')}
           >
@@ -2120,7 +2120,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
             <button
               type="button"
               onClick={handleNewFolder}
-              className="rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 font-medium text-sm text-white"
+              className="rounded-md bg-[var(--primary)] px-3 py-1.5 font-medium text-sm text-[var(--on-primary)]"
             >
               + New folder
             </button>
@@ -2131,7 +2131,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 'rounded-md border border-[var(--border)] px-3 py-1.5 font-medium text-sm text-[var(--foreground)] cursor-pointer text-center',
                 importing
                   ? 'opacity-50 cursor-wait'
-                  : 'hover:border-[var(--accent-contrast)] hover:text-[var(--accent-contrast)]',
+                  : 'hover:border-[var(--primary)] hover:text-[var(--primary)]',
               ].join(' ')}
               aria-label="Import document"
               aria-busy={importing}
@@ -2184,7 +2184,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                   className={[
                     'rounded px-2 py-1 text-sm text-left w-full',
                     over
-                      ? 'bg-[var(--accent-contrast)] text-white'
+                      ? 'bg-[var(--primary)] text-[var(--on-primary)]'
                       : currentFolderId === null
                         ? 'font-semibold text-[var(--foreground)]'
                         : 'text-[var(--muted)]',
@@ -2227,8 +2227,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                       className={[
                         'flex-1 text-left px-2 py-1 text-sm rounded truncate',
                         view === 'smart' && activeSmartId === sf.id
-                          ? 'font-semibold text-[var(--accent-contrast)]'
-                          : 'text-[var(--foreground)] hover:text-[var(--accent-contrast)]',
+                          ? 'font-semibold text-[var(--primary)]'
+                          : 'text-[var(--foreground)] hover:text-[var(--primary)]',
                       ].join(' ')}
                     >
                       🔍 {sf.name}
@@ -2262,7 +2262,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               <button
                 type="button"
                 onClick={() => setShowCreateForm((v) => !v)}
-                className="text-xs text-[var(--muted)] hover:text-[var(--accent-contrast)] text-left px-2 py-1"
+                className="text-xs text-[var(--muted)] hover:text-[var(--primary)] text-left px-2 py-1"
               >
                 + Smart folder
               </button>
@@ -2299,8 +2299,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         className={[
                           'flex-1 text-left px-2 py-1 text-sm rounded truncate flex items-center gap-1.5',
                           view === 'tag' && activeTagId === tag.id
-                            ? 'font-semibold text-[var(--accent-contrast)]'
-                            : 'text-[var(--foreground)] hover:text-[var(--accent-contrast)]',
+                            ? 'font-semibold text-[var(--primary)]'
+                            : 'text-[var(--foreground)] hover:text-[var(--primary)]',
                         ].join(' ')}
                       >
                         <span
@@ -2341,7 +2341,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               <button
                 type="button"
                 onClick={() => setShowTagCreateForm((v) => !v)}
-                className="text-xs text-[var(--muted)] hover:text-[var(--accent-contrast)] text-left px-2 py-1"
+                className="text-xs text-[var(--muted)] hover:text-[var(--primary)] text-left px-2 py-1"
               >
                 + New tag
               </button>
@@ -2381,8 +2381,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         className={[
                           'rounded px-1 hover:underline',
                           over
-                            ? 'bg-[var(--accent-contrast)] text-white'
-                            : 'text-[var(--accent-contrast)]',
+                            ? 'bg-[var(--primary)] text-[var(--on-primary)]'
+                            : 'text-[var(--primary)]',
                         ].join(' ')}
                       >
                         Root
@@ -2405,8 +2405,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                             className={[
                               'rounded px-1 hover:underline',
                               over
-                                ? 'bg-[var(--accent-contrast)] text-white'
-                                : 'text-[var(--accent-contrast)]',
+                                ? 'bg-[var(--primary)] text-[var(--on-primary)]'
+                                : 'text-[var(--primary)]',
                             ].join(' ')}
                           >
                             {segment.name}
@@ -2461,8 +2461,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                                 className={[
                                   'flex w-full items-center gap-2 py-2 rounded font-medium text-left',
                                   over
-                                    ? 'bg-[var(--paper)] text-[var(--accent-contrast)]'
-                                    : 'hover:text-[var(--accent-contrast)]',
+                                    ? 'bg-[var(--paper)] text-[var(--primary)]'
+                                    : 'hover:text-[var(--primary)]',
                                 ].join(' ')}
                               >
                                 <span aria-hidden="true">📁</span>

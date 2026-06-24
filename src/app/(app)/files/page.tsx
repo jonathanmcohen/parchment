@@ -36,7 +36,7 @@ export default async function FilesPage() {
         <form action={newDocument}>
           <button
             type="submit"
-            className="rounded-md bg-[var(--accent-contrast)] px-3 py-1.5 font-medium text-sm text-white"
+            className="rounded-md bg-[var(--primary)] px-3 py-1.5 font-medium text-sm text-[var(--on-primary)]"
           >
             + New document
           </button>

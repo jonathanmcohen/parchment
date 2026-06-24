@@ -1270,7 +1270,8 @@ body {
 
 .parchment-prose ul[data-type="taskList"] li[data-checked="true"] > div {
   text-decoration: line-through;
-  color: var(--muted);
+  /* F2: completed-task text is prose-context muted on the page → --page-ink-muted. */
+  color: var(--page-ink-muted);
 }
 
 /* ── Tables (B4) ─────────────────────────────────────────────────── */
@@ -2076,7 +2077,12 @@ body {
   font-family: var(--font-body);
   font-size: 11pt;
   line-height: 1.15;
-  color: var(--foreground);
+  /* F2: page body uses --page-ink (contrasts the page CANVAS), not the chrome
+     scheme's --foreground. In dark chrome --foreground is #E8EAED (light ink for
+     a dark bg) but the page is a WHITE sheet → light-grey-on-white was unreadable.
+     --page-ink is dark (#202124) for the white/sepia sheet and flips white only in
+     HC-dark where the page itself goes black. */
+  color: var(--page-ink);
 }
 /* G3: headings follow the workspace theme's heading font. */
 .parchment-prose h1,
@@ -2086,7 +2092,8 @@ body {
 .parchment-prose h5,
 .parchment-prose h6 {
   font-family: var(--font-heading);
-  color: var(--foreground);
+  /* F2: heading ramp uses --page-ink for the same reason as the body above. */
+  color: var(--page-ink);
 }
 .parchment-prose h1 {
   font-size: 20pt;
@@ -2122,13 +2129,15 @@ body {
    the canonical S1 token. */
 .parchment-doc-title {
   font: 700 26pt / 1.2 var(--font-body);
-  color: var(--foreground);
+  /* F2: in-document title surface sits on the page canvas → --page-ink. */
+  color: var(--page-ink);
   margin: 12px 0 8px;
   letter-spacing: -0.01em;
 }
 .parchment-doc-subtitle {
   font: 400 16pt var(--font-body);
-  color: var(--muted);
+  /* F2: muted in-document text → --page-ink-muted (page-scoped). */
+  color: var(--page-ink-muted);
 }
 .parchment-prose p {
   margin: 0.5em 0;
@@ -2147,7 +2156,8 @@ body {
 .parchment-prose blockquote {
   border-left: 3px solid var(--border);
   padding-left: 1em;
-  color: var(--muted);
+  /* F2: muted prose text → --page-ink-muted (page-scoped). */
+  color: var(--page-ink-muted);
   margin: 0.6em 0;
 }
 .parchment-prose pre {
@@ -2166,7 +2176,8 @@ body {
 }
 .parchment-prose p.is-editor-empty:first-child::before {
   content: "Start writing…";
-  color: var(--muted);
+  /* F2: placeholder is prose-context muted → --page-ink-muted (page-scoped). */
+  color: var(--page-ink-muted);
   float: left;
   height: 0;
   pointer-events: none;

@@ -384,6 +384,240 @@ body {
   min-height: 100vh;
 }
 
+/* ── S3: editor chrome (title bar, menu bar, shared dropdown shell) ───────────
+ *
+ *  All colors resolve through S1 canonical tokens. Chrome-row borders use
+ *  --border-chrome (#E8EAED); the active pill / outline row use --primary-surface;
+ *  dropdown elevation references --shadow-dropdown via the shared `.px-menu`
+ *  shell (S3-2/S3-3 consume it; S5-3 owns/finalizes it — DECISION 6).
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── S3-1: doc title bar ── */
+.parchment-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-chrome);
+}
+.parchment-titlebar-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  color: var(--primary);
+  text-decoration: none;
+}
+.parchment-titlebar-glyph:hover {
+  background: var(--surface-hover);
+}
+.parchment-titlebar-title {
+  min-width: 80px;
+  max-width: 480px;
+  height: 32px;
+  padding: 0 8px;
+  font: 400 18px / 1 var(--font-ui);
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  text-overflow: ellipsis;
+}
+.parchment-titlebar-title:hover {
+  border-color: var(--border-chrome);
+}
+.parchment-titlebar-title:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+.parchment-titlebar-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.parchment-titlebar-iconbtn:hover {
+  background: var(--surface-hover);
+}
+.parchment-titlebar-iconbtn[aria-pressed="true"] {
+  color: var(--star);
+}
+.parchment-titlebar-iconbtn:disabled,
+.parchment-titlebar-iconbtn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+.parchment-titlebar-savestatus {
+  font: 400 12px / 1 var(--font-ui);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.parchment-titlebar-spacer {
+  flex: 1;
+}
+.parchment-titlebar-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  border: none;
+  background: var(--primary);
+  color: var(--on-primary);
+  font: 600 14px / 1 var(--font-ui);
+  cursor: pointer;
+}
+.parchment-titlebar-share:hover {
+  background: var(--primary-hover);
+}
+.parchment-titlebar-share:active {
+  background: var(--primary-pressed);
+}
+
+/* ── S3-2: menu bar ── */
+.parchment-menubar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-chrome);
+}
+.parchment-menu-wrap {
+  position: relative;
+}
+.parchment-menubar-item {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--foreground);
+  font: 400 14px / 1 var(--font-ui);
+  cursor: pointer;
+}
+.parchment-menubar-item:hover,
+.parchment-menubar-item[aria-expanded="true"] {
+  background: var(--surface-hover);
+}
+
+/* ── S3-2 (DECISION 6): the shared `.px-menu` dropdown shell. S3 builds the
+   class with the S1 --shadow-dropdown token (first consumer); S5-3 finalizes it.
+   Both the menu bar and the toolbar `⋯` consume this — no second component. ── */
+.px-menu {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 8px 0;
+  border: 1px solid var(--border-chrome);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-dropdown);
+}
+.parchment-menu-dropdown {
+  inset-inline-start: 0;
+  top: calc(100% + 4px);
+}
+.px-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 36px;
+  padding: 0 16px;
+  text-align: start;
+  text-decoration: none;
+  font: 400 14px / 1 var(--font-ui);
+  color: var(--foreground);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.px-menu-item:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--surface-hover);
+}
+.px-menu-item:disabled,
+.px-menu-item[aria-disabled="true"] {
+  color: var(--muted);
+  cursor: default;
+}
+.px-menu-item-icon {
+  font-size: 20px;
+  color: var(--muted);
+}
+.px-menu-item-label {
+  flex: 1;
+}
+.px-menu-item-shortcut {
+  color: var(--muted);
+  font-size: 12px;
+}
+.px-menu-item-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+.px-menu-separator {
+  height: 1px;
+  margin: 4px 0;
+  border: none;
+  background: var(--border-chrome);
+}
+.px-menu-group-label {
+  padding: 6px 16px 2px;
+  font: 600 11px / 1 var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+/* ── S3-2/S3-6: Word count modal ── */
+.parchment-wordcount-dialog {
+  min-width: 320px;
+}
+.parchment-wordcount-list {
+  margin: 0;
+  padding: 8px 0;
+}
+.parchment-wordcount-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 6px 0;
+  font-size: 14px;
+  color: var(--foreground);
+}
+.parchment-wordcount-row dt {
+  color: var(--muted);
+}
+.parchment-wordcount-row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.parchment-wordcount-row--selection {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-chrome);
+}
+
 /* Page canvas (B1) */
 .parchment-page {
   position: relative;
@@ -572,13 +806,79 @@ body {
   white-space: nowrap;
 }
 
+/* S3-6: slim 24px white footer, three slots (left/center/right), top chrome
+   border. "min read" dropped from the default view (surfaced in Tools → Word
+   count); the connection dot lives in the right slot. */
 .parchment-status-bar {
-  margin-top: 8px;
-  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+  width: 100%;
+  margin-top: 0;
+  padding: 0 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border-chrome);
+  font-size: 12px;
   color: var(--muted);
-  text-align: right;
-  padding: 0 4px;
   user-select: none;
+}
+
+.parchment-status-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.parchment-status-slot--center {
+  flex: 1;
+  justify-content: center;
+}
+.parchment-status-slot--right {
+  justify-content: flex-end;
+}
+
+/* Center word count → opens Tools → Word count. Looks like text, acts like a btn. */
+.parchment-status-wordcount {
+  background: transparent;
+  border: none;
+  padding: 0 6px;
+  height: 20px;
+  border-radius: 4px;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.parchment-status-wordcount:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+
+.parchment-status-readers {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* S3-6: the connection dot (green online / amber syncing / gray offline). */
+.parchment-status-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.parchment-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+}
+.parchment-status-connection[data-state="online"] .parchment-status-dot {
+  background: var(--success);
+}
+.parchment-status-connection[data-state="syncing"] .parchment-status-dot {
+  background: var(--warning);
+}
+.parchment-status-connection[data-state="offline"] .parchment-status-dot {
+  background: var(--muted);
 }
 
 .parchment-size-btn {
@@ -600,24 +900,42 @@ body {
 
 /* ── Inline formatting toolbar (B2) ─────────────────────────────────── */
 
+/* S3-3: single light 48px toolbar row — no purple, no wrap. Chrome stacks flush
+   below the menu bar (no border-radius, no margin); overflowing controls go to
+   the `⋯` menu.
+
+   Safety net: the row uses `overflow-x: auto` (NOT `overflow: hidden`) so that
+   if the measured `⋯` partition still leaves more inline controls than fit at a
+   given desktop width (e.g. the 769–920px window where the secondary group has
+   already collapsed but the primary controls alone are wider than the row), the
+   row scrolls horizontally rather than silently clipping the trailing controls
+   off-screen and out of reach. `overflow-y` is clipped so the 48px chrome height
+   never grows. The mobile (`max-width: 768px`) block layers touch sizing +
+   sticky positioning on top of this same scroll behavior. */
 .parchment-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 2px;
-  padding: 4px 8px;
-  background: var(--paper);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  margin-bottom: 8px;
+  height: 48px;
+  padding: 0 8px;
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--border-chrome);
+  border-radius: 0;
+  margin-bottom: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Thin, unobtrusive scrollbar only when the row actually overflows. */
+  scrollbar-width: thin;
 }
 
 .parchment-toolbar-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
+  min-width: 32px;
+  height: 32px;
   padding: 0 4px;
   font-size: 0.85rem;
   background: transparent;
@@ -629,13 +947,26 @@ body {
 }
 
 .parchment-toolbar-btn:hover {
-  background: var(--border);
+  background: var(--surface-hover);
 }
 
+/* S3-3: active pill is the blue --primary-surface (was #fff on purple). */
 .parchment-toolbar-btn[aria-pressed="true"] {
-  background: var(--primary);
-  color: var(--on-primary);
-  border-color: var(--primary);
+  background: var(--primary-surface);
+  color: var(--primary-surface-text);
+  border-color: transparent;
+}
+
+.parchment-toolbar-btn:disabled,
+.parchment-toolbar-btn[aria-disabled="true"] {
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* S3-3: the overflow `⋯` trigger pushes to the trailing edge. */
+.parchment-toolbar-overflow {
+  margin-inline-start: auto;
 }
 
 .parchment-toolbar-sep {
@@ -1317,15 +1648,17 @@ body {
 
 /* ── Outline rail (B11) ──────────────────────────────────────────────────── */
 
+/* S3-5: light left-rail — 256px, the standard muted surface (follows the
+   scheme; dark in dark mode, not the bespoke color-mix blend), chrome border. */
 .parchment-outline {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 220px;
-  min-width: 220px;
-  max-width: 220px;
-  border-right: 1px solid var(--border);
-  background: color-mix(in srgb, var(--background) 90%, var(--paper));
+  width: 256px;
+  min-width: 256px;
+  max-width: 256px;
+  border-right: 1px solid var(--border-chrome);
+  background: var(--surface-muted);
   flex-shrink: 0;
   transition:
     width 0.15s ease,
@@ -1468,7 +1801,7 @@ body {
   background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 14px;
   color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
@@ -1477,8 +1810,18 @@ body {
   transition: color 0.1s;
 }
 
+/* S3-5: hover is a subtle text/bg shift, not the purple accent text. */
 .parchment-outline-link:hover {
-  color: var(--accent);
+  color: var(--foreground);
+}
+
+/* S3-5: active-heading row (cursor's section) — light-blue --primary-surface. */
+.parchment-outline-item[aria-current="true"],
+.parchment-outline-item--active {
+  background: var(--primary-surface);
+}
+.parchment-outline-item--active .parchment-outline-link {
+  color: var(--primary-surface-text);
 }
 
 .parchment-outline-link:focus-visible {

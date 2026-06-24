@@ -18,6 +18,7 @@ import { CropDialog } from '@/components/editor/CropDialog'
 import { CrossRefPicker } from '@/components/editor/CrossRefPicker'
 import { CustomCssDialog } from '@/components/editor/CustomCssDialog'
 import { CustomCssStyle } from '@/components/editor/CustomCssStyle'
+import { DocTitleBar } from '@/components/editor/DocTitleBar'
 import { DrawioModal } from '@/components/editor/DrawioModal'
 import { EmbedDialog } from '@/components/editor/EmbedDialog'
 import { FindReplace } from '@/components/editor/FindReplace'
@@ -26,8 +27,8 @@ import { GrammarPanel } from '@/components/editor/GrammarPanel'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { MathPopover } from '@/components/editor/MathPopover'
+import { MenuBar } from '@/components/editor/MenuBar'
 import { MermaidPopover } from '@/components/editor/MermaidPopover'
-import { OfflineIndicator } from '@/components/editor/OfflineIndicator'
 import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
@@ -41,8 +42,12 @@ import { ShareDialog } from '@/components/editor/ShareDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
 import { Toolbar } from '@/components/editor/Toolbar'
+import { useConnectionState } from '@/components/editor/useConnectionState'
+import { useSaveStatus } from '@/components/editor/useSaveStatus'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { WatermarkDialog } from '@/components/editor/WatermarkDialog'
+import { WordCountDialog } from '@/components/editor/WordCountDialog'
+import { Avatar } from '@/components/shell/Avatar'
 import {
   registerShortcutAction,
   SHORTCUT_EVENT,
@@ -566,6 +571,13 @@ export function Editor({
   // G1: share-management dialog toggle
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
 
+  // S3-5: outline pane open-state lifted here so View → Show outline and the
+  // pane's internal chevron drive ONE shared boolean (no desync).
+  const [outlineOpen, setOutlineOpen] = useState(true)
+
+  // S3-2/S3-6: Tools → Word count modal (sourced from the existing counts).
+  const [wordCountOpen, setWordCountOpen] = useState(false)
+
   // D5: reading presence readers list + canvas wrapper ref
   const [readers, setReaders] = useState<Reader[]>([])
 
@@ -791,16 +803,24 @@ export function Editor({
     }
   }, [pageSetup, pageCount])
 
+  // S3-1 (DECISION 4): a small save-status state wrapped around the existing
+  // fire-and-forget save. The save PATH is unchanged — we only observe in-flight
+  // (markSaving) and settled (markSaved) so the title-bar slot can read the
+  // state. S5-9 supplies the COPY.
+  const { status: saveStatus, markSaving, markSaved } = useSaveStatus()
   const save = useCallback(
     (json: Record<string, unknown>) => {
       const markdown = serializeMarkdown(json)
+      markSaving()
       void fetch(`/api/docs/${docId}`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ contentJson: json, markdown }),
+      }).finally(() => {
+        markSaved()
       })
     },
-    [docId],
+    [docId, markSaving, markSaved],
   )
 
   // Upload a File to the assets route and return the resulting URL.
@@ -982,6 +1002,11 @@ export function Editor({
 
   const full: Counts = counts?.full ?? { words: 0, chars: 0 }
   const selection: Counts | null = counts?.selection ?? null
+
+  // S3-6: the connection state (online/syncing/offline) that the standalone
+  // OfflineIndicator pill used to render — now a dot in the status bar's right
+  // slot. Same derivation, new placement (no new connection logic).
+  const connection = useConnectionState(provider)
 
   const openCropForSelection = useCallback(() => {
     if (!editor) return
@@ -1391,11 +1416,44 @@ export function Editor({
     // edge-to-edge inside the shared <main> (negative margin cancels its padding).
     <div className="parchment-editor-shell">
       <div className="mx-auto max-w-5xl">
+        {/* S3-1: pinned doc title bar (first child) — inline-editable title via
+            the title-only /rename endpoint, save-status slot, share/comments/
+            history wired to existing handlers, S2-5 avatar cluster. */}
+        <DocTitleBar
+          docId={docId}
+          initialTitle={initialTitle}
+          saveStatus={saveStatus}
+          onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
+          onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
+          onOpenShare={() => setShareDialogOpen(true)}
+          avatar={<Avatar name={currentUserName} size={32} />}
+        />
+
+        {/* S3-2: menu bar (PARTIAL) — File/Edit/View/Insert/Format/Tools/
+            Extensions/Help; every non-placeholder row re-surfaces an existing
+            handler, placeholders are visibly disabled. */}
+        {editor && (
+          <MenuBar
+            editor={editor}
+            docId={docId}
+            onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
+            onOpenPageSetup={() => setPageSetupOpen(true)}
+            onExportPdf={() => setPrintOpen(true)}
+            onInsertImage={() => openImageDialog()}
+            onOpenLink={openLinkPopover}
+            onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
+            openFind={openFind}
+            onToggleOutline={() => setOutlineOpen((v) => !v)}
+            onOpenWordCount={() => setWordCountOpen(true)}
+            onToggleGrammar={() => setGrammarPanelOpen((v) => !v)}
+            grammarEnabled={grammarEnabled}
+          />
+        )}
+
         {/* Inline formatting toolbar (B2) */}
         {editor && (
           <Toolbar
             editor={editor}
-            docId={docId}
             onInsertImage={openImageDialog}
             onOpenLink={openLinkPopover}
             onCropImage={openCropForSelection}
@@ -1425,7 +1483,8 @@ export function Editor({
           />
         )}
 
-        <h1 className="mb-4 font-semibold text-2xl tracking-tight">{initialTitle}</h1>
+        {/* S3-1: the plain read-only <h1> is superseded by the inline-editable
+            title in <DocTitleBar> above. */}
 
         {/* I2 Part 3: Vim source-mode editor. Rendered in place of the WYSIWYG
           canvas. The editor instance stays mounted (display:none below) so the
@@ -1445,8 +1504,15 @@ export function Editor({
             gap: 0,
           }}
         >
-          {/* B11: outline pane (left rail) */}
-          {editor && <OutlinePane editor={editor} />}
+          {/* B11/S3-5: outline pane (left rail) — open-state lifted here so
+              View → Show outline + the chevron drive one shared boolean. */}
+          {editor && (
+            <OutlinePane
+              editor={editor}
+              open={outlineOpen}
+              onToggle={() => setOutlineOpen((v) => !v)}
+            />
+          )}
 
           {/* B9: find + replace panel — positioned relative to this wrapper */}
           <div ref={canvasWrapRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -1506,14 +1572,15 @@ export function Editor({
         {/* Selection bubble menu (B2 + G13: AI actions) */}
         {editor && <BubbleMenu editor={editor} aiEnabled={aiEnabled} />}
 
-        {/* G11: online/offline + sync status indicator */}
-        <OfflineIndicator provider={provider} />
-
+        {/* S3-6: the standalone OfflineIndicator sibling is folded into the
+            status bar's connection dot below (one bar, no separate pill). */}
         <StatusBar
           pageCount={pageCount}
           full={full}
           selection={selection}
           readers={readers.map((r) => r.user)}
+          connection={connection}
+          onOpenWordCount={() => setWordCountOpen(true)}
         />
 
         {/* B5: Image insert dialog */}
@@ -1665,6 +1732,17 @@ export function Editor({
 
         {/* G1: Share dialog */}
         {shareDialogOpen && <ShareDialog docId={docId} onClose={() => setShareDialogOpen(false)} />}
+
+        {/* S3-2/S3-6: Tools → Word count modal (existing counts; on-demand
+            read-time that S3-6 removed from the always-on status bar). */}
+        {wordCountOpen && (
+          <WordCountDialog
+            full={full}
+            selection={selection}
+            pageCount={pageCount}
+            onClose={() => setWordCountOpen(false)}
+          />
+        )}
 
         {/* G15: Reading mode overlay — rendered outside the layout flow so it is
           full-screen fixed. Content is a snapshot of editor.getJSON() at render

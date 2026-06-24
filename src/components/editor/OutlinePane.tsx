@@ -2,12 +2,43 @@
 
 import type { Editor } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { slugify } from '@/lib/editor/extensions/heading-id'
 import type { HeadingEntry } from '@/lib/editor/headings'
 import { collectHeadings } from '@/lib/editor/headings'
 import { moveHeadingSection } from '@/lib/editor/outline'
+import { activeHeadingId, type HeadingPos } from '@/lib/editor/outline-active'
 
 interface Props {
   editor: Editor
+  /**
+   * S3-5: optional controlled open-state. When provided, the View → Show outline
+   * menu drives the SAME state the internal chevron toggles — one shared boolean,
+   * no desync. When omitted, the pane self-manages its open-state (back-compat).
+   */
+  open?: boolean
+  onToggle?: () => void
+}
+
+// S3-5: resolve each heading's document position from the LIVE PM doc (not a
+// cached JSON shape — the G8 lesson), matched to the slugged ids that
+// collectHeadings produces, so the active-row derivation stays in sync with the
+// rendered outline.
+function headingPositions(editor: Editor): HeadingPos[] {
+  const positions: HeadingPos[] = []
+  const seen = new Map<string, number>()
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name === 'heading') {
+      // Mirror the slug + de-dupe scheme used by collectHeadings.
+      const text = node.textContent
+      const base = slugify(text) || 'heading'
+      const count = (seen.get(base) ?? 0) + 1
+      seen.set(base, count)
+      const id = count === 1 ? base : `${base}-${count}`
+      positions.push({ id, pos })
+    }
+    return true
+  })
+  return positions
 }
 
 /**
@@ -21,23 +52,36 @@ interface Props {
  *   - Drag-to-reorder: drags the entire section in the document via
  *     moveHeadingSection.
  */
-export function OutlinePane({ editor }: Props) {
+export function OutlinePane({ editor, open, onToggle }: Props) {
   const [entries, setEntries] = useState<HeadingEntry[]>(() => collectHeadings(editor.getJSON()))
-  const [paneOpen, setPaneOpen] = useState(true)
+  // S3-5: when `open` is provided the View menu controls the pane; otherwise the
+  // pane self-manages (one shared boolean either way — no competing booleans).
+  const [internalOpen, setInternalOpen] = useState(true)
+  const paneOpen = open ?? internalOpen
+  const togglePane = onToggle ?? (() => setInternalOpen((v) => !v))
   // Set of heading ids whose subtrees are collapsed in the outline
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
+  // S3-5: id of the heading whose section the cursor sits in (derived state).
+  const [activeId, setActiveId] = useState<string | null>(null)
 
   // Drag state — track which id is being dragged
   const draggedId = useRef<string | null>(null)
 
-  // Re-collect headings whenever the document changes
+  // Re-collect headings + derive the active row whenever the document or the
+  // selection changes. Both fold into the existing listeners — no new effect
+  // that re-triggers on its own output (the G7 no-loop lesson); the active id is
+  // resolved from the LIVE PM doc/selection, not a JSON-shape assumption (G8).
   useEffect(() => {
-    const handler = () => {
+    const recompute = () => {
       setEntries(collectHeadings(editor.getJSON()))
+      setActiveId(activeHeadingId(headingPositions(editor), editor.state.selection.from))
     }
-    editor.on('update', handler)
+    recompute()
+    editor.on('update', recompute)
+    editor.on('selectionUpdate', recompute)
     return () => {
-      editor.off('update', handler)
+      editor.off('update', recompute)
+      editor.off('selectionUpdate', recompute)
     }
   }, [editor])
 
@@ -144,7 +188,7 @@ export function OutlinePane({ editor }: Props) {
         className="parchment-outline-toggle"
         aria-expanded={paneOpen}
         aria-label={paneOpen ? 'Collapse outline' : 'Expand outline'}
-        onClick={() => setPaneOpen((v) => !v)}
+        onClick={togglePane}
       >
         <span aria-hidden="true">{paneOpen ? '‹' : '›'}</span>
       </button>
@@ -163,11 +207,13 @@ export function OutlinePane({ editor }: Props) {
                 const isCollapsed = collapsed.has(entry.id)
                 const hasChildren = headingsWithChildren.has(entry.id)
                 const indent = (entry.level - 1) * 12
+                const isActive = entry.id === activeId
 
                 return (
                   <li
                     key={entry.id}
-                    className="parchment-outline-item"
+                    className={`parchment-outline-item${isActive ? ' parchment-outline-item--active' : ''}`}
+                    {...(isActive ? { 'aria-current': 'true' as const } : {})}
                     style={{ paddingLeft: `${indent}px` }}
                     draggable
                     onDragStart={(e) => onDragStart(e, entry.id)}

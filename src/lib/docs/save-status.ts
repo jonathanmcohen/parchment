@@ -3,7 +3,7 @@
 // Today the body save is a fire-and-forget `void fetch` with NO
 // isSaving/saved/lastSaved state anywhere. The doc title bar needs a small
 // in-flight → settled → idle state so the save-status slot can read
-// "Saving…" / "All changes saved to disk" / an idle label (the COPY itself is
+// "Saving…" / "All changes saved" / an idle label (the COPY itself is
 // S5-9; S3-1 owns the STATE). The save *path* is unchanged — this only observes
 // in-flight/settled around the existing save.
 //

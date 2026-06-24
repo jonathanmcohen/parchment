@@ -56,10 +56,10 @@
 
 | ID | Item | Status | Cov | LV | Notes |
 |---|---|---|---|---|---|
-| S4-1 | Font stack RAMP-side (drop Inter, Arial body, theme.ts) — faces in S1-8 | TODO | ☐ | ☐ | |
-| S4-2 | Type ramp (title/subtitle/H1–6/body in pt; ink `--foreground`/`--muted`) | TODO | ☐ | ☐ | md serializer round-trips unchanged |
-| S4-3 | Chrome typography (14px Roboto, 20px Material Symbols) — font loaded by S1-8 | TODO | ☐ | ☐ | |
-| S4-4 | Spacing tokens (4–56 grid; rows 36px; icon btn 32×32/20px; @page 1in) | TODO | ☐ | ☐ | |
+| S4-1 | Font stack RAMP-side (drop Inter, Arial body, theme.ts) — faces in S1-8 | DONE | ☑ | ☑ | Google Sans/Roboto UI, Arial body, Roboto Mono code; inter FontPair dropped |
+| S4-2 | Type ramp (title/subtitle/H1–6/body in pt; ink `--foreground`/`--muted`) | DONE | ☑ | ☑ | pt type ramp on .parchment-prose; ink --foreground/--muted; md round-trip byte-identical (test) |
+| S4-3 | Chrome typography (14px Roboto, 20px Material Symbols) — font loaded by S1-8 | DONE | ☑ | ☑ | 14px Roboto chrome; ALL toolbar/voice/table icons → 20px Material Symbols (no tofu/emoji) |
+| S4-4 | Spacing tokens (4–56 grid; rows 36px; icon btn 32×32/20px; @page 1in) | DONE | ☑ | ☑ | --space 4–56 grid adopted (toolbar/dialog/sidebar/NavRow); @page 1in/A4 2.54cm |
 
 ## Plan S5 — Interactions, file manager, landing ([detail](plan-S5.md))
 
@@ -86,7 +86,7 @@
 | S1 Color/tokens + faces + harness | 9 | 9 | 0 | 0 |
 | S2 Global chrome | 6 | 4 | 2(partial) | 0 |
 | S3 Editor chrome | 6 | 4 | 2(partial) | 0 |
-| S4 Typography | 4 | 0 | 0 | 4 |
+| S4 Typography | 4 | 4 | 0 | 0 |
 | S5 Interactions + surfaces | 13 | 0 | 0 | 13 |
 | **Total** | **38** | **9** | **0** | **29** |
 

@@ -1,0 +1,256 @@
+/* ── S1: Token vocabulary — single source of truth for every color var ───────
+ *
+ *  This file is the ONE place that mints every design token. globals.css
+ *  @imports it at the top and maps the semantic tokens into Tailwind utilities
+ *  via its `@theme inline` block. No component or plan (S1–S5) may invent an
+ *  ad-hoc var: every name a CSS rule references resolves to a token defined
+ *  here.
+ *
+ *  Scheme strategy (mirrors the I1 contract that previously lived in globals):
+ *    :root / [data-color-scheme="light"]  → light vars (always light)
+ *    [data-color-scheme="dark"]           → dark vars  (always dark)
+ *    @media dark + [data-color-scheme="system"] → dark vars (follows OS)
+ *  The app layout sets data-color-scheme={theme.colorScheme} on the wrapper.
+ *
+ *  Brand vs accent (S1-1): the FIXED Google-Docs blue `--primary*` tokens drive
+ *  ALL chrome (buttons, active pills, Share button, focus ring). The user
+ *  picker's `--accent`/`--accent-contrast` are emitted INLINE by themeCssVars()
+ *  on the (app) layout wrapper and drive in-document accent ONLY — they never
+ *  repaint chrome, because chrome reads `--primary*`, not `--accent`.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-color-scheme="light"] {
+  /* core ink */
+  --background: #ffffff;
+  --foreground: #202124;
+  --muted: #5f6368;
+  --paper: #ffffff;
+
+  /* FIXED brand — chrome only; the picker can NEVER repaint these */
+  --primary: #1a73e8;
+  --primary-hover: #1765cc;
+  --primary-pressed: #185abc;
+  --primary-surface: #e8f0fe;
+  --on-primary: #ffffff;
+
+  /* user accent — picker DEFAULT; themeCssVars() overrides inline per-workspace */
+  --accent: #1a73e8;
+  --accent-contrast: #1a73e8;
+
+  /* surfaces */
+  --surface: #ffffff;
+  --surface-muted: #f8f9fa;
+  --surface-hover: #f1f3f4;
+  --border: #dadce0;
+  --border-chrome: #e8eaed;
+
+  /* editor */
+  --editor-gutter: #f1f3f4;
+  --selection-bg: #d2e3fc;
+  --code-bg: #f8f9fa;
+  --highlight: #fef7c3;
+  --star: #ffd180;
+  --tooltip-bg: #3c4043;
+
+  /* elevation — every dropdown/dialog/popover references these (no inline literals) */
+  --shadow-page: 0 1px 3px rgba(60, 64, 67, 0.15), 0 1px 2px rgba(60, 64, 67, 0.3);
+  --shadow-dropdown: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  --shadow-dialog:
+    0 24px 38px 3px rgba(60, 64, 67, 0.16), 0 9px 46px 8px rgba(60, 64, 67, 0.12),
+    0 11px 15px -7px rgba(60, 64, 67, 0.2);
+
+  /* semantic */
+  --link: var(--accent);
+  --error: #d93025;
+  --warning: #f29900;
+  --success: #188038;
+  --info: #1a73e8;
+
+  /* G3: workspace theme font pair (overridden by the app layout per-user). */
+  --font-body:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: var(--font-body);
+  /* S1-8: font/icon FACE defaults (S4 owns the ramp/sizing/weight). */
+  --font-ui: "Google Sans", "Roboto", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "Roboto Mono", "Menlo", monospace;
+
+  /* Page canvas (B1) */
+  --page-pad: 96px;
+  /* I1: page/paper background — overridden by theme's pageBg via themeCssVars. */
+  --page-bg: var(--paper);
+}
+
+[data-color-scheme="dark"] {
+  --background: #202124;
+  --foreground: #e8eaed;
+  --muted: #9aa0a6;
+  --paper: #292a2d;
+
+  --primary: #8ab4f8;
+  --primary-hover: #aecbfa;
+  --primary-pressed: #aecbfa;
+  --primary-surface: #283142;
+  --on-primary: #202124;
+
+  --surface: #292a2d;
+  --surface-muted: #35363a;
+  --surface-hover: #3c4043;
+  --border: #5f6368;
+  --border-chrome: #3c4043;
+
+  --editor-gutter: #202124;
+  --selection-bg: #394457;
+  --code-bg: #292a2d;
+  --highlight: #fef7c3;
+  --star: #ffd180;
+  --tooltip-bg: #202124;
+
+  --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.6), 0 2px 6px 2px rgba(0, 0, 0, 0.3);
+  --shadow-dropdown: 0 1px 3px rgba(0, 0, 0, 0.6), 0 4px 8px 3px rgba(0, 0, 0, 0.4);
+  --shadow-dialog:
+    0 24px 38px 3px rgba(0, 0, 0, 0.5), 0 9px 46px 8px rgba(0, 0, 0, 0.4),
+    0 11px 15px -7px rgba(0, 0, 0, 0.6);
+
+  --error: #f28b82;
+  --warning: #fdd663;
+  --success: #81c995;
+  --info: #8ab4f8;
+
+  --page-bg: var(--paper);
+}
+
+/* I1: When forced-dark is applied to a wrapper div, propagate dark vars to
+ * :root so html/body { background: var(--background) } resolves correctly.
+ * This prevents overscroll gutters and page chrome from showing the light bg.
+ * Uses :has() (baseline 2023, supported by all modern browsers). */
+:root:has([data-color-scheme="dark"]) {
+  --background: #202124;
+  --foreground: #e8eaed;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-color-scheme="system"] {
+    --background: #202124;
+    --foreground: #e8eaed;
+    --muted: #9aa0a6;
+    --paper: #292a2d;
+
+    --primary: #8ab4f8;
+    --primary-hover: #aecbfa;
+    --primary-pressed: #aecbfa;
+    --primary-surface: #283142;
+    --on-primary: #202124;
+
+    --surface: #292a2d;
+    --surface-muted: #35363a;
+    --surface-hover: #3c4043;
+    --border: #5f6368;
+    --border-chrome: #3c4043;
+
+    --editor-gutter: #202124;
+    --selection-bg: #394457;
+    --code-bg: #292a2d;
+    --highlight: #fef7c3;
+    --star: #ffd180;
+    --tooltip-bg: #202124;
+
+    --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.6), 0 2px 6px 2px rgba(0, 0, 0, 0.3);
+    --shadow-dropdown: 0 1px 3px rgba(0, 0, 0, 0.6), 0 4px 8px 3px rgba(0, 0, 0, 0.4);
+    --shadow-dialog:
+      0 24px 38px 3px rgba(0, 0, 0, 0.5), 0 9px 46px 8px rgba(0, 0, 0, 0.4),
+      0 11px 15px -7px rgba(0, 0, 0, 0.6);
+
+    --error: #f28b82;
+    --warning: #fdd663;
+    --success: #81c995;
+    --info: #8ab4f8;
+
+    --page-bg: var(--paper);
+  }
+}
+
+/* ── K2: High-contrast palette ───────────────────────────────────────────────
+ *
+ *  The app layout sets data-high-contrast="true" on the same wrapper as
+ *  data-color-scheme. These overrides LAYER on top of the light/dark scheme
+ *  rules above (declared after, equal-or-higher specificity → win by order),
+ *  targeting WCAG AAA (>=7:1 normal text):
+ *    light HC  → #000 text on #fff, brand #0a2e6e (white text 12.9:1)
+ *    dark  HC  → #fff text on #000, brand #66b2ff (black text 9.4:1)
+ *  In dark HC the bright brand needs BLACK text on accent-filled controls; a
+ *  scoped rule in globals.css ("K2: HC accent text") flips those to #000.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Light high-contrast (default scheme + forced light). */
+[data-high-contrast="true"],
+[data-high-contrast="true"][data-color-scheme="light"] {
+  --background: #ffffff;
+  --foreground: #000000;
+  --muted: #1a1a1a;
+  --accent: #0a2e6e;
+  --accent-contrast: #0a2e6e;
+  --primary: #0a2e6e;
+  --primary-hover: #0a2e6e;
+  --primary-pressed: #0a2e6e;
+  --primary-surface: #d6e2ff;
+  --on-primary: #ffffff;
+  --paper: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #ffffff;
+  --surface-hover: #e8e8e8;
+  --border: #000000;
+  --border-chrome: #000000;
+  --page-bg: #ffffff;
+}
+
+/* Dark high-contrast — forced dark, or system + OS dark. */
+[data-high-contrast="true"][data-color-scheme="dark"] {
+  --background: #000000;
+  --foreground: #ffffff;
+  --muted: #e8e8e8;
+  --accent: #66b2ff;
+  --accent-contrast: #66b2ff;
+  --primary: #66b2ff;
+  --primary-hover: #66b2ff;
+  --primary-pressed: #66b2ff;
+  --primary-surface: #16304d;
+  --on-primary: #000000;
+  --paper: #000000;
+  --surface: #000000;
+  --surface-muted: #000000;
+  --surface-hover: #1a1a1a;
+  --border: #ffffff;
+  --border-chrome: #ffffff;
+  --page-bg: #000000;
+}
+@media (prefers-color-scheme: dark) {
+  [data-high-contrast="true"][data-color-scheme="system"] {
+    --background: #000000;
+    --foreground: #ffffff;
+    --muted: #e8e8e8;
+    --accent: #66b2ff;
+    --accent-contrast: #66b2ff;
+    --primary: #66b2ff;
+    --primary-hover: #66b2ff;
+    --primary-pressed: #66b2ff;
+    --primary-surface: #16304d;
+    --on-primary: #000000;
+    --paper: #000000;
+    --surface: #000000;
+    --surface-muted: #000000;
+    --surface-hover: #1a1a1a;
+    --border: #ffffff;
+    --border-chrome: #ffffff;
+    --page-bg: #000000;
+  }
+}
+
+/* Propagate forced-dark HC to :root (mirrors the I1 dark :has() rule) so the
+ * html/body background and overscroll gutters go black, not light. */
+:root:has([data-high-contrast="true"][data-color-scheme="dark"]) {
+  --background: #000000;
+  --foreground: #ffffff;
+  color-scheme: dark;
+}

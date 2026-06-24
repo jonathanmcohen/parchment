@@ -360,8 +360,8 @@ export function VersionHistory({ docId, editor }: Props) {
               style={{
                 padding: '8px 12px',
                 borderBottom: '1px solid var(--border, #e5e7eb)',
-                background: isSelected ? 'var(--surface-hover, #f9fafb)' : 'transparent',
-                outline: isSelected ? '2px solid var(--accent, #7c3aed)' : 'none',
+                background: isSelected ? 'var(--surface-hover, #F8F9FA)' : 'transparent',
+                outline: isSelected ? '2px solid var(--accent)' : 'none',
                 outlineOffset: -2,
               }}
             >
@@ -383,8 +383,7 @@ export function VersionHistory({ docId, editor }: Props) {
                       fontSize: 10,
                       padding: '1px 5px',
                       borderRadius: 3,
-                      background:
-                        v.kind === 'named' ? 'var(--accent, #7c3aed)' : 'var(--muted-bg, #e5e7eb)',
+                      background: v.kind === 'named' ? 'var(--accent)' : 'var(--muted-bg, #e5e7eb)',
                       color:
                         v.kind === 'named'
                           ? 'var(--accent-contrast, #fff)'
@@ -492,7 +491,7 @@ export function VersionHistory({ docId, editor }: Props) {
               padding: '2px 8px',
               borderRadius: 3,
               border: '1px solid var(--border, #e5e7eb)',
-              background: diffMode === 'visual' ? 'var(--accent, #7c3aed)' : 'transparent',
+              background: diffMode === 'visual' ? 'var(--accent)' : 'transparent',
               color: diffMode === 'visual' ? 'var(--accent-contrast, #fff)' : 'inherit',
               cursor: 'pointer',
               fontWeight: diffMode === 'visual' ? 600 : 400,
@@ -509,7 +508,7 @@ export function VersionHistory({ docId, editor }: Props) {
               padding: '2px 8px',
               borderRadius: 3,
               border: '1px solid var(--border, #e5e7eb)',
-              background: diffMode === 'unified' ? 'var(--accent, #7c3aed)' : 'transparent',
+              background: diffMode === 'unified' ? 'var(--accent)' : 'transparent',
               color: diffMode === 'unified' ? 'var(--accent-contrast, #fff)' : 'inherit',
               cursor: 'pointer',
               fontWeight: diffMode === 'unified' ? 600 : 400,
@@ -548,7 +547,7 @@ export function VersionHistory({ docId, editor }: Props) {
                   key={c.oid}
                   style={{
                     borderBottom: '1px solid var(--border, #e5e7eb)',
-                    background: isOpen ? 'var(--surface-hover, #f9fafb)' : 'transparent',
+                    background: isOpen ? 'var(--surface-hover, #F8F9FA)' : 'transparent',
                   }}
                 >
                   <button
@@ -603,7 +602,7 @@ export function VersionHistory({ docId, editor }: Props) {
                               padding: 8,
                               fontSize: 11,
                               fontFamily: 'ui-monospace, monospace',
-                              background: 'var(--surface-hover, #f9fafb)',
+                              background: 'var(--surface-hover, #F8F9FA)',
                               border: '1px solid var(--border, #e5e7eb)',
                               borderRadius: 4,
                               maxHeight: 240,
@@ -732,7 +731,7 @@ function UnifiedDiffBlock({ patch, label }: { patch: string | null; label: strin
           padding: 8,
           fontSize: 11,
           fontFamily: 'ui-monospace, monospace',
-          background: 'var(--surface-hover, #f9fafb)',
+          background: 'var(--surface-hover, #F8F9FA)',
           border: '1px solid var(--border, #e5e7eb)',
           borderRadius: 4,
           maxHeight: 300,

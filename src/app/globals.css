@@ -1,132 +1,11 @@
+/* S1-7: every color/elevation/font token lives in tokens.css (single source of
+ * truth). It is @imported FIRST so the vars are defined before any rule below
+ * uses them; Tailwind's @import resolves it inline at build time. The scheme
+ * (light/dark/system) + high-contrast palette blocks that used to live here now
+ * live there. The @theme inline map below references the tokens for Tailwind
+ * utilities. */
+@import "../styles/tokens.css";
 @import "tailwindcss";
-
-/* ── I1: Color-scheme strategy ───────────────────────────────────────────────
- *
- *  :root / [data-color-scheme="light"]  → light vars (always light)
- *  [data-color-scheme="dark"]           → dark vars  (always dark)
- *  @media dark + [data-color-scheme="system"] → dark vars (follows OS)
- *
- *  The app layout sets data-color-scheme={theme.colorScheme} on the wrapper.
- *  When the attribute is absent or "system" the @media rule applies; light
- *  and dark are forced regardless of the OS preference.
- * ─────────────────────────────────────────────────────────────────────────── */
-
-:root,
-[data-color-scheme="light"] {
-  --background: #f7f6f3;
-  --foreground: #1a1a17;
-  --muted: #6b6b63;
-  --accent: #7c5cff;
-  /* Accent shade guaranteed to pass WCAG AA with white text (both themes). */
-  --accent-contrast: #6d28d9;
-  --paper: #ffffff;
-  --border: #e3e1da;
-  /* G3: workspace theme font pair (overridden by the app layout per-user). */
-  --font-body:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-heading: var(--font-body);
-  /* Page canvas (B1) */
-  --page-pad: 96px;
-  --page-shadow: 0 2px 8px 0 rgb(0 0 0 / 0.1);
-  /* I1: page/paper background — overridden by theme's pageBg via themeCssVars. */
-  --page-bg: var(--paper);
-}
-
-[data-color-scheme="dark"] {
-  --background: #16151a;
-  --foreground: #ececec;
-  --muted: #9a9aa0;
-  --accent: #9a82ff;
-  --accent-contrast: #9a82ff;
-  --paper: #1f1e25;
-  --border: #2c2b33;
-  --page-bg: var(--paper);
-}
-
-/* I1: When forced-dark is applied to a wrapper div, propagate dark vars to
- * :root so html/body { background: var(--background) } resolves correctly.
- * This prevents overscroll gutters and page chrome from showing the light bg.
- * Uses :has() (baseline 2023, supported by all modern browsers). */
-:root:has([data-color-scheme="dark"]) {
-  --background: #16151a;
-  --foreground: #ececec;
-  color-scheme: dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  [data-color-scheme="system"] {
-    --background: #16151a;
-    --foreground: #ececec;
-    --muted: #9a9aa0;
-    --accent: #9a82ff;
-    --paper: #1f1e25;
-    --border: #2c2b33;
-    --page-bg: var(--paper);
-  }
-}
-
-/* ── K2: High-contrast palette ───────────────────────────────────────────────
- *
- *  The app layout sets data-high-contrast="true" on the same wrapper as
- *  data-color-scheme when the user enables "High contrast" in Appearance.
- *
- *  These overrides LAYER on top of the light/dark scheme rules above. Because
- *  they are declared AFTER them and use an equal-or-higher specificity selector,
- *  they win by source order. The result is a maximum-contrast palette targeting
- *  WCAG AAA (>=7:1 for normal text):
- *
- *    light HC  → #000 text on #fff, accent #0a2e6e (white text 12.9:1)
- *    dark  HC  → #fff text on #000, accent #66b2ff (black text 9.4:1)
- *
- *  Accent surfaces in this app fill with var(--accent-contrast) and hard-code
- *  white text; in dark HC the bright accent needs BLACK text to reach AAA, so a
- *  scoped rule below flips text to #000 on those accent-filled controls.
- * ─────────────────────────────────────────────────────────────────────────── */
-
-/* Light high-contrast (default scheme + forced light). */
-[data-high-contrast="true"],
-[data-high-contrast="true"][data-color-scheme="light"] {
-  --background: #ffffff;
-  --foreground: #000000;
-  --muted: #1a1a1a;
-  --accent: #0a2e6e;
-  --accent-contrast: #0a2e6e;
-  --paper: #ffffff;
-  --border: #000000;
-  --page-bg: #ffffff;
-}
-
-/* Dark high-contrast — forced dark, or system + OS dark. */
-[data-high-contrast="true"][data-color-scheme="dark"] {
-  --background: #000000;
-  --foreground: #ffffff;
-  --muted: #e8e8e8;
-  --accent: #66b2ff;
-  --accent-contrast: #66b2ff;
-  --paper: #000000;
-  --border: #ffffff;
-  --page-bg: #000000;
-}
-@media (prefers-color-scheme: dark) {
-  [data-high-contrast="true"][data-color-scheme="system"] {
-    --background: #000000;
-    --foreground: #ffffff;
-    --muted: #e8e8e8;
-    --accent: #66b2ff;
-    --accent-contrast: #66b2ff;
-    --paper: #000000;
-    --border: #ffffff;
-    --page-bg: #000000;
-  }
-}
-
-/* Propagate forced-dark HC to :root (mirrors the I1 dark :has() rule) so the
- * html/body background and overscroll gutters go black, not light. */
-:root:has([data-high-contrast="true"][data-color-scheme="dark"]) {
-  --background: #000000;
-  --foreground: #ffffff;
-  color-scheme: dark;
-}
 
 /* NOTE: the dark-HC "flip accent text to black" rules and the dyslexic-prose
  * font rules reference component classes (.parchment-*) defined later in this
@@ -175,6 +54,80 @@
   font-family: var(--font-body);
 }
 
+/* ── S1-8: Self-hosted Roboto / Roboto Mono / Material Symbols ────────────────
+ *
+ *  Faces only — the type RAMP / sizing / weight is S4. These are loaded HERE (the
+ *  foundation step) so S2/S3 can reference Roboto text + Material glyphs without
+ *  rendering tofu before S4 runs. Self-hosted (NO external CDN — a self-hosted
+ *  Parchment never phones home for a font); binaries + their Apache-2.0 / OFL
+ *  licenses live in public/fonts/ (see its README), mirroring the K2 OpenDyslexic
+ *  precedent. Google Sans is NOT redistributable — the --font-ui stack lists it
+ *  first for users who have it, falling back to self-hosted Roboto.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: "Roboto";
+  src: url("/fonts/roboto-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("/fonts/roboto-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto";
+  src: url("/fonts/roboto-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto Mono";
+  src: url("/fonts/roboto-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Material Symbols Rounded";
+  src: url("/fonts/material-symbols-rounded.woff2") format("woff2");
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: block;
+}
+
+/* Base glyph class so S2/S3 can render a Material Symbol immediately. The font
+   variation settings keep the unfilled, weight-400, optical-size-24 default;
+   S4 may retune size/weight per call site. */
+.material-symbols-rounded {
+  /* biome-ignore lint/a11y/useGenericFontNames: icon font — a generic fallback
+     would render a letter instead of a glyph (and font-display:block hides text
+     until the face loads), so no serif/sans-serif fallback is appropriate. */
+  font-family: "Material Symbols Rounded";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: "liga";
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -183,6 +136,23 @@
   --color-accent-contrast: var(--accent-contrast);
   --color-paper: var(--paper);
   --color-border: var(--border);
+  /* S1-7: brand + surface + semantic tokens mapped so bg-surface / text-muted /
+     bg-primary etc. Tailwind utilities resolve to the tokens (no silent fallback). */
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-pressed: var(--primary-pressed);
+  --color-primary-surface: var(--primary-surface);
+  --color-on-primary: var(--on-primary);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-border-chrome: var(--border-chrome);
+  --color-editor-gutter: var(--editor-gutter);
+  --color-link: var(--link);
+  --color-error: var(--error);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-info: var(--info);
 }
 
 html,
@@ -191,6 +161,19 @@ body {
   color: var(--foreground);
   /* G3: body text follows the workspace theme's body font. */
   font-family: var(--font-body);
+}
+
+/* ── S1-5: text selection ────────────────────────────────────────────────────
+ * Google-Docs blue selection (light #D2E3FC / dark #394457 via tokens.css), not
+ * the old accent-tinted highlight. color:inherit keeps the underlying text legible
+ * in both schemes (dark #394457 keeps prose text AA). */
+::selection {
+  background: var(--selection-bg);
+  color: inherit;
+}
+.parchment-prose ::selection {
+  background: var(--selection-bg);
+  color: inherit;
 }
 
 /* ── K3: global keyboard-focus ring ──────────────────────────────────────────
@@ -205,7 +188,7 @@ body {
  * Any `outline: none` in this file MUST pair with a :focus-visible substitute.
  * ─────────────────────────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--accent-contrast);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -229,8 +212,8 @@ body {
   margin: 8px;
   padding: 8px 14px;
   border-radius: 6px;
-  background: var(--accent-contrast);
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   font-size: 0.9rem;
   font-weight: 500;
   text-decoration: none;
@@ -246,13 +229,28 @@ body {
   outline-offset: 2px;
 }
 
+/* ── S1-2: editor route gutter ───────────────────────────────────────────────
+ * The full-bleed gray field (Docs #F1F3F4 / dark #202124) the white page floats
+ * on. It is applied to the editor route's full-width shell ONLY (NOT the inner
+ * centered max-w-5xl column — that would only tint a narrow strip), so the white
+ * sheet reads as a floating page. Negative margins cancel the shared <main>'s
+ * p-8 padding so the gray bleeds edge-to-edge; padding restores breathing room
+ * around the centered page. Files/settings pages do not use this class, so they
+ * keep their own --background surface. */
+.parchment-editor-shell {
+  background: var(--editor-gutter);
+  margin: -2rem;
+  padding: 2rem;
+  min-height: 100vh;
+}
+
 /* Page canvas (B1) */
 .parchment-page {
   position: relative;
   /* I1: --page-bg is set by the theme (themeCssVars); falls back to --paper. */
   background: var(--page-bg, var(--paper));
   border: 1px solid var(--border);
-  box-shadow: var(--page-shadow);
+  box-shadow: var(--shadow-page);
   min-height: 1056px; /* one Letter page — overridden by inline style via margins */
   /* padding is set via inline style from pageSetup.margins */
 }
@@ -455,9 +453,9 @@ body {
 }
 
 .parchment-size-btn[aria-pressed="true"] {
-  background: var(--accent-contrast);
-  color: #fff;
-  border-color: var(--accent-contrast);
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
 }
 
 /* ── Inline formatting toolbar (B2) ─────────────────────────────────── */
@@ -495,9 +493,9 @@ body {
 }
 
 .parchment-toolbar-btn[aria-pressed="true"] {
-  background: var(--accent-contrast);
-  color: #fff;
-  border-color: var(--accent-contrast);
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
 }
 
 .parchment-toolbar-sep {
@@ -601,15 +599,15 @@ body {
 }
 
 .parchment-bubble-btn[aria-pressed="true"] {
-  background: var(--accent-contrast);
-  color: #fff;
-  border-color: var(--accent-contrast);
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
 }
 
 /* ── Highlight mark (B2) ─────────────────────────────────────────────── */
 
 .parchment-prose mark {
-  background-color: #fef08a;
+  background-color: var(--highlight);
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
@@ -654,7 +652,7 @@ body {
   cursor: pointer;
   width: 1em;
   height: 1em;
-  accent-color: var(--accent-contrast);
+  accent-color: var(--primary);
 }
 
 .parchment-prose ul[data-type="taskList"] li > div {
@@ -704,9 +702,9 @@ body {
 
 /* Selected cell highlight (ProseMirror adds .selectedCell) */
 .parchment-prose table .selectedCell {
-  outline: 2px solid var(--accent-contrast);
+  outline: 2px solid var(--primary);
   outline-offset: -2px;
-  background: color-mix(in srgb, var(--accent-contrast) 12%, transparent);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 /* Column resize handle injected by the resizable Table extension */
@@ -800,7 +798,7 @@ body {
   position: absolute;
   width: 10px;
   height: 10px;
-  background: var(--accent-contrast);
+  background: var(--primary);
   border: 1px solid #fff;
   border-radius: 2px;
   opacity: 0;
@@ -835,7 +833,7 @@ body {
 
 /* Selected image outline */
 .parchment-image-selected img {
-  outline: 2px solid var(--accent-contrast);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -911,9 +909,9 @@ body {
 }
 
 .parchment-dialog-tab[aria-selected="true"] {
-  background: var(--accent-contrast);
-  color: #fff;
-  border-color: var(--accent-contrast);
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
 }
 
 .parchment-dialog-tab:not([aria-selected="true"]):hover {
@@ -945,7 +943,7 @@ body {
 }
 
 .parchment-dialog-required {
-  color: #dc2626;
+  color: var(--error);
   margin-left: 2px;
 }
 
@@ -962,7 +960,7 @@ body {
 }
 
 .parchment-dialog-input:focus {
-  outline: 2px solid var(--accent-contrast);
+  outline: 2px solid var(--primary);
   outline-offset: 1px;
   border-color: transparent;
 }
@@ -981,7 +979,7 @@ body {
 .parchment-dialog-checkbox {
   width: 16px;
   height: 16px;
-  accent-color: var(--accent-contrast);
+  accent-color: var(--primary);
   cursor: pointer;
   margin-right: 6px;
 }
@@ -993,7 +991,7 @@ body {
 
 .parchment-dialog-error {
   font-size: 0.82rem;
-  color: #dc2626;
+  color: var(--error);
   margin-top: 2px;
 }
 
@@ -1008,8 +1006,8 @@ body {
   height: 34px;
   padding: 0 18px;
   font-size: 0.9rem;
-  background: var(--accent-contrast);
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   border: none;
   border-radius: 5px;
   cursor: pointer;
@@ -1095,9 +1093,9 @@ body {
 }
 
 .parchment-toc-btn[aria-pressed="true"] {
-  background: var(--accent-contrast);
-  color: #fff;
-  border-color: var(--accent-contrast);
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
 }
 
 .parchment-toc-empty {
@@ -1134,7 +1132,7 @@ body {
 }
 
 .parchment-toc-link:focus-visible {
-  outline: 2px solid var(--accent-contrast);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -1230,7 +1228,7 @@ body {
 }
 
 .parchment-outline-toggle:focus-visible {
-  outline: 2px solid var(--accent-contrast);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -1281,8 +1279,8 @@ body {
 }
 
 .parchment-outline-item[data-drag-over="true"] {
-  background: color-mix(in srgb, var(--accent-contrast) 15%, transparent);
-  outline: 1px dashed var(--accent-contrast);
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  outline: 1px dashed var(--primary);
 }
 
 /* Subtree expander */
@@ -1308,7 +1306,7 @@ body {
 }
 
 .parchment-outline-expander:focus-visible {
-  outline: 2px solid var(--accent-contrast);
+  outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
 
@@ -1344,7 +1342,7 @@ body {
 }
 
 .parchment-outline-link:focus-visible {
-  outline: 2px solid var(--accent-contrast);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -1372,7 +1370,7 @@ body {
 
 .parchment-crop-rect {
   position: absolute;
-  border: 1px solid var(--accent-contrast);
+  border: 1px solid var(--primary);
   box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.4);
   cursor: move;
   box-sizing: border-box;
@@ -1382,7 +1380,7 @@ body {
   position: absolute;
   width: 12px;
   height: 12px;
-  background: var(--accent-contrast);
+  background: var(--primary);
   border: 1px solid #fff;
   border-radius: 2px;
   z-index: 1;
@@ -1418,8 +1416,8 @@ body {
   padding: 2px 8px;
   font-size: 0.72rem;
   font-weight: 500;
-  color: #fff;
-  background: var(--accent-contrast);
+  color: var(--on-primary);
+  background: var(--primary);
   border: 1px solid #fff;
   border-radius: 4px;
   cursor: pointer;
@@ -1483,10 +1481,10 @@ body {
 }
 .parchment-prose pre {
   /* C3/C4: Shiki token colours are applied via inline styles on individual spans.
-     Use a light neutral background that complements all 6 bundled themes.
-     github-light / solarized-light stay on white; github-dark / dracula / nord /
-     solarized-dark need the dark mode override below. */
-  background: #f6f8fa;
+     --code-bg is a light neutral that complements all 6 bundled themes and is
+     already scheme-aware (light #F8F9FA / dark #292A2D via tokens.css), so the
+     former hard-coded dark override blocks are gone. */
+  background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 0.4rem;
   padding: 0.75em 1em;
@@ -1494,14 +1492,6 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* Prevent the default inherit from washing out Shiki inline token colours. */
   color: inherit;
-}
-@media (prefers-color-scheme: dark) {
-  [data-color-scheme="system"] .parchment-prose pre {
-    background: #1e2030;
-  }
-}
-[data-color-scheme="dark"] .parchment-prose pre {
-  background: #1e2030;
 }
 .parchment-prose p.is-editor-empty:first-child::before {
   content: "Start writing…";
@@ -1625,24 +1615,17 @@ body {
   border-color: var(--accent);
 }
 
-/* Inner <pre> — reset border/radius since wrapper owns chrome */
+/* Inner <pre> — reset border/radius since wrapper owns chrome. --code-bg is
+   scheme-aware (light/dark via tokens.css) so no per-scheme override is needed. */
 .parchment-cb-pre {
   margin: 0;
-  background: #f6f8fa;
+  background: var(--code-bg);
   border: none;
   border-radius: 0;
   padding: 0.75em 1em;
   overflow-x: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color: inherit;
-}
-@media (prefers-color-scheme: dark) {
-  [data-color-scheme="system"] .parchment-cb-pre {
-    background: #1e2030;
-  }
-}
-[data-color-scheme="dark"] .parchment-cb-pre {
-  background: #1e2030;
 }
 
 /* Collapsed state — hide the pre, keep header */
@@ -1712,7 +1695,7 @@ body {
 
 .parchment-fn-ref-link:hover {
   text-decoration: underline;
-  color: var(--accent-contrast);
+  color: var(--primary);
 }
 
 /* End-of-doc footnotes/endnotes block */
@@ -1783,7 +1766,7 @@ body {
 }
 
 .parchment-fn-backlink:hover {
-  color: var(--accent-contrast);
+  color: var(--primary);
 }
 
 /* The editable <ol> rendered by NodeViewContent */
@@ -1833,7 +1816,7 @@ body {
 /* ── Grammar-check decorations (K7) ─────────────────────────────────── */
 
 .parchment-grammar-match {
-  text-decoration: underline wavy color-mix(in srgb, #d97706 80%, transparent);
+  text-decoration: underline wavy color-mix(in srgb, var(--warning) 80%, transparent);
   text-decoration-skip-ink: none;
   text-underline-offset: 2px;
   cursor: help;
@@ -2050,12 +2033,12 @@ body {
 }
 
 .parchment-find-error {
-  color: #dc2626;
+  color: var(--error);
   font-size: 0.8rem;
   padding: 4px 6px;
-  background: color-mix(in srgb, #dc2626 10%, transparent);
+  background: color-mix(in srgb, var(--error) 10%, transparent);
   border-radius: 4px;
-  border: 1px solid color-mix(in srgb, #dc2626 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
 }
 
 .parchment-find-sr-only {
@@ -2318,8 +2301,8 @@ body {
   cursor: pointer;
 }
 .parchment-section-break-edit-btn:hover {
-  border-color: var(--accent-contrast);
-  color: var(--accent-contrast);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 /* ── D2: Suggesting mode ──────────────────────────────────────────────────── */
@@ -2341,11 +2324,13 @@ body {
   opacity: 0.75;
 }
 
-/* Toolbar button active state for suggesting mode */
+/* Toolbar button active state for suggesting mode. Suggesting marks are an
+   IN-DOCUMENT accent (colored per author/accent), so this toggle intentionally
+   tracks the user's --accent, not the fixed --primary chrome. */
 .parchment-toolbar-btn--suggesting {
-  background: var(--accent, #7c3aed);
-  color: var(--accent-contrast, #fff);
-  outline: 2px solid var(--accent, #7c3aed);
+  background: var(--accent);
+  color: var(--on-primary);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -2357,8 +2342,8 @@ body {
   font-weight: 700;
   letter-spacing: 0.04em;
   vertical-align: middle;
-  background: var(--accent-contrast, #fff);
-  color: var(--accent, #7c3aed);
+  background: var(--on-primary);
+  color: var(--accent);
   border-radius: 3px;
   padding: 0 3px;
   line-height: 1.4;
@@ -2436,13 +2421,13 @@ body {
 }
 
 .parchment-suggestions-badge--insertion {
-  background: rgba(29, 78, 216, 0.12);
-  color: #1d4ed8;
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+  color: var(--info);
 }
 
 .parchment-suggestions-badge--deletion {
-  background: rgba(190, 18, 60, 0.12);
-  color: #be123c;
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+  color: var(--error);
 }
 
 .parchment-suggestions-author-dot {
@@ -2495,20 +2480,20 @@ body {
 }
 
 .parchment-suggestions-accept-btn {
-  border-color: #15803d;
-  color: #15803d;
+  border-color: var(--success);
+  color: var(--success);
 }
 .parchment-suggestions-accept-btn:not(:disabled):hover {
-  background: #15803d;
+  background: var(--success);
   color: #fff;
 }
 
 .parchment-suggestions-reject-btn {
-  border-color: #be123c;
-  color: #be123c;
+  border-color: var(--error);
+  color: var(--error);
 }
 .parchment-suggestions-reject-btn:not(:disabled):hover {
-  background: #be123c;
+  background: var(--error);
   color: #fff;
 }
 
@@ -2552,9 +2537,12 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Remote selection highlight — inherits the user color via background alpha. */
+/* Remote selection highlight — the extension sets a per-author background-color
+   inline (the author's caret hue at low alpha). This is the FALLBACK when no
+   inline color is present: a Docs-blue selection tint, not a flat gray, so it
+   reads as a coloured selection in both schemes. */
 .collaboration-carets__selection {
-  background-color: rgba(0, 0, 0, 0.08);
+  background-color: color-mix(in srgb, var(--selection-bg) 70%, transparent);
 }
 
 /* ─── G1: Share dialog list + public share viewer ─────────────────────────── */
@@ -2604,7 +2592,7 @@ body {
 }
 
 .parchment-share-error {
-  color: #b91c1c;
+  color: var(--error);
   font-size: 0.8rem;
   margin: 0;
 }
@@ -3219,8 +3207,8 @@ body {
   display: block;
   margin: 0.75em 0;
   padding: 0.5em 0.75em 0.5em 1em;
-  border-left: 3px solid #9a82ff;
-  background: color-mix(in srgb, #9a82ff 8%, transparent);
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: var(--muted);
   font-size: 0.9em;
   font-style: italic;
@@ -3231,12 +3219,12 @@ body {
   content: "Speaker note\00a0\2014\00a0";
   font-weight: 600;
   font-style: normal;
-  color: #9a82ff;
+  color: var(--accent);
 }
 
 @media (prefers-color-scheme: dark) {
   .parchment-speaker-note {
-    background: color-mix(in srgb, #9a82ff 10%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
 }
 

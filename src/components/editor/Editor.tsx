@@ -1386,311 +1386,316 @@ export function Editor({
   }, [editor, provider, currentUserName, cursorColor])
 
   return (
-    <div className="mx-auto max-w-5xl">
-      {/* Inline formatting toolbar (B2) */}
-      {editor && (
-        <Toolbar
-          editor={editor}
-          docId={docId}
-          onInsertImage={openImageDialog}
-          onOpenLink={openLinkPopover}
-          onCropImage={openCropForSelection}
-          onOpenPageSetup={() => setPageSetupOpen(true)}
-          onOpenWatermark={() => setWatermarkOpen(true)}
-          onOpenCustomCss={() => setCustomCssOpen(true)}
-          onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
-          commentsSidebarOpen={commentsSidebarOpen}
-          onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
-          versionHistoryOpen={versionHistoryOpen}
-          onToggleSuggestions={() => setSuggestionsOpen((v) => !v)}
-          suggestionsOpen={suggestionsOpen}
-          onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
-          backlinksOpen={backlinksOpen}
-          onToggleGrammar={() => setGrammarPanelOpen((v) => !v)}
-          grammarOpen={grammarPanelOpen}
-          grammarEnabled={grammarEnabled}
-          onOpenShare={() => setShareDialogOpen(true)}
-          onToggleReading={() => setReadingOpen((v) => !v)}
-          readingOpen={readingOpen}
-          onTogglePresenter={() => setPresenterOpen((v) => !v)}
-          presenterOpen={presenterOpen}
-          onExportPdf={() => setPrintOpen(true)}
-          onToggleSourceMode={openSourceMode}
-          sourceModeOpen={sourceModeOpen}
-          sourceModeDisabled={collabActive}
-        />
-      )}
+    // S1-2: full-bleed gray gutter the white page floats on (editor route only).
+    // The inner max-w-5xl keeps the centered column; the shell paints the gutter
+    // edge-to-edge inside the shared <main> (negative margin cancels its padding).
+    <div className="parchment-editor-shell">
+      <div className="mx-auto max-w-5xl">
+        {/* Inline formatting toolbar (B2) */}
+        {editor && (
+          <Toolbar
+            editor={editor}
+            docId={docId}
+            onInsertImage={openImageDialog}
+            onOpenLink={openLinkPopover}
+            onCropImage={openCropForSelection}
+            onOpenPageSetup={() => setPageSetupOpen(true)}
+            onOpenWatermark={() => setWatermarkOpen(true)}
+            onOpenCustomCss={() => setCustomCssOpen(true)}
+            onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
+            commentsSidebarOpen={commentsSidebarOpen}
+            onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
+            versionHistoryOpen={versionHistoryOpen}
+            onToggleSuggestions={() => setSuggestionsOpen((v) => !v)}
+            suggestionsOpen={suggestionsOpen}
+            onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
+            backlinksOpen={backlinksOpen}
+            onToggleGrammar={() => setGrammarPanelOpen((v) => !v)}
+            grammarOpen={grammarPanelOpen}
+            grammarEnabled={grammarEnabled}
+            onOpenShare={() => setShareDialogOpen(true)}
+            onToggleReading={() => setReadingOpen((v) => !v)}
+            readingOpen={readingOpen}
+            onTogglePresenter={() => setPresenterOpen((v) => !v)}
+            presenterOpen={presenterOpen}
+            onExportPdf={() => setPrintOpen(true)}
+            onToggleSourceMode={openSourceMode}
+            sourceModeOpen={sourceModeOpen}
+            sourceModeDisabled={collabActive}
+          />
+        )}
 
-      <h1 className="mb-4 font-semibold text-2xl tracking-tight">{initialTitle}</h1>
+        <h1 className="mb-4 font-semibold text-2xl tracking-tight">{initialTitle}</h1>
 
-      {/* I2 Part 3: Vim source-mode editor. Rendered in place of the WYSIWYG
+        {/* I2 Part 3: Vim source-mode editor. Rendered in place of the WYSIWYG
           canvas. The editor instance stays mounted (display:none below) so the
           Y.Doc/collab binding is never torn down; on exit we apply the parsed
           markdown back into it as a single transaction. */}
-      {sourceModeOpen && sourceSnapshot && (
-        <div className="mb-4 rounded-md border border-[var(--border)] overflow-hidden">
-          <SourceMode json={sourceSnapshot} onExit={exitSourceMode} />
-        </div>
-      )}
+        {sourceModeOpen && sourceSnapshot && (
+          <div className="mb-4 rounded-md border border-[var(--border)] overflow-hidden">
+            <SourceMode json={sourceSnapshot} onExit={exitSourceMode} />
+          </div>
+        )}
 
-      {/* B11: outline rail + canvas in a flex row; D1: comments sidebar on the right */}
-      <div
-        style={{
-          display: sourceModeOpen ? 'none' : 'flex',
-          alignItems: 'flex-start',
-          gap: 0,
-        }}
-      >
-        {/* B11: outline pane (left rail) */}
-        {editor && <OutlinePane editor={editor} />}
+        {/* B11: outline rail + canvas in a flex row; D1: comments sidebar on the right */}
+        <div
+          style={{
+            display: sourceModeOpen ? 'none' : 'flex',
+            alignItems: 'flex-start',
+            gap: 0,
+          }}
+        >
+          {/* B11: outline pane (left rail) */}
+          {editor && <OutlinePane editor={editor} />}
 
-        {/* B9: find + replace panel — positioned relative to this wrapper */}
-        <div ref={canvasWrapRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-          {/* G12: scaled host — CSS var --page-scale is set by the page-fit hook
+          {/* B9: find + replace panel — positioned relative to this wrapper */}
+          <div ref={canvasWrapRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+            {/* G12: scaled host — CSS var --page-scale is set by the page-fit hook
               above. On desktop the var is absent / 1 so transform:scale(1) is a
               no-op. On mobile the host height collapses to pageHeight×scale so
               no empty gap appears below the shrunken page.
               CRITICAL: ResizeObserver in PageCanvas watches .parchment-page-content
               (the INNER unscaled content div), so pagination metrics are computed
               on un-transformed dimensions and are never corrupted by the scale. */}
-          {/* G17: scope class wraps doc content ONLY (not toolbar/chrome).
+            {/* G17: scope class wraps doc content ONLY (not toolbar/chrome).
               CustomCssStyle injects the sanitized+scoped <style> here. */}
-          <div ref={scaledHostRef} className={`parchment-canvas-scaled-host ${CUSTOM_CSS_SCOPE}`}>
-            <CustomCssStyle css={customCss} />
-            <PageCanvas
-              pageSetup={pageSetup}
-              onPageCountChange={setPageCount}
-              editor={editor}
-              watermark={watermark}
-            >
-              <EditorContent editor={editor} />
-            </PageCanvas>
+            <div ref={scaledHostRef} className={`parchment-canvas-scaled-host ${CUSTOM_CSS_SCOPE}`}>
+              <CustomCssStyle css={customCss} />
+              <PageCanvas
+                pageSetup={pageSetup}
+                onPageCountChange={setPageCount}
+                editor={editor}
+                watermark={watermark}
+              >
+                <EditorContent editor={editor} />
+              </PageCanvas>
+            </div>
+
+            {editor && findOpen && (
+              <FindReplace editor={editor} initialMode={findMode} onClose={closeFind} />
+            )}
+
+            {editor && provider && (
+              <ReadingPresence
+                editor={editor}
+                provider={provider}
+                containerRef={canvasWrapRef}
+                onReadersChange={setReaders}
+              />
+            )}
           </div>
 
-          {editor && findOpen && (
-            <FindReplace editor={editor} initialMode={findMode} onClose={closeFind} />
+          {/* D1: comments sidebar (right rail) */}
+          {editor && commentsSidebarOpen && <CommentsSidebar docId={docId} editor={editor} />}
+
+          {/* D3: version history panel (right rail) */}
+          {editor && versionHistoryOpen && <VersionHistory docId={docId} editor={editor} />}
+
+          {/* D2: suggestions panel (right rail) */}
+          {editor && suggestionsOpen && <SuggestionsPanel editor={editor} />}
+
+          {/* K7: grammar-check panel (right rail) — only when LanguageTool is enabled */}
+          {editor && grammarEnabled && grammarPanelOpen && (
+            <GrammarPanel editor={editor} onClose={() => setGrammarPanelOpen(false)} />
           )}
 
-          {editor && provider && (
-            <ReadingPresence
-              editor={editor}
-              provider={provider}
-              containerRef={canvasWrapRef}
-              onReadersChange={setReaders}
-            />
-          )}
+          {/* F6: backlinks panel (right rail) */}
+          {editor && backlinksOpen && <BacklinksPanel docId={docId} />}
         </div>
 
-        {/* D1: comments sidebar (right rail) */}
-        {editor && commentsSidebarOpen && <CommentsSidebar docId={docId} editor={editor} />}
+        {/* Selection bubble menu (B2 + G13: AI actions) */}
+        {editor && <BubbleMenu editor={editor} aiEnabled={aiEnabled} />}
 
-        {/* D3: version history panel (right rail) */}
-        {editor && versionHistoryOpen && <VersionHistory docId={docId} editor={editor} />}
+        {/* G11: online/offline + sync status indicator */}
+        <OfflineIndicator provider={provider} />
 
-        {/* D2: suggestions panel (right rail) */}
-        {editor && suggestionsOpen && <SuggestionsPanel editor={editor} />}
+        <StatusBar
+          pageCount={pageCount}
+          full={full}
+          selection={selection}
+          readers={readers.map((r) => r.user)}
+        />
 
-        {/* K7: grammar-check panel (right rail) — only when LanguageTool is enabled */}
-        {editor && grammarEnabled && grammarPanelOpen && (
-          <GrammarPanel editor={editor} onClose={() => setGrammarPanelOpen(false)} />
+        {/* B5: Image insert dialog */}
+        {editor && imageDialogOpen && (
+          <ImageDialog
+            editor={editor}
+            docId={docId}
+            {...(imageDialogPrefillSrc !== undefined ? { prefillSrc: imageDialogPrefillSrc } : {})}
+            onClose={closeImageDialog}
+          />
         )}
 
-        {/* F6: backlinks panel (right rail) */}
-        {editor && backlinksOpen && <BacklinksPanel docId={docId} />}
-      </div>
+        {/* B6: Link popover */}
+        {editor && linkPopoverOpen && <LinkPopover editor={editor} onClose={closeLinkPopover} />}
 
-      {/* Selection bubble menu (B2 + G13: AI actions) */}
-      {editor && <BubbleMenu editor={editor} aiEnabled={aiEnabled} />}
+        {/* G4: Math editor popover */}
+        {editor && mathEdit !== null && (
+          <MathPopover
+            editor={editor}
+            pos={mathEdit.pos}
+            initialLatex={mathEdit.latex}
+            onClose={() => setMathEdit(null)}
+          />
+        )}
 
-      {/* G11: online/offline + sync status indicator */}
-      <OfflineIndicator provider={provider} />
+        {/* G5: Drawing editor modal */}
+        {editor && drawingEdit !== null && (
+          <DrawingModal
+            editor={editor}
+            pos={drawingEdit.pos}
+            initialScene={drawingEdit.scene}
+            onClose={() => setDrawingEdit(null)}
+          />
+        )}
 
-      <StatusBar
-        pageCount={pageCount}
-        full={full}
-        selection={selection}
-        readers={readers.map((r) => r.user)}
-      />
+        {/* G6a: Mermaid diagram editor popover */}
+        {editor && mermaidEdit !== null && (
+          <MermaidPopover
+            editor={editor}
+            pos={mermaidEdit.pos}
+            initialSource={mermaidEdit.source}
+            onClose={() => setMermaidEdit(null)}
+          />
+        )}
 
-      {/* B5: Image insert dialog */}
-      {editor && imageDialogOpen && (
-        <ImageDialog
-          editor={editor}
-          docId={docId}
-          {...(imageDialogPrefillSrc !== undefined ? { prefillSrc: imageDialogPrefillSrc } : {})}
-          onClose={closeImageDialog}
-        />
-      )}
+        {/* G6b: PlantUML diagram editor popover */}
+        {editor && plantumlEdit !== null && (
+          <PlantumlPopover
+            editor={editor}
+            pos={plantumlEdit.pos}
+            initialSource={plantumlEdit.source}
+            onClose={() => setPlantumlEdit(null)}
+          />
+        )}
 
-      {/* B6: Link popover */}
-      {editor && linkPopoverOpen && <LinkPopover editor={editor} onClose={closeLinkPopover} />}
+        {/* G6c: Drawio diagram editor modal */}
+        {editor && drawioEdit !== null && (
+          <DrawioModal
+            editor={editor}
+            pos={drawioEdit.pos}
+            initialXml={drawioEdit.xml}
+            onClose={() => setDrawioEdit(null)}
+          />
+        )}
 
-      {/* G4: Math editor popover */}
-      {editor && mathEdit !== null && (
-        <MathPopover
-          editor={editor}
-          pos={mathEdit.pos}
-          initialLatex={mathEdit.latex}
-          onClose={() => setMathEdit(null)}
-        />
-      )}
+        {/* J2/J3: Embed (calendar / spreadsheet) URL dialog */}
+        {editor && embedEdit !== null && (
+          <EmbedDialog
+            editor={editor}
+            pos={embedEdit.pos}
+            kind={embedEdit.kind}
+            initialUrl={embedEdit.url}
+            initialTitle={embedEdit.title}
+            onClose={() => setEmbedEdit(null)}
+          />
+        )}
 
-      {/* G5: Drawing editor modal */}
-      {editor && drawingEdit !== null && (
-        <DrawingModal
-          editor={editor}
-          pos={drawingEdit.pos}
-          initialScene={drawingEdit.scene}
-          onClose={() => setDrawingEdit(null)}
-        />
-      )}
+        {/* J6: GitHub PR/issue embed URL dialog */}
+        {editor && githubEmbedEdit !== null && (
+          <GithubEmbedDialog
+            editor={editor}
+            pos={githubEmbedEdit.pos}
+            initialUrl={githubEmbedEdit.url}
+            initialTitle={githubEmbedEdit.title}
+            onClose={() => setGithubEmbedEdit(null)}
+          />
+        )}
 
-      {/* G6a: Mermaid diagram editor popover */}
-      {editor && mermaidEdit !== null && (
-        <MermaidPopover
-          editor={editor}
-          pos={mermaidEdit.pos}
-          initialSource={mermaidEdit.source}
-          onClose={() => setMermaidEdit(null)}
-        />
-      )}
+        {/* G8b: Cross-reference picker — opened from the slash-menu "Cross-reference" item */}
+        {editor && crossRefPickerOpen && (
+          <CrossRefPicker
+            editor={editor}
+            onPick={(targetId, kind) => {
+              setCrossRefPickerOpen(false)
+              editor.chain().focus().insertCrossRef(targetId, kind).run()
+            }}
+            onClose={() => setCrossRefPickerOpen(false)}
+          />
+        )}
 
-      {/* G6b: PlantUML diagram editor popover */}
-      {editor && plantumlEdit !== null && (
-        <PlantumlPopover
-          editor={editor}
-          pos={plantumlEdit.pos}
-          initialSource={plantumlEdit.source}
-          onClose={() => setPlantumlEdit(null)}
-        />
-      )}
+        {/* B13: section-break edit dialog */}
+        {editor && sectionDialogPos !== null && (
+          <SectionBreakDialog
+            editor={editor}
+            pos={sectionDialogPos}
+            onClose={() => setSectionDialogPos(null)}
+          />
+        )}
 
-      {/* G6c: Drawio diagram editor modal */}
-      {editor && drawioEdit !== null && (
-        <DrawioModal
-          editor={editor}
-          pos={drawioEdit.pos}
-          initialXml={drawioEdit.xml}
-          onClose={() => setDrawioEdit(null)}
-        />
-      )}
+        {/* B5: Image crop dialog (selected image) */}
+        {editor && cropState && (
+          <CropDialog
+            docId={docId}
+            src={cropState.src}
+            alt={cropState.alt}
+            onCropped={applyCrop}
+            onClose={() => setCropState(null)}
+          />
+        )}
 
-      {/* J2/J3: Embed (calendar / spreadsheet) URL dialog */}
-      {editor && embedEdit !== null && (
-        <EmbedDialog
-          editor={editor}
-          pos={embedEdit.pos}
-          kind={embedEdit.kind}
-          initialUrl={embedEdit.url}
-          initialTitle={embedEdit.title}
-          onClose={() => setEmbedEdit(null)}
-        />
-      )}
+        {/* B14: Page setup dialog */}
+        {pageSetupOpen && (
+          <PageSetupDialog
+            initial={pageSetup}
+            onApply={setPageSetup}
+            onClose={() => setPageSetupOpen(false)}
+          />
+        )}
 
-      {/* J6: GitHub PR/issue embed URL dialog */}
-      {editor && githubEmbedEdit !== null && (
-        <GithubEmbedDialog
-          editor={editor}
-          pos={githubEmbedEdit.pos}
-          initialUrl={githubEmbedEdit.url}
-          initialTitle={githubEmbedEdit.title}
-          onClose={() => setGithubEmbedEdit(null)}
-        />
-      )}
+        {/* G9: Watermark dialog */}
+        {watermarkOpen && (
+          <WatermarkDialog
+            initial={watermark}
+            docId={docId}
+            onApply={setWatermark}
+            onClose={() => setWatermarkOpen(false)}
+          />
+        )}
 
-      {/* G8b: Cross-reference picker — opened from the slash-menu "Cross-reference" item */}
-      {editor && crossRefPickerOpen && (
-        <CrossRefPicker
-          editor={editor}
-          onPick={(targetId, kind) => {
-            setCrossRefPickerOpen(false)
-            editor.chain().focus().insertCrossRef(targetId, kind).run()
-          }}
-          onClose={() => setCrossRefPickerOpen(false)}
-        />
-      )}
+        {/* G17: Custom CSS dialog */}
+        {customCssOpen && (
+          <CustomCssDialog
+            initial={customCss}
+            docId={docId}
+            onApply={setCustomCss}
+            onClose={() => setCustomCssOpen(false)}
+          />
+        )}
 
-      {/* B13: section-break edit dialog */}
-      {editor && sectionDialogPos !== null && (
-        <SectionBreakDialog
-          editor={editor}
-          pos={sectionDialogPos}
-          onClose={() => setSectionDialogPos(null)}
-        />
-      )}
+        {/* G1: Share dialog */}
+        {shareDialogOpen && <ShareDialog docId={docId} onClose={() => setShareDialogOpen(false)} />}
 
-      {/* B5: Image crop dialog (selected image) */}
-      {editor && cropState && (
-        <CropDialog
-          docId={docId}
-          src={cropState.src}
-          alt={cropState.alt}
-          onCropped={applyCrop}
-          onClose={() => setCropState(null)}
-        />
-      )}
-
-      {/* B14: Page setup dialog */}
-      {pageSetupOpen && (
-        <PageSetupDialog
-          initial={pageSetup}
-          onApply={setPageSetup}
-          onClose={() => setPageSetupOpen(false)}
-        />
-      )}
-
-      {/* G9: Watermark dialog */}
-      {watermarkOpen && (
-        <WatermarkDialog
-          initial={watermark}
-          docId={docId}
-          onApply={setWatermark}
-          onClose={() => setWatermarkOpen(false)}
-        />
-      )}
-
-      {/* G17: Custom CSS dialog */}
-      {customCssOpen && (
-        <CustomCssDialog
-          initial={customCss}
-          docId={docId}
-          onApply={setCustomCss}
-          onClose={() => setCustomCssOpen(false)}
-        />
-      )}
-
-      {/* G1: Share dialog */}
-      {shareDialogOpen && <ShareDialog docId={docId} onClose={() => setShareDialogOpen(false)} />}
-
-      {/* G15: Reading mode overlay — rendered outside the layout flow so it is
+        {/* G15: Reading mode overlay — rendered outside the layout flow so it is
           full-screen fixed. Content is a snapshot of editor.getJSON() at render
           time — read-only view via renderReadOnlyDoc, no editor/contenteditable. */}
-      {readingOpen && editor && (
-        <ReadingView
-          content={editor.getJSON()}
-          docId={docId}
-          customCss={customCss}
-          onClose={() => setReadingOpen(false)}
-        />
-      )}
+        {readingOpen && editor && (
+          <ReadingView
+            content={editor.getJSON()}
+            docId={docId}
+            customCss={customCss}
+            onClose={() => setReadingOpen(false)}
+          />
+        )}
 
-      {/* G16: Presenter mode overlay — full-screen slideshow. Content is a
+        {/* G16: Presenter mode overlay — full-screen slideshow. Content is a
           snapshot of editor.getJSON() at open time. PresenterView manages its
           own keyboard handler and fullscreen lifecycle. */}
-      {presenterOpen && editor && (
-        <PresenterView docJson={editor.getJSON()} onClose={() => setPresenterOpen(false)} />
-      )}
+        {presenterOpen && editor && (
+          <PresenterView docJson={editor.getJSON()} onClose={() => setPresenterOpen(false)} />
+        )}
 
-      {/* H2: Print / PDF overlay — paged.js paginates a read-only snapshot of the
+        {/* H2: Print / PDF overlay — paged.js paginates a read-only snapshot of the
           doc with @page rules matching the editor canvas, then window.print()
           sends it to the browser print dialog for "Save as PDF". */}
-      {printOpen && editor && (
-        <PrintView
-          content={editor.getJSON()}
-          pageSetup={pageSetup}
-          onClose={() => setPrintOpen(false)}
-        />
-      )}
+        {printOpen && editor && (
+          <PrintView
+            content={editor.getJSON()}
+            pageSetup={pageSetup}
+            onClose={() => setPrintOpen(false)}
+          />
+        )}
+      </div>
     </div>
   )
 }

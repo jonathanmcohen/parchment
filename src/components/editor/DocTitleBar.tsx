@@ -95,81 +95,85 @@ export function DocTitleBar({
   const status = saveStatusLabel(saveStatus)
 
   return (
+    // L2: the <header> is the full-bleed bg/border/sticky box; the inner
+    // .parchment-titlebar-inner re-centers the controls at the body max-width.
     <header className="parchment-titlebar">
-      <a href="/files" className="parchment-titlebar-glyph">
-        <span aria-hidden className="material-symbols-rounded text-[24px]">
-          description
-        </span>
-        <span className="sr-only">Back to files</span>
-      </a>
+      <div className="parchment-titlebar-inner mx-auto max-w-5xl">
+        <a href="/files" className="parchment-titlebar-glyph">
+          <span aria-hidden className="material-symbols-rounded text-[24px]">
+            description
+          </span>
+          <span className="sr-only">Back to files</span>
+        </a>
 
-      <InlineTitle docId={docId} initialTitle={initialTitle} />
+        <InlineTitle docId={docId} initialTitle={initialTitle} />
 
-      {/* star + move are placeholders (no editor-side endpoint) — visibly inert. */}
-      <button
-        type="button"
-        className="parchment-titlebar-iconbtn"
-        aria-pressed={starred}
-        aria-label={starred ? 'Unstar' : 'Star'}
-        title="Star"
-        onClick={() => setStarred((v) => !v)}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          {starred ? 'star' : 'star_border'}
-        </span>
-      </button>
-      <button
-        type="button"
-        className="parchment-titlebar-iconbtn"
-        aria-label="Move"
-        aria-disabled
-        disabled
-        title="Move (coming soon)"
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          drive_file_move
-        </span>
-      </button>
+        {/* star + move are placeholders (no editor-side endpoint) — visibly inert. */}
+        <button
+          type="button"
+          className="parchment-titlebar-iconbtn"
+          aria-pressed={starred}
+          aria-label={starred ? 'Unstar' : 'Star'}
+          title="Star"
+          onClick={() => setStarred((v) => !v)}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            {starred ? 'star' : 'star_border'}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="parchment-titlebar-iconbtn"
+          aria-label="Move"
+          aria-disabled
+          disabled
+          title="Move (coming soon)"
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            drive_file_move
+          </span>
+        </button>
 
-      {status && (
-        <span className="parchment-titlebar-savestatus" role="status" aria-live="polite">
-          {status}
-        </span>
-      )}
+        {status && (
+          <span className="parchment-titlebar-savestatus" role="status" aria-live="polite">
+            {status}
+          </span>
+        )}
 
-      <span className="parchment-titlebar-spacer" />
+        <span className="parchment-titlebar-spacer" />
 
-      <button
-        type="button"
-        className="parchment-titlebar-iconbtn"
-        aria-label="Comments"
-        title="Comments"
-        onClick={onToggleComments}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          chat_bubble
-        </span>
-      </button>
-      <button
-        type="button"
-        className="parchment-titlebar-iconbtn"
-        aria-label="Version history"
-        title="Version history"
-        onClick={onToggleVersionHistory}
-      >
-        <span aria-hidden className="material-symbols-rounded text-[20px]">
-          history
-        </span>
-      </button>
+        <button
+          type="button"
+          className="parchment-titlebar-iconbtn"
+          aria-label="Comments"
+          title="Comments"
+          onClick={onToggleComments}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            chat_bubble
+          </span>
+        </button>
+        <button
+          type="button"
+          className="parchment-titlebar-iconbtn"
+          aria-label="Version history"
+          title="Version history"
+          onClick={onToggleVersionHistory}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            history
+          </span>
+        </button>
 
-      <button type="button" className="parchment-titlebar-share" onClick={onOpenShare}>
-        <span aria-hidden className="material-symbols-rounded text-[16px]">
-          group
-        </span>
-        Share
-      </button>
+        <button type="button" className="parchment-titlebar-share" onClick={onOpenShare}>
+          <span aria-hidden className="material-symbols-rounded text-[16px]">
+            group
+          </span>
+          Share
+        </button>
 
-      {avatar}
+        {avatar}
+      </div>
     </header>
   )
 }

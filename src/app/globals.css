@@ -402,15 +402,35 @@ body {
  *  shell (S3-2/S3-3 consume it; S5-3 owns/finalizes it — DECISION 6).
  * ─────────────────────────────────────────────────────────────────────────── */
 
-/* ── S3-1: doc title bar ── */
+/* ── L1/L2/L7: full-width sticky chrome stack ──
+ * The three chrome bars (title 56px / menu 32px / toolbar 48px = 136px) are
+ * lifted out of the centered body column into .parchment-chrome-stack so their
+ * backgrounds + bottom borders bleed edge-to-edge of the main content area.
+ * The stack cancels the .parchment-editor-shell's horizontal padding (-2rem)
+ * so the bars reach the viewport edge; each bar's .parchment-*-inner wrapper
+ * (mx-auto max-w-5xl) re-centers its controls at the body max-width. The bars
+ * are individually sticky and stack flush (title top:0 > menu top:56px >
+ * toolbar top:88px), with z-index title 30 > menu 20 > toolbar 10 so the title
+ * wins on any overlap. */
+.parchment-chrome-stack {
+  margin: 0 -2rem; /* cancel the shell's horizontal padding → full-bleed bars */
+}
+
+/* ── S3-1: doc title bar (L2: full-bleed bg/border, sticky top:0) ── */
 .parchment-titlebar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-chrome);
+}
+.parchment-titlebar-inner {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 56px;
+  height: 100%;
   padding: 0 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border-chrome);
 }
 .parchment-titlebar-glyph {
   display: inline-flex;
@@ -495,15 +515,21 @@ body {
   background: var(--primary-pressed);
 }
 
-/* ── S3-2: menu bar ── */
+/* ── S3-2: menu bar (L2: full-bleed bg/border, sticky top:56px) ── */
 .parchment-menubar {
+  position: sticky;
+  top: 56px;
+  z-index: 20;
+  height: 32px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-chrome);
+}
+.parchment-menubar-inner {
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 32px;
+  height: 100%;
   padding: 0 8px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border-chrome);
 }
 .parchment-menu-wrap {
   position: relative;
@@ -1014,6 +1040,16 @@ body {
    off-screen and out of reach. `overflow-y` is clipped so the 48px chrome height
    never grows. The mobile (`max-width: 768px`) block layers touch sizing +
    sticky positioning on top of this same scroll behavior. */
+/* L1: .parchment-toolbar-bleed is the full-bleed bg/border/sticky box (top:88px
+   = title 56 + menu 32). The inner .parchment-toolbar keeps the centered flex
+   row + overflow measurement (role="toolbar"/toolbarRef live there). */
+.parchment-toolbar-bleed {
+  position: sticky;
+  top: 88px;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-chrome);
+}
 .parchment-toolbar {
   display: flex;
   flex-wrap: nowrap;
@@ -1021,9 +1057,7 @@ body {
   gap: 2px;
   height: 48px;
   padding: 0 var(--space-2); /* S4-4: 8px === --space-2 */
-  background: var(--surface);
   border: none;
-  border-bottom: 1px solid var(--border-chrome);
   border-radius: 0;
   margin-bottom: 0;
   overflow-x: auto;
@@ -3552,7 +3586,11 @@ body {
 
   /* ── Touch toolbar ── */
 
-  /* Make the toolbar horizontally scrollable with 44px touch targets. */
+  /* Make the toolbar horizontally scrollable with 44px touch targets.
+     L1/L7: stickiness now lives on the .parchment-toolbar-bleed wrapper at
+     top:88px (title 56 + menu 32) for every viewport — title (top:0) and menu
+     (top:56px) keep their heights at <768px, so the 136px stack math holds on
+     mobile too. The inner row only owns the touch scroll behavior here. */
   .parchment-toolbar {
     overflow-x: auto;
     flex-wrap: nowrap;
@@ -3560,10 +3598,6 @@ body {
     -webkit-overflow-scrolling: touch;
     /* Hide scrollbar visually (still scrollable) */
     scrollbar-width: none;
-    /* Keep toolbar sticky at the top so it stays reachable while scrolling */
-    position: sticky;
-    top: 0;
-    z-index: 10;
   }
 
   /* Hide the webkit scrollbar track in the toolbar */

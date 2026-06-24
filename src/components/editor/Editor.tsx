@@ -1415,7 +1415,13 @@ export function Editor({
     // The inner max-w-5xl keeps the centered column; the shell paints the gutter
     // edge-to-edge inside the shared <main> (negative margin cancels its padding).
     <div className="parchment-editor-shell">
-      <div className="mx-auto max-w-5xl">
+      {/* L1+L2+L7: full-width sticky chrome stack. The three bars are lifted OUT
+          of the centered body column so their backgrounds + bottom borders bleed
+          edge-to-edge of the main content area; each bar's own inner wrapper
+          (.parchment-*-inner) re-centers its controls at the body max-width.
+          The bars are individually sticky (title top:0/z-30, menu top:56px/z-20,
+          toolbar top:88px/z-10) so they stack flush to 136px on scroll. */}
+      <header className="parchment-chrome-stack">
         {/* S3-1: pinned doc title bar (first child) — inline-editable title via
             the title-only /rename endpoint, save-status slot, share/comments/
             history wired to existing handlers, S2-5 avatar cluster. */}
@@ -1482,7 +1488,9 @@ export function Editor({
             sourceModeDisabled={collabActive}
           />
         )}
+      </header>
 
+      <div className="mx-auto max-w-5xl">
         {/* S3-1: the plain read-only <h1> is superseded by the inline-editable
             title in <DocTitleBar> above. */}
 

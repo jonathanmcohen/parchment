@@ -459,7 +459,8 @@ body {
   max-width: 480px;
   height: 32px;
   padding: 0 8px;
-  font: 400 18px / 1 var(--font-ui);
+  /* LT3-4: 18px semibold (Google Sans via --font-ui). */
+  font: 600 18px / 1 var(--font-ui);
   color: var(--foreground);
   background: transparent;
   border: 1px solid transparent;
@@ -497,7 +498,8 @@ body {
   cursor: default;
 }
 .parchment-titlebar-savestatus {
-  font: 400 12px / 1 var(--font-ui);
+  /* LT3-2: 13px medium — a standalone status indicator, not inline body text. */
+  font: 500 13px / 1 var(--font-ui);
   color: var(--muted);
   white-space: nowrap;
 }
@@ -509,6 +511,8 @@ body {
   align-items: center;
   gap: 8px;
   height: 36px;
+  /* LT3-6: 16px before the Share button (icons keep the 8px container gap). */
+  margin-left: 16px;
   padding: 0 16px;
   border-radius: 18px;
   border: none;
@@ -538,7 +542,8 @@ body {
   align-items: center;
   gap: 2px;
   height: 100%;
-  padding: 0 8px;
+  /* LT3-5: 24px left pad before File (8px right). */
+  padding: 0 8px 0 24px;
 }
 .parchment-menu-wrap {
   position: relative;

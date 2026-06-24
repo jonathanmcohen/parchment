@@ -47,43 +47,51 @@ export function StatusBar({
       : `${full.words} ${full.words === 1 ? 'word' : 'words'} · ${full.chars} ${full.chars === 1 ? 'char' : 'chars'}`
 
   return (
+    // F8+L3: the bar is pinned full-width to the viewport bottom via
+    // .parchment-status-bar (fixed, edge-to-edge bg + top chrome border). The
+    // inner .parchment-status-inner (mx-auto max-w-5xl) re-centers the three
+    // slots at the body max-width — same full-bleed-bg/centered-content pattern
+    // as the L-chrome-stack bars. Counts / word-count modal / connection-dot
+    // wiring is unchanged (layout only).
     <div role="status" aria-live="polite" className="parchment-status-bar">
-      <span className="parchment-status-slot parchment-status-slot--left">
-        Page {pageCount} of {pageCount}
-      </span>
+      <div className="parchment-status-inner mx-auto max-w-5xl">
+        <span className="parchment-status-slot parchment-status-slot--left">
+          Page {pageCount} of {pageCount}
+        </span>
 
-      <span className="parchment-status-slot parchment-status-slot--center">
-        {onOpenWordCount ? (
-          <button type="button" className="parchment-status-wordcount" onClick={onOpenWordCount}>
-            {countText}
-          </button>
-        ) : (
-          <span>{countText}</span>
-        )}
-      </span>
-
-      <span className="parchment-status-slot parchment-status-slot--right">
-        {readers.length > 0 && (
-          // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label describes the presence count to screen readers
-          <span
-            className="parchment-status-readers"
-            aria-label={`${readers.length} other ${readers.length === 1 ? 'person' : 'people'} reading: ${names.join(', ')}`}
-          >
-            <span aria-hidden className="material-symbols-rounded text-[16px]">
-              visibility
-            </span>
-            {readers.length}
-          </span>
-        )}
-        <span className="parchment-status-connection" data-state={connection}>
-          <span aria-hidden className="parchment-status-dot" />
-          {connectionLabel ? (
-            <span>{connectionLabel}</span>
+        <span className="parchment-status-slot parchment-status-slot--center">
+          {onOpenWordCount ? (
+            <button type="button" className="parchment-status-wordcount" onClick={onOpenWordCount}>
+              {countText}
+            </button>
           ) : (
-            <span className="sr-only">Online</span>
+            <span>{countText}</span>
           )}
         </span>
-      </span>
+
+        <span className="parchment-status-slot parchment-status-slot--right">
+          {readers.length > 0 && (
+            // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label describes the presence count to screen readers
+            <span
+              className="parchment-status-readers"
+              aria-label={`${readers.length} other ${readers.length === 1 ? 'person' : 'people'} reading: ${names.join(', ')}`}
+            >
+              <span aria-hidden className="material-symbols-rounded text-[16px]">
+                visibility
+              </span>
+              {readers.length}
+            </span>
+          )}
+          <span className="parchment-status-connection" data-state={connection}>
+            <span aria-hidden className="parchment-status-dot" />
+            {connectionLabel ? (
+              <span>{connectionLabel}</span>
+            ) : (
+              <span className="sr-only">Online</span>
+            )}
+          </span>
+        </span>
+      </div>
     </div>
   )
 }

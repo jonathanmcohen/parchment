@@ -117,6 +117,15 @@
   --icon-btn: 32px; /* toolbar/menu icon-button box (S4-3) */
   --icon-size: 20px; /* Material Symbols glyph inside it (S4-3) */
 
+  /* F8+L3: app-shell sidebar rail width — single source of truth for the
+     always-on rail (AppShell <aside class="w-64"> = 16rem) AND the narrow
+     off-canvas drawer. The pinned status bar derives its leading-edge offset
+     from this token (plus the rail's 1px border) so a future rail-width change
+     can never silently desync the bar's left edge from the chrome stack.
+     Scheme-independent (a dimension, not a color), so it lives here with the
+     spacing grid + --page-pad. */
+  --sidebar-width: 16rem;
+
   /* Page canvas (B1). --page-pad = 1in @ 96dpi mirrors the print @page margin
      (page-css.ts DEFAULT_RULE = margin: 1in; A4 preset = 2.54cm = 1in). */
   --page-pad: 96px;

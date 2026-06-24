@@ -94,7 +94,7 @@ export function NewMenu({
           ref={menuRef}
           role="menu"
           aria-label={labels.new}
-          className="parchment-new-menu absolute start-0 top-[calc(100%+8px)] z-20 flex min-w-[224px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1"
+          className="parchment-new-menu absolute start-0 top-[calc(100%+8px)] z-20 flex w-[220px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1"
         >
           {/* Blank document — existing server action (same call as the files form).
               menuitems start at tabIndex -1; useMenuKeyboard rolls focus. */}

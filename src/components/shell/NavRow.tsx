@@ -40,7 +40,7 @@ export function NavRow({ href, icon, label }: { href: string; icon: string; labe
           : 'text-[var(--foreground)] hover:bg-[var(--surface-hover)]',
       ].join(' ')}
     >
-      <span aria-hidden className="material-symbols-rounded text-[20px]">
+      <span aria-hidden className="material-symbols-rounded text-[20px] leading-none">
         {icon}
       </span>
       {label}

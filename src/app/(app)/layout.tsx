@@ -81,8 +81,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ))}
       </nav>
 
-      {/* S2-2: bottom cluster — reads as secondary (muted). */}
-      <div className="mt-auto flex flex-col gap-1 border-[var(--border)] border-t pt-4">
+      {/* S2-2: bottom cluster — reads as secondary (muted). LT4-5: 12px row density. */}
+      <div className="mt-auto flex flex-col gap-3 border-[var(--border)] border-t pt-4">
         <span className="flex items-center gap-2 px-2 text-[var(--muted)] text-xs">
           <Avatar name={user.name} size={24} />
           <span className="truncate">{user.name}</span>

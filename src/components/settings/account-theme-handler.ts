@@ -30,7 +30,15 @@ export async function applyColorScheme(
   deps: { fetch: typeof fetch; router: ThemeRouter },
 ): Promise<WorkspaceTheme> {
   const next: WorkspaceTheme = { ...current, colorScheme: scheme }
-  const res = await deps.fetch('/api/settings/theme', {
+  // Call fetch UNQUALIFIED. Invoking `deps.fetch(...)` as a member sets `this`
+  // to `deps`, and the platform window.fetch rejects a non-global `this` with
+  // "Failed to execute 'fetch' on 'Window': Illegal invocation" — which silently
+  // broke BOTH theme entry points (Account → Appearance and the user-menu Theme
+  // submenu). Hoisting to a local makes it an unqualified call (`this` ===
+  // undefined), which the platform fetch accepts; injected test mocks are
+  // unaffected since they don't guard `this`.
+  const doFetch = deps.fetch
+  const res = await doFetch('/api/settings/theme', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(next),

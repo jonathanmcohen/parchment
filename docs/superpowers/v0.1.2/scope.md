@@ -34,7 +34,7 @@ F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = 
 | L1 | Editor toolbar full-width (sticky `top:56px`, edge-to-edge bg, centered content) | DONE | ☑ | ☑ | PR #95 (L1+L2+L7). Full-bleed bars (256→1425) + centered inner 1024px + sticky top:0/56/88. Live light+dark
 | L2 | Title bar + menu bar full-width sticky | DONE | ☑ | ☑ | PR #95 (with L1/L7). Title 56 + menu 32 sticky full-width, content centered
 | L3 | Bottom status bar full-width (with F8) | DONE | ☑ | ☑ | PR #96 (=F8). Same pin; RTL logical props (review-fixed)
-| L4 | Outline pane anchored left, not floating; 40px collapsed rail; sentence-case "Outline" | TODO | ☐ | ☐ | restyle: pane is in-flow flex child but not sticky; collapse target is 32px (→40px) + uppercase title (→sentence) |
+| L4 | Outline pane anchored left, not floating; 40px collapsed rail; sentence-case "Outline" | DONE | ☑ | ☑ | PR #97. sticky top:136px, 256px, collapse 40px rail, sentence-case "Outline" 13px/500; scroll-chain fixed (review). Left edge → 256 after L5/L6 declamp
 | L5 | Page canvas fits (viewport − sidebar − outline; gutter; 816px; gutter-only h-scroll; 24px pad; verify S1-3 shadow) | TODO | ☐ | ☐ | restyle: page is flex:1 grow; `--shadow-page` confirmed present (`globals.css:729`); add gutter-only overflow + vertical pad |
 | L6 | Eliminate floating-card chrome (no rounded card) | TODO | ☐ | ☐ | restyle: grounding found **no** rounded card today — the `max-w-5xl` column is flat on the `--editor-gutter` shell. Item = ensure no card residue while L1/L2/L4 reshape; mostly a verify |
 | L7 | Sticky top chrome stack 136px (title 56 / menu 32 / toolbar 48), status bottom:0 | DONE | ☑ | ☑ | PR #95 (with L1/L2). Sticky stack 136px, z 30/20/10, toolbar top:88px (review caught vs 56)

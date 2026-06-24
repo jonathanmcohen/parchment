@@ -54,7 +54,9 @@ export async function rpContext(): Promise<RpContext> {
 function challengeCookieOpts(maxAge: number) {
   return {
     httpOnly: true as const,
-    secure: env.nodeEnv === 'production',
+    // CF1: same secure guard as the session cookie — SECURE_COOKIES lets the
+    // HTTPS-behind-Caddy deploy opt in without forcing secure on local http dev.
+    secure: env.nodeEnv === 'production' || env.secureCookies,
     sameSite: 'lax' as const,
     path: '/',
     maxAge,

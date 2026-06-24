@@ -1,6 +1,14 @@
 import { AccountThemeSelect } from '@/components/settings/AccountThemeSelect'
+import { requireUser } from '@/lib/auth/guard'
 
-export default function AccountSettingsPage() {
+// CF6: this is an async server component. `requireUser()` resolves the live
+// session user (the (app)/layout.tsx already gates the group, redirecting
+// logged-out visitors to /login), so the Profile inputs can be pre-populated
+// with the user's real name + email via defaultValue. Without `async`, the
+// page can't `await requireUser()` and the inputs render empty.
+export default async function AccountSettingsPage() {
+  const user = await requireUser()
+
   return (
     <section className="max-w-2xl">
       <h1 className="font-semibold text-2xl tracking-tight">Account</h1>
@@ -25,6 +33,7 @@ export default function AccountSettingsPage() {
               name="name"
               type="text"
               autoComplete="name"
+              defaultValue={user.name ?? ''}
               className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm"
             />
           </div>
@@ -37,6 +46,7 @@ export default function AccountSettingsPage() {
               name="email"
               type="email"
               autoComplete="email"
+              defaultValue={user.email}
               className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm"
             />
           </div>

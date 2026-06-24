@@ -213,8 +213,46 @@ export function Toolbar({
       image: ed.isActive('image'),
       // D2: suggesting mode active
       suggesting: ed.storage.suggesting?.enabled === true,
+      // S5-10: read-only "Viewing" mode (editor non-editable).
+      editable: ed.isEditable,
     }),
   })
+
+  // S5-10: the active editing mode for the right-end Editing/Suggesting/Viewing
+  // dropdown. Derived from EXISTING editor state — no new mode state is stored:
+  //   Viewing    = editor is non-editable (read-only)
+  //   Suggesting = the D2 suggesting plugin is enabled
+  //   Editing    = the default (editable, not suggesting)
+  const activeMode: 'editing' | 'suggesting' | 'viewing' = !s.editable
+    ? 'viewing'
+    : s.suggesting
+      ? 'suggesting'
+      : 'editing'
+
+  // S5-10: switch modes by flipping the EXISTING flags — no new editing logic.
+  //   • Suggesting routes edits through the existing D2 track-changes marks (the
+  //     dropdown only toggles the plugin flag the D2 path already honors — the
+  //     G13 lesson: programmatic/IME edits still go through the marks, never a
+  //     silent commit).
+  //   • Viewing sets editor.setEditable(false) — typing is a no-op.
+  function selectMode(mode: 'editing' | 'suggesting' | 'viewing') {
+    if (mode === activeMode) return
+    // Leaving a mode: re-enable editing and clear suggesting as needed.
+    if (activeMode === 'viewing') editor.setEditable(true)
+    if (activeMode === 'suggesting') editor.chain().focus().toggleSuggesting().run()
+    // Entering the new mode.
+    if (mode === 'viewing') {
+      editor.setEditable(false)
+    } else if (mode === 'suggesting') {
+      editor.chain().focus().toggleSuggesting().run()
+    }
+    // 'editing' needs no extra step — the leave-cleanup above already restored it.
+  }
+
+  const modeLabel =
+    activeMode === 'viewing' ? 'Viewing' : activeMode === 'suggesting' ? 'Suggesting' : 'Editing'
+  const modeIcon =
+    activeMode === 'viewing' ? 'visibility' : activeMode === 'suggesting' ? 'edit_note' : 'edit'
 
   // Derive the active block type for the <select>
   const activeBlockType = (() => {
@@ -1176,6 +1214,38 @@ export function Toolbar({
           }
         />
       )}
+
+      {/* ── S5-10: Editing / Suggesting / Viewing mode dropdown (right end).
+          Reuses the shared `.px-menu` Menu primitive (S5-3). Each row flips an
+          EXISTING flag — Suggesting → the D2 track-changes plugin, Viewing →
+          editor.setEditable(false). No new editing logic. The trailing margin
+          pushes it to the right edge (after the overflow ⋯ when present). */}
+      <Menu
+        label={modeLabel}
+        triggerClassName="parchment-toolbar-btn parchment-toolbar-mode"
+        triggerAriaLabel={`Editing mode: ${modeLabel}`}
+        triggerContent={
+          <span className="parchment-toolbar-mode-trigger">
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              {modeIcon}
+            </span>
+            <span className="parchment-toolbar-mode-label">{modeLabel}</span>
+          </span>
+        }
+        items={(
+          [
+            { label: 'Editing', icon: 'edit', mode: 'editing' as const },
+            { label: 'Suggesting', icon: 'edit_note', mode: 'suggesting' as const },
+            { label: 'Viewing', icon: 'visibility', mode: 'viewing' as const },
+          ] satisfies { label: string; icon: string; mode: typeof activeMode }[]
+        ).map(({ label, icon, mode }) => ({
+          label,
+          icon,
+          // Only attach `hint` when this is the current mode (exactOptionalPropertyTypes).
+          ...(activeMode === mode ? { hint: 'Current' } : {}),
+          onSelect: () => selectMode(mode),
+        }))}
+      />
     </div>
   )
 }

@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Parchment',
     short_name: 'Parchment',
-    description: 'Markdown-first writing, page-bounded canvas, self-hosted.',
+    description: 'Parchment — your documents, on your disk.',
     start_url: '/',
     display: 'standalone',
     background_color: '#FFFFFF',

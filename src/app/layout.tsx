@@ -7,7 +7,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Parchment',
-  description: 'Markdown-first writing, page-bounded canvas, self-hosted.',
+  description: 'Parchment — your documents, on your disk.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,

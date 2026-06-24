@@ -1,13 +1,17 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { DocGlyph } from '@/components/file-manager/DocGlyph'
+import { FolderGlyph } from '@/components/file-manager/FolderGlyph'
+import { Dropdown } from '@/components/ui/Dropdown'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { docMenuItems } from '@/lib/docs/context-actions'
 import type { SortDir, SortKey } from '@/lib/docs/doc-sort'
 import { sortDocs } from '@/lib/docs/doc-sort'
 import type { FolderNode, TreeNode } from '@/lib/docs/folder-tree'
 import { buildTree, folderPath } from '@/lib/docs/folder-tree'
-import { rangeBetween, toggle as toggleSelection } from '@/lib/docs/selection'
+import { rangeBetween, selectOnly, toggle as toggleSelection } from '@/lib/docs/selection'
 import { describeCriteria, parseCriteria } from '@/lib/docs/smart-folder-criteria'
 import { resolveTagColor, TAG_COLORS } from '@/lib/docs/tag-colors'
 import { normalizeFilesView } from '@/lib/shell/nav'
@@ -363,11 +367,14 @@ function TagPopover({ docId, docTitle, allTags, onClose, onChanged }: TagPopover
   }
 
   return (
+    // S5-3: the tag picker adopts the shared dropdown elevation — 8px radius,
+    // --shadow-dropdown, white --surface, --border-chrome (no bespoke shadow-lg
+    // / --paper). Tokens match the `.px-menu` shell every other overlay uses.
     <div
       ref={ref}
       role="dialog"
       aria-label={`Edit tags for ${docTitle}`}
-      className="absolute z-50 right-0 top-8 w-52 bg-[var(--paper)] border border-[var(--border)] rounded-md shadow-lg p-3 flex flex-col gap-2"
+      className="absolute z-50 right-0 top-8 w-52 rounded-lg border border-[var(--border-chrome)] bg-[var(--surface)] p-3 flex flex-col gap-2 shadow-[var(--shadow-dropdown)]"
     >
       <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Tags</p>
       {loading ? (
@@ -533,7 +540,7 @@ function FolderTreeItem({
             onClick={() => onSelect(node.id)}
             style={{ paddingLeft: `${depth * 16}px` }}
             className={[
-              'flex w-full items-center text-left px-2 py-1 text-sm rounded truncate',
+              'flex w-full items-center gap-2 text-left px-2 py-1 text-sm rounded truncate',
               over
                 ? 'bg-[var(--primary)] text-[var(--on-primary)]'
                 : isActive
@@ -541,7 +548,8 @@ function FolderTreeItem({
                   : 'text-[var(--foreground)] hover:text-[var(--primary)]',
             ].join(' ')}
           >
-            📁 {node.name}
+            <FolderGlyph />
+            <span className="truncate">{node.name}</span>
           </button>
         )}
       </DropZone>
@@ -582,18 +590,31 @@ function SortViewToolbar({
   onSortDir,
   onViewMode,
 }: SortViewToolbarProps) {
+  // S5-4: the sort chip reads the current key + direction (e.g. "Name ↑");
+  // clicking it cycles the direction. The <select> stays for picking the key
+  // (a11y: a labelled control), styled as a flat chip. No behavior change —
+  // doc-sort.ts already produces the order.
+  const sortLabel = SORT_KEYS.find((s) => s.key === sortKey)?.label ?? 'Sort'
+  const VIEW_MODES = [
+    { mode: 'list' as const, icon: 'view_list', label: 'List view' },
+    { mode: 'grid' as const, icon: 'grid_view', label: 'Grid view' },
+    { mode: 'details' as const, icon: 'view_column', label: 'Details view' },
+  ]
+
   return (
-    <div className="flex items-center gap-3 mb-3 flex-wrap">
-      {/* Sort controls */}
-      <div className="flex items-center gap-1">
-        <label htmlFor="fm-sort-key" className="text-xs text-[var(--muted)] shrink-0">
+    <div className="flex items-center gap-2 mb-3 flex-wrap">
+      {/* Sort chip — key select + a direction toggle, right-aligned group with
+          the view toggle pushed to the trailing edge. */}
+      <div className="flex items-center gap-1 ml-auto">
+        <label htmlFor="fm-sort-key" className="sr-only">
           Sort by
         </label>
         <select
           id="fm-sort-key"
           value={sortKey}
           onChange={(e) => onSortKey(e.target.value as SortKey)}
-          className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+          aria-label="Sort by"
+          className="h-8 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--foreground)]"
         >
           {SORT_KEYS.map((s) => (
             <option key={s.key} value={s.key}>
@@ -601,33 +622,46 @@ function SortViewToolbar({
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={() => onSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-          aria-label={sortDir === 'asc' ? 'Sort descending' : 'Sort ascending'}
-          className="px-2 py-1 text-xs border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)] hover:text-[var(--primary)]"
-        >
-          {sortDir === 'asc' ? '↑ Asc' : '↓ Desc'}
-        </button>
+        <Tooltip label={sortDir === 'asc' ? 'Sort descending' : 'Sort ascending'}>
+          <button
+            type="button"
+            onClick={() => onSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+            aria-label={`${sortLabel}, ${sortDir === 'asc' ? 'ascending — sort descending' : 'descending — sort ascending'}`}
+            className="px-interactive flex h-8 w-8 items-center justify-center text-[var(--muted)]"
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              {sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+            </span>
+          </button>
+        </Tooltip>
       </div>
 
-      {/* View mode toggle */}
-      <div className="flex items-center gap-0.5 border border-[var(--border)] rounded overflow-hidden ml-auto">
-        {(['list', 'grid', 'details'] as const).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => onViewMode(mode)}
-            aria-pressed={viewMode === mode}
-            className={[
-              'px-2 py-1 text-xs capitalize',
-              viewMode === mode
-                ? 'bg-[var(--primary)] text-[var(--on-primary)]'
-                : 'bg-[var(--background)] text-[var(--muted)] hover:text-[var(--foreground)]',
-            ].join(' ')}
-          >
-            {mode === 'list' ? '☰ List' : mode === 'grid' ? '⊞ Grid' : '≡ Details'}
-          </button>
+      {/* Segmented icon-only View toggle (List / Grid / Details). */}
+      {/* biome-ignore lint/a11y/useSemanticElements: a toolbar-style toggle group; <fieldset> would impose legend/box semantics inappropriate for an icon segmented control */}
+      <div
+        className="flex items-center rounded-full border border-[var(--border)] overflow-hidden"
+        role="group"
+        aria-label="View mode"
+      >
+        {VIEW_MODES.map(({ mode, icon, label }) => (
+          <Tooltip key={mode} label={label}>
+            <button
+              type="button"
+              onClick={() => onViewMode(mode)}
+              aria-pressed={viewMode === mode}
+              aria-label={label}
+              className={[
+                'flex h-8 w-9 items-center justify-center',
+                viewMode === mode
+                  ? 'bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
+                  : 'text-[var(--muted)] hover:bg-[var(--surface-hover)]',
+              ].join(' ')}
+            >
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                {icon}
+              </span>
+            </button>
+          </Tooltip>
         ))}
       </div>
     </div>
@@ -780,21 +814,22 @@ function ContextMenu({ state, onClose, onRefresh, navigateTo, onSetView }: Conte
     }
   }
 
-  // Clamp position so menu doesn't overflow viewport
+  // Clamp position so menu doesn't overflow viewport. S5-3: the menu rides the
+  // shared `.px-menu` shell (via ui/Dropdown), positioned `fixed` at the click
+  // point (the `--fixed` modifier flips the base `position: absolute`).
   const menuStyle: React.CSSProperties = {
-    position: 'fixed',
     top: y,
     left: x,
     zIndex: 1000,
   }
 
   return (
-    <div
+    <Dropdown
       ref={ref}
       role="menu"
       aria-label={`Actions for ${doc.title}`}
       style={menuStyle}
-      className="min-w-44 bg-[var(--paper)] border border-[var(--border)] rounded-md shadow-xl py-1 flex flex-col"
+      className="px-menu--fixed"
     >
       {items.map((item) => (
         <button
@@ -806,17 +841,12 @@ function ContextMenu({ state, onClose, onRefresh, navigateTo, onSetView }: Conte
           onClick={() => {
             if (item.enabled) handleAction(item.key)
           }}
-          className={[
-            'text-left px-3 py-1.5 text-sm',
-            item.enabled
-              ? 'text-[var(--foreground)] hover:bg-[var(--primary)] hover:text-[var(--on-primary)] cursor-pointer'
-              : 'text-[var(--muted)] cursor-default',
-          ].join(' ')}
+          className="px-menu-item px-menu-action"
         >
           {item.label}
         </button>
       ))}
-    </div>
+    </Dropdown>
   )
 }
 
@@ -886,17 +916,26 @@ function DocActions({
   const isStarred = doc.starred ?? false
 
   return (
-    <div className="flex items-center gap-1 shrink-0">
+    // S5-4 Drive parity: the row action cluster is hidden until the row is
+    // hovered (`group-hover/row`) or any control inside it gains keyboard focus
+    // (`group-focus-within/row`) — matching Google Drive. The parent row
+    // applies `group/row`. focus-within keeps the keyboard path fully reachable
+    // (Tab into the row reveals the controls); `transition-opacity` softens it.
+    <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
       {/* Tag button + popover */}
       <div className="relative">
-        <button
-          type="button"
-          onClick={() => setShowTagPopover((v) => !v)}
-          aria-label={`Edit tags for ${doc.title}`}
-          className="text-sm px-1 text-[var(--muted)] hover:text-[var(--primary)]"
-        >
-          🏷
-        </button>
+        <Tooltip label={`Edit tags for ${doc.title}`}>
+          <button
+            type="button"
+            onClick={() => setShowTagPopover((v) => !v)}
+            aria-label={`Edit tags for ${doc.title}`}
+            className="px-interactive flex h-8 w-8 items-center justify-center text-[var(--muted)]"
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              label
+            </span>
+          </button>
+        </Tooltip>
         {showTagPopover && (
           <TagPopover
             docId={doc.id}
@@ -912,22 +951,36 @@ function DocActions({
       </div>
       {view !== 'trash' && (
         <>
-          <button
-            type="button"
-            onClick={handleStar}
-            aria-label={isStarred ? `Unstar ${doc.title}` : `Star ${doc.title}`}
-            className="text-base leading-none px-1 hover:text-[var(--primary)]"
-          >
-            {isStarred ? '★' : '☆'}
-          </button>
-          <button
-            type="button"
-            onClick={handleTrash}
-            aria-label={`Move ${doc.title} to trash`}
-            className="text-xs px-2 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-red-600 hover:border-red-400"
-          >
-            🗑 Trash
-          </button>
+          <Tooltip label={isStarred ? `Unstar ${doc.title}` : `Star ${doc.title}`}>
+            <button
+              type="button"
+              onClick={handleStar}
+              aria-label={isStarred ? `Unstar ${doc.title}` : `Star ${doc.title}`}
+              aria-pressed={isStarred}
+              className="px-interactive flex h-8 w-8 items-center justify-center"
+              style={{ color: isStarred ? 'var(--star)' : 'var(--muted)' }}
+            >
+              <span
+                aria-hidden
+                className="material-symbols-rounded text-[20px]"
+                style={{ fontVariationSettings: isStarred ? '"FILL" 1' : '"FILL" 0' }}
+              >
+                star
+              </span>
+            </button>
+          </Tooltip>
+          <Tooltip label={`Move ${doc.title} to trash`}>
+            <button
+              type="button"
+              onClick={handleTrash}
+              aria-label={`Move ${doc.title} to trash`}
+              className="px-interactive flex h-8 w-8 items-center justify-center text-[var(--muted)]"
+            >
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                delete
+              </span>
+            </button>
+          </Tooltip>
         </>
       )}
       {view === 'trash' && (
@@ -941,17 +994,21 @@ function DocActions({
         </button>
       )}
       {/* ⋯ More button — keyboard-accessible path to context menu */}
-      <button
-        type="button"
-        aria-label={`Actions for ${doc.title}`}
-        onClick={(e) => {
-          const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-          setContextMenu({ x: rect.left, y: rect.bottom + 4 })
-        }}
-        className="text-xs px-1 text-[var(--muted)] hover:text-[var(--foreground)]"
-      >
-        ⋯
-      </button>
+      <Tooltip label={`Actions for ${doc.title}`}>
+        <button
+          type="button"
+          aria-label={`Actions for ${doc.title}`}
+          onClick={(e) => {
+            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+            setContextMenu({ x: rect.left, y: rect.bottom + 4 })
+          }}
+          className="px-interactive flex h-8 w-8 items-center justify-center text-[var(--muted)]"
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            more_horiz
+          </span>
+        </button>
+      </Tooltip>
       {contextMenu !== null && (
         <ContextMenu
           state={{ doc, x: contextMenu.x, y: contextMenu.y }}
@@ -1145,9 +1202,12 @@ function BulkActionBar({
       <button
         type="button"
         onClick={handleTrash}
-        className="px-2 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)] hover:text-red-600 hover:border-red-400"
+        className="px-2 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)] hover:text-red-600 hover:border-red-400 inline-flex items-center gap-1"
       >
-        🗑 Delete
+        <span aria-hidden className="material-symbols-rounded text-[16px]">
+          delete
+        </span>
+        Delete
       </button>
 
       {/* Clear */}
@@ -1171,6 +1231,14 @@ interface DocListRowProps {
   selected: boolean
   orderedIds: string[]
   onToggle: (docId: string, shiftKey: boolean, orderedIds: string[]) => void
+  /** S5-5: row-body click gestures (single / ⌘ / shift). */
+  onRowSelect: (
+    docId: string,
+    mods: { meta: boolean; shift: boolean },
+    orderedIds: string[],
+  ) => void
+  /** S5-5: double-click opens the doc. */
+  onOpen: (docId: string) => void
   onRefresh: () => void
   allTags: TagDTO[]
   onTagsChanged?: (() => void) | undefined
@@ -1185,6 +1253,8 @@ function DocListRow({
   selected,
   orderedIds,
   onToggle,
+  onRowSelect,
+  onOpen,
   onRefresh,
   allTags,
   onTagsChanged,
@@ -1195,9 +1265,26 @@ function DocListRow({
 
   return (
     <li>
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: context menu on row; ⋯ button is the keyboard-accessible path */}
+      {/* S5-5: row-body gestures — single-click selects (--selection-bg pill),
+          double-click opens, ⌘/Ctrl/shift extend selection; right-click keeps
+          the context menu. The <a> stays for keyboard / middle-click. */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: row gestures are convenience; the <a> + checkbox + ⋯ are the keyboard-accessible paths */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard users open via the <a> and select via the checkbox; the row click is a pointer convenience only */}
       <div
-        className="flex items-center justify-between py-2 gap-2"
+        className={[
+          'group/row flex items-center justify-between py-2 gap-2 rounded px-1',
+          selected ? 'bg-[var(--selection-bg)]' : '',
+        ].join(' ')}
+        onClick={(e) => {
+          // Ignore clicks that originate on the interactive children (checkbox,
+          // link, action buttons) — those have their own handlers.
+          if ((e.target as HTMLElement).closest('a,button,input')) return
+          onRowSelect(doc.id, { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey }, orderedIds)
+        }}
+        onDoubleClick={(e) => {
+          if ((e.target as HTMLElement).closest('button,input')) return
+          onOpen(doc.id)
+        }}
         onContextMenu={(e) => {
           e.preventDefault()
           setRowContextMenu({ x: e.clientX, y: e.clientY })
@@ -1215,9 +1302,10 @@ function DocListRow({
         />
         <a
           href={`/d/${doc.id}`}
-          className="flex-1 font-medium hover:text-[var(--primary)] truncate"
+          className="flex-1 flex items-center gap-2 font-medium hover:text-[var(--primary)] truncate"
         >
-          📄 {doc.title}
+          <DocGlyph />
+          <span className="truncate">{doc.title}</span>
         </a>
         <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0">
           {fmt.format(new Date(doc.updatedAt))}
@@ -1262,6 +1350,14 @@ interface DocListProps {
   selected: Set<string>
   anchorId: string | null
   onToggle: (docId: string, shiftKey: boolean, orderedIds: string[]) => void
+  /** S5-5: row-body click gestures (single / ⌘ / shift). */
+  onRowSelect: (
+    docId: string,
+    mods: { meta: boolean; shift: boolean },
+    orderedIds: string[],
+  ) => void
+  /** S5-5: double-click opens the doc. */
+  onOpen: (docId: string) => void
   onSelectAll: (allIds: string[]) => void
   navigateTo: (folderId: string | null) => void
   onSetView: (v: 'all') => void
@@ -1281,6 +1377,8 @@ function DocList({
   selected,
   // anchorId is managed by the parent; we only use selected + orderedIds here
   onToggle,
+  onRowSelect,
+  onOpen,
   onSelectAll,
   navigateTo,
   onSetView,
@@ -1299,6 +1397,15 @@ function DocList({
     if (sortKey !== key) return 'none'
     return sortDir === 'asc' ? 'ascending' : 'descending'
   }
+
+  // S5-4: the column sort arrow is a Material glyph (no ↑/↓ emoji char); shown
+  // only on the active column. aria-hidden — aria-sort on the <th> conveys it.
+  const SortArrow = ({ active }: { active: boolean }) =>
+    active ? (
+      <span aria-hidden className="material-symbols-rounded text-[16px] align-middle">
+        {sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+      </span>
+    ) : null
 
   const orderedIds = docs.map((d) => d.id)
   const allDisplayedSelected = docs.length > 0 && docs.every((d) => selected.has(d.id))
@@ -1327,6 +1434,8 @@ function DocList({
               selected={selected.has(doc.id)}
               orderedIds={orderedIds}
               onToggle={onToggle}
+              onRowSelect={onRowSelect}
+              onOpen={onOpen}
               onRefresh={onRefresh}
               allTags={allTags}
               onTagsChanged={onTagsChanged}
@@ -1375,14 +1484,15 @@ function DocList({
               <a
                 href={`/d/${doc.id}`}
                 aria-label={doc.title}
+                onDoubleClick={() => onOpen(doc.id)}
                 className={[
-                  'flex flex-col gap-1 p-3 pl-8 border border-[var(--border)] rounded-lg bg-[var(--paper)] hover:border-[var(--primary)] transition-colors h-full',
-                  selected.has(doc.id) ? 'border-[var(--primary)]' : '',
+                  'flex flex-col gap-1 p-3 pl-8 border rounded-lg transition-colors h-full',
+                  selected.has(doc.id)
+                    ? 'border-[var(--primary)] bg-[var(--selection-bg)]'
+                    : 'border-[var(--border)] bg-[var(--paper)] hover:border-[var(--primary)]',
                 ].join(' ')}
               >
-                <span className="text-2xl" aria-hidden="true">
-                  📄
-                </span>
+                <DocGlyph size={32} />
                 <span className="font-medium text-sm truncate text-[var(--foreground)]">
                   {doc.title}
                 </span>
@@ -1426,7 +1536,7 @@ function DocList({
               onClick={() => handleHeaderClick('name')}
               className="hover:text-[var(--foreground)]"
             >
-              Name {sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              Name <SortArrow active={sortKey === 'name'} />
             </button>
           </th>
           <th
@@ -1439,7 +1549,7 @@ function DocList({
               onClick={() => handleHeaderClick('modified')}
               className="hover:text-[var(--foreground)]"
             >
-              Modified {sortKey === 'modified' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              Modified <SortArrow active={sortKey === 'modified'} />
             </button>
           </th>
           <th
@@ -1452,7 +1562,7 @@ function DocList({
               onClick={() => handleHeaderClick('created')}
               className="hover:text-[var(--foreground)]"
             >
-              Created {sortKey === 'created' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              Created <SortArrow active={sortKey === 'created'} />
             </button>
           </th>
           <th
@@ -1465,7 +1575,7 @@ function DocList({
               onClick={() => handleHeaderClick('size')}
               className="hover:text-[var(--foreground)]"
             >
-              Size {sortKey === 'size' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              Size <SortArrow active={sortKey === 'size'} />
             </button>
           </th>
           <th scope="col" className="text-left py-2 font-medium">
@@ -1475,7 +1585,23 @@ function DocList({
       </thead>
       <tbody>
         {docs.map((doc) => (
-          <tr key={doc.id} className="border-b border-[var(--border)] hover:bg-[var(--paper)]">
+          <tr
+            key={doc.id}
+            // S5-5: row-body gestures on the details row too (single / double /
+            // ⌘ / shift); the checkbox + link keep their own handlers.
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest('a,button,input')) return
+              onRowSelect(doc.id, { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey }, orderedIds)
+            }}
+            onDoubleClick={(e) => {
+              if ((e.target as HTMLElement).closest('button,input')) return
+              onOpen(doc.id)
+            }}
+            className={[
+              'group/row border-b border-[var(--border)]',
+              selected.has(doc.id) ? 'bg-[var(--selection-bg)]' : 'hover:bg-[var(--surface-hover)]',
+            ].join(' ')}
+          >
             <td className="py-2 pr-2">
               <input
                 type="checkbox"
@@ -1491,9 +1617,10 @@ function DocList({
             <td className="py-2 pr-3">
               <a
                 href={`/d/${doc.id}`}
-                className="font-medium hover:text-[var(--primary)] truncate block max-w-xs"
+                className="flex items-center gap-2 font-medium hover:text-[var(--primary)] truncate max-w-xs"
               >
-                📄 {doc.title}
+                <DocGlyph />
+                <span className="truncate">{doc.title}</span>
               </a>
             </td>
             <td className="py-2 pr-3 text-[var(--muted)] text-xs whitespace-nowrap">
@@ -1530,6 +1657,10 @@ interface AllViewDocRowProps {
   allTags: TagDTO[]
   selected: boolean
   onToggle: (shiftKey: boolean) => void
+  /** S5-5: row-body click gestures (single / ⌘ / shift). */
+  onRowSelect: (mods: { meta: boolean; shift: boolean }) => void
+  /** S5-5: double-click opens the doc. */
+  onOpen: () => void
   onRefresh: () => void
   navigateTo: (folderId: string | null) => void
   onSetView: (v: 'all') => void
@@ -1540,6 +1671,8 @@ function AllViewDocRow({
   allTags,
   selected,
   onToggle,
+  onRowSelect,
+  onOpen,
   onRefresh,
   navigateTo,
   onSetView,
@@ -1548,9 +1681,22 @@ function AllViewDocRow({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: context menu on row; ⋯ button is the keyboard-accessible path
+    // S5-5: row-body gestures (single / double / ⌘ / shift); right-click menu kept.
+    // biome-ignore lint/a11y/noStaticElementInteractions: row gestures are convenience; the <a> + checkbox + ⋯ are the keyboard-accessible paths
+    // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard users open via the <a> and select via the checkbox; the row click is a pointer convenience only
     <div
-      className="flex items-center justify-between py-2 gap-2"
+      className={[
+        'group/row flex items-center justify-between py-2 gap-2 rounded px-1',
+        selected ? 'bg-[var(--selection-bg)]' : '',
+      ].join(' ')}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest('a,button,input')) return
+        onRowSelect({ meta: e.metaKey || e.ctrlKey, shift: e.shiftKey })
+      }}
+      onDoubleClick={(e) => {
+        if ((e.target as HTMLElement).closest('button,input')) return
+        onOpen()
+      }}
       onContextMenu={(e) => {
         e.preventDefault()
         setContextMenu({ x: e.clientX, y: e.clientY })
@@ -1573,9 +1719,10 @@ function AllViewDocRow({
           e.dataTransfer.setData('application/json', JSON.stringify({ type: 'doc', id: doc.id }))
           e.dataTransfer.effectAllowed = 'move'
         }}
-        className="flex-1 font-medium hover:text-[var(--primary)]"
+        className="flex-1 flex items-center gap-2 font-medium hover:text-[var(--primary)]"
       >
-        📄 {doc.title}
+        <DocGlyph />
+        <span className="truncate">{doc.title}</span>
       </a>
       <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0 ml-4">
         {new Intl.DateTimeFormat('en', {
@@ -1583,36 +1730,49 @@ function AllViewDocRow({
           timeStyle: 'short',
         }).format(new Date(doc.updatedAt))}
       </time>
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={() => setShowTagPopover((v) => !v)}
-          aria-label={`Edit tags for ${doc.title}`}
-          className="text-sm px-1 text-[var(--muted)] hover:text-[var(--primary)]"
-        >
-          🏷
-        </button>
-        {showTagPopover && (
-          <TagPopover
-            docId={doc.id}
-            docTitle={doc.title}
-            allTags={allTags}
-            onClose={() => setShowTagPopover(false)}
-          />
-        )}
+      {/* S5-4 Drive parity: action controls hidden until row hover
+          (`group-hover/row`) or keyboard focus within the row
+          (`group-focus-within/row`), so they stay reachable via Tab. */}
+      <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+        <div className="relative shrink-0">
+          <Tooltip label={`Edit tags for ${doc.title}`}>
+            <button
+              type="button"
+              onClick={() => setShowTagPopover((v) => !v)}
+              aria-label={`Edit tags for ${doc.title}`}
+              className="px-interactive flex h-8 w-8 items-center justify-center text-[var(--muted)]"
+            >
+              <span aria-hidden className="material-symbols-rounded text-[20px]">
+                label
+              </span>
+            </button>
+          </Tooltip>
+          {showTagPopover && (
+            <TagPopover
+              docId={doc.id}
+              docTitle={doc.title}
+              allTags={allTags}
+              onClose={() => setShowTagPopover(false)}
+            />
+          )}
+        </div>
+        {/* ⋯ More button */}
+        <Tooltip label={`Actions for ${doc.title}`} className="shrink-0">
+          <button
+            type="button"
+            aria-label={`Actions for ${doc.title}`}
+            onClick={(e) => {
+              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+              setContextMenu({ x: rect.left, y: rect.bottom + 4 })
+            }}
+            className="px-interactive flex h-8 w-8 items-center justify-center text-[var(--muted)]"
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              more_horiz
+            </span>
+          </button>
+        </Tooltip>
       </div>
-      {/* ⋯ More button */}
-      <button
-        type="button"
-        aria-label={`Actions for ${doc.title}`}
-        onClick={(e) => {
-          const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-          setContextMenu({ x: rect.left, y: rect.bottom + 4 })
-        }}
-        className="text-xs px-1 text-[var(--muted)] hover:text-[var(--foreground)] shrink-0"
-      >
-        ⋯
-      </button>
       {contextMenu !== null && (
         <ContextMenu
           state={{ doc, x: contextMenu.x, y: contextMenu.y }}
@@ -1795,6 +1955,9 @@ function TrashToolbar({ docCount, onAfterEmpty }: TrashToolbarProps) {
 
 export default function FileManager({ initialFolders, initialDocs }: Props) {
   const searchParams = useSearchParams()
+  // S5-5: double-click-open routes through the client router (the row keeps its
+  // <a href> for keyboard / middle-click; double-click is the primary open).
+  const router = useRouter()
   const [view, setView] = useState<View>('all')
   const [folders, setFolders] = useState<FolderDTO[]>(initialFolders)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
@@ -1851,6 +2014,32 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
       }
     },
     [selected],
+  )
+
+  // S5-5: double-click-open helper, shared by every row renderer.
+  const openDoc = useCallback((docId: string) => router.push(`/d/${docId}`), [router])
+
+  // S5-5: the row-body click reducer (Drive gestures). Routes the EXISTING pure
+  // selection.ts logic — no new selection capability:
+  //   • plain click  → selectOnly (collapse to this one row)
+  //   • ⌘/Ctrl click → toggle into/out of the set (multi)
+  //   • shift click  → rangeBetween from the anchor (range), via handleToggle
+  // Double-click-open and right-click-menu are wired in the row components.
+  const handleRowSelect = useCallback(
+    (docId: string, mods: { meta: boolean; shift: boolean }, orderedIds: string[]) => {
+      if (mods.shift && anchorId !== null) {
+        handleToggle(docId, true, orderedIds)
+        return
+      }
+      if (mods.meta) {
+        setSelected((prev) => toggleSelection(prev, docId))
+        setAnchorId(docId)
+        return
+      }
+      setSelected(selectOnly(docId))
+      setAnchorId(docId)
+    },
+    [anchorId, handleToggle],
   )
 
   // Sort + view-mode state (hydrated from localStorage on mount)
@@ -2135,18 +2324,14 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               (landmark-complementary-is-top-level). The folder tree below uses
               <ul>/<li> list semantics for its structure. */}
           <div className="w-56 shrink-0 border-r border-[var(--border)] pr-4 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={handleNewFolder}
-              className="rounded-md bg-[var(--primary)] px-3 py-1.5 font-medium text-sm text-[var(--on-primary)]"
-            >
-              + New folder
-            </button>
+            {/* S5-4/S5-8: the standalone "+ New folder" button is gone — "Folder"
+                lives in the sidebar "+ New" mega-menu (S2-1), which routes to
+                `?new=folder` → handleNewFolder (still wired below via newParam). */}
 
             {/* H9: Import button + hidden file input */}
             <label
               className={[
-                'rounded-md border border-[var(--border)] px-3 py-1.5 font-medium text-sm text-[var(--foreground)] cursor-pointer text-center',
+                'rounded-md border border-[var(--border)] px-3 py-1.5 font-medium text-sm text-[var(--foreground)] cursor-pointer text-center inline-flex items-center justify-center gap-1',
                 importing
                   ? 'opacity-50 cursor-wait'
                   : 'hover:border-[var(--primary)] hover:text-[var(--primary)]',
@@ -2154,7 +2339,10 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               aria-label="Import document"
               aria-busy={importing}
             >
-              {importing ? 'Importing…' : '↑ Import'}
+              <span aria-hidden className="material-symbols-rounded text-[18px]">
+                upload
+              </span>
+              {importing ? 'Importing…' : 'Import'}
               <input
                 ref={importInputRef}
                 type="file"
@@ -2200,7 +2388,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                   onDrop={handlers.onDrop}
                   onClick={() => navigateTo(null)}
                   className={[
-                    'rounded px-2 py-1 text-sm text-left w-full',
+                    'flex w-full items-center gap-2 rounded px-2 py-1 text-sm text-left',
                     over
                       ? 'bg-[var(--primary)] text-[var(--on-primary)]'
                       : currentFolderId === null
@@ -2208,7 +2396,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         : 'text-[var(--muted)]',
                   ].join(' ')}
                 >
-                  🏠 Root
+                  <FolderGlyph home />
+                  Root
                 </button>
               )}
             </DropZone>
@@ -2226,9 +2415,10 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               ))}
             </ul>
 
-            {/* Smart Folders section */}
-            <div className="mt-4 flex flex-col gap-1">
-              <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide px-1">
+            {/* Smart Folders section — S5-4: indented under the tree (pl-2),
+                smaller overline header. */}
+            <div className="mt-4 flex flex-col gap-1 pl-2">
+              <p className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wide px-1">
                 Smart Folders
               </p>
               <ul className="flex flex-col gap-0.5">
@@ -2243,37 +2433,44 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         clearSelection()
                       }}
                       className={[
-                        'flex-1 text-left px-2 py-1 text-sm rounded truncate',
+                        'flex-1 flex items-center gap-2 text-left px-2 py-1 text-sm rounded truncate',
                         view === 'smart' && activeSmartId === sf.id
                           ? 'font-semibold text-[var(--primary)]'
                           : 'text-[var(--foreground)] hover:text-[var(--primary)]',
                       ].join(' ')}
                     >
-                      🔍 {sf.name}
+                      <span aria-hidden className="material-symbols-rounded text-[18px]">
+                        search
+                      </span>
+                      <span className="truncate">{sf.name}</span>
                     </button>
-                    <button
-                      type="button"
-                      aria-label={`Delete smart folder ${sf.name}`}
-                      onClick={async () => {
-                        try {
-                          const res = await fetch(`/api/smart-folders/${sf.id}`, {
-                            method: 'DELETE',
-                          })
-                          if (res.ok) {
-                            if (activeSmartId === sf.id) {
-                              setView('all')
-                              setActiveSmartId(null)
+                    <Tooltip label={`Delete smart folder ${sf.name}`} className="shrink-0">
+                      <button
+                        type="button"
+                        aria-label={`Delete smart folder ${sf.name}`}
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/smart-folders/${sf.id}`, {
+                              method: 'DELETE',
+                            })
+                            if (res.ok) {
+                              if (activeSmartId === sf.id) {
+                                setView('all')
+                                setActiveSmartId(null)
+                              }
+                              await fetchSmartFolders()
                             }
-                            await fetchSmartFolders()
+                          } catch {
+                            // leave state unchanged
                           }
-                        } catch {
-                          // leave state unchanged
-                        }
-                      }}
-                      className="text-xs text-[var(--muted)] hover:text-red-600 px-1 shrink-0"
-                    >
-                      ✕
-                    </button>
+                        }}
+                        className="flex h-6 w-6 items-center justify-center text-[var(--muted)] hover:text-red-600"
+                      >
+                        <span aria-hidden className="material-symbols-rounded text-[16px]">
+                          close
+                        </span>
+                      </button>
+                    </Tooltip>
                   </li>
                 ))}
               </ul>
@@ -2295,9 +2492,10 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               )}
             </div>
 
-            {/* Tags section */}
-            <div className="mt-4 flex flex-col gap-1">
-              <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide px-1">
+            {/* Tags section — S5-4: indented (pl-2), smaller overline header,
+                6px square tag dot left of the name. */}
+            <div className="mt-4 flex flex-col gap-1 pl-2">
+              <p className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wide px-1">
                 Tags
               </p>
               <ul className="flex flex-col gap-0.5">
@@ -2323,7 +2521,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                       >
                         <span
                           aria-hidden="true"
-                          className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                          className="inline-block w-1.5 h-1.5 rounded-[1px] shrink-0"
                           style={{ backgroundColor: tc.bg }}
                         />
                         <span className="truncate">{tag.name}</span>
@@ -2331,27 +2529,31 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           {tag.count}
                         </span>
                       </button>
-                      <button
-                        type="button"
-                        aria-label={`Delete tag ${tag.name}`}
-                        onClick={async () => {
-                          try {
-                            const res = await fetch(`/api/tags/${tag.id}`, { method: 'DELETE' })
-                            if (res.ok) {
-                              if (activeTagId === tag.id) {
-                                setView('all')
-                                setActiveTagId(null)
+                      <Tooltip label={`Delete tag ${tag.name}`} className="shrink-0">
+                        <button
+                          type="button"
+                          aria-label={`Delete tag ${tag.name}`}
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/tags/${tag.id}`, { method: 'DELETE' })
+                              if (res.ok) {
+                                if (activeTagId === tag.id) {
+                                  setView('all')
+                                  setActiveTagId(null)
+                                }
+                                await fetchTags()
                               }
-                              await fetchTags()
+                            } catch {
+                              // leave state unchanged
                             }
-                          } catch {
-                            // leave state unchanged
-                          }
-                        }}
-                        className="text-xs text-[var(--muted)] hover:text-red-600 px-1 shrink-0"
-                      >
-                        ✕
-                      </button>
+                          }}
+                          className="flex h-6 w-6 items-center justify-center text-[var(--muted)] hover:text-red-600"
+                        >
+                          <span aria-hidden className="material-symbols-rounded text-[16px]">
+                            close
+                          </span>
+                        </button>
+                      </Tooltip>
                     </li>
                   )
                 })}
@@ -2483,7 +2685,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                                     : 'hover:text-[var(--primary)]',
                                 ].join(' ')}
                               >
-                                <span aria-hidden="true">📁</span>
+                                <FolderGlyph />
                                 {folder.name}
                               </button>
                             )}
@@ -2523,6 +2725,14 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                                       sortedDocs.map((d) => d.id),
                                     )
                                   }
+                                  onRowSelect={(mods) =>
+                                    handleRowSelect(
+                                      doc.id,
+                                      mods,
+                                      sortedDocs.map((d) => d.id),
+                                    )
+                                  }
+                                  onOpen={() => router.push(`/d/${doc.id}`)}
                                   onRefresh={() => fetchDocs(currentFolderId)}
                                   navigateTo={navigateTo}
                                   onSetView={(v) => setView(v)}
@@ -2546,6 +2756,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                             selected={selected}
                             anchorId={anchorId}
                             onToggle={handleToggle}
+                            onRowSelect={handleRowSelect}
+                            onOpen={openDoc}
                             onSelectAll={handleSelectAll}
                             navigateTo={navigateTo}
                             onSetView={(v) => setView(v)}
@@ -2610,6 +2822,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           selected={selected}
                           anchorId={anchorId}
                           onToggle={handleToggle}
+                          onRowSelect={handleRowSelect}
+                          onOpen={openDoc}
                           onSelectAll={handleSelectAll}
                           navigateTo={navigateTo}
                           onSetView={(v) => setView(v)}
@@ -2677,6 +2891,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           selected={selected}
                           anchorId={anchorId}
                           onToggle={handleToggle}
+                          onRowSelect={handleRowSelect}
+                          onOpen={openDoc}
                           onSelectAll={handleSelectAll}
                           navigateTo={navigateTo}
                           onSetView={(v) => setView(v)}
@@ -2733,6 +2949,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 selected={selected}
                 anchorId={anchorId}
                 onToggle={handleToggle}
+                onRowSelect={handleRowSelect}
+                onOpen={openDoc}
                 onSelectAll={handleSelectAll}
                 navigateTo={navigateTo}
                 onSetView={(v) => setView(v)}

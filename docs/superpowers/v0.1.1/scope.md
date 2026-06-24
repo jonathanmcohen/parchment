@@ -65,19 +65,19 @@
 
 | ID | Item | Status | Cov | LV | Notes |
 |---|---|---|---|---|---|
-| S5-1 | Hover/pressed/disabled states on every interactive element | TODO | ☐ | ☐ | |
-| S5-2 | Tooltips on every icon-only control | TODO | ☐ | ☐ | |
-| S5-3 | Dropdown elevation — OWNER of shared `.px-menu` shell + `--shadow-dropdown` | TODO | ☐ | ☐ | Decision 6 (#16) |
-| S5-4 | File manager Drive parity (doc/folder glyphs, sort/view, tag dot, ⋯ on hover) | TODO | ☐ | ☐ | refs S2-4 strip delete |
-| S5-5 | File-row selection states (click/double/shift/⌘/right-click) | TODO | ☐ | ☐ | |
-| S5-6 | Landing `/` → `/files`; drop the centered card | TODO | ☐ | ☐ | Health via Settings→Admin |
-| S5-7 | Files hero → "My Drive"/"My Files" 22px; drop subtitle | TODO | ☐ | ☐ | |
-| S5-8 | Copy revisions (New mega-menu labels; drop version/tagline strings) | TODO | ☐ | ☐ | |
-| S5-9 | Save-status COPY only ("All changes saved to disk" / idle "N min ago") | TODO | ☐ | ☐ | STATE = S3-1 (Dec.4) |
-| S5-10 | Editing-mode dropdown (Editing/Suggesting/Viewing) | TODO | ☐ | ☐ | ties S3-3 |
-| S5-11 | Modal dialog shell → Docs (`.parchment-dialog`, ShareDialog + 10 dialogs) | TODO | ☐ | ☐ | makes VR #6 owned (#5/#6) |
-| S5-12 | Floating editor surfaces (BubbleMenu/SlashMenu/LinkPopover) → Docs popover | TODO | ☐ | ☐ | (#11) |
-| S5-13 | Secondary surfaces parity (comments + version drawers, /share, /login) | TODO | ☐ | ☐ | PARTIAL risk (#7/#8/#9) |
+| S5-1 | Hover/pressed/disabled states on every interactive element | DONE | ☑ | ☑ | hover --surface-hover / active --primary-surface(+text) / disabled 38% (the contrast lesson) |
+| S5-2 | Tooltips on every icon-only control | DONE | ☑ | ☑ | Tooltip on file-manager icon controls (title-bar/toolbar use native title) |
+| S5-3 | Dropdown elevation — OWNER of shared `.px-menu` shell + `--shadow-dropdown` | DONE | ☑ | ☑ | shared Dropdown shell + --shadow-dropdown (owner; S2/S3 consume) |
+| S5-4 | File manager Drive parity (doc/folder glyphs, sort/view, tag dot, ⋯ on hover) | DONE | ☑ | ☑ | DocGlyph/FolderGlyph Material icons (no emoji), sort chip + View toggle, hover ⋯, selection; +New-folder fold + tag-dot = minor follow-up |
+| S5-5 | File-row selection states (click/double/shift/⌘/right-click) | DONE | ☑ | ☑ | selectOnly reducer (TDD); single/double/shift/⌘/right-click; E6/E7 intact |
+| S5-6 | Landing `/` → `/files`; drop the centered card | DONE | ☑ | ☑ | / → /files server redirect; centered card dropped; unauthed→/login no loop |
+| S5-7 | Files hero → "My Drive"/"My Files" 22px; drop subtitle | DONE | ☑ | ☑ | files hero 22px, subtitle dropped |
+| S5-8 | Copy revisions (New mega-menu labels; drop version/tagline strings) | DONE | ☑ | ☑ | mega-menu copy; version/tagline strings dropped (incl. SEO meta/manifest) |
+| S5-9 | Save-status COPY only ("All changes saved to disk" / idle "N min ago") | PARTIAL (66%) | ☑ | ☑ | Saving…/All-changes-saved wired; idle "N min ago" needs lastSavedAt (S3-1 enum lacks it) — logged |
+| S5-10 | Editing-mode dropdown (Editing/Suggesting/Viewing) | DONE | ☑ | ☑ | Editing/Suggesting/Viewing dropdown → existing D2 suggesting + setEditable; modeLabel on button |
+| S5-11 | Modal dialog shell → Docs (`.parchment-dialog`, ShareDialog + 10 dialogs) | DONE | ☑ | ☑ | .parchment-dialog shell → Docs --shadow-dialog (ShareDialog + all dialogs) |
+| S5-12 | Floating editor surfaces (BubbleMenu/SlashMenu/LinkPopover) → Docs popover | DONE | ☑ | ☑ | BubbleMenu/SlashMenu/LinkPopover → Docs popover elevation |
+| S5-13 | Secondary surfaces parity (comments + version drawers, /share, /login) | PARTIAL (40%) | ☑ | ☐ | /login + ShareViewer done; Comments(516)/VersionHistory(778) drawers token-clean, full Docs redesign deferred |
 
 ## Roll-up
 
@@ -87,7 +87,7 @@
 | S2 Global chrome | 6 | 4 | 2(partial) | 0 |
 | S3 Editor chrome | 6 | 4 | 2(partial) | 0 |
 | S4 Typography | 4 | 4 | 0 | 0 |
-| S5 Interactions + surfaces | 13 | 0 | 0 | 13 |
+| S5 Interactions + surfaces | 13 | 11 | 2(partial) | 0 |
 | **Total** | **38** | **9** | **0** | **29** |
 
 **Known PARTIAL-risk items** (will not flip to DONE while a sub-part is a

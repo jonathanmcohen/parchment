@@ -50,6 +50,7 @@ describe('A1 — migration + schema', () => {
     await c.end()
     expect(rows.map((r) => r.tablename)).toEqual([
       'audit_log',
+      'cairn_links',
       'collab_state',
       'comments',
       'doc_links',
@@ -57,6 +58,7 @@ describe('A1 — migration + schema', () => {
       'document_tags',
       'documents',
       'folders',
+      'passkeys',
       'pats',
       'sessions',
       'settings',
@@ -64,7 +66,9 @@ describe('A1 — migration + schema', () => {
       'smart_folders',
       'tags',
       'templates',
+      'user_mfa',
       'users',
+      'webhooks',
     ])
   })
 

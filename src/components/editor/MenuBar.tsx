@@ -1,6 +1,7 @@
 'use client'
 
 import type { Editor } from '@tiptap/core'
+import { dispatchShortcut } from '@/components/shortcuts/GlobalShortcuts'
 import {
   copySelection,
   cutSelection,
@@ -9,18 +10,16 @@ import {
 } from './clipboard-actions'
 import { Menu, type MenuItemConfig } from './menus/Menu'
 
-// S3-2: the editor menu bar (File · Edit · View · Insert · Format · Tools ·
-// Extensions · Help). PARTIAL by design — every NON-placeholder row re-surfaces
-// an EXISTING handler on Editor.tsx / the TipTap editor (no new feature logic);
-// rows with no backing action ship as visibly-disabled "coming soon"
-// placeholders (placeholder honesty, finding #21). The shipped-vs-placeholder
-// split is recorded in scope.md.
+// S3-2 + F10: the editor menu bar (File · Edit · View · Insert · Format · Tools ·
+// Help). Every visible row re-surfaces an EXISTING handler on Editor.tsx / the
+// TipTap editor (no new feature logic). F10 removed the remaining "coming soon"
+// placeholder rows (unbacked features that won't ship in v0.1.2) — including the
+// whole Extensions menu, which held only placeholders — so no visibly-disabled
+// placeholder row remains in any menu.
 //
 // Each <Menu> consumes the shared accessible primitive (menus/Menu.tsx), which
 // styles its panel with the `.px-menu` shell + the S1 `--shadow-dropdown` token
 // (DECISION 6). No second dropdown component exists.
-
-const COMING_SOON = 'Coming soon'
 
 export type MenuBarHandlers = {
   editor: Editor
@@ -36,10 +35,6 @@ export type MenuBarHandlers = {
   onOpenWordCount: () => void
   onToggleGrammar?: () => void
   grammarEnabled?: boolean
-}
-
-function placeholder(label: string): MenuItemConfig {
-  return { label, disabled: true, hint: COMING_SOON }
 }
 
 export function MenuBar(props: MenuBarHandlers) {
@@ -83,13 +78,6 @@ export function MenuBar(props: MenuBarHandlers) {
     },
     { label: 'Page setup', icon: 'settings_overscan', onSelect: onOpenPageSetup },
     { label: 'Print', icon: 'print', onSelect: onExportPdf, shortcut: '⌘P' },
-    { kind: 'separator' },
-    placeholder('New'),
-    placeholder('Open'),
-    placeholder('Make a copy'),
-    placeholder('Move'),
-    placeholder('Move to trash'),
-    placeholder('Email'),
   ]
 
   const editMenu: MenuItemConfig[] = [
@@ -138,11 +126,6 @@ export function MenuBar(props: MenuBarHandlers) {
 
   const viewMenu: MenuItemConfig[] = [
     { label: 'Show outline', icon: 'toc', onSelect: onToggleOutline },
-    { kind: 'separator' },
-    placeholder('Print layout'),
-    placeholder('Pageless'),
-    placeholder('Show ruler'),
-    placeholder('Full screen'),
   ]
 
   const insertMenu: MenuItemConfig[] = [
@@ -169,10 +152,11 @@ export function MenuBar(props: MenuBarHandlers) {
       label: 'Page break',
       onSelect: () => editor.chain().focus().insertPageBreak().run(),
     },
-    { kind: 'separator' },
-    placeholder('Chart'),
-    placeholder('Special characters'),
-    placeholder('Headers & footers'),
+    {
+      label: 'Horizontal line',
+      icon: 'horizontal_rule',
+      onSelect: () => editor.chain().focus().setHorizontalRule().run(),
+    },
   ]
 
   const formatMenu: MenuItemConfig[] = [
@@ -204,9 +188,6 @@ export function MenuBar(props: MenuBarHandlers) {
       icon: 'format_clear',
       onSelect: () => editor.chain().focus().unsetAllMarks().clearNodes().run(),
     },
-    { kind: 'separator' },
-    placeholder('Columns'),
-    placeholder('Page numbers'),
   ]
 
   const toolsMenu: MenuItemConfig[] = [
@@ -214,13 +195,7 @@ export function MenuBar(props: MenuBarHandlers) {
     ...(grammarEnabled && onToggleGrammar
       ? [{ label: 'Grammar suggestions', icon: 'spellcheck', onSelect: onToggleGrammar }]
       : []),
-    { kind: 'separator' },
-    placeholder('Spell check'),
-    placeholder('Personal dictionary'),
-    placeholder('Translate document'),
   ]
-
-  const extensionsMenu: MenuItemConfig[] = [placeholder('Add-ons'), placeholder('Apps Script')]
 
   const helpMenu: MenuItemConfig[] = [
     {
@@ -229,9 +204,14 @@ export function MenuBar(props: MenuBarHandlers) {
       href: '/whats-new',
     },
     { kind: 'separator' },
-    placeholder('Keyboard shortcuts'),
-    placeholder('Replay tour'),
-    placeholder('About Parchment'),
+    {
+      label: 'Keyboard shortcuts',
+      icon: 'keyboard',
+      // F10: the global cheat-sheet action is owned by the HelpMenu (mounted in
+      // the app layout, registers `shortcuts-help`). Dispatch the same action the
+      // ⌘⇧/ chord fires so there is ONE owner of the shortcuts modal.
+      onSelect: () => dispatchShortcut('shortcuts-help'),
+    },
   ]
 
   return (
@@ -245,7 +225,6 @@ export function MenuBar(props: MenuBarHandlers) {
         <Menu label="Insert" items={insertMenu} />
         <Menu label="Format" items={formatMenu} />
         <Menu label="Tools" items={toolsMenu} />
-        <Menu label="Extensions" items={extensionsMenu} />
         <Menu label="Help" items={helpMenu} />
       </div>
     </nav>

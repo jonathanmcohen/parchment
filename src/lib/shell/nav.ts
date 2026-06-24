@@ -7,17 +7,48 @@
 // import them, and they unit-test as plain functions.
 
 /**
- * Is the sidebar nav row for `href` the active one for the current `pathname`?
+ * Is the sidebar nav row for `href` the active one for the current location?
  *
- * A row is active when the pathname equals its href, or is a descendant segment
- * of it (`/settings/appearance` lights `/settings`). The descendant check is
- * boundary-aware: `/files-archive` must NOT light `/files` just because the
- * string starts the same — the next character has to be a path separator.
+ * Active detection is **query-aware** because the routeless Drive views (Shared,
+ * Starred, Recents) share the `/files` route and differ only by `?view=`. The
+ * caller passes the resolved `pathname` (no query — `usePathname()` strips it)
+ * AND the current `view` query value separately (`useSearchParams().get('view')`).
+ *
+ * Rules:
+ *  - The href is split into its path and its own `?view=` (if any).
+ *  - The path must match the pathname (exactly, or as a boundary-aware ancestor
+ *    so `/settings/appearance` lights `/settings` but `/files-archive` does NOT
+ *    light `/files`).
+ *  - When the matched path is `/files`, the *view* must also agree: a row whose
+ *    href carries `?view=shared` is active only when the current view normalizes
+ *    to `shared`; the bare `/files` row (no `?view=`, i.e. the `all` view) is
+ *    active only when the current view normalizes to `all`. This guarantees
+ *    exactly one active row per route/view — the bare Files row no longer lights
+ *    up under `?view=shared`/`?view=starred`/`?view=recents`, and those rows now
+ *    correctly light instead.
+ *  - For non-`/files` rows the `view` is irrelevant (plain path matching).
  */
-export function isNavRowActive(pathname: string | null | undefined, href: string): boolean {
+export function isNavRowActive(
+  pathname: string | null | undefined,
+  href: string,
+  view?: string | null | undefined,
+): boolean {
   if (!pathname) return false
-  if (pathname === href) return true
-  return pathname.startsWith(`${href}/`)
+
+  const [hrefPath, hrefQuery] = href.split('?')
+  const pathMatches = pathname === hrefPath || pathname.startsWith(`${hrefPath}/`)
+  if (!pathMatches) return false
+
+  // Files-route rows disambiguate on the normalized `?view=`. The href's own
+  // `view=` (if present) is the row's intended view; a bare `/files` href is the
+  // `all` view. Compare both through `normalizeFilesView` so `view=all`,
+  // missing, and unknown all collapse to `all` consistently on each side.
+  if (hrefPath === '/files') {
+    const rowView = normalizeFilesView(new URLSearchParams(hrefQuery ?? '').get('view'))
+    return normalizeFilesView(view) === rowView
+  }
+
+  return true
 }
 
 /** The files-page view-state keys reachable via the `?view=` query param. */

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useRef, useState, useTransition } from 'react'
 import { Avatar } from './Avatar'
 import { useMenuDismiss } from './use-menu-dismiss'
+import { useMenuKeyboard } from './use-menu-keyboard'
 
 // S2-5: top-right user cluster — a 32px initial-fallback avatar that opens an
 // account menu (Manage account / Sign out / Switch account placeholder).
@@ -35,8 +36,21 @@ export function UserCluster({
   const [pending, startTransition] = useTransition()
   const wrapRef = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useMenuDismiss(open, () => setOpen(false), wrapRef, toggleRef)
+  // Full WAI-ARIA menu keyboard model: focus into menu on open, Arrow/Home/End
+  // navigation, roving tabindex, Tab-trap (the K3/G15 lesson). The disabled
+  // "Switch account" placeholder is skipped by roving focus.
+  useMenuKeyboard(open, menuRef)
+
+  // ArrowDown/ArrowUp on the closed trigger opens + focuses the menu.
+  function onTriggerKeyDown(e: React.KeyboardEvent) {
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault()
+      setOpen(true)
+    }
+  }
 
   function manageAccount() {
     setOpen(false)
@@ -63,6 +77,7 @@ export function UserCluster({
         title={name}
         className="rounded-full focus-visible:outline-none"
         onClick={() => setOpen((v) => !v)}
+        onKeyDown={onTriggerKeyDown}
       >
         <Avatar name={name} size={32} />
       </button>
@@ -70,6 +85,7 @@ export function UserCluster({
       {open && (
         // Flat in S2; S5-3 adopts the shared `.px-menu` elevation shell.
         <div
+          ref={menuRef}
           role="menu"
           aria-label={labels.accountMenu}
           className="parchment-account-menu absolute end-0 top-[calc(100%+8px)] z-20 flex min-w-[224px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1"
@@ -79,9 +95,11 @@ export function UserCluster({
             <span className="truncate text-[var(--foreground)] text-sm">{name}</span>
           </div>
           <div className="my-1 border-[var(--border)] border-t" />
+          {/* menuitems start at tabIndex -1; useMenuKeyboard rolls focus. */}
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             className="parchment-account-menuitem"
             onClick={manageAccount}
           >
@@ -93,6 +111,7 @@ export function UserCluster({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             className="parchment-account-menuitem"
             onClick={signOut}
             disabled={pending}

@@ -1,8 +1,11 @@
 {
   "nav": {
     "files": "קבצים",
+    "recents": "אחרונים",
     "templates": "תבניות",
     "inbox": "דואר נכנס",
+    "shared": "משותפים",
+    "starred": "מסומנים בכוכב",
     "trash": "אשפה",
     "settings": "הגדרות",
     "primaryLabel": "ניווט ראשי"

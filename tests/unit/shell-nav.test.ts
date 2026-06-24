@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  isNavRowActive,
-  normalizeFilesView,
-  userInitial,
-} from '@/lib/shell/nav'
+import { isNavRowActive, normalizeFilesView, userInitial } from '@/lib/shell/nav'
 
 describe('isNavRowActive', () => {
   it('marks the exact route active', () => {
@@ -28,15 +24,69 @@ describe('isNavRowActive', () => {
     expect(isNavRowActive('/files', '/settings')).toBe(false)
   })
 
-  it('matches Files row for a query-string view of /files', () => {
-    // usePathname() strips the query, so the bare path is what we receive; the
-    // ?view=starred rows still resolve to the /files row being active.
-    expect(isNavRowActive('/files', '/files')).toBe(true)
-  })
-
   it('handles a null/empty pathname without throwing', () => {
     expect(isNavRowActive(null, '/files')).toBe(false)
     expect(isNavRowActive('', '/files')).toBe(false)
+  })
+
+  describe('query-aware Files-route views (the routeless ?view= rows)', () => {
+    it('lights only the bare Files row on /files with no view', () => {
+      // Bare /files (the "all" view) → Files row active, the ?view= rows NOT.
+      expect(isNavRowActive('/files', '/files', null)).toBe(true)
+      expect(isNavRowActive('/files', '/files?view=shared', null)).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=starred', null)).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=recents', null)).toBe(false)
+    })
+
+    it('treats view=all (or unknown) the same as the bare Files row', () => {
+      expect(isNavRowActive('/files', '/files', 'all')).toBe(true)
+      expect(isNavRowActive('/files', '/files', 'bogus')).toBe(true)
+      // and the ?view= rows stay inactive under view=all
+      expect(isNavRowActive('/files', '/files?view=shared', 'all')).toBe(false)
+    })
+
+    it('lights the Shared row (and ONLY it) on ?view=shared', () => {
+      expect(isNavRowActive('/files', '/files?view=shared', 'shared')).toBe(true)
+      // the bare Files row must NOT light under ?view=shared (the bug being fixed)
+      expect(isNavRowActive('/files', '/files', 'shared')).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=starred', 'shared')).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=recents', 'shared')).toBe(false)
+    })
+
+    it('lights the Starred row (and ONLY it) on ?view=starred', () => {
+      expect(isNavRowActive('/files', '/files?view=starred', 'starred')).toBe(true)
+      expect(isNavRowActive('/files', '/files', 'starred')).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=shared', 'starred')).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=recents', 'starred')).toBe(false)
+    })
+
+    it('lights the Recents row (and ONLY it) on ?view=recents', () => {
+      expect(isNavRowActive('/files', '/files?view=recents', 'recents')).toBe(true)
+      expect(isNavRowActive('/files', '/files', 'recents')).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=shared', 'recents')).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=starred', 'recents')).toBe(false)
+    })
+
+    it('keeps exactly one active row across every files view', () => {
+      const fileRows = [
+        '/files',
+        '/files?view=recents',
+        '/files?view=shared',
+        '/files?view=starred',
+      ]
+      for (const view of [null, 'all', 'recents', 'shared', 'starred']) {
+        const activeCount = fileRows.filter((href) => isNavRowActive('/files', href, view)).length
+        expect(activeCount).toBe(1)
+      }
+    })
+
+    it('non-files rows ignore the view param', () => {
+      // The view param is meaningless off /files — Trash/Settings still match on
+      // path alone regardless of any stray ?view=.
+      expect(isNavRowActive('/trash', '/trash', 'shared')).toBe(true)
+      expect(isNavRowActive('/settings', '/settings', 'starred')).toBe(true)
+      expect(isNavRowActive('/trash', '/files?view=shared', 'shared')).toBe(false)
+    })
   })
 })
 

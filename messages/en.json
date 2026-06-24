@@ -1,6 +1,7 @@
 {
   "nav": {
     "files": "Files",
+    "recents": "Recent",
     "templates": "Templates",
     "inbox": "Inbox",
     "shared": "Shared",

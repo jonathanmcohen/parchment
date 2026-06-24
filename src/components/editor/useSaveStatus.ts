@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { nextSaveStatus, type SaveStatus } from '@/lib/docs/save-status'
+import { nextSaveStatus, remainingSettleDelayMs, type SaveStatus } from '@/lib/docs/save-status'
 
 // S3-1 (DECISION 4): a small in-flight → settled → idle state wrapper around the
 // EXISTING body save. The save *path* is unchanged — this hook only observes it:
@@ -24,6 +24,9 @@ export type UseSaveStatus = {
 export function useSaveStatus(): UseSaveStatus {
   const [status, setStatus] = useState<SaveStatus>('idle')
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // C5: floor the "Saving…" label so a sub-200ms save is still perceptible.
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savingStartedAt = useRef<number | null>(null)
 
   const clearIdleTimer = useCallback(() => {
     if (idleTimer.current) {
@@ -32,12 +35,18 @@ export function useSaveStatus(): UseSaveStatus {
     }
   }, [])
 
-  const markSaving = useCallback(() => {
-    clearIdleTimer()
-    setStatus((s) => nextSaveStatus(s, 'save-start'))
-  }, [clearIdleTimer])
+  // C5: cancel any pending floored settle so a new save (or unmount) can never
+  // be clobbered by a stale settle firing late.
+  const clearSettleTimer = useCallback(() => {
+    if (settleTimer.current) {
+      clearTimeout(settleTimer.current)
+      settleTimer.current = null
+    }
+  }, [])
 
-  const markSaved = useCallback(() => {
+  // Commit the saving → saved transition and arm the 5-minute idle timer. The
+  // idle timeout is UNCHANGED by C5 — only the moment we run this is floored.
+  const settle = useCallback(() => {
     setStatus((s) => nextSaveStatus(s, 'save-settle'))
     clearIdleTimer()
     idleTimer.current = setTimeout(() => {
@@ -45,8 +54,39 @@ export function useSaveStatus(): UseSaveStatus {
     }, IDLE_AFTER_MS)
   }, [clearIdleTimer])
 
-  // Clean up the idle timer on unmount.
-  useEffect(() => clearIdleTimer, [clearIdleTimer])
+  const markSaving = useCallback(() => {
+    // A new save supersedes any in-flight floor: cancel a pending settle so it
+    // can't flip us to 'saved' mid-save.
+    clearSettleTimer()
+    clearIdleTimer()
+    savingStartedAt.current = Date.now()
+    setStatus((s) => nextSaveStatus(s, 'save-start'))
+  }, [clearIdleTimer, clearSettleTimer])
+
+  const markSaved = useCallback(() => {
+    clearSettleTimer()
+    const startedAt = savingStartedAt.current
+    // No recorded start (defensive): settle immediately.
+    const delay = startedAt === null ? 0 : remainingSettleDelayMs(startedAt, Date.now())
+    if (delay <= 0) {
+      // Slow save (past the floor): settle now — never artificially extended.
+      settle()
+      return
+    }
+    // Fast save (under the floor): keep "Saving…" visible for the remainder.
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null
+      settle()
+    }, delay)
+  }, [clearSettleTimer, settle])
+
+  // Clean up both timers on unmount (no stale settle/idle firing after teardown).
+  useEffect(() => {
+    return () => {
+      clearIdleTimer()
+      clearSettleTimer()
+    }
+  }, [clearIdleTimer, clearSettleTimer])
 
   return { status, markSaving, markSaved }
 }

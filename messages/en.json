@@ -23,6 +23,10 @@
     "accountMenu": "Account",
     "manageAccount": "Manage account",
     "switchAccount": "Switch account",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
     "openNav": "Open navigation menu",
     "closeNav": "Close navigation menu"
   },

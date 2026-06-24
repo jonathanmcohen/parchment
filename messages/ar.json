@@ -23,6 +23,10 @@
     "accountMenu": "الحساب",
     "manageAccount": "إدارة الحساب",
     "switchAccount": "تبديل الحساب",
+    "theme": "المظهر",
+    "themeLight": "فاتح",
+    "themeDark": "داكن",
+    "themeSystem": "النظام",
     "openNav": "فتح قائمة التنقل",
     "closeNav": "إغلاق قائمة التنقل"
   },

@@ -8,7 +8,7 @@ import { AppShell } from '@/components/shell/AppShell'
 import { Avatar } from '@/components/shell/Avatar'
 import { NavRow } from '@/components/shell/NavRow'
 import { NewMenu } from '@/components/shell/NewMenu'
-import { UserCluster } from '@/components/shell/UserCluster'
+import { TopbarUserCluster } from '@/components/shell/TopbarUserCluster'
 import { GlobalShortcuts } from '@/components/shortcuts/GlobalShortcuts'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
@@ -115,13 +115,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <AppShell
         sidebar={sidebar}
         topbarRight={
-          <UserCluster
+          <TopbarUserCluster
             name={user.name}
             labels={{
               accountMenu: t('shell.accountMenu'),
               manageAccount: t('shell.manageAccount'),
               signOut: t('shell.signOut'),
               switchAccount: t('shell.switchAccount'),
+              theme: t('shell.theme'),
+              themeLight: t('shell.themeLight'),
+              themeDark: t('shell.themeDark'),
+              themeSystem: t('shell.themeSystem'),
             }}
           />
         }

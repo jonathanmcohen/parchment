@@ -77,6 +77,8 @@ leaving them unset simply disables that feature (no external call is ever made).
 | `COLLAB_URL` | `ws://localhost:1234` | Server-side collab URL (health probes). |
 | `NEXT_PUBLIC_COLLAB_URL` | `ws://localhost:1234` | **Browser-facing** collab websocket URL the editor connects to. Set this to your public origin when the collab port is reached through a different host/proxy. |
 | `PARCHMENT_FILES_ROOT` | `/data/files` (image) | Root directory for the disk-mirrored Markdown files. |
+| `NODE_ENV` | `production` (image) | Standard Node mode. In `production` the session cookie is sent `Secure` (https-only). Run the image **with `NODE_ENV=production`** when it's served over https. |
+| `SECURE_COOKIES` | unset | Set to `true` to force the `Secure` flag on the session cookie even when `NODE_ENV` is not `production` — needed behind a TLS-terminating reverse proxy (Caddy/nginx) if the container runs with the default `NODE_ENV`. Leave unset (or `false`) for plain http (local dev), otherwise the browser drops the cookie and login/theme-save fail. |
 
 ### Authentication / passkeys
 

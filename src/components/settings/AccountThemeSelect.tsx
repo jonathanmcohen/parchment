@@ -56,8 +56,11 @@ export function AccountThemeSelect() {
     try {
       const next = await applyColorScheme(theme, scheme, { fetch, router })
       setTheme(next)
-    } catch {
-      setError('Could not save appearance. Try again.')
+    } catch (err) {
+      // CF1: surface the underlying status/message so a deploy-time failure is
+      // visible (e.g. "save failed (HTTP 401)") rather than an opaque retry hint.
+      const detail = err instanceof Error ? err.message : String(err)
+      setError(`Could not save appearance: ${detail}. Try again.`)
     } finally {
       setSaving(false)
     }

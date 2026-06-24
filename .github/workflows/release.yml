@@ -59,6 +59,10 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          # CF2: stamp the image with the commit it was built from. version.ts
+          # BUILD_SHA reads process.env.GIT_SHA → shown on the /whats-new About page.
+          build-args: |
+            GIT_SHA=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           provenance: true

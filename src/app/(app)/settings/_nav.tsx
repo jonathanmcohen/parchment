@@ -8,7 +8,8 @@ const groups = [
   { href: '/settings/workspace', label: 'Workspace' },
   { href: '/settings/admin', label: 'Admin' },
   { href: '/settings/developer', label: 'Developer' },
-  { href: '/settings/notifications', label: 'Notifications' },
+  // CF2: Notifications hidden from the nav — no SMTP/notification delivery
+  // shipped yet. The route file stays in the tree but is not linked.
   { href: '/settings/security', label: 'Security' },
   // L5: "About" links to the dedicated, linkable What's-new page.
   { href: '/whats-new', label: 'About' },

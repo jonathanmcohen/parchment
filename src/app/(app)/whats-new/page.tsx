@@ -1,6 +1,12 @@
 import type { Metadata } from 'next'
 import { RELEASE_NOTES } from '@/lib/help/content'
-import { APP_LICENSE_URL, APP_REPO_URL, APP_VERSION } from '@/lib/version'
+import {
+  APP_LICENSE_URL,
+  APP_REPO_URL,
+  APP_VERSION,
+  BUILD_SHA,
+  BUILD_SHA_SHORT,
+} from '@/lib/version'
 
 // L5: dedicated, linkable "What's new" page. Reuses I9's RELEASE_NOTES (single
 // source of truth for the version + highlights) — the Help-menu drawer renders
@@ -36,6 +42,23 @@ export default function WhatsNewPage() {
         <div className="flex gap-2">
           <dt className="font-medium">Version</dt>
           <dd className="text-[var(--muted)]">v{APP_VERSION}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="font-medium">Build</dt>
+          <dd className="text-[var(--muted)]">
+            {BUILD_SHA === 'dev' ? (
+              <code className="font-mono">dev</code>
+            ) : (
+              <a
+                href={`${APP_REPO_URL}/commit/${BUILD_SHA}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-[var(--primary)] underline"
+              >
+                {BUILD_SHA_SHORT}
+              </a>
+            )}
+          </dd>
         </div>
         <div className="flex gap-2">
           <dt className="font-medium">Source</dt>

@@ -54,6 +54,7 @@ import {
   type ShortcutEventDetail,
 } from '@/components/shortcuts/GlobalShortcuts'
 import { clampAutosaveMs } from '@/lib/docs/autosave-config'
+import { OPEN_COMMENT_COMPOSER_EVENT } from '@/lib/editor/comment-events'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
 import { resolveProvider } from '@/lib/editor/embed-providers'
@@ -1008,6 +1009,18 @@ export function Editor({
   // slot. Same derivation, new placement (no new connection logic).
   const connection = useConnectionState(provider)
 
+  // F3: "Add comment" — reuse the D1 create flow. Open the sidebar, then signal
+  // its composer (which reads the live editor selection and POSTs via the SAME
+  // handleAddComment path) to open. No parallel comment system. The event is
+  // dispatched on the next frame so the sidebar is mounted before it fires.
+  const handleAddComment = useCallback(() => {
+    if (!editor) return
+    setCommentsSidebarOpen(true)
+    requestAnimationFrame(() => {
+      editor.view.dom.dispatchEvent(new CustomEvent(OPEN_COMMENT_COMPOSER_EVENT))
+    })
+  }, [editor])
+
   const openCropForSelection = useCallback(() => {
     if (!editor) return
     const sel = editor.state.selection
@@ -1468,6 +1481,7 @@ export function Editor({
             onOpenCustomCss={() => setCustomCssOpen(true)}
             onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
             commentsSidebarOpen={commentsSidebarOpen}
+            onAddComment={handleAddComment}
             onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
             versionHistoryOpen={versionHistoryOpen}
             onToggleSuggestions={() => setSuggestionsOpen((v) => !v)}

@@ -1246,6 +1246,20 @@ body {
   text-align: right;
 }
 
+/* F3: the font-size −/+ chips flanking the numeric input. Sized to match the
+   26px control row (smaller than the default 32px toolbar button) so the size
+   group stays compact. */
+.parchment-toolbar-btn.parchment-size-step {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+}
+
+.parchment-toolbar-btn.parchment-size-step .material-symbols-rounded {
+  font-size: 18px;
+}
+
 .parchment-unit-btn {
   font-size: 0.75rem;
   padding: 2px 6px;

@@ -3,6 +3,7 @@
 import type { Editor } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { parseMentions } from '@/lib/docs/comments-shared'
+import { OPEN_COMMENT_COMPOSER_EVENT } from '@/lib/editor/comment-events'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -140,6 +141,27 @@ export function CommentsSidebar({ docId, editor, currentUserId }: Props) {
     }
     dom.addEventListener('parchment:focus-comment', handler)
     return () => dom.removeEventListener('parchment:focus-comment', handler)
+  }, [editor])
+
+  // ── F3: open the composer on the toolbar "Add comment" signal ──────────────
+  // The toolbar button (via Editor.handleAddComment) opens this sidebar and
+  // dispatches OPEN_COMMENT_COMPOSER_EVENT. We just open the composer — the
+  // existing handleAddComment below reads the live selection and anchors the
+  // comment, so no comment-create logic is duplicated.
+  useEffect(() => {
+    const dom = editor.view.dom
+    const handler = () => {
+      setComposerOpen(true)
+      // Focus the textarea once it renders.
+      requestAnimationFrame(() => {
+        const ta = dom
+          .closest('body')
+          ?.querySelector<HTMLTextAreaElement>('textarea[aria-label="New comment body"]')
+        ta?.focus()
+      })
+    }
+    dom.addEventListener(OPEN_COMMENT_COMPOSER_EVENT, handler)
+    return () => dom.removeEventListener(OPEN_COMMENT_COMPOSER_EVENT, handler)
   }, [editor])
 
   // ── Create thread ─────────────────────────────────────────────────────

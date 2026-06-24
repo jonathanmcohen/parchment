@@ -10,6 +10,7 @@ import { VoiceButton } from '@/components/editor/VoiceButton'
 import { detectLanguage, getActiveCodeBlockText } from '@/lib/editor/shiki/auto-detect'
 import { TOP_LANGUAGES } from '@/lib/editor/shiki/languages'
 import { partitionControls } from '@/lib/editor/toolbar-overflow'
+import { stepFontSize } from '@/lib/editor/toolbar-size'
 
 // S3-3: px reserved for the `⋯` trigger (a 32px icon button + 2px flex gap)
 // when the secondary group overflows. Fed to `partitionControls`.
@@ -25,6 +26,13 @@ type Props = {
   onOpenCustomCss: () => void
   onToggleComments: () => void
   commentsSidebarOpen: boolean
+  /**
+   * F3: "Add comment" — anchors a comment to the current selection by REUSING
+   * the D1 create flow. The handler opens the comments sidebar and signals it to
+   * open its composer on the selection (see comment-events.ts). No parallel
+   * comment system; the toolbar only triggers the existing path.
+   */
+  onAddComment: () => void
   onToggleVersionHistory: () => void
   versionHistoryOpen: boolean
   onToggleSuggestions: () => void
@@ -49,14 +57,32 @@ type Props = {
   sourceModeDisabled: boolean
 }
 
+// F3: the Google-Docs font list, in Docs order. Arial is the default — when no
+// fontFamily mark is set the <select> shows Arial selected (see DEFAULT_FONT_VALUE)
+// and selecting it applies `Arial, sans-serif`. Each entry's CSS value is applied
+// to the selection via setFontFamily. The generics (System/Serif/Mono) are gone.
 const FONT_FAMILIES = [
-  { label: 'System', value: '' },
-  { label: 'Serif', value: 'Georgia, serif' },
-  { label: 'Mono', value: 'ui-monospace, monospace' },
   { label: 'Arial', value: 'Arial, sans-serif' },
-  { label: 'Times New Roman', value: '"Times New Roman", serif' },
+  { label: 'Calibri', value: 'Calibri, sans-serif' },
+  { label: 'Cambria', value: 'Cambria, serif' },
+  { label: 'Comic Sans MS', value: '"Comic Sans MS", cursive' },
   { label: 'Courier New', value: '"Courier New", monospace' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+  { label: 'Times New Roman', value: '"Times New Roman", serif' },
+  { label: 'Trebuchet MS', value: '"Trebuchet MS", sans-serif' },
+  { label: 'Verdana', value: 'Verdana, sans-serif' },
 ]
+
+// F3: the default family the <select> shows when no fontFamily mark is present.
+// Arial is the Google-Docs default; an unset selection displays (and on first
+// pick, applies) Arial rather than a blank option.
+const DEFAULT_FONT_VALUE = 'Arial, sans-serif'
+
+// F3: sentinel for the trailing disabled "More fonts…" affordance. Selecting it
+// is a no-op (the <option> is disabled) — it is a "coming soon" signpost, not a
+// font value and not a picker dialog.
+const MORE_FONTS_VALUE = '__more_fonts__'
 
 const LINE_HEIGHTS = [
   { label: 'Single (1)', value: '1' },
@@ -144,6 +170,7 @@ export function Toolbar({
   onOpenCustomCss,
   onToggleComments,
   commentsSidebarOpen,
+  onAddComment,
   onToggleVersionHistory,
   versionHistoryOpen,
   onToggleSuggestions,
@@ -177,6 +204,9 @@ export function Toolbar({
       superscript: ed.isActive('superscript'),
       code: ed.isActive('code'),
       highlight: ed.isActive('highlight'),
+      // F3: the active highlight mark's color (multicolor highlight stores it on
+      // the mark's `color` attr). Undefined when no explicit color was set.
+      highlightColor: ed.getAttributes('highlight').color as string | undefined,
       color: ed.getAttributes('textStyle').color as string | undefined,
       fontFamily: ed.getAttributes('textStyle').fontFamily as string | undefined,
       fontSize: ed.getAttributes('textStyle').fontSize as string | undefined,
@@ -707,6 +737,24 @@ export function Toolbar({
           </span>
         </button>
 
+        {/* ── F3: Highlight color picker ─────────────────────────────────────
+          The Highlight extension is configured with `multicolor: true`
+          (inline-extensions.ts), so setHighlight({ color }) applies the chosen
+          color to the mark (stored on its `color` attr). Picking a swatch
+          sets/replaces the highlight color over the selection; the value tracks
+          the active mark's color. Mirrors the text-color control. ──────────── */}
+        <label className="parchment-toolbar-label" htmlFor="toolbar-highlight-color">
+          <span className="sr-only">Highlight color</span>
+          <input
+            id="toolbar-highlight-color"
+            type="color"
+            aria-label="Highlight color"
+            value={s.highlightColor ?? '#fff176'}
+            onChange={(e) => editor.chain().focus().setHighlight({ color: e.target.value }).run()}
+            className="parchment-color-input"
+          />
+        </label>
+
         <span className="parchment-toolbar-sep" aria-hidden="true" />
 
         <label className="parchment-toolbar-label" htmlFor="toolbar-color">
@@ -728,19 +776,26 @@ export function Toolbar({
           <select
             id="toolbar-font-family"
             aria-label="Font family"
-            value={s.fontFamily ?? ''}
-            onChange={(e) =>
-              e.target.value === ''
-                ? editor.chain().focus().unsetFontFamily().run()
-                : editor.chain().focus().setFontFamily(e.target.value).run()
-            }
+            // F3: an unset selection shows Arial (the Docs default); every entry
+            // is a real CSS value applied via setFontFamily.
+            value={s.fontFamily ?? DEFAULT_FONT_VALUE}
+            onChange={(e) => {
+              // The disabled "More fonts…" option cannot be selected, but guard
+              // it anyway so the sentinel never reaches setFontFamily.
+              if (e.target.value === MORE_FONTS_VALUE) return
+              editor.chain().focus().setFontFamily(e.target.value).run()
+            }}
             className="parchment-toolbar-select"
           >
             {FONT_FAMILIES.map((f) => (
-              <option key={f.value} value={f.value}>
+              <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
                 {f.label}
               </option>
             ))}
+            {/* F3: disabled "coming soon" affordance — no picker dialog. */}
+            <option value={MORE_FONTS_VALUE} disabled>
+              More fonts…
+            </option>
           </select>
         </label>
 
@@ -748,6 +803,18 @@ export function Toolbar({
 
         <label className="parchment-toolbar-label" htmlFor="toolbar-font-size">
           Size
+          {/* F3: − chip → applySize(value − 1), preserving the unit, clamped 1–999. */}
+          <button
+            type="button"
+            aria-label="Decrease font size"
+            className="parchment-toolbar-btn parchment-size-step"
+            onMouseDown={keepSelection}
+            onClick={() => applySize(stepFontSize(sizeValue, -1), sizeUnit)}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              remove
+            </span>
+          </button>
           <input
             id="toolbar-font-size"
             type="number"
@@ -761,6 +828,18 @@ export function Toolbar({
             }}
             className="parchment-size-input"
           />
+          {/* F3: + chip → applySize(value + 1), preserving the unit, clamped 1–999. */}
+          <button
+            type="button"
+            aria-label="Increase font size"
+            className="parchment-toolbar-btn parchment-size-step"
+            onMouseDown={keepSelection}
+            onClick={() => applySize(stepFontSize(sizeValue, 1), sizeUnit)}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              add
+            </span>
+          </button>
           <button
             type="button"
             aria-label={`Font size unit: ${sizeUnit}, click to toggle`}
@@ -1042,6 +1121,23 @@ export function Toolbar({
         )}
 
         <span className="parchment-toolbar-sep" aria-hidden="true" />
+
+        {/* ── F3: Add comment (anchored to selection) ───────────────────────
+          Reuses the D1 create flow: opens the sidebar + signals its composer to
+          open on the current selection (Editor wires onAddComment). NOT a
+          parallel comment system. ──────────────────────────────────────────── */}
+        <button
+          type="button"
+          aria-label="Add comment"
+          title="Add comment on selection"
+          className="parchment-toolbar-btn"
+          onMouseDown={keepSelection}
+          onClick={onAddComment}
+        >
+          <span aria-hidden className="material-symbols-rounded text-[20px]">
+            add_comment
+          </span>
+        </button>
 
         {/* ── D1: Toggle comments sidebar ───────────────────────────────── */}
         <button

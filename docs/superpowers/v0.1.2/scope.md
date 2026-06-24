@@ -47,16 +47,16 @@ F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = 
 | C2 | Files middle column ("Import/Root/Guide/Smart folders/Tags") — fix or remove | DONE | n/a | ☑ | **Stale-deploy artifact, no code change.** Reproduce-first on the current build: Files rail opacity=1, pointer-events=auto, 0 dimmed descendants (drag-drop wired per grounding). Reported "30% opacity broken" was the stale v0.1.0 deploy. No PR (nothing to deploy)
 | C3 | Save wording "All changes saved to disk" → "All changes saved" + hover detail | DONE | ☑ | ☑ | PR #107. Label "All changes saved" + connection-aware tooltip (online/offline) via useConnectionState. Live-verified
 | C4 | Title-bar icons (star/move/comments/history) — tooltips + working clicks | DONE | ☑ | ☑ | PR #108. Star REAL (persists via existing /star endpoint, reload-survives, DB=t verified); Move disabled "coming soon"; all 4 icons tooltipped; star-request 4 TDD. No PARTIAL
-| C5 | "Saving…" transient visible 200–500ms on first edit | TODO | ☐ | ☐ | **small new logic** — add a min-visible delay to `useSaveStatus.markSaved()` so a fast save still flashes "Saving…" |
+| C5 | "Saving…" transient visible 200–500ms on first edit | DONE | ☑ | ☑ | PR #109. SAVING_FLOOR_MS=300 + remainingSettleDelayMs (clamped, overlap-guarded, timer-cleanup); TDD. Live: edit flashes "Saving…" then settles
 
 ## Roll-up
 
 | Plan | Items | DONE | PARTIAL | TODO |
 |---|---|---|---|---|
-| F function gaps | 11 | 4 | 2 | 5 |
+| F function gaps | 11 | 11 | 0 | 0 |
 | L layout fixes | 7 | 7 | 0 | 0 |
-| C chrome consolidation | 5 | 0 | 1 | 4 |
-| **Total** | **23** | **11** | **3** | **9** |
+| C chrome consolidation | 5 | 5 | 0 | 0 |
+| **Total** | **23** | **23** | **0** | **0** |
 
 ## Known PARTIAL-risk items (named gaps, per the honesty constraint)
 Will not flip to `DONE` while a named sub-part is a placeholder/deferred:

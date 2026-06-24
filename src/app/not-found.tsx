@@ -44,7 +44,8 @@ export default function NotFound() {
     // Request-ordering guard: stamp each request; ignore a response if a newer
     // request has since been issued (a slow earlier fetch must not overwrite a
     // faster later one with stale results).
-    const seq = (reqSeqRef.current += 1)
+    reqSeqRef.current += 1
+    const seq = reqSeqRef.current
     try {
       const res = await fetch(url)
       let body: RecoverySearchBody | null = null

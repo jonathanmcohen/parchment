@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { and, eq, gt, sql } from 'drizzle-orm'
+import { and, eq, gt, ne, sql } from 'drizzle-orm'
 import { cookies } from 'next/headers'
 import { db, schema } from '@/db'
 import { env } from '@/lib/env'
@@ -228,4 +228,28 @@ export async function destroySession(): Promise<void> {
   }
 
   store.delete(SESSION_COOKIE)
+}
+
+// V3: revoke all of a user's sessions EXCEPT the one making the current request.
+// Called after a password change so that any OTHER live session (a second
+// device, or an attacker who copied a session token) stops working — that is the
+// whole point of rotating a password as a remediation step. The current session
+// is preserved so the user is not logged out of the device they just used.
+//
+// Fail-safe: on an authenticated request requireSessionUser has already
+// validated the cookie, so the current token is always present here. If it
+// somehow is not, revoke ALL of the user's sessions rather than leave stale ones
+// alive (logging out is the safe failure for a password rotation).
+export async function revokeOtherSessions(userId: string): Promise<void> {
+  const store = await cookies()
+  const token = store.get(SESSION_COOKIE)?.value
+
+  if (token) {
+    await db
+      .delete(schema.sessions)
+      .where(and(eq(schema.sessions.userId, userId), ne(schema.sessions.tokenHash, sha256(token))))
+    return
+  }
+
+  await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId))
 }

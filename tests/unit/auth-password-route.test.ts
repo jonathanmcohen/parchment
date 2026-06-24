@@ -4,17 +4,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // mocked so this stays a fast unit test (no Postgres) while still exercising the
 // auth gate, body validation, the current-password verify, and the persist path.
 
-const { authenticateRequest, verifyPassword, hashPassword, dbUpdateSet, dbUpdateWhere } =
-  vi.hoisted(() => ({
-    authenticateRequest: vi.fn(),
-    verifyPassword: vi.fn(),
-    hashPassword: vi.fn(),
-    dbUpdateSet: vi.fn(),
-    dbUpdateWhere: vi.fn(),
-  }))
+const {
+  authenticateRequest,
+  verifyPassword,
+  hashPassword,
+  dbUpdateSet,
+  dbUpdateWhere,
+  clientIp,
+  rateLimit,
+  revokeOtherSessions,
+} = vi.hoisted(() => ({
+  authenticateRequest: vi.fn(),
+  verifyPassword: vi.fn(),
+  hashPassword: vi.fn(),
+  dbUpdateSet: vi.fn(),
+  dbUpdateWhere: vi.fn(),
+  clientIp: vi.fn(),
+  rateLimit: vi.fn(),
+  revokeOtherSessions: vi.fn(),
+}))
 
 vi.mock('@/lib/auth/guard', () => ({ authenticateRequest }))
 vi.mock('@/lib/auth/password', () => ({ verifyPassword, hashPassword }))
+vi.mock('@/lib/auth/rate-limit', () => ({ clientIp, rateLimit }))
+vi.mock('@/lib/auth/session', () => ({ revokeOtherSessions }))
 vi.mock('@/db', () => ({
   schema: { users: { id: 'users.id' } },
   db: {
@@ -48,6 +61,9 @@ beforeEach(() => {
   authenticateRequest.mockResolvedValue(USER)
   verifyPassword.mockResolvedValue(true)
   hashPassword.mockResolvedValue('argon2-new-hash')
+  clientIp.mockResolvedValue('1.2.3.4')
+  rateLimit.mockReturnValue({ ok: true, remaining: 4, retryAfterSeconds: 60 })
+  revokeOtherSessions.mockResolvedValue(undefined)
 })
 
 describe('POST /api/auth/password — auth gate', () => {
@@ -112,11 +128,59 @@ describe('POST /api/auth/password — current-password verify', () => {
     expect(hashPassword).toHaveBeenCalledWith('newpass12')
     expect(dbUpdateSet).toHaveBeenCalledWith({ passwordHash: 'argon2-new-hash' })
     expect(dbUpdateWhere).toHaveBeenCalledTimes(1)
+    // V3: a successful change revokes the user's OTHER sessions.
+    expect(revokeOtherSessions).toHaveBeenCalledWith('u1')
   })
 
   it('never leaks a hash in the response body', async () => {
     const res = await POST(makeReq({ currentPassword: 'oldpass12', newPassword: 'newpass12' }))
     const text = JSON.stringify(await res.json())
     expect(text).not.toContain('argon2')
+  })
+})
+
+describe('POST /api/auth/password — V4 rate-limit', () => {
+  it('429 rate_limited with a retry-after header when the limiter rejects (no verify, no write)', async () => {
+    rateLimit.mockReturnValue({ ok: false, remaining: 0, retryAfterSeconds: 42 })
+    const res = await POST(makeReq({ currentPassword: 'oldpass12', newPassword: 'newpass12' }))
+    expect(res.status).toBe(429)
+    expect(await res.json()).toEqual({ error: 'rate_limited' })
+    expect(res.headers.get('retry-after')).toBe('42')
+    // The throttle fires BEFORE the expensive verify and before any DB write.
+    expect(verifyPassword).not.toHaveBeenCalled()
+    expect(dbUpdateSet).not.toHaveBeenCalled()
+    expect(revokeOtherSessions).not.toHaveBeenCalled()
+  })
+
+  it('keys the limiter per-IP under the password-verify namespace', async () => {
+    await POST(makeReq({ currentPassword: 'oldpass12', newPassword: 'newpass12' }))
+    expect(clientIp).toHaveBeenCalledTimes(1)
+    expect(rateLimit).toHaveBeenCalledWith('password-verify:1.2.3.4', 5, 60)
+  })
+
+  it('checks the rate-limit only after the auth gate (no throttle hit on a 401)', async () => {
+    authenticateRequest.mockResolvedValue(null)
+    const res = await POST(makeReq({ currentPassword: 'oldpass12', newPassword: 'newpass12' }))
+    expect(res.status).toBe(401)
+    expect(rateLimit).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/auth/password — V3 session revocation', () => {
+  it('does NOT revoke sessions when the current-password verify fails', async () => {
+    verifyPassword.mockResolvedValue(false)
+    const res = await POST(makeReq({ currentPassword: 'wrongpass', newPassword: 'newpass12' }))
+    expect(res.status).toBe(400)
+    expect(revokeOtherSessions).not.toHaveBeenCalled()
+  })
+
+  it('revokes other sessions only AFTER the new hash is persisted', async () => {
+    const order: string[] = []
+    dbUpdateSet.mockImplementation(() => order.push('persist'))
+    revokeOtherSessions.mockImplementation(async () => {
+      order.push('revoke')
+    })
+    await POST(makeReq({ currentPassword: 'oldpass12', newPassword: 'newpass12' }))
+    expect(order).toEqual(['persist', 'revoke'])
   })
 })

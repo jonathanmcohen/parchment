@@ -1878,13 +1878,23 @@ body {
 
 /* S3-5: light left-rail — 256px, the standard muted surface (follows the
    scheme; dark in dark mode, not the bespoke color-mix blend), chrome border. */
+/* L4: anchored left rail, sticky below the 136px chrome stack (title56 +
+ * menu32 + toolbar48). The pane stays put while the canvas scrolls — it does
+ * not float over or overlap the canvas (sits beside it in the flex row). The
+ * bounded height (viewport minus the stack) lets the inner list scroll while
+ * the pane itself is pinned. z-index stays below the chrome stack (10–30) so
+ * the sticky bars always win on any overlap. */
 .parchment-outline {
-  position: relative;
+  position: sticky;
+  top: 136px;
+  z-index: 5;
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
   width: 256px;
   min-width: 256px;
   max-width: 256px;
+  max-height: calc(100vh - 136px);
   border-right: 1px solid var(--border-chrome);
   background: var(--surface-muted);
   flex-shrink: 0;
@@ -1894,10 +1904,12 @@ body {
   overflow: hidden;
 }
 
+/* L4: collapsed rail is 40px (was 32) — wide enough to keep the › re-open
+ * affordance visible and tappable. */
 .parchment-outline--collapsed {
-  width: 32px;
-  min-width: 32px;
-  max-width: 32px;
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
 }
 
 /* Toggle chevron button */
@@ -1938,11 +1950,11 @@ body {
   padding: 10px 32px 6px 10px;
 }
 
+/* L4: sentence-case "Outline" 13px medium (dropped the uppercase transform +
+ * letter-spacing; was uppercase 0.7rem/600). */
 .parchment-outline-title {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--muted);
 }
 

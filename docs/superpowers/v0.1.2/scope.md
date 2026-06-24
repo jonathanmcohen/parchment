@@ -6,7 +6,7 @@
 > `PARTIAL (n%)` · `DONE`. `Cov` = covered by a per-PR visual-snapshot (+axe)
 > artifact. `LV` = live-deploy verified **in light AND dark**.
 
-**22 items · single tag `v0.1.2` · no deferrals.** Order: F1+F2 → L1–L7 →
+**23 items (incl. F2b) · single tag `v0.1.2` · no deferrals.** Order: F1+F2 → L1–L7 →
 F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = `main`
 @ `v0.1.1`, `542a2d8`). Stale-deploy reconciliation in
 [coverage-matrix.md](coverage-matrix.md).

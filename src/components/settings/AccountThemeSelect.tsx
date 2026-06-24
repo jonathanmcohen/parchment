@@ -81,7 +81,7 @@ export function AccountThemeSelect() {
         <option value="dark">Dark</option>
       </select>
       {error && (
-        <p className="text-sm" style={{ color: '#dc2626' }} role="alert">
+        <p className="text-sm" style={{ color: 'var(--error)' }} role="alert">
           {error}
         </p>
       )}

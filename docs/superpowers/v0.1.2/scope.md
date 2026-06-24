@@ -23,7 +23,7 @@ F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = 
 | F5 | Edit menu — add Cut/Copy/Paste/Paste-without-formatting | TODO | ☐ | ☐ | Edit menu is NOT empty in code (`MenuBar.tsx:89-107`); add 4 clipboard rows; repro "opens nothing"; paste-w/o-formatting has no native backing → custom strip or honest placeholder |
 | F6 | Parchment-styled 404 (`not-found.tsx`) | TODO | ☐ | ☐ | new file; "404 / This page wandered off" + Back-to-home (`--primary`) + recovery search → existing `/api/search`; gate the input behind auth (search route is authed) |
 | F7 | Settings ghosted sub-pages — ship-or-hide | PARTIAL-risk | ☐ | ☐ | **no half-built state.** Sub-pages render but Workspace inputs have **no backing endpoint**. Decision per coverage-matrix: ship Admin→Health (exists) + About(/whats-new, exists); Workspace-name needs a new `/api/settings/workspace` route OR disable+"v0.2" label |
-| F8 | Bottom status bar restored + pinned (24px, full-width) | TODO | ☐ | ☐ | `StatusBar` already rendered+wired (`Editor.tsx:1577`); only **pin** `position:fixed; bottom:0` full-width (overlaps L3) |
+| F8 | Bottom status bar restored + pinned (24px, full-width) | DONE | ☑ | ☑ | PR #96 (=L3). position:fixed bottom:0, full-width 257→1425, centered 1024px, --sidebar-width token; live light
 | F9 | Share dialog completeness | PARTIAL-risk | ☐ | ☐ | **PARTIAL-risk** — link-side (auto-link on open, "Copy link" primary, Restricted/Anyone toggle) is in-scope; **per-email "Add people" + roles needs new API+schema** → ship the link UX, keep "Invite by email (v0.2)" as the honest placeholder; Restricted toggle needs a `mode` field decision |
 | F10 | Audit "Coming soon" menu rows — ship 3, hide rest | TODO | ☐ | ☐ | ship: Insert→Horizontal line (`setHorizontalRule` exists), Help→Keyboard shortcuts (HelpMenu dialog exists). Already-wired: Format→Clear formatting. **Page number HIDDEN** (no backing — section-break attr, not a trivial insert; user's "ship 4" reconciled to 3) + the rest of the placeholder set hidden |
 
@@ -33,7 +33,7 @@ F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = 
 |---|---|---|---|---|---|
 | L1 | Editor toolbar full-width (sticky `top:56px`, edge-to-edge bg, centered content) | DONE | ☑ | ☑ | PR #95 (L1+L2+L7). Full-bleed bars (256→1425) + centered inner 1024px + sticky top:0/56/88. Live light+dark
 | L2 | Title bar + menu bar full-width sticky | DONE | ☑ | ☑ | PR #95 (with L1/L7). Title 56 + menu 32 sticky full-width, content centered
-| L3 | Bottom status bar full-width (with F8) | TODO | ☐ | ☐ | restyle: same full-bleed-bg/centered-content treatment; pairs with F8 pinning |
+| L3 | Bottom status bar full-width (with F8) | DONE | ☑ | ☑ | PR #96 (=F8). Same pin; RTL logical props (review-fixed)
 | L4 | Outline pane anchored left, not floating; 40px collapsed rail; sentence-case "Outline" | TODO | ☐ | ☐ | restyle: pane is in-flow flex child but not sticky; collapse target is 32px (→40px) + uppercase title (→sentence) |
 | L5 | Page canvas fits (viewport − sidebar − outline; gutter; 816px; gutter-only h-scroll; 24px pad; verify S1-3 shadow) | TODO | ☐ | ☐ | restyle: page is flex:1 grow; `--shadow-page` confirmed present (`globals.css:729`); add gutter-only overflow + vertical pad |
 | L6 | Eliminate floating-card chrome (no rounded card) | TODO | ☐ | ☐ | restyle: grounding found **no** rounded card today — the `max-w-5xl` column is flat on the `--editor-gutter` shell. Item = ensure no card residue while L1/L2/L4 reshape; mostly a verify |

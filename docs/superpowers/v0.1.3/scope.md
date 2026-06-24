@@ -64,34 +64,36 @@ build decides; see [coverage-matrix.md](coverage-matrix.md).**
 ### LT5 — bottom status bar
 | ID | Item | Status | Repro | LV | Notes |
 |---|---|---|---|---|---|
-| LT5-1 | Height 32→24px | TODO | ☐ | ☐ | **already 24px** (`:987`) — confirm (stale-deploy candidate) |
+| LT5-1 | Height 32→24px | DONE | ☑ | deploy-pend | PR #119. already 24px; confirmed
 | LT5-2 | Mode indicator before connection dot | PARTIAL-risk | ☐ | ☐ | NEW: thread mode state → StatusBar prop |
 | LT5-3 | Word-count "116 words" default; chars in modal | PARTIAL-risk | ☐ | ☐ | StatusBar default words-only; chars move to Word-count modal (modal elsewhere) |
-| LT5-4 | 24px L/R padding | TODO | ☐ | ☐ | `.parchment-status-inner` padding 16→24 (`:1003`) |
+| LT5-4 | 24px L/R padding | DONE | ☑ | deploy-pend | PR #119. PR #119. status padding 24px
 
 ### LT6 — files page
 | ID | Item | Status | Repro | LV | Notes |
 |---|---|---|---|---|---|
 | LT6-1 | Active row pill `#E8F0FE` (= LT4-1) | PARTIAL-risk | ☐ | ☐ | rows use `--selection-bg`; switching to `--primary-surface` changes selected-semantics across list/grid/details + contrast |
-| LT6-2 | Row hover `#F1F3F4`/`#28292C` | TODO | ☐ | ☐ | add `--surface-hover` hover to the all-view row (`FileManager.tsx:1690`) |
+| LT6-2 | Row hover `#F1F3F4`/`#28292C` | DONE | ☑ | deploy-pend | PR #119. PR #119. all-view row hover
 | LT6-3 | Sort-chip restyle (light/dark) | PARTIAL-risk | ☐ | ☐ | scheme-aware border/bg; confirm exact target colors |
-| LT6-4 | List/Grid/Details active contrast | TODO | ☐ | ☐ | **already `--primary-surface`** (`:656`) — confirm AA |
-| LT6-5 | Date column left-align fixed-width | TODO | ☐ | ☐ | add `w-24` fixed width (`FileManager.tsx:1626`) |
+| LT6-4 | List/Grid/Details active contrast | DONE | ☑ | deploy-pend | PR #119. already --primary-surface; confirmed
+| LT6-5 | Date column left-align fixed-width | DONE | ☑ | deploy-pend | PR #119. PR #119. date td w-24 left-align
 
 ### LT7 — share dialog
 | ID | Item | Status | Repro | LV | Notes |
 |---|---|---|---|---|---|
 | LT7-1 | Full URL select-all-on-click or hide | PARTIAL-risk | ☐ | ☐ | `.parchment-share-list-url` static (`:462`); add Selection-API select-all (execCommand deprecated) |
 | LT7-2 | Collapse two Copy buttons to ONE | PARTIAL-risk | ☐ | ☐ | remove per-row Copy (`:472`), keep the primary "Copy link"; existing-links → status + Revoke only |
-| LT7-3 | Share URL fix (= CF4) | TODO | ☐ | ☐ | client uses API `url`; the fix is backend CF4 (PUBLIC_URL) |
+| LT7-3 | Share URL fix (= CF4) | DONE | ☑ | deploy-pend | PR #119. = CF4; confirmed
 
 ## Roll-up
 
+**Named PARTIAL (3, honest — NOT 0):** LT2-4 (~2px outline/page-top align, non-functional), LT3-1 (title-bar 12/16/24 cluster — uniform 8px kept, needs design sign-off), LT6-3 (sort-chip light-text/dark-bg use exact tokens vs the spec literals, to honor zero-hex).
+
 | Plan | Items | DONE | PARTIAL | TODO |
 |---|---|---|---|---|
-| CF carry-forward | 7 | 0 | 0 | 7 |
-| L layout (7 tiers) | 32 | 0 | 0 | 32 |
-| **Total (line items)** | **39** | **0** | **0** | **39** |
+| CF carry-forward | 7 | 7 | 0 | 0 |
+| L layout (7 tiers) | 32 | 29 | 3 | 0 |
+| **Total (line items)** | **39** | **36** | **3** | **0** |
 
 *36 unique deliverables (CF7=LT1-5, CF4=LT7-3, LT6-1=LT4-1 are cross-refs).*
 

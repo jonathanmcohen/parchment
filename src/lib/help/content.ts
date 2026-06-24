@@ -39,6 +39,7 @@ export type ReleaseNotes = {
 export const RELEASE_NOTES: ReleaseNotes = {
   version: APP_VERSION,
   highlights: [
+    'Live-deploy fixes + a full Google-Docs layout sweep (theme save, share links, settings, sidebar/status/editor spacing)',
     'Google Docs-style interface — full-width chrome, anchored outline, centered page, and a polished light/dark theme',
     'Rich collaborative editor powered by Tiptap + Yjs — real-time co-editing with presence cursors',
     'Disk-mirror: every document is a Markdown file on disk, git-tracked and portable',

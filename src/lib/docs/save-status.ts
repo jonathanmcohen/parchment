@@ -14,6 +14,34 @@ export type SaveStatus = 'idle' | 'saving' | 'saved'
 
 export type SaveEvent = 'save-start' | 'save-settle' | 'idle-timeout'
 
+// C5: minimum time the "Saving…" transient stays visible before settling to
+// "All changes saved". On a fast network the save settles in <200ms and the
+// label flashes too fast to perceive, so we floor only the LABEL transition (not
+// the save itself) to a perceptible window. 300ms sits in the 200–500ms target.
+export const SAVING_FLOOR_MS = 300
+
+/**
+ * Pure timing helper for the C5 minimum-visible floor. Given when the save
+ * started, the current time, and the floor, return how long (ms) the settle to
+ * 'saved' must be deferred so "Saving…" stays visible for at least `floorMs`.
+ *
+ *   • A sub-floor save (settled before the floor) → defer the remaining time.
+ *   • A save at/after the floor → 0 (settle immediately; never extend a slow save).
+ *   • A backwards clock (now < start) → elapsed clamped to 0, so at most the full
+ *     floor (never an inflated delay, never negative).
+ *
+ * The actual save path/timing is untouched — this only floors the label.
+ */
+export function remainingSettleDelayMs(
+  savingStartedAt: number,
+  now: number,
+  floorMs: number = SAVING_FLOOR_MS,
+): number {
+  const elapsed = Math.max(0, now - savingStartedAt)
+  const remaining = floorMs - elapsed
+  return remaining > 0 ? remaining : 0
+}
+
 // C3: which connection-aware tooltip COPY the save-status text shows. The STATE
 // machine above is untouched — this is a pure mapping from the live collab
 // connection state (online/syncing/offline) to a tooltip kind. The type is a

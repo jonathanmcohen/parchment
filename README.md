@@ -79,6 +79,7 @@ leaving them unset simply disables that feature (no external call is ever made).
 | `PARCHMENT_FILES_ROOT` | `/data/files` (image) | Root directory for the disk-mirrored Markdown files. |
 | `NODE_ENV` | `production` (image) | Standard Node mode. In `production` the session cookie is sent `Secure` (https-only). Run the image **with `NODE_ENV=production`** when it's served over https. |
 | `SECURE_COOKIES` | unset | Set to `true` to force the `Secure` flag on the session cookie even when `NODE_ENV` is not `production` — needed behind a TLS-terminating reverse proxy (Caddy/nginx) if the container runs with the default `NODE_ENV`. Leave unset (or `false`) for plain http (local dev), otherwise the browser drops the cookie and login/theme-save fail. |
+| `PUBLIC_URL` | falls back to `PARCHMENT_RP_ORIGIN`, then `http://localhost:3000` | The **public** base URL (`scheme://host[:port]`) used to build copyable absolute share links (`/share/<token>`). MUST be your public host as seen by browsers — behind a reverse proxy the app's own request origin is the internal `0.0.0.0:3000` bind, which would otherwise leak into the link. Optional: if unset it defaults to `PARCHMENT_RP_ORIGIN` (which the deploy already sets for passkeys), so a **redeploy** self-corrects existing share links with no new config. Set it explicitly only to override that. A change takes effect on redeploy. |
 
 ### Authentication / passkeys
 

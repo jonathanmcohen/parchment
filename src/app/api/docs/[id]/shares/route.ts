@@ -1,14 +1,17 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
 import { getDocument } from '@/lib/docs/repo'
+import { buildShareUrl } from '@/lib/docs/share-link'
 import { createShare, listShares, PERMISSIONS, type Permission } from '@/lib/docs/shares-repo'
+import { env } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
 
-// Build the public viewer URL for a share token from the request origin so the
-// owner gets a copyable absolute link without a hard-coded base URL.
-function shareUrl(req: NextRequest, token: string): string {
-  return new URL(`/share/${token}`, req.nextUrl.origin).toString()
+// CF4: build the copyable share link from the FIXED public base URL (env.publicUrl
+// = PUBLIC_URL || PARCHMENT_RP_ORIGIN), NOT req.nextUrl.origin. Behind Caddy the
+// request origin is the internal 0.0.0.0:3000 bind, which would leak into the link.
+function shareUrl(token: string): string {
+  return buildShareUrl(env.publicUrl, token)
 }
 
 function isPermission(value: unknown): value is Permission {
@@ -35,7 +38,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       hasPassword: s.passwordHash !== null,
       expiresAt: s.expiresAt,
       createdAt: s.createdAt,
-      url: shareUrl(req, s.token),
+      url: shareUrl(s.token),
     })),
   )
 }
@@ -78,5 +81,5 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     expiresAt,
   })
 
-  return NextResponse.json({ id: shareId, token, url: shareUrl(req, token) }, { status: 201 })
+  return NextResponse.json({ id: shareId, token, url: shareUrl(token) }, { status: 201 })
 }

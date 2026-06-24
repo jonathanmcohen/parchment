@@ -30,4 +30,12 @@ export const env = {
   // scheme/port); RP_ORIGIN is the full scheme://host[:port].
   webauthnRpId: process.env.PARCHMENT_RP_ID,
   webauthnOrigin: process.env.PARCHMENT_RP_ORIGIN,
+  // CF4: the public base URL (scheme://host[:port]) for user-facing absolute
+  // links — currently the share-viewer URL. It MUST be fixed server config, never
+  // derived from request headers: behind a TLS-terminating reverse proxy (Caddy)
+  // the app's `req.nextUrl.origin` is the internal `0.0.0.0:3000` bind, which
+  // would leak into copyable share links. Defaults to PARCHMENT_RP_ORIGIN — the
+  // public host the deploy already sets for WebAuthn — so a redeploy self-corrects
+  // the share link WITHOUT any new config; PUBLIC_URL is an explicit override.
+  publicUrl: process.env.PUBLIC_URL || process.env.PARCHMENT_RP_ORIGIN || 'http://localhost:3000',
 }

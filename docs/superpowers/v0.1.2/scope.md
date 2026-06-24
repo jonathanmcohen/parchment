@@ -15,7 +15,7 @@ F3–F10 → C1–C5. Grounded against the v0.1.1 code (`release/v0.1.2` base = 
 
 | ID | Item | Status | Cov | LV | Notes / pre-identified gap |
 |---|---|---|---|---|---|
-| F1 | Theme switch actually applies (Account select → `/api/settings/theme` + refresh) | TODO | ☐ | ☐ | wiring: backend works; the Account `<select>` (`account/page.tsx:56`) fires no onChange. Reuse `AppearanceSettings` onChange+`router.refresh()` pattern |
+| F1 | Theme switch actually applies (Account select → `/api/settings/theme` + refresh) | DONE | ☑ | ☑ | PR #92. `AccountThemeSelect` island + `applyColorScheme` (merges over full theme, no clobber) + `router.refresh()`. Live-verified system→dark + dark→light re-theme without reload + persist; 4 new tests |
 | F2 | Page-body ink correct in dark (always `--foreground`, never `--muted`) | TODO | ☐ | ☐ | **reproduce-first** — `.parchment-prose` is already `var(--foreground)` (scheme-correct, `globals.css:2079`). Find the real overriding rule (wrapper/HC/dyslexic) or close as stale-deploy |
 | F3 | Missing toolbar controls (font list, size ±, highlight color, insert-comment) | TODO | ☐ | ☐ | **PARTIAL-risk** — 7/8 exist; gaps: font list 6→10 + "More fonts…", size −/+ chips, **highlight COLOR picker (no `setHighlightColor` today)**, **insert-comment-per-selection (collides w/ D1 sidebar model)** |
 | F4 | Merge Block + Styles dropdowns into one "Styles" | TODO | ☐ | ☐ | wiring: combine `BLOCK_TYPES` select + `StylesMenu` into one control; drop "Block" label |

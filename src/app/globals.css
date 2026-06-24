@@ -751,6 +751,24 @@ body {
   border-top: 1px solid var(--border-chrome);
 }
 
+/* ── L5: canvas gutter container ─────────────────────────────────────────────
+ * The flex:1 column to the right of the 256px outline rail. After the L6
+ * de-clamp it spans the full remaining main-content width, so the fixed-width
+ * .parchment-page (816px @100%, centered via its own mx-auto) floats centered in
+ * the gutter field painted by .parchment-editor-shell (--editor-gutter).
+ *
+ * Horizontal overflow lives HERE (and only here): at high zoom×width the page can
+ * exceed the viewport, so overflow-x:auto scrolls ONLY this gutter sideways — the
+ * sticky chrome stack (title/menu/toolbar) and the fixed status bar never scroll.
+ * 24px top/bottom padding keeps breathing room above/below the page on top of the
+ * shell's own 2rem; the page is never hidden behind the 136px chrome or sidebar.
+ * Desktop-only — the S2-6 mobile --page-scale path (≤768px) is untouched. */
+.parchment-canvas-gutter {
+  overflow-x: auto;
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+
 /* Page canvas (B1) */
 .parchment-page {
   position: relative;

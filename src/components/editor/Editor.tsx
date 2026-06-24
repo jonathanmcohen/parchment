@@ -1490,7 +1490,12 @@ export function Editor({
         )}
       </header>
 
-      <div className="mx-auto max-w-5xl">
+      {/* L6: the editor body (outline + canvas row, status bar, dialogs) spans the
+          FULL main content area — the old `mx-auto max-w-5xl` clamp is removed so
+          the outline anchors flush at the 256px sidebar edge (L4) and the page
+          centers in the remaining gutter to its right (L5). The CHROME stack
+          keeps its own full-bleed + centered-inner (L1/L2/L7); this is body only. */}
+      <div>
         {/* S3-1: the plain read-only <h1> is superseded by the inline-editable
             title in <DocTitleBar> above. */}
 
@@ -1522,8 +1527,18 @@ export function Editor({
             />
           )}
 
-          {/* B9: find + replace panel — positioned relative to this wrapper */}
-          <div ref={canvasWrapRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+          {/* B9: find + replace panel — positioned relative to this wrapper.
+              L5: this flex:1 column IS the gutter container — it owns the
+              horizontal overflow (overflow-x:auto) so ONLY the gutter scrolls
+              sideways at high zoom×width while the sticky chrome + fixed status
+              bar stay put, and it pads ≥24px above/below the centered page
+              (.parchment-page mx-auto). The gutter field color is painted by the
+              .parchment-editor-shell (--editor-gutter). */}
+          <div
+            ref={canvasWrapRef}
+            className="parchment-canvas-gutter"
+            style={{ position: 'relative', flex: 1, minWidth: 0 }}
+          >
             {/* G12: scaled host — CSS var --page-scale is set by the page-fit hook
               above. On desktop the var is absent / 1 so transform:scale(1) is a
               no-op. On mobile the host height collapses to pageHeight×scale so

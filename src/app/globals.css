@@ -902,7 +902,16 @@ body {
 
 /* S3-3: single light 48px toolbar row — no purple, no wrap. Chrome stacks flush
    below the menu bar (no border-radius, no margin); overflowing controls go to
-   the `⋯` menu. */
+   the `⋯` menu.
+
+   Safety net: the row uses `overflow-x: auto` (NOT `overflow: hidden`) so that
+   if the measured `⋯` partition still leaves more inline controls than fit at a
+   given desktop width (e.g. the 769–920px window where the secondary group has
+   already collapsed but the primary controls alone are wider than the row), the
+   row scrolls horizontally rather than silently clipping the trailing controls
+   off-screen and out of reach. `overflow-y` is clipped so the 48px chrome height
+   never grows. The mobile (`max-width: 768px`) block layers touch sizing +
+   sticky positioning on top of this same scroll behavior. */
 .parchment-toolbar {
   display: flex;
   flex-wrap: nowrap;
@@ -915,7 +924,10 @@ body {
   border-bottom: 1px solid var(--border-chrome);
   border-radius: 0;
   margin-bottom: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Thin, unobtrusive scrollbar only when the row actually overflows. */
+  scrollbar-width: thin;
 }
 
 .parchment-toolbar-btn {

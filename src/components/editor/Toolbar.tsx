@@ -9,6 +9,11 @@ import { TableControls } from '@/components/editor/TableControls'
 import { VoiceButton } from '@/components/editor/VoiceButton'
 import { detectLanguage, getActiveCodeBlockText } from '@/lib/editor/shiki/auto-detect'
 import { TOP_LANGUAGES } from '@/lib/editor/shiki/languages'
+import { partitionControls } from '@/lib/editor/toolbar-overflow'
+
+// S3-3: px reserved for the `⋯` trigger (a 32px icon button + 2px flex gap)
+// when the secondary group overflows. Fed to `partitionControls`.
+const OVERFLOW_BTN_WIDTH = 34
 
 type Props = {
   editor: Editor
@@ -264,25 +269,70 @@ export function Toolbar({
   // S3-3: overflow `⋯`. When the single 48px row is too narrow to show every
   // control, the trailing secondary actions collapse into a `⋯` dropdown (the
   // shared S3-2 Menu primitive). A control appears EXACTLY once — inline OR in
-  // the overflow, never both. Visibility is driven by a ResizeObserver on the
-  // toolbar (the same pattern used for page-fit), not by JS width math on every
-  // control, so it cannot duplicate or drop a control.
+  // the overflow, never both.
+  //
+  // The decision is MEASURED, not a hardcoded width threshold: a ResizeObserver
+  // reports the toolbar's available inner width, and `partitionControls`
+  // (src/lib/editor/toolbar-overflow.ts) decides — from the toolbar's own
+  // natural content width — whether the secondary group fits. When it does not,
+  // the whole secondary group collapses into `⋯` as one unit (the group is the
+  // partition's overflow bucket). The natural width is captured from the
+  // rendered row's `scrollWidth` only while the group is inline, so the
+  // measurement never feeds back on its own collapsed state — this dodges the
+  // G12 ResizeObserver feedback loop while keeping the overflow set the REAL
+  // measured hidden set rather than a guessed threshold. The CSS `overflow-x:
+  // auto` on `.parchment-toolbar` is the final safety net: even if the primary
+  // controls alone exceed the width, the row scrolls rather than clipping.
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [overflowed, setOverflowed] = useState(false)
+  // Natural (uncollapsed) width of the full control row + the px width the
+  // secondary group occupies inline, measured once the group is rendered inline.
+  // Persist across renders so the collapsed pass can decide whether to expand.
+  const naturalWidthRef = useRef<{ total: number; secondary: number } | null>(null)
   useEffect(() => {
     const el = toolbarRef.current
     if (!el) return
-    // Collapse the secondary group below this width threshold. The threshold is
-    // a single boolean flip (not per-control measurement) to dodge the G12
-    // ResizeObserver feedback loop.
-    const THRESHOLD = 920
+
+    const measure = (available: number) => {
+      // Capture the natural geometry only while the secondary group is inline
+      // (overflowed === false): `scrollWidth` then equals the full row width and
+      // the inline secondary group's width is derivable. Reuse the last good
+      // capture while collapsed so we know the expand-back boundary.
+      if (!overflowed) {
+        const total = el.scrollWidth
+        const inlineSecondary = el.querySelectorAll('[data-toolbar-secondary]')
+        let secondary = 0
+        for (const node of inlineSecondary) {
+          secondary += (node as HTMLElement).offsetWidth
+          secondary += 2 // the 2px flex gap each control adds
+        }
+        naturalWidthRef.current = { total, secondary }
+      }
+      const nat = naturalWidthRef.current
+      if (!nat) return
+
+      // Feed the measured geometry through the pure partitioner. Two control
+      // "slots": the always-inline primary block and the collapsible secondary
+      // block. If the secondary slot lands in the overflow bucket, collapse it.
+      const primaryWidth = Math.max(0, nat.total - nat.secondary)
+      const { overflow } = partitionControls(
+        [
+          { id: 'primary', width: primaryWidth },
+          { id: 'secondary', width: nat.secondary },
+        ],
+        available,
+        OVERFLOW_BTN_WIDTH,
+      )
+      setOverflowed(overflow.some((c) => c.id === 'secondary'))
+    }
+
     const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? el.clientWidth
-      setOverflowed(w < THRESHOLD)
+      const available = entries[0]?.contentRect.width ?? el.clientWidth
+      measure(available)
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [overflowed])
 
   // The secondary actions that move into the `⋯` menu when overflowed. Each
   // re-surfaces an EXISTING handler (no new feature logic).
@@ -839,6 +889,7 @@ export function Toolbar({
           <button
             type="button"
             aria-label="Page setup"
+            data-toolbar-secondary
             className="parchment-toolbar-btn"
             onMouseDown={keepSelection}
             onClick={(e) => {
@@ -853,6 +904,7 @@ export function Toolbar({
           <button
             type="button"
             aria-label="Watermark"
+            data-toolbar-secondary
             className="parchment-toolbar-btn"
             onMouseDown={keepSelection}
             onClick={(e) => {
@@ -867,6 +919,7 @@ export function Toolbar({
           <button
             type="button"
             aria-label="Custom CSS"
+            data-toolbar-secondary
             className="parchment-toolbar-btn"
             onMouseDown={keepSelection}
             onClick={(e) => {
@@ -987,6 +1040,7 @@ export function Toolbar({
             type="button"
             aria-label="Reading mode"
             aria-pressed={readingOpen}
+            data-toolbar-secondary
             className="parchment-toolbar-btn"
             onMouseDown={keepSelection}
             onClick={onToggleReading}
@@ -999,6 +1053,7 @@ export function Toolbar({
             type="button"
             aria-label="Presenter mode"
             aria-pressed={presenterOpen}
+            data-toolbar-secondary
             className="parchment-toolbar-btn"
             onMouseDown={keepSelection}
             onClick={onTogglePresenter}

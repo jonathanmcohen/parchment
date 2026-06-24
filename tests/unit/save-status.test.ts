@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type SaveStatus, nextSaveStatus } from '@/lib/docs/save-status'
+import { nextSaveStatus, type SaveStatus } from '@/lib/docs/save-status'
 
 // S3-1 (DECISION 4): a minimal in-flight → settled → idle state machine wrapped
 // around the EXISTING fire-and-forget body save. S3-1 owns the STATE; S5-9 owns

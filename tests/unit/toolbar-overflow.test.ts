@@ -19,7 +19,14 @@ const controls = [
 describe('partitionControls', () => {
   it('keeps everything inline when the row is wide enough', () => {
     const { inline, overflow } = partitionControls(controls, 10_000, 40)
-    expect(inline.map((c) => c.id)).toEqual(['undo', 'redo', 'print', 'bold', 'italic', 'underline'])
+    expect(inline.map((c) => c.id)).toEqual([
+      'undo',
+      'redo',
+      'print',
+      'bold',
+      'italic',
+      'underline',
+    ])
     expect(overflow).toEqual([])
   })
 
@@ -50,6 +57,13 @@ describe('partitionControls', () => {
   it('treats a non-positive width as everything overflowing', () => {
     const { inline, overflow } = partitionControls(controls, 0, 40)
     expect(inline).toEqual([])
-    expect(overflow.map((c) => c.id)).toEqual(['undo', 'redo', 'print', 'bold', 'italic', 'underline'])
+    expect(overflow.map((c) => c.id)).toEqual([
+      'undo',
+      'redo',
+      'print',
+      'bold',
+      'italic',
+      'underline',
+    ])
   })
 })

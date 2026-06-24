@@ -2,10 +2,10 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  🟢  GO — EXECUTING (Plan F1+F2 → L → F3–F10 → C).                         ║
+║  🚀  RELEASED — v0.1.2 (2026-06-24).                                       ║
 ║                                                                            ║
-║  Plans verified via a 5-lens adversarial review (2 blocking + 5 important  ║
-║  + 2 minor findings, all fixed 2026-06-24). User gave GO. One PR per item. ║
+║  All 23 items (F/L/C) shipped, one PR each (#92–#110), 0 PARTIAL. Final    ║
+║  whole-branch review clean; CI green (incl. e2e-a11y); tagged v0.1.2.      ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
 

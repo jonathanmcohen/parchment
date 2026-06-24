@@ -28,9 +28,10 @@ type Props = {
   commentsSidebarOpen: boolean
   /**
    * F3: "Add comment" — anchors a comment to the current selection by REUSING
-   * the D1 create flow. The handler opens the comments sidebar and signals it to
-   * open its composer on the selection (see comment-events.ts). No parallel
-   * comment system; the toolbar only triggers the existing path.
+   * the D1 create flow. The handler opens the comments sidebar and bumps a
+   * composer-open intent passed to CommentsSidebar as a prop, which opens its
+   * composer on the selection once mounted. No parallel comment system; the
+   * toolbar only triggers the existing path.
    */
   onAddComment: () => void
   onToggleVersionHistory: () => void

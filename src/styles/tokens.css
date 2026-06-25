@@ -222,6 +222,11 @@
     --primary-hover: #aecbfa;
     --primary-pressed: #aecbfa;
     --primary-surface: #283142;
+    /* v0.1.7: mirror the explicit-dark block. Without this the system path
+       leaks the light :root --primary-surface-text (#185abc) onto the navy
+       pill, dropping active sidebar/file/slash text to ~2:1. #8ab4f8 on
+       #283142 = 6:1. */
+    --primary-surface-text: #8ab4f8;
     --on-primary: #202124;
 
     --surface: #292a2d;
@@ -339,6 +344,9 @@
     --primary-hover: #66b2ff;
     --primary-pressed: #66b2ff;
     --primary-surface: #16304d;
+    /* v0.1.7: system+HC+dark can't inherit the [data-color-scheme="dark"]
+       --primary-surface-text, so set it here too. #8ab4f8 on #16304d = 6.6:1. */
+    --primary-surface-text: #8ab4f8;
     --on-primary: #000000;
     --paper: #000000;
     --surface: #000000;

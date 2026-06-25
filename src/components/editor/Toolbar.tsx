@@ -701,10 +701,14 @@ export function Toolbar({
         <span className="parchment-toolbar-sep" aria-hidden="true" />
 
         <label className="parchment-toolbar-label" htmlFor="toolbar-font-family">
-          Font
+          {/* I1: prefix labels are sr-only (Google-Docs style — the select value
+              is self-evident) so the toolbar fits one row with no horizontal
+              scroll. The label stays in the a11y tree; the select keeps aria-label. */}
+          <span className="sr-only">Font</span>
           <select
             id="toolbar-font-family"
             aria-label="Font family"
+            title="Font"
             // F3: an unset selection shows Arial (the Docs default); every entry
             // is a real CSS value applied via setFontFamily.
             value={s.fontFamily ?? DEFAULT_FONT_VALUE}
@@ -731,7 +735,7 @@ export function Toolbar({
         <span className="parchment-toolbar-sep" aria-hidden="true" />
 
         <label className="parchment-toolbar-label" htmlFor="toolbar-font-size">
-          Size
+          <span className="sr-only">Size</span>
           {/* F3: − chip → applySize(value − 1), preserving the unit, clamped 1–999. */}
           <button
             type="button"
@@ -783,10 +787,11 @@ export function Toolbar({
         <span className="parchment-toolbar-sep" aria-hidden="true" />
 
         <label className="parchment-toolbar-label" htmlFor="toolbar-line-height">
-          Line
+          <span className="sr-only">Line</span>
           <select
             id="toolbar-line-height"
             aria-label="Line height"
+            title="Line spacing"
             value={s.lineHeight ?? ''}
             onChange={(e) =>
               e.target.value === ''
@@ -807,10 +812,11 @@ export function Toolbar({
         <span className="parchment-toolbar-sep" aria-hidden="true" />
 
         <label className="parchment-toolbar-label" htmlFor="toolbar-letter-spacing">
-          Spacing
+          <span className="sr-only">Spacing</span>
           <select
             id="toolbar-letter-spacing"
             aria-label="Letter spacing"
+            title="Letter spacing"
             value={s.letterSpacing ?? ''}
             onChange={(e) =>
               e.target.value === ''

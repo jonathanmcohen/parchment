@@ -1,10 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, useTransition } from 'react'
 import type { ConnectionState } from '@/components/editor/StatusBar'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { renameDocumentAction } from '@/lib/docs/rename-action'
 import { buildRenameRequest } from '@/lib/docs/rename-request'
 import { type SaveStatus, saveTooltipKind } from '@/lib/docs/save-status'
 import { buildStarRequest } from '@/lib/docs/star-request'
@@ -39,34 +39,37 @@ function saveStatusKey(status: SaveStatus): 'saving' | 'saved' | null {
 }
 
 function InlineTitle({ docId, initialTitle }: { docId: string; initialTitle: string }) {
-  const router = useRouter()
+  const [, startTransition] = useTransition()
   const [title, setTitle] = useState(initialTitle)
   const lastSaved = useRef(initialTitle)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const commit = useCallback(() => {
-    const req = buildRenameRequest(docId, title, lastSaved.current)
+    const prev = lastSaved.current
+    const req = buildRenameRequest(docId, title, prev)
     if (!req) {
       // Empty or unchanged → revert any whitespace-only edit, persist nothing.
-      setTitle(lastSaved.current)
+      setTitle(prev)
       return
     }
-    lastSaved.current = req.body.title
-    setTitle(req.body.title)
-    // Title-only endpoint — never the body-PUT (I4 clobber guard).
-    void fetch(req.url, {
-      method: req.method,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(req.body),
-    }).then((res) => {
-      // I6: the rename route's revalidatePath busts the SERVER cache, but a
-      // route-handler call can't invalidate the CLIENT Router Cache — so a
-      // client-nav to /files (or the sidebar) showed the STALE title until a hard
-      // reload (live-verified: client-nav lagged the DB by one rename). router
-      // .refresh() clears the client Router Cache so the next navigation is fresh.
-      if (res.ok) router.refresh()
+    const nextTitle = req.body.title
+    lastSaved.current = nextTitle
+    setTitle(nextTitle)
+    // P3 (v0.1.7): rename via a Server Action — title-only, never the body-PUT,
+    // preserving the I4 clobber guard. A route-handler revalidatePath could only
+    // bust the SERVER cache and the prior router.refresh only refreshed THIS
+    // route, so a client-nav to /files showed the stale title. A Server Action's
+    // revalidatePath is streamed back in the action response, invalidating the
+    // CLIENT Router Cache for /files so the next navigation is fresh.
+    startTransition(async () => {
+      const res = await renameDocumentAction(docId, nextTitle)
+      if ('error' in res) {
+        // Server rejected — revert the optimistic title to the last good value.
+        lastSaved.current = prev
+        setTitle(prev)
+      }
     })
-  }, [docId, title, router])
+  }, [docId, title])
 
   return (
     <input

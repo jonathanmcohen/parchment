@@ -52,7 +52,14 @@ export function SessionsList() {
   }
 
   if (sessions.length === 0) {
-    return <p className="mt-4 text-[var(--muted)] text-sm">No active sessions.</p>
+    return (
+      <div className="mt-4 flex flex-col items-center gap-2 py-8 text-center text-[var(--muted)]">
+        <span aria-hidden className="material-symbols-rounded text-[24px]">
+          devices
+        </span>
+        <p className="text-sm">No active sessions.</p>
+      </div>
+    )
   }
 
   return (

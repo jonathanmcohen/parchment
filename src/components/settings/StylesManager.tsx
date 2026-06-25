@@ -113,7 +113,10 @@ export function StylesManager() {
   }
 
   return (
-    <section aria-labelledby="workspace-styles" className="mt-8">
+    <section
+      aria-labelledby="workspace-styles"
+      className="mt-12 border-t border-[var(--border)] pt-8"
+    >
       <h2 id="workspace-styles" className="font-medium text-lg">
         Styles
       </h2>

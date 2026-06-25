@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 /**
  * V2: Account → Profile display-name control.
@@ -25,6 +25,21 @@ export function AccountNameSetting({ initialName }: { initialName: string }) {
   const [saving, setSaving] = useState(false)
   const [savedTick, setSavedTick] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Auto-hide timer for the brief "Saved ✓" confirmation.
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Clear any pending auto-hide timer on unmount.
+  useEffect(
+    () => () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    },
+    [],
+  )
+
+  const clearSavedTick = () => {
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    setSavedTick(false)
+  }
 
   const save = async () => {
     const trimmed = name.trim()
@@ -36,7 +51,7 @@ export function AccountNameSetting({ initialName }: { initialName: string }) {
     if (trimmed === savedRef.current) return // nothing changed
 
     setSaving(true)
-    setSavedTick(false)
+    clearSavedTick()
     setError(null)
     try {
       const res = await fetch('/api/settings/profile', {
@@ -48,6 +63,8 @@ export function AccountNameSetting({ initialName }: { initialName: string }) {
       savedRef.current = trimmed
       setName(trimmed)
       setSavedTick(true)
+      // Auto-hide the "Saved ✓" confirmation after ~1.5s.
+      savedTimerRef.current = setTimeout(() => setSavedTick(false), 1500)
       router.refresh()
     } catch {
       setError('Could not save your name. Try again.')
@@ -70,7 +87,7 @@ export function AccountNameSetting({ initialName }: { initialName: string }) {
         disabled={saving}
         onChange={(e) => {
           setName(e.target.value)
-          setSavedTick(false)
+          clearSavedTick()
           setError(null)
         }}
         onBlur={save}
@@ -82,7 +99,18 @@ export function AccountNameSetting({ initialName }: { initialName: string }) {
         }}
         className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm disabled:opacity-60"
       />
-      {savedTick && !error && <p className="text-[var(--muted)] text-xs">Saved.</p>}
+      {savedTick && !error && (
+        <p
+          className="flex items-center gap-1 text-xs"
+          style={{ color: 'var(--success)' }}
+          aria-live="polite"
+        >
+          <span aria-hidden className="material-symbols-rounded text-[16px]">
+            check_circle
+          </span>
+          Saved
+        </p>
+      )}
       {error && (
         <p className="text-xs" style={{ color: 'var(--error)' }} role="alert">
           {error}

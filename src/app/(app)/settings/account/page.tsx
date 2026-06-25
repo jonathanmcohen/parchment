@@ -12,13 +12,13 @@ export default async function AccountSettingsPage() {
   const user = await requireUser()
 
   return (
-    <section className="max-w-2xl">
+    <section className="max-w-2xl px-4 sm:px-6 md:px-0">
       <h1 className="font-semibold text-2xl tracking-tight">Account</h1>
       <p className="mt-2 text-[var(--muted)]">
         Manage your personal profile, appearance, and language preferences.
       </p>
 
-      <section aria-labelledby="account-profile" className="mt-8">
+      <section aria-labelledby="account-profile" className="mt-10">
         <h2 id="account-profile" className="font-medium text-lg">
           Profile
         </h2>
@@ -49,7 +49,10 @@ export default async function AccountSettingsPage() {
         </div>
       </section>
 
-      <section aria-labelledby="account-theme" className="mt-8">
+      <section
+        aria-labelledby="account-theme"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="account-theme" className="font-medium text-lg">
           Theme
         </h2>
@@ -59,7 +62,10 @@ export default async function AccountSettingsPage() {
         <AccountThemeSelect />
       </section>
 
-      <section aria-labelledby="account-language" className="mt-8">
+      <section
+        aria-labelledby="account-language"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="account-language" className="font-medium text-lg">
           Language
         </h2>

@@ -3,13 +3,13 @@ import { WebhooksManager } from '@/components/settings/WebhooksManager'
 
 export default function DeveloperSettingsPage() {
   return (
-    <section className="max-w-2xl">
+    <section className="max-w-2xl px-4 sm:px-6 md:px-0">
       <h1 className="font-semibold text-2xl tracking-tight">Developer</h1>
       <p className="mt-2 text-[var(--muted)]">
         Programmatic access to your workspace for scripts and integrations.
       </p>
 
-      <section aria-labelledby="developer-tokens" className="mt-8">
+      <section aria-labelledby="developer-tokens" className="mt-10">
         <h2 id="developer-tokens" className="font-medium text-lg">
           Personal access tokens
         </h2>
@@ -21,7 +21,10 @@ export default function DeveloperSettingsPage() {
         <PATManager />
       </section>
 
-      <section aria-labelledby="developer-webhooks" className="mt-8">
+      <section
+        aria-labelledby="developer-webhooks"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="developer-webhooks" className="font-medium text-lg">
           Webhooks
         </h2>

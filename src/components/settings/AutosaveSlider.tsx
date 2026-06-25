@@ -25,8 +25,11 @@ export function AutosaveSlider() {
   const inputId = useId()
   const [ms, setMs] = useState(DEFAULT_AUTOSAVE_MS)
   const [saving, setSaving] = useState(false)
+  const [savedTick, setSavedTick] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Auto-hide timer for the brief "Saved ✓" confirmation.
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let active = true
@@ -41,6 +44,8 @@ export function AutosaveSlider() {
       })
     return () => {
       active = false
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
     }
   }, [])
 
@@ -48,6 +53,9 @@ export function AutosaveSlider() {
     const next = clampAutosaveMs(Number(e.target.value))
     setMs(next)
     setError(null)
+    // A new edit supersedes any showing "Saved ✓".
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    setSavedTick(false)
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
@@ -59,6 +67,10 @@ export function AutosaveSlider() {
           body: JSON.stringify({ ms: next }),
         })
         if (!res.ok) throw new Error('save failed')
+        setSavedTick(true)
+        // Auto-hide the "Saved ✓" confirmation after ~1.5s.
+        if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+        savedTimerRef.current = setTimeout(() => setSavedTick(false), 1500)
       } catch {
         setError('Could not save autosave interval. Try again.')
       } finally {
@@ -97,6 +109,18 @@ export function AutosaveSlider() {
         <span>5s</span>
         <span>5 min</span>
       </div>
+      {savedTick && !error && (
+        <p
+          className="flex items-center gap-1 text-xs"
+          style={{ color: 'var(--success)' }}
+          aria-live="polite"
+        >
+          <span aria-hidden className="material-symbols-rounded text-[16px]">
+            check_circle
+          </span>
+          Saved
+        </p>
+      )}
       {error && (
         <p className="text-sm" style={{ color: 'var(--error)' }} role="alert">
           {error}

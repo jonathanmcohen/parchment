@@ -2,10 +2,12 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  🛠  IN PROGRESS — v0.1.4. Per-item PRs onto release/v0.1.4.               ║
-║  Discipline: reproduce-first WITH EVIDENCE → fix + test → browser-verify   ║
-║  (light AND dark) → CI green → user redeploys → final live-confirm.        ║
-║  No item flips DONE without a browser/probe artifact. No "0 PARTIAL" claim.║
+║  ✅  ALL 7 MERGED to release/v0.1.4 (PRs #120–#126). CI green per PR.      ║
+║  Version 0.1.3→0.1.4. ⏳ tag v0.1.4 + multi-arch publish → USER redeploys  ║
+║  (PARCHMENT_VERSION=v0.1.4, SECURE_COOKIES=true, NODE_ENV=production) →     ║
+║  controller final live-confirm (each item, light AND dark, console clean). ║
+║  Per-item verification = RED→GREEN unit test OR live-browser mechanism      ║
+║  proof; the as-shipped live confirm is post-redeploy (v0.1.3 contract).    ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
 

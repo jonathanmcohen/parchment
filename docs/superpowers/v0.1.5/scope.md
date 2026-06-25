@@ -2,12 +2,14 @@
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  🛠  IN PROGRESS — v0.1.5. Per-item PRs onto release/v0.1.5.               ║
-║  User: "everything should be fixed in 0.1.5" → 6 reported + 3 polish tiers.║
-║  Discipline (carries v0.1.0–v0.1.4): reproduce-first WITH EVIDENCE → fix   ║
-║  + test → browser-verify (light AND dark) → CI green → user redeploys →    ║
-║  controller final live-confirm. No item DONE without a browser/probe       ║
-║  artifact. No "0 PARTIAL" claim. Name every PARTIAL.                       ║
+║  ✅ ALL 9 MERGED to release/v0.1.5 (PRs #127–#135). 6 reported + 3 tiers.  ║
+║  I1 toolbar · I2 code-block dark · I3 system theme · I4 paged mode ·        ║
+║  I5 About-in-settings · I6 rename-live · T1 dark sweep · T2 chrome · T3.    ║
+║  Version 0.1.4→0.1.5. ⏳ tag v0.1.5 + publish → USER redeploys → controller ║
+║  final per-item live-verify (light AND dark). Per-item evidence = RED→GREEN ║
+║  test OR live-browser mechanism proof; as-shipped live confirm post-deploy. ║
+║  PARTIAL: I4 = setting+sheet-edge VISUAL only (true content-pagination is a ║
+║  named follow-up — the editor is a continuous canvas by design).           ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
 

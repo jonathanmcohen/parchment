@@ -39,6 +39,7 @@ export type ReleaseNotes = {
 export const RELEASE_NOTES: ReleaseNotes = {
   version: APP_VERSION,
   highlights: [
+    'Editor + theme polish: full-width toolbar with a “⋯ More” overflow (no more horizontal scroll), legible code blocks in dark mode, a consistent System theme, a Paged layout option, About moved into Settings, instant title renames, and a broad dark-mode + UI polish sweep',
     'Reliability + polish: dark-mode slash/wiki/cite menus, Account name & language now save, password-change hardening, runtime collab URL, no editor hydration error, tighter editor top bar',
     'Live-deploy fixes + a full Google-Docs layout sweep (theme save, share links, settings, sidebar/status/editor spacing)',
     'Google Docs-style interface — full-width chrome, anchored outline, centered page, and a polished light/dark theme',

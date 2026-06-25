@@ -25,10 +25,7 @@ export function ParchmentLogo({
     >
       {title ? <title>{title}</title> : null}
       <rect x="2" y="2" width="96" height="96" rx="22" fill="#1A73E8" />
-      <path
-        d="M32 30 q0 -8 8 -8 h28 q-6 4 -6 12 v44 q0 8 -8 8 h-28 q6 -4 6 -12 Z"
-        fill="#ffffff"
-      />
+      <path d="M32 30 q0 -8 8 -8 h28 q-6 4 -6 12 v44 q0 8 -8 8 h-28 q6 -4 6 -12 Z" fill="#ffffff" />
       <path
         d="M62 22 q8 0 8 8 v40 q0 8 -8 8"
         fill="none"

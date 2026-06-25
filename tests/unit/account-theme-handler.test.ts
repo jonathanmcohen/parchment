@@ -82,3 +82,37 @@ describe('applyColorScheme — fetch this-binding (Illegal invocation regression
     expect(r.refresh).not.toHaveBeenCalled()
   })
 })
+
+// P8 (v0.1.7): a live observation suggested a SECOND theme change might not
+// apply. Investigation found the handler is correct — it has NO value-equality
+// guard or cached-state short-circuit, so every call fully persists + refreshes
+// (the observation was a synthetic-event/test-harness artifact, not a defect).
+// These tests lock that invariant in so a future "skip when unchanged"
+// optimization can't silently swallow a repeated change without updating them.
+describe('applyColorScheme — repeated/sequential changes each apply (P8)', () => {
+  it('PUTs + refreshes on EVERY call with no short-circuit (light→dark→light)', async () => {
+    const fetchMock = vi.fn(async () => okResponse()) as unknown as typeof fetch
+    const r = router()
+
+    let theme = await applyColorScheme(DEFAULT_THEME, 'light', { fetch: fetchMock, router: r })
+    theme = await applyColorScheme(theme, 'dark', { fetch: fetchMock, router: r })
+    theme = await applyColorScheme(theme, 'light', { fetch: fetchMock, router: r })
+
+    // No swallowed second/third change — each persisted and re-rendered.
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(r.refresh).toHaveBeenCalledTimes(3)
+    expect(theme.colorScheme).toBe('light')
+  })
+
+  it('does NOT short-circuit even when the chosen scheme equals the current one', async () => {
+    const fetchMock = vi.fn(async () => okResponse()) as unknown as typeof fetch
+    const r = router()
+
+    const dark: WorkspaceTheme = { ...DEFAULT_THEME, colorScheme: 'dark' }
+    await applyColorScheme(dark, 'dark', { fetch: fetchMock, router: r })
+    await applyColorScheme(dark, 'dark', { fetch: fetchMock, router: r })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(r.refresh).toHaveBeenCalledTimes(2)
+  })
+})

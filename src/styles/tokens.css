@@ -155,7 +155,11 @@
 
   --editor-gutter: #202124;
   --selection-bg: #394457;
-  --code-bg: #292a2d;
+  /* I2: code blocks live on the editor's always-white page sheet (F2), so
+     --code-bg stays the light neutral in every scheme — flipping it dark made a
+     dark code box with dark page-ink text on a white page = illegible. The
+     github-light Shiki tokens read correctly on this light surface. */
+  --code-bg: #f8f9fa;
   --highlight: #fef7c3;
   --star: #ffd180;
   --tooltip-bg: #202124;
@@ -205,7 +209,8 @@
 
     --editor-gutter: #202124;
     --selection-bg: #394457;
-    --code-bg: #292a2d;
+    /* I2: code-bg stays light under system-dark too (see the dark block). */
+    --code-bg: #f8f9fa;
     --highlight: #fef7c3;
     --star: #ffd180;
     --tooltip-bg: #202124;

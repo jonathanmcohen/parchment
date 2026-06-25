@@ -2340,9 +2340,10 @@ body {
 }
 .parchment-prose pre {
   /* C3/C4: Shiki token colours are applied via inline styles on individual spans.
-     --code-bg is a light neutral that complements all 6 bundled themes and is
-     already scheme-aware (light #F8F9FA / dark #292A2D via tokens.css), so the
-     former hard-coded dark override blocks are gone. */
+     I2: --code-bg is a light neutral in EVERY scheme — the code block sits on the
+     editor's always-white page sheet (F2), so it must stay light to be legible
+     (a dark code box on a white page was unreadable in dark mode). The
+     github-light Shiki tokens are tuned for exactly this light surface. */
   background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 0.4rem;

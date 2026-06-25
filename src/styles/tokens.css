@@ -90,6 +90,17 @@
   --success: #188038;
   --info: #1a73e8;
 
+  /* ── diff semantics (F5 VersionHistory) ───────────────────────────────────
+     The add/del/hunk line tints + text used by the version diff renderer.
+     Light values preserve the original Google-Docs-style greens/reds/blues;
+     the dark/system-dark blocks re-point them to dark-friendly variants. */
+  --diff-add: rgba(34, 197, 94, 0.15);
+  --diff-add-text: #166534;
+  --diff-del: rgba(239, 68, 68, 0.15);
+  --diff-del-text: #991b1b;
+  --diff-hunk: rgba(59, 130, 246, 0.08);
+  --diff-hunk-text: #1d4ed8;
+
   /* G3: workspace theme font pair (overridden by the app layout per-user).
      S4-1: the DOCUMENT body default is Arial (Google-Docs body face); chrome
      reads --font-ui (Roboto) so the two stay independent (see globals body rule). */
@@ -162,7 +173,9 @@
   --code-bg: #f8f9fa;
   --highlight: #fef7c3;
   --star: #ffd180;
-  --tooltip-bg: #202124;
+  /* Elevated above the dark page bg (#202124) so the tooltip stands out as a
+     raised surface rather than blending into the page (S5-2). */
+  --tooltip-bg: #3c4043;
 
   --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.6), 0 2px 6px 2px rgba(0, 0, 0, 0.3);
   --shadow-dropdown: 0 1px 3px rgba(0, 0, 0, 0.6), 0 4px 8px 3px rgba(0, 0, 0, 0.4);
@@ -174,6 +187,16 @@
   --warning: #fdd663;
   --success: #81c995;
   --info: #8ab4f8;
+
+  /* ── diff semantics (F5 VersionHistory) ───────────────────────────────────
+     Dark variants use the lighter, dark-friendly success/info family so the
+     diff add/del/hunk colors stay legible on the dark surface. */
+  --diff-add: color-mix(in srgb, var(--success) 22%, transparent);
+  --diff-add-text: #81c995;
+  --diff-del: color-mix(in srgb, var(--error) 22%, transparent);
+  --diff-del-text: #f28b82;
+  --diff-hunk: color-mix(in srgb, var(--info) 16%, transparent);
+  --diff-hunk-text: #8ab4f8;
 
   --page-bg: var(--paper);
 }
@@ -213,7 +236,8 @@
     --code-bg: #f8f9fa;
     --highlight: #fef7c3;
     --star: #ffd180;
-    --tooltip-bg: #202124;
+    /* Elevated above the dark page bg (#202124) — see the dark block above. */
+    --tooltip-bg: #3c4043;
 
     --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.6), 0 2px 6px 2px rgba(0, 0, 0, 0.3);
     --shadow-dropdown: 0 1px 3px rgba(0, 0, 0, 0.6), 0 4px 8px 3px rgba(0, 0, 0, 0.4);
@@ -225,6 +249,14 @@
     --warning: #fdd663;
     --success: #81c995;
     --info: #8ab4f8;
+
+    /* diff semantics (F5) — dark variants, mirror the dark block. */
+    --diff-add: color-mix(in srgb, var(--success) 22%, transparent);
+    --diff-add-text: #81c995;
+    --diff-del: color-mix(in srgb, var(--error) 22%, transparent);
+    --diff-del-text: #f28b82;
+    --diff-hunk: color-mix(in srgb, var(--info) 16%, transparent);
+    --diff-hunk-text: #8ab4f8;
 
     --page-bg: var(--paper);
   }

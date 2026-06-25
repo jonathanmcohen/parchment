@@ -82,10 +82,10 @@ export function MermaidView({ node, getPos, editor }: NodeViewProps) {
             padding: '2rem',
             textAlign: 'center',
             cursor: 'pointer',
-            border: '2px dashed #ccc',
+            border: '2px dashed var(--border)',
             borderRadius: '4px',
             background: 'none',
-            color: '#999',
+            color: 'var(--muted)',
           }}
         >
           Empty diagram — click to edit
@@ -97,11 +97,11 @@ export function MermaidView({ node, getPos, editor }: NodeViewProps) {
           onClick={handleClick}
           style={{
             padding: '1rem',
-            background: '#fff8f8',
-            border: '1px solid #fcc',
+            background: 'color-mix(in srgb, var(--error) 8%, transparent)',
+            border: '1px solid var(--error)',
             borderRadius: '4px',
             cursor: 'pointer',
-            color: '#c00',
+            color: 'var(--error)',
             fontFamily: 'monospace',
             fontSize: '0.85em',
             whiteSpace: 'pre-wrap',
@@ -123,10 +123,10 @@ export function MermaidView({ node, getPos, editor }: NodeViewProps) {
         <div
           style={{
             padding: '1rem',
-            background: '#f9f9f9',
-            border: '1px solid #eee',
+            background: 'var(--surface-muted)',
+            border: '1px solid var(--border)',
             borderRadius: '4px',
-            color: '#999',
+            color: 'var(--muted)',
             fontFamily: 'monospace',
             fontSize: '0.85em',
           }}

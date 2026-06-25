@@ -98,7 +98,7 @@ export function AutosaveSlider() {
         <span>5 min</span>
       </div>
       {error && (
-        <p className="text-sm" style={{ color: '#dc2626' }} role="alert">
+        <p className="text-sm" style={{ color: 'var(--error)' }} role="alert">
           {error}
         </p>
       )}

@@ -245,7 +245,7 @@ export function ShortcutsSettings() {
               <span className="text-sm">{b.label}</span>
               <span className="flex items-center gap-2">
                 {isConflicting && (
-                  <span className="text-xs" style={{ color: '#dc2626' }} role="alert">
+                  <span className="text-xs" style={{ color: 'var(--error)' }} role="alert">
                     conflict
                   </span>
                 )}
@@ -263,7 +263,7 @@ export function ShortcutsSettings() {
                   aria-label={`Change shortcut for ${b.label}`}
                   aria-pressed={isRecording}
                   className="min-w-[6rem] rounded-md border border-[var(--border)] px-2 py-1 font-mono text-sm hover:bg-[var(--background)]"
-                  style={isConflicting ? { borderColor: '#dc2626' } : undefined}
+                  style={isConflicting ? { borderColor: 'var(--error)' } : undefined}
                 >
                   {isRecording ? 'Press keys…' : formatCombo(combo, mac)}
                 </button>
@@ -283,7 +283,7 @@ export function ShortcutsSettings() {
       </ul>
 
       {hasConflict && (
-        <p className="mt-3 text-sm" style={{ color: '#dc2626' }} role="alert">
+        <p className="mt-3 text-sm" style={{ color: 'var(--error)' }} role="alert">
           Two actions share the same key. Resolve the conflict before saving for predictable
           behavior.
         </p>
@@ -299,7 +299,7 @@ export function ShortcutsSettings() {
           {saving ? 'Saving…' : 'Save shortcuts'}
         </button>
         {error && (
-          <span className="text-sm" style={{ color: '#dc2626' }} role="alert">
+          <span className="text-sm" style={{ color: 'var(--error)' }} role="alert">
             {error}
           </span>
         )}

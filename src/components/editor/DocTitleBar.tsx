@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useRef, useState } from 'react'
 import type { ConnectionState } from '@/components/editor/StatusBar'
@@ -38,6 +39,7 @@ function saveStatusKey(status: SaveStatus): 'saving' | 'saved' | null {
 }
 
 function InlineTitle({ docId, initialTitle }: { docId: string; initialTitle: string }) {
+  const router = useRouter()
   const [title, setTitle] = useState(initialTitle)
   const lastSaved = useRef(initialTitle)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -56,8 +58,15 @@ function InlineTitle({ docId, initialTitle }: { docId: string; initialTitle: str
       method: req.method,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(req.body),
+    }).then((res) => {
+      // I6: the rename route's revalidatePath busts the SERVER cache, but a
+      // route-handler call can't invalidate the CLIENT Router Cache — so a
+      // client-nav to /files (or the sidebar) showed the STALE title until a hard
+      // reload (live-verified: client-nav lagged the DB by one rename). router
+      // .refresh() clears the client Router Cache so the next navigation is fresh.
+      if (res.ok) router.refresh()
     })
-  }, [docId, title])
+  }, [docId, title, router])
 
   return (
     <input

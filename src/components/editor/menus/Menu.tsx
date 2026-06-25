@@ -136,6 +136,7 @@ export function Menu({
   triggerClassName = 'parchment-menubar-item',
   triggerContent,
   triggerAriaLabel,
+  align = 'start',
 }: {
   label: string
   items: MenuItemConfig[]
@@ -145,6 +146,12 @@ export function Menu({
   triggerContent?: React.ReactNode
   /** aria-label when the trigger content is an icon, not text. */
   triggerAriaLabel?: string
+  /**
+   * Panel anchoring. 'start' (default) left-anchors the dropdown to the
+   * trigger; 'end' right-anchors it (grows leftward) so a trigger pinned to
+   * the far-right toolbar edge does not overflow the viewport (P2/v0.1.7).
+   */
+  align?: 'start' | 'end'
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -186,7 +193,7 @@ export function Menu({
           id={menuId}
           role="menu"
           aria-label={label}
-          className="px-menu parchment-menu-dropdown"
+          className={`px-menu parchment-menu-dropdown${align === 'end' ? ' parchment-menu-dropdown-end' : ''}`}
         >
           <MenuRows items={items} close={close} />
         </div>

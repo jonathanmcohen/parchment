@@ -1339,6 +1339,7 @@ export function Toolbar({
           <Menu
             label="More"
             items={overflowItems}
+            align="end"
             triggerClassName="parchment-toolbar-btn parchment-toolbar-overflow parchment-toolbar-overflow-btn"
             triggerAriaLabel="More tools"
             triggerContent={
@@ -1356,6 +1357,7 @@ export function Toolbar({
           pushes it to the right edge (after the overflow ⋯ when present). */}
         <Menu
           label={modeLabel}
+          align="end"
           triggerClassName="parchment-toolbar-btn parchment-toolbar-mode"
           triggerAriaLabel={`Editing mode: ${modeLabel}`}
           triggerContent={

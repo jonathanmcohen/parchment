@@ -604,6 +604,14 @@ body {
   inset-inline-start: 0;
   top: calc(100% + 4px);
 }
+/* P2 (v0.1.7): right-anchor variant for triggers pinned to the far-right
+   toolbar edge (the ⋯ overflow + Editing-mode menus). Anchoring the panel's
+   right edge to the trigger lets it grow leftward instead of overflowing the
+   viewport. Opt-in via Menu's align="end" — the menu-bar menus stay start. */
+.parchment-menu-dropdown-end {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+}
 .px-menu-item {
   display: flex;
   align-items: center;
@@ -2558,6 +2566,15 @@ body {
   color: var(--accent);
   border-color: var(--accent);
 }
+/* P6 (v0.1.7): destructive accent for the delete-code-block button so it reads
+   as dangerous. Defined after the shared hover so it wins on the .parchment-cb-btn
+   base it also carries. */
+.parchment-cb-delete:hover,
+.parchment-cb-delete:focus-visible {
+  background: color-mix(in srgb, var(--error) 14%, transparent);
+  border-color: color-mix(in srgb, var(--error) 45%, transparent);
+  color: var(--error);
+}
 
 /* Inner <pre> — reset border/radius since wrapper owns chrome. --code-bg is
    scheme-aware (light/dark via tokens.css) so no per-scheme override is needed. */
@@ -3103,6 +3120,14 @@ body {
   font-size: 0.68rem;
   color: var(--muted);
   letter-spacing: 0.04em;
+}
+
+/* P5 (v0.1.7): on the hover (--surface-hover) and active (--primary-surface)
+   row backgrounds the --muted category subtext drops to ~4:1 small text.
+   Brighten it toward the row ink so it clears AA in every reachable state. */
+.parchment-slash-item:hover .parchment-slash-item-category,
+.parchment-slash-item-active .parchment-slash-item-category {
+  color: color-mix(in srgb, var(--muted) 45%, var(--foreground));
 }
 
 .parchment-slash-empty {

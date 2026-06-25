@@ -21,7 +21,7 @@ import { useCallback, useRef, useState } from 'react'
  * diff colours) continues to apply inside NodeViewContent — the NodeView just
  * wraps the ProseMirror-managed <code> element.
  */
-export function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
+export function CodeBlockView({ node, updateAttributes, deleteNode }: NodeViewProps) {
   const attrs = node.attrs as {
     language?: string | null
     theme?: string
@@ -69,6 +69,12 @@ export function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
     },
     [updateAttributes],
   )
+
+  // P6 (v0.1.7): remove this code block. deleteNode() (from NodeViewProps) is
+  // bound to THIS node, so no getPos math is needed; editor undo restores it.
+  const handleDelete = useCallback(() => {
+    deleteNode()
+  }, [deleteNode])
 
   return (
     <NodeViewWrapper
@@ -136,6 +142,17 @@ export function CodeBlockView({ node, updateAttributes }: NodeViewProps) {
             onClick={handleCollapseToggle}
           >
             {collapsed ? '▶' : '▼'}
+          </button>
+
+          {/* Delete code block (P6/v0.1.7) — removes this node; undo restores it. */}
+          <button
+            type="button"
+            className="parchment-cb-delete parchment-cb-btn"
+            aria-label="Delete code block"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleDelete}
+          >
+            ✕
           </button>
         </div>
       </div>

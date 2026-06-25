@@ -118,6 +118,8 @@ type Props = {
   spellcheckEnabled?: boolean
   /** K7: true when LANGUAGETOOL_URL is configured server-side. Never derived client-side. */
   grammarEnabled?: boolean
+  /** v0.1.5: workspace page-layout mode — drives the sheet-edge boundary visual. */
+  pageLayoutMode?: 'continuous' | 'paged'
 }
 
 const FIELD = 'default'
@@ -140,6 +142,7 @@ export function Editor({
   autosaveIntervalMs = 30_000,
   spellcheckEnabled = true,
   grammarEnabled = false,
+  pageLayoutMode = 'continuous',
 }: Props) {
   // The Y.Doc is created empty — we do NOT eagerly seed it here (D4). Seeding is
   // gated on `hasCollabState` (a server-rendered fact, not a live fragment check)
@@ -1594,6 +1597,7 @@ export function Editor({
                 onPageCountChange={setPageCount}
                 editor={editor}
                 watermark={watermark}
+                pageLayoutMode={pageLayoutMode}
               >
                 <EditorContent editor={editor} />
               </PageCanvas>

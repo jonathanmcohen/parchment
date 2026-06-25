@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server'
 import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher'
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
 import { AutosaveSlider } from '@/components/settings/AutosaveSlider'
+import { PageLayoutSetting } from '@/components/settings/PageLayoutSetting'
 import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { SpellingSettings } from '@/components/settings/SpellingSettings'
 import { StylesManager } from '@/components/settings/StylesManager'
@@ -37,6 +38,18 @@ export default async function WorkspaceSettingsPage() {
           How often a version snapshot is saved while you are editing.
         </p>
         <AutosaveSlider />
+      </section>
+
+      <section aria-labelledby="workspace-page-layout" className="mt-8">
+        <h2 id="workspace-page-layout" className="font-medium text-lg">
+          Page layout
+        </h2>
+        <p className="mt-1 text-[var(--muted)] text-sm">
+          How page breaks are shown in the editor. Continuous flows as one sheet; Paged renders
+          stronger sheet edges between pages.
+        </p>
+        {/* v0.1.5: real, wired control (GET/PUT /api/settings/page-layout). */}
+        <PageLayoutSetting />
       </section>
 
       <section aria-labelledby="workspace-language" className="mt-8">

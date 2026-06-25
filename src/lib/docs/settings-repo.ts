@@ -27,6 +27,14 @@ export const DOC_STYLES_KEY = 'docStyles'
 export const SPELLCHECK_KEY = 'spellcheckEnabled'
 export const DEFAULT_SPELLCHECK_ENABLED = true
 
+// v0.1.5: workspace page-layout mode — Continuous (default) vs Paged. Drives a
+// stronger "sheet-edge" boundary visual in the editor. Reuses this generic
+// settings store under a new KEY; no DB migration. We NEVER trust an arbitrary
+// stored string — only the exact literal 'paged' is honoured, everything else
+// (including malformed/legacy values) falls back to 'continuous'.
+export const PAGE_LAYOUT_MODE_KEY = 'pageLayoutMode'
+export type PageLayoutMode = 'continuous' | 'paged'
+
 // F7: workspace display name. Reuses this generic settings store under a new
 // KEY — no DB migration. Constants + the pure normalize helper live in the
 // client-safe split so the route and the client island share one source.
@@ -104,6 +112,19 @@ export async function getAutosaveInterval(ownerId: string): Promise<number> {
 export async function setAutosaveInterval(ownerId: string, ms: number): Promise<void> {
   const clamped = clampAutosaveMs(ms)
   await setSetting(ownerId, AUTOSAVE_INTERVAL_KEY, clamped)
+}
+
+/** Read the owner's page-layout mode (validated; 'continuous' unless stored value is exactly 'paged'). */
+export async function getPageLayoutMode(ownerId: string): Promise<PageLayoutMode> {
+  const raw = await getSetting<unknown>(ownerId, PAGE_LAYOUT_MODE_KEY, 'continuous')
+  return raw === 'paged' ? 'paged' : 'continuous'
+}
+
+/** Persist the owner's page-layout mode (coerced to 'paged' or 'continuous'). Returns the normalized value. */
+export async function setPageLayoutMode(ownerId: string, mode: unknown): Promise<PageLayoutMode> {
+  const normalized: PageLayoutMode = mode === 'paged' ? 'paged' : 'continuous'
+  await setSetting(ownerId, PAGE_LAYOUT_MODE_KEY, normalized)
+  return normalized
 }
 
 /** Read the owner's native-spellcheck preference (default ON). */

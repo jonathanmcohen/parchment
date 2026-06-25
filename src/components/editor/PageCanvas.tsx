@@ -32,6 +32,8 @@ type Props = {
   editor?: Editor | null
   /** G9: doc-level watermark default. Per-section overrides take precedence when set. */
   watermark?: WatermarkConfig
+  /** v0.1.5: workspace page-layout mode — 'paged' renders stronger sheet-edge boundaries. */
+  pageLayoutMode?: 'continuous' | 'paged'
 }
 
 /** Doc-level info extracted from the editor state. */
@@ -82,6 +84,7 @@ export function PageCanvas({
   onPageCountChange,
   editor,
   watermark = DEFAULT_WATERMARK,
+  pageLayoutMode = 'continuous',
 }: Props) {
   const { widthPx, heightPx } = resolvePageDims(pageSetup)
   const { margins } = pageSetup
@@ -222,6 +225,7 @@ export function PageCanvas({
         paddingLeft: margins.left,
       }}
       className="parchment-page mx-auto"
+      data-page-layout={pageLayoutMode}
     >
       {/* Page-boundary overlays — decorative, aria-hidden */}
       {allBreaks.map((offset, i) => {

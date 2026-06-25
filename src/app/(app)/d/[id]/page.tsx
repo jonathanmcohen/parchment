@@ -3,7 +3,11 @@ import { Editor } from '@/components/editor/Editor'
 import { isAiEnabled } from '@/lib/ai/compose'
 import { requireUser } from '@/lib/auth/guard'
 import { getDocument, hasCollabState } from '@/lib/docs/repo'
-import { getAutosaveInterval, getSpellcheckEnabled } from '@/lib/docs/settings-repo'
+import {
+  getAutosaveInterval,
+  getPageLayoutMode,
+  getSpellcheckEnabled,
+} from '@/lib/docs/settings-repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
 import { parseWatermark } from '@/lib/editor/watermark'
 import { isLanguageToolEnabled } from '@/lib/integrations/languagetool'
@@ -37,6 +41,10 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
   // K6: the owner's native-spellcheck preference (default ON).
   const spellcheckEnabled = await getSpellcheckEnabled(user.id)
 
+  // v0.1.5: the owner's page-layout mode (default 'continuous'); drives the
+  // stronger sheet-edge boundary visual in Paged mode.
+  const pageLayoutMode = await getPageLayoutMode(user.id)
+
   // K7: grammar check is off by default — only enabled when LANGUAGETOOL_URL is
   // configured. Computed server-side so the client never reads the env / key.
   const grammarEnabled = isLanguageToolEnabled()
@@ -56,6 +64,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
       autosaveIntervalMs={autosaveIntervalMs}
       spellcheckEnabled={spellcheckEnabled}
       grammarEnabled={grammarEnabled}
+      pageLayoutMode={pageLayoutMode}
     />
   )
 }

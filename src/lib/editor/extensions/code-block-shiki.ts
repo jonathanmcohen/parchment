@@ -40,7 +40,7 @@
 
 import { CodeBlock } from '@tiptap/extension-code-block'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import type { EditorState } from '@tiptap/pm/state'
+import type { EditorState, Transaction } from '@tiptap/pm/state'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
@@ -48,6 +48,7 @@ import { ReactNodeViewRenderer } from '@tiptap/react'
 import type { BundledLanguage, BundledTheme } from 'shiki'
 import { CodeBlockView } from '@/components/editor/CodeBlockView'
 import { diffLineKind, parseLineRanges } from '@/lib/editor/code-block-lines'
+import { detectLanguage, MIN_CODE_CHARS } from '@/lib/editor/shiki/auto-detect'
 import type { ShikiTheme } from '@/lib/editor/shiki/highlighter'
 import {
   DEFAULT_THEME,
@@ -305,6 +306,141 @@ function _initHighlighter(view: EditorView | null): Promise<void> {
   })
 }
 
+// ── Auto-detect driver (P4) ──────────────────────────────────────────────────
+
+/**
+ * A half-open range [from, to) in document positions.
+ */
+export interface ChangedRange {
+  from: number
+  to: number
+}
+
+/**
+ * A codeBlock node eligible for language auto-detection.
+ */
+export interface AutoDetectTarget {
+  /** Document position of the codeBlock node (points at its opening token). */
+  pos: number
+  /** The node's text content. */
+  text: string
+}
+
+/** Debounce window (ms) before running auto-detection after the last edit. */
+const AUTO_DETECT_DEBOUNCE_MS = 400
+
+/**
+ * Pure candidate-selection logic (P4 / churn-safety).
+ *
+ * Walks `doc` and returns every codeBlock node that:
+ *   1. has `language` === null/undefined (i.e. "undetected/auto" — NOT an
+ *      explicit choice, including not an explicit 'plaintext'), AND
+ *   2. overlaps at least one of `changedRanges` (i.e. THIS transaction touched
+ *      its text).
+ *
+ * Blocks loaded from disk and never edited produce no changed ranges, so they
+ * are NEVER returned — that is the disk-mirror churn-safety guarantee. Blocks
+ * with a concrete language are skipped so we never re-label an explicit choice.
+ *
+ * Ranges are expressed in the coordinate space of `doc` (i.e. the NEW doc after
+ * the transaction, mapped through the step maps).
+ */
+export function collectAutoDetectTargets(
+  doc: PMNode,
+  changedRanges: readonly ChangedRange[],
+): AutoDetectTarget[] {
+  if (changedRanges.length === 0) return []
+
+  const targets: AutoDetectTarget[] = []
+
+  doc.descendants((node: PMNode, pos: number) => {
+    if (node.type.name !== 'codeBlock') return true
+
+    const lang = (node.attrs as Record<string, unknown>).language
+    // Only auto-detect "undetected" blocks. A concrete string (incl. 'plaintext')
+    // means the user made an explicit choice — leave it alone.
+    if (lang !== null && lang !== undefined) return false
+
+    // Node occupies [pos, pos + nodeSize) in doc positions.
+    const nodeFrom = pos
+    const nodeTo = pos + node.nodeSize
+    const touched = changedRanges.some((range) => range.from < nodeTo && range.to > nodeFrom)
+    if (touched) {
+      targets.push({ pos, text: node.textContent })
+    }
+    // Code blocks don't contain other code blocks — no need to descend.
+    return false
+  })
+
+  return targets
+}
+
+/**
+ * Collect the ranges in the NEW document that a transaction changed, by walking
+ * its step maps. Each map's `forEach` yields (oldStart, oldEnd, newStart, newEnd);
+ * we keep the NEW-doc range [newStart, newEnd). To express every range in the
+ * final document's coordinate space we map each new range forward through the
+ * remaining step maps.
+ */
+function changedRangesFromTransaction(tr: Transaction): ChangedRange[] {
+  const ranges: ChangedRange[] = []
+  const maps = tr.mapping.maps
+  for (let i = 0; i < maps.length; i++) {
+    const map = maps[i]
+    if (map === undefined) continue
+    map.forEach((_oldStart, _oldEnd, newStart, newEnd) => {
+      // Map this new range forward through the steps that came after step i so
+      // it lands in the final doc's coordinate space.
+      const slice = tr.mapping.slice(i + 1)
+      ranges.push({ from: slice.map(newStart, -1), to: slice.map(newEnd, 1) })
+    })
+  }
+  return ranges
+}
+
+/**
+ * Run one auto-detection pass over the current view's doc, restricted to the
+ * given candidate targets. For each candidate with >= MIN_CODE_CHARS non-space
+ * chars whose detectLanguage returns a CONCRETE language (not 'plaintext'),
+ * dispatch ONE transaction setting the `language` attr. The transaction is
+ * marked `addToHistory: false` and `autoDetect: true`, and re-validates each
+ * candidate against the live doc (positions may have shifted, the block may have
+ * been deleted, or the user may have set a language in the meantime).
+ */
+function runAutoDetect(view: EditorView, targets: readonly AutoDetectTarget[]): void {
+  if (view.isDestroyed || targets.length === 0) return
+
+  const { state } = view
+  let tr = state.tr
+  let changed = false
+
+  for (const target of targets) {
+    const nonSpace = target.text.replace(/\s/g, '')
+    if (nonSpace.length < MIN_CODE_CHARS) continue
+
+    // Re-validate the node still exists at this position, is a codeBlock, still
+    // has null language, and still holds the text we detected against.
+    const node = state.doc.nodeAt(target.pos)
+    if (node === null || node.type.name !== 'codeBlock') continue
+    const lang = (node.attrs as Record<string, unknown>).language
+    if (lang !== null && lang !== undefined) continue
+    if (node.textContent !== target.text) continue
+
+    const detected = detectLanguage(target.text)
+    // Never persist 'plaintext' from auto-detection — leave null so a later edit
+    // retries detection once there's more signal.
+    if (detected.language === 'plaintext') continue
+
+    tr = tr.setNodeAttribute(target.pos, 'language', detected.language)
+    changed = true
+  }
+
+  if (!changed || view.isDestroyed) return
+  tr.setMeta('addToHistory', false)
+  tr.setMeta('autoDetect', true)
+  view.dispatch(tr)
+}
+
 // ── ProseMirror plugin ─────────────────────────────────────────────────────
 
 function makeShikiPlugin(): Plugin<DecorationSet> {
@@ -317,6 +453,15 @@ function makeShikiPlugin(): Plugin<DecorationSet> {
       },
 
       apply(tr, old, _oldState, newState) {
+        // P4: feed the debounced auto-detect driver. Only react to genuine doc
+        // edits (skip our own marker transactions to avoid a detect→detect loop).
+        if (tr.docChanged && tr.getMeta('autoDetect') !== true) {
+          const ranges = changedRangesFromTransaction(tr)
+          const candidates = collectAutoDetectTargets(newState.doc, ranges)
+          if (candidates.length > 0) {
+            _autoDetectDriver?.enqueue(candidates)
+          }
+        }
         if (!tr.docChanged && tr.getMeta('shikiReady') === undefined) {
           return old
         }
@@ -333,8 +478,11 @@ function makeShikiPlugin(): Plugin<DecorationSet> {
     view(editorView) {
       _currentView = editorView
       void _initHighlighter(editorView)
+      _autoDetectDriver = createAutoDetectDriver(editorView)
       return {
         destroy() {
+          _autoDetectDriver?.destroy()
+          _autoDetectDriver = null
           _currentView = null
         },
       }
@@ -343,6 +491,58 @@ function makeShikiPlugin(): Plugin<DecorationSet> {
 }
 
 let _currentView: EditorView | null = null
+
+// ── Debounced auto-detect driver (P4) ────────────────────────────────────────
+
+interface AutoDetectDriver {
+  /** Queue candidate code blocks and (re)arm the debounce timer. */
+  enqueue(candidates: readonly AutoDetectTarget[]): void
+  destroy(): void
+}
+
+let _autoDetectDriver: AutoDetectDriver | null = null
+
+/**
+ * Build the debounced driver bound to a single EditorView. Candidates are
+ * coalesced by node position; the actual text is re-read from the live doc when
+ * the timer fires, so positions/edits that landed during the debounce window are
+ * validated by runAutoDetect. The timer is cleared on view destroy.
+ */
+function createAutoDetectDriver(view: EditorView): AutoDetectDriver {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  // Coalesce by position; text is re-derived at fire time from the live doc.
+  let pendingPositions = new Set<number>()
+
+  const fire = (): void => {
+    timer = null
+    const positions = pendingPositions
+    pendingPositions = new Set()
+    if (view.isDestroyed || positions.size === 0) return
+    const targets: AutoDetectTarget[] = []
+    for (const pos of positions) {
+      const node = view.state.doc.nodeAt(pos)
+      if (node !== null && node.type.name === 'codeBlock') {
+        targets.push({ pos, text: node.textContent })
+      }
+    }
+    runAutoDetect(view, targets)
+  }
+
+  return {
+    enqueue(candidates) {
+      for (const c of candidates) pendingPositions.add(c.pos)
+      if (timer !== null) clearTimeout(timer)
+      timer = setTimeout(fire, AUTO_DETECT_DEBOUNCE_MS)
+    },
+    destroy() {
+      if (timer !== null) {
+        clearTimeout(timer)
+        timer = null
+      }
+      pendingPositions = new Set()
+    },
+  }
+}
 
 // ── Tiptap extension ────────────────────────────────────────────────────────
 

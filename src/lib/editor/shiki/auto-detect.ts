@@ -24,8 +24,12 @@ export interface Detection {
 /** Minimum hljs relevance score to accept a detection (below → plaintext). */
 const CONFIDENCE_THRESHOLD = 5
 
-/** Minimum non-space characters required to attempt detection. */
-const MIN_CODE_CHARS = 12
+/**
+ * Minimum non-space characters required to attempt detection.
+ * Exported so the auto-detect plugin driver can apply the same gate before
+ * paying the cost of an hljs pass.
+ */
+export const MIN_CODE_CHARS = 12
 
 /**
  * hljs language ids to include in highlightAuto's subset.

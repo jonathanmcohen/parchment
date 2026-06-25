@@ -7,7 +7,6 @@ import { Menu, type MenuItemConfig } from '@/components/editor/menus/Menu'
 import { StylesMenu } from '@/components/editor/StylesMenu'
 import { TableControls } from '@/components/editor/TableControls'
 import { VoiceButton } from '@/components/editor/VoiceButton'
-import { detectLanguage, getActiveCodeBlockText } from '@/lib/editor/shiki/auto-detect'
 import { TOP_LANGUAGES } from '@/lib/editor/shiki/languages'
 import { partitionControls } from '@/lib/editor/toolbar-overflow'
 import { stepFontSize } from '@/lib/editor/toolbar-size'
@@ -844,17 +843,17 @@ export function Toolbar({
               <select
                 id="toolbar-code-language"
                 aria-label="Code block language"
-                value={s.codeLanguage ?? ''}
+                // P4: an undetected (null/undefined) block displays "Auto-detect".
+                // A concrete string (incl. '' → Plaintext) is an explicit choice.
+                value={s.codeLanguage ?? AUTO_DETECT_VALUE}
                 onChange={(e) => {
                   const chosen = e.target.value
-                  if (chosen === AUTO_DETECT_VALUE) {
-                    // Read active code block text and detect its language.
-                    const text = getActiveCodeBlockText(editor) ?? ''
-                    const { language } = detectLanguage(text)
-                    editor.chain().focus().updateAttributes('codeBlock', { language }).run()
-                  } else {
-                    editor.chain().focus().updateAttributes('codeBlock', { language: chosen }).run()
-                  }
+                  // Choosing "Auto-detect" clears the language back to null so the
+                  // plugin's debounced driver re-detects on the next edit. Any other
+                  // value (incl. 'Plaintext' → '') is an explicit choice that
+                  // disables auto-detection. Detection lives ONLY in the plugin.
+                  const language = chosen === AUTO_DETECT_VALUE ? null : chosen
+                  editor.chain().focus().updateAttributes('codeBlock', { language }).run()
                 }}
                 className="parchment-toolbar-select"
               >

@@ -73,6 +73,15 @@ function renderChildren(nodes: PMNode[] | undefined): ReactNode[] {
   return (nodes ?? []).map((n, i) => renderNode(n, i))
 }
 
+// P7 (v0.1.7): the HTML export pre-pass annotates codeBlock nodes with a
+// pre-built, escaped + hex-color-validated `__exportHtml` string, which the
+// codeBlock branches emit via dangerouslySetInnerHTML. ONLY the HTML export may
+// do that — every other consumer (the PUBLIC ShareViewer, Reading/Presenter/
+// Print/epub views) must keep render-pm's "never emit raw HTML" guarantee, in
+// case a crafted/stored doc ever carries a forged __exportHtml attr.
+// renderReadOnlyDoc flips this true only when called with `exportHighlight`.
+let allowExportHtml = false
+
 function renderNode(node: PMNode, key: number): ReactNode {
   if (node.type === 'text') {
     return applyMarks(node.text ?? '', node.marks, key)
@@ -109,12 +118,29 @@ function renderNode(node: PMNode, key: number): ReactNode {
       )
     case 'blockquote':
       return <blockquote key={key}>{children}</blockquote>
-    case 'codeBlock':
+    case 'codeBlock': {
+      // If the HTML export pre-pass set __exportHtml, use it (dangerouslySetInnerHTML
+      // is safe here: the content is built by us from Shiki tokens with escaped text
+      // and regex-validated hex colors — never from raw user HTML). The public viewer
+      // never sets __exportHtml so this branch is unreachable in the share viewer.
+      const exportHtml =
+        typeof node.attrs?.__exportHtml === 'string' && node.attrs.__exportHtml.length > 0
+          ? node.attrs.__exportHtml
+          : null
+      if (allowExportHtml && exportHtml !== null) {
+        return (
+          <pre key={key}>
+            {/* biome-ignore lint/security/noDangerouslySetInnerHtml: content is self-built from Shiki tokens (escaped text + validated #rrggbb hex colors), never from user HTML */}
+            <code dangerouslySetInnerHTML={{ __html: exportHtml }} />
+          </pre>
+        )
+      }
       return (
         <pre key={key}>
           <code>{children}</code>
         </pre>
       )
+    }
     case 'horizontalRule':
     case 'pageBreak':
       return <hr key={key} />
@@ -448,12 +474,27 @@ function renderNodeWithCites(
       )
     case 'blockquote':
       return <blockquote key={key}>{children}</blockquote>
-    case 'codeBlock':
+    case 'codeBlock': {
+      // Same sentinel gate as in renderNode: __exportHtml is set by the HTML export
+      // pre-pass only; the public share viewer never sets it, so this is XSS-safe.
+      const exportHtml =
+        typeof node.attrs?.__exportHtml === 'string' && node.attrs.__exportHtml.length > 0
+          ? node.attrs.__exportHtml
+          : null
+      if (allowExportHtml && exportHtml !== null) {
+        return (
+          <pre key={key}>
+            {/* biome-ignore lint/security/noDangerouslySetInnerHtml: content is self-built from Shiki tokens (escaped text + validated #rrggbb hex colors), never from user HTML */}
+            <code dangerouslySetInnerHTML={{ __html: exportHtml }} />
+          </pre>
+        )
+      }
       return (
         <pre key={key}>
           <code>{children}</code>
         </pre>
       )
+    }
     // G16: speakerNote — NEVER rendered in the public/reading/share view.
     // Notes are author-only; returning null here ensures they never leak.
     case 'speakerNote':
@@ -480,8 +521,23 @@ function renderChildrenWithCites(
 
 /** Render a ProseMirror `doc` JSON value to read-only React nodes. Accepts the
  *  raw `contentJson` from the API (unknown); a null/invalid value renders an
- *  empty doc. NEVER throws and NEVER emits raw HTML. */
-export function renderReadOnlyDoc(content: unknown): ReactNode {
+ *  empty doc. NEVER throws. Emits raw HTML for code blocks ONLY when called with
+ *  `exportHighlight: true` (the HTML export, which pre-builds escaped + hex-
+ *  validated token spans); every other caller (public ShareViewer, reading,
+ *  presenter, print, epub) omits it and stays raw-HTML-free. */
+export function renderReadOnlyDoc(
+  content: unknown,
+  options?: { exportHighlight?: boolean },
+): ReactNode {
+  allowExportHtml = options?.exportHighlight === true
+  try {
+    return renderReadOnlyDocInner(content)
+  } finally {
+    allowExportHtml = false
+  }
+}
+
+function renderReadOnlyDocInner(content: unknown): ReactNode {
   if (!content || typeof content !== 'object') {
     return <p className="parchment-share-empty">This document is empty.</p>
   }

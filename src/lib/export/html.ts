@@ -10,12 +10,54 @@ import { renderReadOnlyDoc } from '@/components/share/render-pm'
 // imports react-dom/server"). The dynamic import keeps it out of the static graph.
 // (The unit gate doesn't run the Next bundler, so only `pnpm build` surfaced this.)
 
-function escapeHtml(s: string): string {
+// Similarly, getHighlighter / ensureLanguage are dynamically imported inside
+// docToStandaloneHtml. The Shiki highlighter.ts module uses a singleton that
+// needs `shiki` (a server-only library) and having it in the static import
+// graph of this module could create bundler issues with Turbopack.
+
+/** Validated color regex: only allow CSS hex colors (#rgb, #rrggbb, #rrggbbaa) */
+const SAFE_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/
+
+/**
+ * Escape a string for safe HTML text content.
+ * Escapes & < > " '
+ */
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * Convert Shiki token lines to an HTML string for use in dangerouslySetInnerHTML.
+ * Each token's color is validated against /^#[0-9a-fA-F]{3,8}$/ before inlining.
+ * If the color fails validation, the text is emitted as escaped text with no style span.
+ * Lines are joined with '\n'.
+ * This is a pure function suitable for unit testing.
+ */
+export function tokensToExportHtml(
+  lines: { content: string; color?: string | undefined }[][],
+): string {
+  return lines
+    .map((line) =>
+      line
+        .map((token) => {
+          const escaped = escapeHtml(token.content)
+          if (
+            token.color !== undefined &&
+            token.color !== null &&
+            SAFE_COLOR_RE.test(token.color)
+          ) {
+            return `<span style="color:${token.color}">${escaped}</span>`
+          }
+          return escaped
+        })
+        .join(''),
+    )
+    .join('\n')
 }
 
 type PMNode = {
@@ -177,14 +219,103 @@ sup { vertical-align: super; font-size: 0.75em; }
 sub { vertical-align: sub;   font-size: 0.75em; }
 `.trim()
 
+/**
+ * Walk a PM doc and annotate codeBlock nodes with syntax-highlighted HTML via
+ * Shiki. Returns a new doc with each highlightable codeBlock's attrs augmented
+ * with `__exportHtml` (the pre-built inner HTML string). Nodes with unsupported
+ * or plaintext languages are left unchanged.
+ *
+ * This is intentionally wrapped in try/catch at the call site — any failure
+ * falls back to the unmodified doc (plaintext rendering).
+ */
+async function annotateCodeBlocksWithShiki(
+  node: PMNode,
+  hl: import('shiki').Highlighter,
+  ensureLanguage: (lang: string) => Promise<boolean>,
+  normalizeLang: (lang: string | null | undefined) => string,
+  isSupportedLanguage: (lang: string) => boolean,
+  theme: string,
+): Promise<PMNode> {
+  if (node.type === 'codeBlock') {
+    // Defense-in-depth: never trust a pre-existing __exportHtml from stored
+    // content — strip it, then set our own only for blocks we actually
+    // highlight. (render-pm additionally gates this attr behind export mode, so
+    // a forged value can never reach the public viewer either way.)
+    const safeAttrs: Record<string, unknown> = { ...(node.attrs ?? {}) }
+    delete safeAttrs.__exportHtml
+    const baseNode: PMNode = { ...node, attrs: safeAttrs }
+
+    const lang = normalizeLang(typeof safeAttrs.language === 'string' ? safeAttrs.language : null)
+    // Skip plaintext and unsupported languages.
+    if (lang !== 'plaintext' && isSupportedLanguage(lang)) {
+      const ready = await ensureLanguage(lang)
+      if (ready) {
+        const code = (node.content ?? [])
+          .filter((c) => c.type === 'text')
+          .map((c) => c.text ?? '')
+          .join('')
+        try {
+          const lines = hl.codeToTokensBase(code, {
+            // biome-ignore lint/suspicious/noExplicitAny: Shiki's BundledLanguage is a large union; we guard with isSupportedLanguage before reaching here
+            lang: lang as any,
+            // biome-ignore lint/suspicious/noExplicitAny: Shiki's BundledTheme is a large union; DEFAULT_THEME is always valid
+            theme: theme as any,
+          })
+          return { ...baseNode, attrs: { ...safeAttrs, __exportHtml: tokensToExportHtml(lines) } }
+        } catch {
+          // Tokenization failed — fall through to the stripped (plaintext) node.
+        }
+      }
+    }
+    return baseNode
+  }
+  if (!node.content) return node
+  const newContent = await Promise.all(
+    node.content.map((child) =>
+      annotateCodeBlocksWithShiki(
+        child,
+        hl,
+        ensureLanguage,
+        normalizeLang,
+        isSupportedLanguage,
+        theme,
+      ),
+    ),
+  )
+  return { ...node, content: newContent }
+}
+
 export async function docToStandaloneHtml(doc: unknown, title: string): Promise<string> {
   try {
     const { renderToStaticMarkup } = await import('react-dom/server')
     // Strip plantuml nodes to their source-in-pre fallback before rendering
     // so the exported file never contains an external resource URL, regardless
     // of whether NEXT_PUBLIC_PLANTUML_SERVER_URL is configured on the server.
-    const safeDoc = doc && typeof doc === 'object' ? stripPlantumlToSource(doc as PMNode) : doc
-    const bodyNode = renderReadOnlyDoc(safeDoc)
+    let safeDoc = doc && typeof doc === 'object' ? stripPlantumlToSource(doc as PMNode) : doc
+
+    // Pre-pass: annotate codeBlock nodes with Shiki syntax-highlighted HTML.
+    // Wrapped in try/catch so any Shiki failure falls back to plaintext.
+    try {
+      const { getHighlighter, ensureLanguage, DEFAULT_THEME } = await import(
+        '@/lib/editor/shiki/highlighter'
+      )
+      const { normalizeLang, isSupportedLanguage } = await import('@/lib/editor/shiki/languages')
+      const hl = await getHighlighter()
+      safeDoc = await annotateCodeBlocksWithShiki(
+        safeDoc as PMNode,
+        hl,
+        ensureLanguage,
+        normalizeLang,
+        isSupportedLanguage,
+        DEFAULT_THEME,
+      )
+    } catch {
+      // Shiki unavailable or failed — continue with plaintext code blocks
+    }
+
+    // exportHighlight: true authorizes render-pm to emit our pre-built code-block
+    // HTML for THIS render only — no other caller (public viewer included) does.
+    const bodyNode = renderReadOnlyDoc(safeDoc, { exportHighlight: true })
     const bodyHtml = renderToStaticMarkup(bodyNode as React.ReactElement)
     const safeTitle = escapeHtml(title || 'Untitled')
     return [

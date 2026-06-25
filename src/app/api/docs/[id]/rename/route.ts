@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
 import { getDocument, renameDocument } from '@/lib/docs/repo'
@@ -27,6 +28,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     throw err
   }
+
+  // I6: the /files list (and its Recents/Starred/Shared views) is a server-
+  // rendered RSC reading listDocumentsInFolder — without invalidating its cache,
+  // a rename from the editor title bar only showed after a manual refresh. The
+  // route is the right place to revalidate (renameDocument is a pure DB write).
+  revalidatePath('/files')
+  // The editor's own SSR title for this doc, so a reload reflects the new name.
+  revalidatePath(`/d/${id}`)
 
   return NextResponse.json({ ok: true })
 }

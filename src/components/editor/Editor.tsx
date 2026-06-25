@@ -54,6 +54,7 @@ import {
   type ShortcutEventDetail,
 } from '@/components/shortcuts/GlobalShortcuts'
 import { clampAutosaveMs } from '@/lib/docs/autosave-config'
+import { getCollabUrl } from '@/lib/editor/collab-url'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
 import { resolveProvider } from '@/lib/editor/embed-providers'
@@ -87,10 +88,6 @@ const SourceMode = dynamic(
   () => import('@/components/editor/SourceMode').then((m) => m.SourceMode),
   { ssr: false },
 )
-
-// Public collab URL — falls back to localhost in dev when env var is absent.
-const COLLAB_URL =
-  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_COLLAB_URL) || 'ws://localhost:1234'
 
 type Props = {
   docId: string
@@ -377,7 +374,7 @@ export function Editor({
       }
       offlineTimerRef.current = setTimeout(goOffline, OFFLINE_FALLBACK_MS)
       p = new HocuspocusProvider({
-        url: COLLAB_URL,
+        url: getCollabUrl(),
         name: docId,
         document: ydoc,
         onSynced: () => {

@@ -82,7 +82,10 @@ export function AppearanceSettings() {
   }
 
   return (
-    <section aria-labelledby="workspace-appearance" className="mt-8">
+    <section
+      aria-labelledby="workspace-appearance"
+      className="mt-12 border-t border-[var(--border)] pt-8"
+    >
       <h2 id="workspace-appearance" className="font-medium text-lg">
         Appearance
       </h2>

@@ -4,13 +4,13 @@ import { MfaSection } from './mfa-section'
 
 export default function SecuritySettingsPage() {
   return (
-    <section className="max-w-2xl">
+    <section className="max-w-2xl px-4 sm:px-6 md:px-0">
       <h1 className="font-semibold text-2xl tracking-tight">Security</h1>
       <p className="mt-2 text-[var(--muted)]">
         Protect your account with a strong password and additional factors.
       </p>
 
-      <section aria-labelledby="security-password" className="mt-8">
+      <section aria-labelledby="security-password" className="mt-10">
         <h2 id="security-password" className="font-medium text-lg">
           Password
         </h2>
@@ -20,7 +20,10 @@ export default function SecuritySettingsPage() {
         <PasswordChangeForm />
       </section>
 
-      <section aria-labelledby="security-mfa" className="mt-8">
+      <section
+        aria-labelledby="security-mfa"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="security-mfa" className="font-medium text-lg">
           Two-factor authentication
         </h2>
@@ -30,7 +33,10 @@ export default function SecuritySettingsPage() {
         <MfaSection />
       </section>
 
-      <section aria-labelledby="security-sessions" className="mt-8">
+      <section
+        aria-labelledby="security-sessions"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="security-sessions" className="font-medium text-lg">
           Sessions
         </h2>

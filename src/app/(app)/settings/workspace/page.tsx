@@ -15,11 +15,11 @@ export default async function WorkspaceSettingsPage() {
   // read client-side); the UI shows enabled/disabled + the env-config note.
   const grammarEnabled = isLanguageToolEnabled()
   return (
-    <section className="max-w-2xl">
+    <section className="max-w-2xl px-4 sm:px-6 md:px-0">
       <h1 className="font-semibold text-2xl tracking-tight">Workspace</h1>
       <p className="mt-2 text-[var(--muted)]">Settings that apply to everyone in this workspace.</p>
 
-      <section aria-labelledby="workspace-identity" className="mt-8">
+      <section aria-labelledby="workspace-identity" className="mt-10">
         <h2 id="workspace-identity" className="font-medium text-lg">
           Identity
         </h2>
@@ -30,7 +30,10 @@ export default async function WorkspaceSettingsPage() {
         <WorkspaceNameSetting />
       </section>
 
-      <section aria-labelledby="workspace-autosave" className="mt-8">
+      <section
+        aria-labelledby="workspace-autosave"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="workspace-autosave" className="font-medium text-lg">
           Autosave
         </h2>
@@ -40,7 +43,10 @@ export default async function WorkspaceSettingsPage() {
         <AutosaveSlider />
       </section>
 
-      <section aria-labelledby="workspace-page-layout" className="mt-8">
+      <section
+        aria-labelledby="workspace-page-layout"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="workspace-page-layout" className="font-medium text-lg">
           Page layout
         </h2>
@@ -52,7 +58,10 @@ export default async function WorkspaceSettingsPage() {
         <PageLayoutSetting />
       </section>
 
-      <section aria-labelledby="workspace-language" className="mt-8">
+      <section
+        aria-labelledby="workspace-language"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="workspace-language" className="font-medium text-lg">
           {t('language')}
         </h2>

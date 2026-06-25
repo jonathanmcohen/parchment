@@ -2,13 +2,13 @@ import Link from 'next/link'
 
 export default function AdminSettingsPage() {
   return (
-    <section className="max-w-2xl">
+    <section className="max-w-2xl px-4 sm:px-6 md:px-0">
       <h1 className="font-semibold text-2xl tracking-tight">Admin</h1>
       <p className="mt-2 text-[var(--muted)]">
         Operational controls for owners and administrators.
       </p>
 
-      <section aria-labelledby="admin-observability" className="mt-8">
+      <section aria-labelledby="admin-observability" className="mt-10">
         <h2 id="admin-observability" className="font-medium text-lg">
           Observability
         </h2>
@@ -41,7 +41,10 @@ export default function AdminSettingsPage() {
         </ul>
       </section>
 
-      <section aria-labelledby="admin-maintenance" className="mt-8">
+      <section
+        aria-labelledby="admin-maintenance"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="admin-maintenance" className="font-medium text-lg">
           Maintenance
         </h2>

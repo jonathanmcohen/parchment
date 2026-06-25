@@ -687,6 +687,30 @@ body {
   text-align: start;
 }
 
+/* ── S015: overlay entrance — a brief opacity+scale fade-in for the file-manager
+ *  ContextMenu and TagPopover, which mount/unmount (no separate open-state to
+ *  drive a class toggle), so a keyframe is the simplest way to ease them in.
+ *  Honors prefers-reduced-motion. */
+@keyframes px-overlay-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.px-overlay-enter {
+  animation: px-overlay-enter 0.15s ease-out;
+  transform-origin: top;
+}
+@media (prefers-reduced-motion: reduce) {
+  .px-overlay-enter {
+    animation: none;
+  }
+}
+
 /* ── S5-1: unified interaction states (hover / pressed / disabled) ────────────
  *  Every button / row / icon-button that opts in gets ONE interaction language,
  *  token-driven (no hex literals):

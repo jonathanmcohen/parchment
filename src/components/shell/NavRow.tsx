@@ -37,7 +37,9 @@ export function NavRow({ href, icon, label }: { href: string; icon: string; labe
         'flex h-[var(--row-h)] items-center gap-[var(--space-3)] rounded-full px-[var(--space-3)] text-sm',
         active
           ? 'bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
-          : 'text-[var(--foreground)] hover:bg-[var(--surface-hover)]',
+          : // S015: idle hover is a faint blue wash (Drive-like), stronger than the
+            // near-invisible --surface-hover, reading in both light + dark.
+            'text-[var(--foreground)] hover:bg-[color-mix(in_srgb,var(--primary)_8%,transparent)]',
       ].join(' ')}
     >
       <span aria-hidden className="material-symbols-rounded text-[20px] leading-none">

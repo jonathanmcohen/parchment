@@ -19,7 +19,10 @@ import { useEffect, useId, useState } from 'react'
  */
 export function SpellingSettings({ grammarEnabled }: { grammarEnabled: boolean }) {
   return (
-    <section aria-labelledby="workspace-spelling" className="mt-8">
+    <section
+      aria-labelledby="workspace-spelling"
+      className="mt-12 border-t border-[var(--border)] pt-8"
+    >
       <h2 id="workspace-spelling" className="font-medium text-lg">
         Spelling &amp; grammar
       </h2>
@@ -195,27 +198,33 @@ function CustomDictionaryManager() {
         Words here are never flagged by the grammar checker.
       </p>
 
-      <ul className="mt-3 flex flex-wrap gap-2">
-        {loaded && words.length === 0 && (
-          <li className="text-[var(--muted)] text-sm">No words yet.</li>
-        )}
-        {words.map((w) => (
-          <li
-            key={w}
-            className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--paper)] px-2.5 py-1 text-sm"
-          >
-            <span className="font-mono">{w}</span>
-            <button
-              type="button"
-              onClick={() => void remove(w)}
-              aria-label={`Remove ${w} from dictionary`}
-              className="text-[var(--muted)] hover:text-[var(--foreground)]"
+      {loaded && words.length === 0 ? (
+        <div className="mt-3 flex flex-col items-center gap-2 py-8 text-center text-[var(--muted)]">
+          <span aria-hidden className="material-symbols-rounded text-[24px]">
+            menu_book
+          </span>
+          <p className="text-sm">No words yet.</p>
+        </div>
+      ) : (
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {words.map((w) => (
+            <li
+              key={w}
+              className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--paper)] px-2.5 py-1 text-sm"
             >
-              ×
-            </button>
-          </li>
-        ))}
-      </ul>
+              <span className="font-mono">{w}</span>
+              <button
+                type="button"
+                onClick={() => void remove(w)}
+                aria-label={`Remove ${w} from dictionary`}
+                className="text-[var(--muted)] hover:text-[var(--foreground)]"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <form
         className="mt-3 flex items-center gap-2"
@@ -234,7 +243,7 @@ function CustomDictionaryManager() {
           spellCheck={false}
           placeholder="Add a word…"
           onChange={(e) => setDraft(e.target.value)}
-          className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-1.5 text-sm"
+          className="h-9 rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 text-sm"
         />
         <button
           type="submit"

@@ -109,7 +109,7 @@ export function PATManager() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. CI deploy, laptop script"
-            className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-1.5 text-sm"
+            className="h-9 rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 text-sm"
           />
         </div>
         <button
@@ -175,9 +175,14 @@ export function PATManager() {
           ))}
         </ul>
       ) : (
-        <p className="text-[var(--muted)] text-sm">
-          No tokens yet. Generate one above to authenticate API requests on your behalf.
-        </p>
+        <div className="flex flex-col items-center gap-2 py-8 text-center text-[var(--muted)]">
+          <span aria-hidden className="material-symbols-rounded text-[24px]">
+            key
+          </span>
+          <p className="text-sm">
+            No tokens yet. Generate one above to authenticate API requests on your behalf.
+          </p>
+        </div>
       )}
     </div>
   )

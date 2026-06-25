@@ -200,7 +200,7 @@ export function ShortcutsSettings() {
   const hasConflict = conflicts.length > 0
 
   return (
-    <section aria-labelledby={headingId} className="mt-8">
+    <section aria-labelledby={headingId} className="mt-12 border-t border-[var(--border)] pt-8">
       <h2 id={headingId} className="font-medium text-lg">
         Keyboard shortcuts
       </h2>

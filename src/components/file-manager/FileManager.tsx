@@ -374,7 +374,7 @@ function TagPopover({ docId, docTitle, allTags, onClose, onChanged }: TagPopover
       ref={ref}
       role="dialog"
       aria-label={`Edit tags for ${docTitle}`}
-      className="absolute z-50 right-0 top-8 w-52 rounded-lg border border-[var(--border-chrome)] bg-[var(--surface)] p-3 flex flex-col gap-2 shadow-[var(--shadow-dropdown)]"
+      className="px-overlay-enter absolute z-50 right-0 top-8 w-52 rounded-lg border border-[var(--border-chrome)] bg-[var(--surface)] p-3 flex flex-col gap-2 shadow-[var(--shadow-dropdown)]"
     >
       <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Tags</p>
       {loading ? (
@@ -540,7 +540,7 @@ function FolderTreeItem({
             onClick={() => onSelect(node.id)}
             style={{ paddingLeft: `${depth * 16}px` }}
             className={[
-              'flex w-full items-center gap-2 text-left px-2 py-1 text-sm rounded truncate',
+              'flex w-full items-center gap-2 text-left px-2 py-1 text-sm rounded truncate transition-colors duration-150',
               over
                 ? 'bg-[var(--primary)] text-[var(--on-primary)]'
                 : isActive
@@ -814,12 +814,20 @@ function ContextMenu({ state, onClose, onRefresh, navigateTo, onSetView }: Conte
     }
   }
 
-  // Clamp position so menu doesn't overflow viewport. S5-3: the menu rides the
-  // shared `.px-menu` shell (via ui/Dropdown), positioned `fixed` at the click
-  // point (the `--fixed` modifier flips the base `position: absolute`).
+  // Clamp position so the menu doesn't overflow the viewport. S5-3: the menu
+  // rides the shared `.px-menu` shell (via ui/Dropdown), positioned `fixed` at
+  // the click point (the `--fixed` modifier flips the base `position: absolute`).
+  // MENU_W/MENU_H approximate the menu box; we keep an 8px gutter from each edge
+  // so a click near the right/bottom edge still renders fully on-screen.
+  const MENU_W = 220
+  const MENU_H = 320
+  const vw = typeof window === 'undefined' ? Number.POSITIVE_INFINITY : window.innerWidth
+  const vh = typeof window === 'undefined' ? Number.POSITIVE_INFINITY : window.innerHeight
+  const clampedLeft = Math.max(8, Math.min(x, vw - MENU_W))
+  const clampedTop = Math.max(8, Math.min(y, vh - MENU_H))
   const menuStyle: React.CSSProperties = {
-    top: y,
-    left: x,
+    top: clampedTop,
+    left: clampedLeft,
     zIndex: 1000,
   }
 
@@ -829,7 +837,7 @@ function ContextMenu({ state, onClose, onRefresh, navigateTo, onSetView }: Conte
       role="menu"
       aria-label={`Actions for ${doc.title}`}
       style={menuStyle}
-      className="px-menu--fixed"
+      className="px-menu--fixed px-overlay-enter"
     >
       {items.map((item) => (
         <button
@@ -1026,6 +1034,8 @@ function DocActions({
 
 interface BulkActionBarProps {
   selected: Set<string>
+  /** Count of currently-visible items, so the bar can show "{n} of {total}". */
+  total: number
   folders: FolderDTO[]
   allTags: TagDTO[]
   onClear: () => void
@@ -1035,6 +1045,7 @@ interface BulkActionBarProps {
 
 function BulkActionBar({
   selected,
+  total,
   folders,
   allTags,
   onClear,
@@ -1128,7 +1139,7 @@ function BulkActionBar({
       className="flex items-center gap-3 px-3 py-2 mb-3 rounded-md border border-[var(--primary)] bg-[var(--paper)] flex-wrap"
     >
       <span className="text-sm font-medium text-[var(--foreground)] shrink-0">
-        {count} selected
+        {count} of {total} selected
       </span>
 
       {/* Move to… */}
@@ -1403,14 +1414,24 @@ function DocList({
     return sortDir === 'asc' ? 'ascending' : 'descending'
   }
 
-  // S5-4: the column sort arrow is a Material glyph (no ↑/↓ emoji char); shown
-  // only on the active column. aria-hidden — aria-sort on the <th> conveys it.
+  // S5-4: the column sort arrow is a Material glyph (no ↑/↓ emoji char). The
+  // ACTIVE column shows its real direction at full opacity; every other sortable
+  // column shows a faint `unfold_more` affordance (hidden until the header is
+  // hovered, then 40% opacity) so the whole row reads as sortable. aria-hidden —
+  // aria-sort on the <th> conveys the state to assistive tech.
   const SortArrow = ({ active }: { active: boolean }) =>
     active ? (
       <span aria-hidden className="material-symbols-rounded text-[16px] align-middle">
         {sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'}
       </span>
-    ) : null
+    ) : (
+      <span
+        aria-hidden
+        className="material-symbols-rounded text-[16px] align-middle opacity-0 transition-opacity group-hover:opacity-40"
+      >
+        unfold_more
+      </span>
+    )
 
   const orderedIds = docs.map((d) => d.id)
   const allDisplayedSelected = docs.length > 0 && docs.every((d) => selected.has(d.id))
@@ -1540,7 +1561,7 @@ function DocList({
             <button
               type="button"
               onClick={() => handleHeaderClick('name')}
-              className="hover:text-[var(--foreground)]"
+              className="group hover:text-[var(--foreground)]"
             >
               Name <SortArrow active={sortKey === 'name'} />
             </button>
@@ -1553,7 +1574,7 @@ function DocList({
             <button
               type="button"
               onClick={() => handleHeaderClick('modified')}
-              className="hover:text-[var(--foreground)]"
+              className="group hover:text-[var(--foreground)]"
             >
               Modified <SortArrow active={sortKey === 'modified'} />
             </button>
@@ -1566,7 +1587,7 @@ function DocList({
             <button
               type="button"
               onClick={() => handleHeaderClick('created')}
-              className="hover:text-[var(--foreground)]"
+              className="group hover:text-[var(--foreground)]"
             >
               Created <SortArrow active={sortKey === 'created'} />
             </button>
@@ -1579,7 +1600,7 @@ function DocList({
             <button
               type="button"
               onClick={() => handleHeaderClick('size')}
-              className="hover:text-[var(--foreground)]"
+              className="group hover:text-[var(--foreground)]"
             >
               Size <SortArrow active={sortKey === 'size'} />
             </button>
@@ -2403,7 +2424,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                   onDrop={handlers.onDrop}
                   onClick={() => navigateTo(null)}
                   className={[
-                    'flex w-full items-center gap-2 rounded px-2 py-1 text-sm text-left',
+                    'flex w-full items-center gap-2 rounded px-2 py-1 text-sm text-left transition-colors duration-150',
                     over
                       ? 'bg-[var(--primary)] text-[var(--on-primary)]'
                       : currentFolderId === null
@@ -2614,7 +2635,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         onDragLeave={handlers.onDragLeave}
                         onDrop={handlers.onDrop}
                         className={[
-                          'rounded px-1 hover:underline',
+                          'rounded px-1 hover:underline transition-colors duration-150',
                           over
                             ? 'bg-[var(--primary)] text-[var(--on-primary)]'
                             : 'text-[var(--primary)]',
@@ -2624,32 +2645,38 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                       </button>
                     )}
                   </DropZone>
-                  {breadcrumb.map((segment) => (
-                    <span key={segment.id} className="flex items-center gap-1">
-                      <span className="text-[var(--muted)]" aria-hidden="true">
-                        /
+                  {breadcrumb.map((segment, index) => {
+                    // The final crumb (the current folder) stays fully readable;
+                    // intermediate crumbs truncate so a deep path doesn't wrap.
+                    const isLast = index === breadcrumb.length - 1
+                    return (
+                      <span key={segment.id} className="flex items-center gap-1 min-w-0">
+                        <span className="text-[var(--muted)] shrink-0" aria-hidden="true">
+                          /
+                        </span>
+                        <DropZone targetFolderId={segment.id} onDropped={onDropped}>
+                          {(over, handlers) => (
+                            <button
+                              type="button"
+                              onClick={() => navigateTo(segment.id)}
+                              onDragOver={handlers.onDragOver}
+                              onDragLeave={handlers.onDragLeave}
+                              onDrop={handlers.onDrop}
+                              className={[
+                                'rounded px-1 hover:underline transition-colors duration-150',
+                                isLast ? '' : 'max-w-[200px] truncate',
+                                over
+                                  ? 'bg-[var(--primary)] text-[var(--on-primary)]'
+                                  : 'text-[var(--primary)]',
+                              ].join(' ')}
+                            >
+                              {segment.name}
+                            </button>
+                          )}
+                        </DropZone>
                       </span>
-                      <DropZone targetFolderId={segment.id} onDropped={onDropped}>
-                        {(over, handlers) => (
-                          <button
-                            type="button"
-                            onClick={() => navigateTo(segment.id)}
-                            onDragOver={handlers.onDragOver}
-                            onDragLeave={handlers.onDragLeave}
-                            onDrop={handlers.onDrop}
-                            className={[
-                              'rounded px-1 hover:underline',
-                              over
-                                ? 'bg-[var(--primary)] text-[var(--on-primary)]'
-                                : 'text-[var(--primary)]',
-                            ].join(' ')}
-                          >
-                            {segment.name}
-                          </button>
-                        )}
-                      </DropZone>
-                    </span>
-                  ))}
+                    )
+                  })}
                 </nav>
 
                 {/* Content list */}
@@ -2672,6 +2699,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                     {docs.length > 0 && (
                       <BulkActionBar
                         selected={selected}
+                        total={sortedDocs.length}
                         folders={folders}
                         allTags={tags}
                         onClear={clearSelection}
@@ -2694,7 +2722,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                                 onDrop={handlers.onDrop}
                                 onClick={() => navigateTo(folder.id)}
                                 className={[
-                                  'flex w-full items-center gap-2 py-2 rounded font-medium text-left',
+                                  'flex w-full items-center gap-2 py-2 rounded font-medium text-left transition-colors duration-150',
                                   over
                                     ? 'bg-[var(--paper)] text-[var(--primary)]'
                                     : 'hover:text-[var(--primary)]',
@@ -2813,6 +2841,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         />
                         <BulkActionBar
                           selected={selected}
+                          total={sortedSmartDocs.length}
                           folders={folders}
                           allTags={tags}
                           onClear={clearSelection}
@@ -2882,6 +2911,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                         />
                         <BulkActionBar
                           selected={selected}
+                          total={sortedTagDocs.length}
                           folders={folders}
                           allTags={tags}
                           onClear={clearSelection}
@@ -2944,6 +2974,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               />
               <BulkActionBar
                 selected={selected}
+                total={sortedFlatDocs.length}
                 folders={folders}
                 allTags={tags}
                 onClear={clearSelection}

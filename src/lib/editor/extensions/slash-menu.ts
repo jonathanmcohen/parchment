@@ -2,6 +2,7 @@ import { Extension } from '@tiptap/core'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import type { SlashMenuRef } from '@/components/editor/SlashMenu'
+import { SUGGESTION_CONTAINER } from '@/lib/editor/extensions/suggestion-container'
 import { filterSlashItems, type SlashItem } from '@/lib/editor/slash-items'
 
 // ── Extension options ──────────────────────────────────────────────────────
@@ -420,6 +421,8 @@ export const SlashMenuExtension = Extension.create<SlashMenuOptions>({
     return [
       Suggestion({
         editor: this.editor,
+        // V1: mount inside the themed wrapper so dark-mode tokens resolve.
+        container: SUGGESTION_CONTAINER,
         char: '/',
         startOfLine: false,
         // Allow slash after space (not just at start of line)

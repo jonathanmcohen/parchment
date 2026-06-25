@@ -3080,6 +3080,58 @@ body {
   color: var(--muted);
 }
 
+/* V1b: the @-citation menu (CiteSuggestionMenu) shipped with no CSS — its
+   classes resolved to browser defaults (unstyled button list). Mirror the
+   wiki menu so it matches the other suggestion popovers and reads the theme
+   tokens (now legible in dark mode via the [data-color-scheme] mount). */
+.parchment-cite-menu {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  width: 280px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px 0 rgb(0 0 0 / 0.15);
+  overflow-y: auto;
+  padding: 4px;
+  gap: 1px;
+  z-index: 9999;
+}
+
+.parchment-cite-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+
+.parchment-cite-menu-item:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.parchment-cite-menu-item-active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.parchment-cite-menu-status {
+  padding: 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 /* ── B14: page setup dialog ──────────────────────────────────────────────── */
 
 .parchment-page-setup-dialog {

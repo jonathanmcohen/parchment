@@ -3,6 +3,7 @@ import { PluginKey } from '@tiptap/pm/state'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import type { CairnPage, CairnSuggestionMenuRef } from '@/components/editor/CairnSuggestionMenu'
+import { SUGGESTION_CONTAINER } from '@/lib/editor/extensions/suggestion-container'
 
 // DISTINCT plugin key — @tiptap/suggestion defaults to a single shared key, so
 // without a unique key here the `[[cairn://` suggestion plugin would collide
@@ -29,6 +30,8 @@ export const CairnSuggestionExtension = Extension.create({
     return [
       Suggestion<CairnPage>({
         editor: this.editor,
+        // V1b: mount inside the themed wrapper so dark-mode tokens resolve.
+        container: SUGGESTION_CONTAINER,
         pluginKey: cairnSuggestionPluginKey,
         char: '[[cairn://',
         startOfLine: false,

@@ -18,6 +18,7 @@ import { citeLabel } from '@/lib/citations/format'
 import type { CslEntry } from '@/lib/citations/types'
 import { parseCslEntries } from '@/lib/citations/types'
 import { citationResolveKey } from '@/lib/editor/extensions/citation'
+import { SUGGESTION_CONTAINER } from '@/lib/editor/extensions/suggestion-container'
 
 // DISTINCT key — critical (F6 lesson).
 const citeSuggestionPluginKey = new PluginKey('citeSuggestion')
@@ -29,6 +30,8 @@ export const CiteSuggestionExtension = Extension.create({
     return [
       Suggestion<CslEntry>({
         editor: this.editor,
+        // V1b: mount inside the themed wrapper so dark-mode tokens resolve.
+        container: SUGGESTION_CONTAINER,
         pluginKey: citeSuggestionPluginKey,
         char: '@',
         startOfLine: false,

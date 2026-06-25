@@ -201,7 +201,7 @@ export function MenuBar(props: MenuBarHandlers) {
     {
       label: "What's new",
       icon: 'tips_and_updates',
-      href: '/whats-new',
+      href: '/settings/about',
     },
     { kind: 'separator' },
     {

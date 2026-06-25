@@ -6,8 +6,6 @@
  * to a canonical Shiki id. Low-confidence or trivially-short input → 'plaintext'.
  */
 
-import type { Editor } from '@tiptap/core'
-import type { Node as PMNode } from '@tiptap/pm/model'
 import { normalizeLang } from '@/lib/editor/shiki/languages'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -163,22 +161,4 @@ export function detectLanguage(code: string): Detection {
   } catch {
     return { language: 'plaintext', confidence: 0 }
   }
-}
-
-/**
- * Read the text content of the active code block node in the editor.
- * Returns null when the cursor is not inside a codeBlock node.
- */
-export function getActiveCodeBlockText(editor: Editor): string | null {
-  const { state } = editor
-  const { $from } = state.selection
-
-  // Walk up the ancestry to find a codeBlock node.
-  for (let depth = $from.depth; depth >= 0; depth--) {
-    const node: PMNode = $from.node(depth)
-    if (node.type.name === 'codeBlock') {
-      return node.textContent
-    }
-  }
-  return null
 }

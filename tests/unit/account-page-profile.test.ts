@@ -1,15 +1,21 @@
+import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 // CF6: the Settings → Account page must populate the Display-name + Email inputs
-// with the authed session user's values. Before the fix the page was a *non*-async
-// component that never called requireUser() and the inputs had no defaultValue, so
-// they rendered empty even when logged in. This probe renders the real page server
-// component (requireUser + client theme island mocked) and asserts the inputs
-// carry the user's name/email via the emitted `value="…"` attribute.
+// with the authed session user's values. Before CF6 the page never called
+// requireUser() and the inputs had no value, so they rendered empty.
 //
-// RED (pre-fix): no value attributes → these assertions fail (inputs empty).
-// GREEN (post-fix): value="Ada Lovelace" / value="ada@parchment.local" present.
+// V2 update: Display name is now the AccountNameSetting client island (it takes
+// the value as the `initialName` prop and persists edits) and Language is the
+// LocaleSwitcher island; both are 'use client' + next/navigation, so — like the
+// existing AccountThemeSelect mock — they are stubbed to keep this SSR probe pure.
+// The AccountNameSetting stub echoes its `initialName` so the page→island
+// name-wiring is still asserted. Email stays a server-rendered (now read-only)
+// input.
+//
+// RED (pre-CF6): no value attributes → assertions fail (inputs empty).
+// GREEN: value="Ada Lovelace" passed to the name island / value="ada@parchment.local".
 
 // page.tsx → @/lib/auth/guard imports 'server-only'; neutralize it for the runner.
 vi.mock('server-only', () => ({}))
@@ -33,6 +39,21 @@ vi.mock('@/lib/auth/guard', () => ({
 // the render pure in the node test environment.
 vi.mock('@/components/settings/AccountThemeSelect', () => ({
   AccountThemeSelect: () => null,
+}))
+
+// V2: Display name moved into the AccountNameSetting client island (useRouter →
+// throws without a mounted app router in this SSR probe). Stub it to echo the
+// `initialName` prop as an input value, so the page→island wiring is still
+// asserted while keeping the render pure.
+vi.mock('@/components/settings/AccountNameSetting', () => ({
+  AccountNameSetting: ({ initialName }: { initialName: string }) =>
+    createElement('input', { id: 'account-name', value: initialName, readOnly: true }),
+}))
+
+// V2: Language is the LocaleSwitcher island (useRouter/useLocale) — irrelevant to
+// the Profile inputs under test; stub to null like AccountThemeSelect.
+vi.mock('@/components/i18n/LocaleSwitcher', () => ({
+  LocaleSwitcher: () => null,
 }))
 
 async function renderAccountPage(): Promise<string> {

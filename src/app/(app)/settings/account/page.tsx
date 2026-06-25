@@ -1,3 +1,5 @@
+import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher'
+import { AccountNameSetting } from '@/components/settings/AccountNameSetting'
 import { AccountThemeSelect } from '@/components/settings/AccountThemeSelect'
 import { requireUser } from '@/lib/auth/guard'
 
@@ -24,31 +26,25 @@ export default async function AccountSettingsPage() {
           Your name and email as they appear to collaborators.
         </p>
         <div className="mt-4 flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="account-name" className="font-medium text-sm">
-              Display name
-            </label>
-            <input
-              id="account-name"
-              name="name"
-              type="text"
-              autoComplete="name"
-              defaultValue={user.name ?? ''}
-              className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm"
-            />
-          </div>
+          <AccountNameSetting initialName={user.name ?? ''} />
           <div className="flex flex-col gap-1.5">
             <label htmlFor="account-email" className="font-medium text-sm">
               Email
             </label>
+            {/* V2: email is the login identity and there is no verification flow
+                yet, so it is read-only for now (the dead editable input silently
+                lost edits). Display name + Language below are now persisted. */}
             <input
               id="account-email"
               name="email"
               type="email"
               autoComplete="email"
               defaultValue={user.email}
-              className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm"
+              disabled
+              readOnly
+              className="cursor-not-allowed rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm opacity-60"
             />
+            <p className="text-[var(--muted)] text-xs">Email changes aren’t available yet.</p>
           </div>
         </div>
       </section>
@@ -70,21 +66,12 @@ export default async function AccountSettingsPage() {
         <p className="mt-1 text-[var(--muted)] text-sm">
           The display language for menus, labels, and messages.
         </p>
-        <div className="mt-4 flex flex-col gap-1.5">
-          <label htmlFor="account-language-select" className="font-medium text-sm">
-            Language
-          </label>
-          <select
-            id="account-language-select"
-            name="language"
-            defaultValue="en"
-            className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm"
-          >
-            <option value="en">English</option>
-            <option value="es">Español</option>
-            <option value="fr">Français</option>
-            <option value="de">Deutsch</option>
-          </select>
+        {/* V2: reuse the canonical LocaleSwitcher (useLocale + setLocale server
+            action + router.refresh) instead of the previous dead <select> that
+            had no onChange and hard-coded "en". One locale control, one code
+            path — the same one the Workspace page uses. */}
+        <div className="mt-4">
+          <LocaleSwitcher />
         </div>
       </section>
     </section>

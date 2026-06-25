@@ -877,6 +877,45 @@ body {
   user-select: none;
 }
 
+/* ── v0.1.5: Paged-mode boundary visual ──────────────────────────────────
+ *
+ * The editor renders ONE continuous .parchment-page sheet; the boundary markers
+ * are absolutely-positioned overlays at measured break offsets. In Paged mode we
+ * want each break to READ as the gap between two separate physical sheets — the
+ * bottom edge of page N and the top edge of page N+1, with the gutter colour
+ * showing through the seam.
+ *
+ * CRITICAL CONSTRAINT: the content beneath these overlays is CONTINUOUS (it is
+ * NOT split into pages), so the boundary visual MUST stay transparent over the
+ * text. We use SEMI-TRANSPARENT shadows + a thin gutter-coloured divider only —
+ * never an opaque band that would hide a line of text straddling the seam.
+ *
+ * Continuous mode is unchanged (no shadows; the default dashed divider stays).
+ *
+ * REVIEWER: these shadow offsets/blur/alpha are a FIRST PASS — tune the exact
+ * sheet-edge look in-browser. The hard rule to preserve: keep the over-content
+ * fills transparent (shadows/gradients only), so no text is ever covered. */
+
+/* The boundary container carries the two sheet edges via box-shadow:
+ *   • downward shadow  → bottom edge of the departing page (page N)
+ *   • upward shadow    → top edge of the arriving page (page N+1)
+ * Both are soft + semi-transparent so continuous text underneath stays legible. */
+.parchment-page[data-page-layout="paged"] .parchment-page-boundary {
+  box-shadow:
+    0 6px 8px -6px color-mix(in srgb, var(--foreground) 22%, transparent),
+    0 -6px 8px -6px color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+/* Replace the dashed hairline with a solid gutter-coloured seam so the two
+ * sheet edges read as separated by the page gutter. height:0 is kept (the
+ * overlay is zero-height); the border + box-shadow do the visual work. */
+.parchment-page[data-page-layout="paged"] .parchment-page-divider {
+  border-top: 2px solid var(--editor-gutter);
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, var(--foreground) 10%, transparent),
+    0 -1px 0 0 color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
 /* Running header — rendered at the top of the new page region */
 .parchment-running-header {
   order: 1; /* after footer, before divider */

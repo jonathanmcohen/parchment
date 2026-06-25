@@ -1,10 +1,11 @@
 import type { Pill, PillStatus } from '@/lib/health/probes'
 
-// AA-contrast colors against light paper/background. The status label reuses the
-// dot color (dark green/red on a light surface) — never white text on light.
+// Scheme-aware status colors. The status label reuses the dot color (success
+// green / error red on the paper surface); the tokens flip in dark mode so the
+// label stays legible on the dark paper.
 const COLOR: Record<PillStatus, string> = {
-  up: '#16803d', // green-700
-  down: '#b91c1c', // red-700
+  up: 'var(--success)',
+  down: 'var(--error)',
   unknown: 'var(--muted)',
 }
 

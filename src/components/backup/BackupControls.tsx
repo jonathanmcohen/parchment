@@ -74,7 +74,7 @@ export function RestoreForm() {
         </button>
       </div>
       {error ? (
-        <p role="alert" className="text-sm" style={{ color: '#b91c1c' }}>
+        <p role="alert" className="text-sm" style={{ color: 'var(--error)' }}>
           {error}
         </p>
       ) : null}
@@ -147,12 +147,12 @@ export function S3BackupNowButton() {
         {busy ? 'Backing up…' : 'Back up to S3 now'}
       </button>
       {error ? (
-        <span role="alert" className="text-sm" style={{ color: '#b91c1c' }}>
+        <span role="alert" className="text-sm" style={{ color: 'var(--error)' }}>
           {error}
         </span>
       ) : null}
       {done && !error ? (
-        <span role="status" className="text-sm" style={{ color: '#16803d' }}>
+        <span role="status" className="text-sm" style={{ color: 'var(--success)' }}>
           Backup triggered.
         </span>
       ) : null}

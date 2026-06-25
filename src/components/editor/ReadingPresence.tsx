@@ -128,7 +128,7 @@ export function ReadingPresence({ editor, provider, containerRef, onReadersChang
               borderRadius: '50%',
               backgroundColor: reader.user.color,
               color: '#ffffff',
-              border: '1.5px solid rgba(0,0,0,0.15)',
+              border: '1.5px solid var(--border)',
               fontSize: 11,
               fontWeight: 600,
               display: 'flex',

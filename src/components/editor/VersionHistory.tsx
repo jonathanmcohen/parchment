@@ -333,7 +333,10 @@ export function VersionHistory({ docId, editor }: Props) {
 
       {/* Error */}
       {error && (
-        <p role="alert" style={{ fontSize: 12, color: '#dc2626', padding: '4px 12px', margin: 0 }}>
+        <p
+          role="alert"
+          style={{ fontSize: 12, color: 'var(--error)', padding: '4px 12px', margin: 0 }}
+        >
           {error}
         </p>
       )}
@@ -419,7 +422,7 @@ export function VersionHistory({ docId, editor }: Props) {
                       padding: '1px 5px',
                       borderRadius: 3,
                       border: '1px solid var(--border, #e5e7eb)',
-                      background: isA ? '#22c55e' : 'transparent',
+                      background: isA ? 'var(--diff-add-text)' : 'transparent',
                       color: isA ? '#fff' : 'inherit',
                       cursor: 'pointer',
                     }}
@@ -436,7 +439,7 @@ export function VersionHistory({ docId, editor }: Props) {
                       padding: '1px 5px',
                       borderRadius: 3,
                       border: '1px solid var(--border, #e5e7eb)',
-                      background: isB ? '#3b82f6' : 'transparent',
+                      background: isB ? 'var(--diff-hunk-text)' : 'transparent',
                       color: isB ? '#fff' : 'inherit',
                       cursor: 'pointer',
                     }}
@@ -590,7 +593,7 @@ export function VersionHistory({ docId, editor }: Props) {
                     <div style={{ padding: '0 12px 8px' }}>
                       {gitPreviewLoading && <p style={{ fontSize: 12, margin: 0 }}>Loading…</p>}
                       {!gitPreviewLoading && gitPreview === null && (
-                        <p style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>
+                        <p style={{ fontSize: 12, color: 'var(--error)', margin: 0 }}>
                           Could not load this version.
                         </p>
                       )}
@@ -649,9 +652,9 @@ export function VersionHistory({ docId, editor }: Props) {
               gap: 8,
             }}
           >
-            <span style={{ color: '#22c55e' }}>A</span>
+            <span style={{ color: 'var(--diff-add-text)' }}>A</span>
             <span>vs</span>
-            <span style={{ color: '#3b82f6' }}>B</span>
+            <span style={{ color: 'var(--diff-hunk-text)' }}>B</span>
             {(!selectedA || !selectedB) && (
               <span style={{ color: 'var(--muted, #6b7280)', fontWeight: 400 }}>(select both)</span>
             )}
@@ -685,12 +688,16 @@ export function VersionHistory({ docId, editor }: Props) {
                   style={{
                     background:
                       line.type === 'add'
-                        ? 'rgba(34, 197, 94, 0.15)'
+                        ? 'var(--diff-add)'
                         : line.type === 'del'
-                          ? 'rgba(239, 68, 68, 0.15)'
+                          ? 'var(--diff-del)'
                           : 'transparent',
                     color:
-                      line.type === 'add' ? '#166534' : line.type === 'del' ? '#991b1b' : 'inherit',
+                      line.type === 'add'
+                        ? 'var(--diff-add-text)'
+                        : line.type === 'del'
+                          ? 'var(--diff-del-text)'
+                          : 'inherit',
                     paddingLeft: 4,
                   }}
                 >
@@ -750,19 +757,19 @@ function UnifiedDiffBlock({ patch, label }: { patch: string | null; label: strin
             style={{
               background:
                 line.kind === 'add'
-                  ? 'rgba(34, 197, 94, 0.15)'
+                  ? 'var(--diff-add)'
                   : line.kind === 'del'
-                    ? 'rgba(239, 68, 68, 0.15)'
+                    ? 'var(--diff-del)'
                     : line.kind === 'hunk'
-                      ? 'rgba(59, 130, 246, 0.08)'
+                      ? 'var(--diff-hunk)'
                       : 'transparent',
               color:
                 line.kind === 'add'
-                  ? '#166534'
+                  ? 'var(--diff-add-text)'
                   : line.kind === 'del'
-                    ? '#991b1b'
+                    ? 'var(--diff-del-text)'
                     : line.kind === 'hunk'
-                      ? '#1d4ed8'
+                      ? 'var(--diff-hunk-text)'
                       : line.kind === 'meta'
                         ? 'var(--muted, #6b7280)'
                         : 'inherit',

@@ -112,8 +112,8 @@ export function CrossRefPicker({ editor, onPick, onClose }: Props) {
         top,
         left,
         zIndex: 9999,
-        background: 'white',
-        border: '1px solid #d1d5db',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
         borderRadius: 6,
         boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
         minWidth: 220,
@@ -128,7 +128,7 @@ export function CrossRefPicker({ editor, onPick, onClose }: Props) {
         <div
           style={{
             padding: '8px 12px',
-            color: '#9ca3af',
+            color: 'var(--muted)',
             fontStyle: 'italic',
             fontSize: 13,
           }}
@@ -145,7 +145,7 @@ export function CrossRefPicker({ editor, onPick, onClose }: Props) {
                 fontWeight: 600,
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                color: '#6b7280',
+                color: 'var(--muted)',
               }}
             >
               {kindLabel[kind]}
@@ -166,7 +166,7 @@ export function CrossRefPicker({ editor, onPick, onClose }: Props) {
                   lineHeight: 1.4,
                 }}
                 onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'
+                  ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-hover)'
                 }}
                 onMouseLeave={(e) => {
                   ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
@@ -181,7 +181,7 @@ export function CrossRefPicker({ editor, onPick, onClose }: Props) {
                   <span
                     style={{
                       marginLeft: 6,
-                      color: '#6b7280',
+                      color: 'var(--muted)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',

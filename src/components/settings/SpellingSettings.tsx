@@ -91,7 +91,7 @@ function SpellcheckToggle() {
         grammar (LanguageTool) matches.
       </p>
       {error && (
-        <p className="mt-1 text-sm" style={{ color: '#dc2626' }} role="alert">
+        <p className="mt-1 text-sm" style={{ color: 'var(--error)' }} role="alert">
           {error}
         </p>
       )}
@@ -245,7 +245,7 @@ function CustomDictionaryManager() {
       </form>
 
       {error && (
-        <p className="mt-2 text-sm" style={{ color: '#dc2626' }} role="alert">
+        <p className="mt-2 text-sm" style={{ color: 'var(--error)' }} role="alert">
           {error}
         </p>
       )}

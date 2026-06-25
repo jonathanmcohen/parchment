@@ -42,7 +42,7 @@ export function RunNowButton({ name }: { name: string }) {
         {running ? 'Running…' : 'Run now'}
       </button>
       {error ? (
-        <span role="alert" className="text-xs" style={{ color: '#b91c1c' }}>
+        <span role="alert" className="text-xs" style={{ color: 'var(--error)' }}>
           {error}
         </span>
       ) : null}

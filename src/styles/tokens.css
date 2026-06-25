@@ -326,3 +326,22 @@
   --foreground: #ffffff;
   color-scheme: dark;
 }
+
+/* I3: the SAME :root propagation for "system" + OS-dark. Without it, system+OS-dark
+ * themed only the wrapper div while html/body kept the LIGHT --background — so the
+ * page gutter / body behind the dark chrome rendered light = the "system is a mix,
+ * not cleanly dark" bug. These mirror the explicit-dark :has() rules above but are
+ * gated on the OS preference. The HC rule is second + has a more specific :has()
+ * argument, so it wins when both match (high-contrast + system). */
+@media (prefers-color-scheme: dark) {
+  :root:has([data-color-scheme="system"]) {
+    --background: #202124;
+    --foreground: #e8eaed;
+    color-scheme: dark;
+  }
+  :root:has([data-high-contrast="true"][data-color-scheme="system"]) {
+    --background: #000000;
+    --foreground: #ffffff;
+    color-scheme: dark;
+  }
+}

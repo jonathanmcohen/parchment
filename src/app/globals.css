@@ -474,12 +474,16 @@ body {
   max-width: 480px;
   height: 32px;
   padding: 0 8px;
-  /* LT3-4: 18px semibold (Google Sans via --font-ui). */
-  font: 600 18px / 1 var(--font-ui);
+  /* LT3-4: 18px semibold (Google Sans via --font-ui). line-height 1.78 vertically
+   * centers the 18px text inside the 32px box. */
+  font: 600 18px / 1.78 var(--font-ui);
   color: var(--foreground);
   background: transparent;
-  border: 1px solid transparent;
+  /* Subtle permanent border so the title reads as an editable field. */
+  border: 1px solid var(--border);
   border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
   text-overflow: ellipsis;
 }
 .parchment-titlebar-title:hover {
@@ -487,6 +491,7 @@ body {
 }
 .parchment-titlebar-title:focus {
   border-color: var(--primary);
+  background: var(--primary-surface);
   outline: none;
 }
 .parchment-titlebar-iconbtn {
@@ -500,6 +505,9 @@ body {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 .parchment-titlebar-iconbtn:hover {
   background: var(--surface-hover);
@@ -579,6 +587,10 @@ body {
 .parchment-menubar-item[aria-expanded="true"] {
   background: var(--surface-hover);
 }
+.parchment-menubar-item:focus-visible {
+  background: var(--primary-surface);
+  color: var(--primary-surface-text);
+}
 
 /* ── S3-2 (DECISION 6): the shared `.px-menu` dropdown shell. S3 builds the
    class with the S1 --shadow-dropdown token (first consumer); S5-3 finalizes it.
@@ -591,6 +603,7 @@ body {
   min-width: 240px;
   max-height: 70vh;
   overflow-y: auto;
+  scrollbar-width: thin;
   padding: 8px 0;
   border: 1px solid var(--border-chrome);
   border-radius: 8px;
@@ -629,7 +642,7 @@ body {
   pointer-events: none;
 }
 .px-menu-item-icon {
-  font-size: 20px;
+  font-size: 24px;
   color: var(--muted);
 }
 .px-menu-item-label {
@@ -1052,6 +1065,15 @@ body {
 .parchment-status-slot--right {
   justify-content: flex-end;
 }
+/* Subtle divider between the mode label and the connection indicator so the
+ * right cluster reads as two groups instead of one crowded run. Only applies
+ * when the connection group follows a sibling (e.g. the mode label / readers);
+ * a lone connection indicator gets no stray leading border. */
+.parchment-status-slot--right .parchment-status-connection:not(:first-child) {
+  border-left: 1px solid var(--border-chrome);
+  padding-left: 8px;
+  margin-left: 2px;
+}
 
 /* Center word count → opens Tools → Word count. Looks like text, acts like a btn. */
 .parchment-status-wordcount {
@@ -1192,7 +1214,7 @@ body {
 .parchment-toolbar-btn:disabled,
 .parchment-toolbar-btn[aria-disabled="true"] {
   color: var(--muted);
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -1214,6 +1236,9 @@ body {
   display: inline-block;
   width: 1px;
   height: 20px;
+  /* T2: --border (#5f6368 in dark) reads MORE visibly on the dark --surface than
+     --border-chrome (#3c4043, nearly the surface colour) — so keep --border for
+     toolbar separators in both schemes. */
   background: var(--border);
   margin: 0 4px;
 }
@@ -1225,7 +1250,7 @@ body {
   margin-inline-start: auto;
   width: auto;
   min-width: auto;
-  padding: 0 8px;
+  padding: 0 12px;
   gap: 6px;
 }
 .parchment-toolbar-overflow + .parchment-toolbar-mode {
@@ -1251,8 +1276,9 @@ body {
 }
 
 .parchment-toolbar-select {
-  height: 26px;
-  padding: 0 4px;
+  /* Match the 32px icon-button row height so the toolbar reads as one even row. */
+  height: var(--icon-btn);
+  padding: 0 6px;
   font: 400 14px / 1 var(--font-ui);
   background: var(--paper);
   color: var(--foreground);
@@ -1262,8 +1288,9 @@ body {
 }
 
 .parchment-color-input {
-  width: 28px;
-  height: 26px;
+  width: 32px;
+  /* Match the 32px icon-button row height so the swatch sits even with buttons. */
+  height: var(--icon-btn);
   padding: 1px;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -2110,7 +2137,7 @@ body {
 
 .parchment-outline-expander:focus-visible {
   outline: 2px solid var(--primary);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 /* Spacer when no expander (keeps indent consistent) */
@@ -2156,7 +2183,7 @@ body {
 
 .parchment-outline-link:focus-visible {
   outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 /* ── Image crop (B5 follow-up) ─────────────────────────────────────────── */

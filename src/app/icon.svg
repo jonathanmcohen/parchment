@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Parchment">
+  <title>Parchment</title>
+  <rect x="2" y="2" width="96" height="96" rx="22" fill="#1A73E8"/>
+  <!-- Parchment scroll: a sheet curling at its edges, with text lines. -->
+  <path d="M32 30 q0 -8 8 -8 h28 q-6 4 -6 12 v44 q0 8 -8 8 h-28 q6 -4 6 -12 Z" fill="#ffffff"/>
+  <path d="M62 22 q8 0 8 8 v40 q0 8 -8 8" fill="none" stroke="#aecbfa" stroke-width="4.5" stroke-linecap="round"/>
+  <rect x="38" y="40" width="20" height="4" rx="2" fill="#1A73E8"/>
+  <rect x="38" y="50" width="20" height="4" rx="2" fill="#1A73E8"/>
+  <rect x="38" y="60" width="13" height="4" rx="2" fill="#8ab4f8"/>
+</svg>

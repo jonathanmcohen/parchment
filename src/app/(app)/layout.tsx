@@ -8,6 +8,7 @@ import { AppShell } from '@/components/shell/AppShell'
 import { Avatar } from '@/components/shell/Avatar'
 import { NavRow } from '@/components/shell/NavRow'
 import { NewMenu } from '@/components/shell/NewMenu'
+import { ParchmentLogo } from '@/components/shell/ParchmentLogo'
 import { TopbarUserCluster } from '@/components/shell/TopbarUserCluster'
 import { GlobalShortcuts } from '@/components/shortcuts/GlobalShortcuts'
 import { requireUser } from '@/lib/auth/guard'
@@ -59,7 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         href="/"
         className="mb-2 flex h-14 items-center gap-2 px-2 font-semibold text-[16px] text-[var(--foreground)] tracking-tight"
       >
-        <span aria-hidden className="parchment-logo-glyph" />
+        <ParchmentLogo size={22} />
         {t('shell.appName')}
       </Link>
 

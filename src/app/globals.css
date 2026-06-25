@@ -246,16 +246,6 @@ body {
  *  the shared `.px-menu` shell; S2 menus may ship flat with the token present).
  * ─────────────────────────────────────────────────────────────────────────── */
 
-/* S2-3: optional wordmark glyph — a small --primary square left of the brand.
-   Decorative (aria-hidden in markup); sized to the 16px cap height. */
-.parchment-logo-glyph {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  background: var(--primary);
-}
-
 /* S2-1: "+ New" button — 56px white, 16px radius, resting 1px lift, deeper on
    hover. Both shadows are S1 tokens (dark variants included), never inline. */
 .parchment-new-btn {

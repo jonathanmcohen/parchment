@@ -154,7 +154,7 @@ function renderNode(node: PMNode, key: number): ReactNode {
       const svg = str(node.attrs?.svg)
       if (!svg) {
         return (
-          <p key={key} style={{ color: '#999', fontStyle: 'italic' }}>
+          <p key={key} style={{ color: 'var(--page-ink-muted)', fontStyle: 'italic' }}>
             Drawing
           </p>
         )
@@ -175,7 +175,7 @@ function renderNode(node: PMNode, key: number): ReactNode {
       const svg = str(node.attrs?.svg)
       if (!svg) {
         return (
-          <p key={key} style={{ color: '#999', fontStyle: 'italic' }}>
+          <p key={key} style={{ color: 'var(--page-ink-muted)', fontStyle: 'italic' }}>
             Diagram
           </p>
         )
@@ -200,7 +200,12 @@ function renderNode(node: PMNode, key: number): ReactNode {
       return (
         <div key={key} style={{ margin: '1em 0' }}>
           <p
-            style={{ color: '#999', fontStyle: 'italic', fontSize: '0.85em', margin: '0 0 0.25em' }}
+            style={{
+              color: 'var(--page-ink-muted)',
+              fontStyle: 'italic',
+              fontSize: '0.85em',
+              margin: '0 0 0.25em',
+            }}
           >
             Mermaid diagram
           </p>
@@ -235,7 +240,12 @@ function renderNode(node: PMNode, key: number): ReactNode {
       ) : (
         <div key={key} style={{ margin: '1em 0' }}>
           <p
-            style={{ color: '#999', fontStyle: 'italic', fontSize: '0.85em', margin: '0 0 0.25em' }}
+            style={{
+              color: 'var(--page-ink-muted)',
+              fontStyle: 'italic',
+              fontSize: '0.85em',
+              margin: '0 0 0.25em',
+            }}
           >
             PlantUML diagram
           </p>
@@ -428,7 +438,7 @@ function renderNodeWithCites(
       <div key={key} className="parchment-bibliography-share">
         <h2>References</h2>
         {refs.length === 0 ? (
-          <p style={{ color: '#999', fontStyle: 'italic' }}>No references.</p>
+          <p style={{ color: 'var(--page-ink-muted)', fontStyle: 'italic' }}>No references.</p>
         ) : (
           <ol>
             {formatted.map(({ id, text }) => (

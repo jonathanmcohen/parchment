@@ -54,6 +54,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // overriding the globals.css defaults (--accent-contrast, --font-*).
   const theme = await getWorkspaceTheme(user.id)
   const themeStyle = themeCssVars(theme) as CSSProperties
+  // #8 (v0.1.9): expose the selected page background as a data attribute on the
+  // theme wrapper (ancestor of the editor). 'dark' drives the dark-page-only CSS
+  // overrides (link colour, code-block header control ink) AND is read by the
+  // Shiki decoration plugin to flip default code blocks to the github-dark theme.
+  // 'light' covers white / sepia / any custom-hex sheet (all light surfaces).
+  const pageBgKind = theme.pageBg === 'dark' ? 'dark' : 'light'
 
   // I2: the owner's persisted shortcut overrides, merged with DEFAULT_BINDINGS by
   // the GlobalShortcuts dispatcher (key routing) and the HelpMenu (cheat sheet).
@@ -107,6 +113,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div
       style={themeStyle}
       data-color-scheme={theme.colorScheme}
+      // #8: 'dark' enables the dark-document-page CSS overrides + Shiki dark theme.
+      data-page-bg={pageBgKind}
       // K2: accessibility toggles — globals.css keys high-contrast var overrides
       // off [data-high-contrast="true"] and the OpenDyslexic font off
       // [data-font="dyslexic"]. Omit the attribute entirely when off so the

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   ACCENT_SWATCHES,
+  DARK_PAGE_VARS,
   DEFAULT_THEME,
   FONT_PAIRS,
+  isDarkPage,
   PAGE_BG_PRESETS,
   parseTheme,
+  resolvePageBg,
   themeCssVars,
   type WorkspaceTheme,
 } from '@/lib/editor/theme'
@@ -122,6 +125,13 @@ describe('parseTheme', () => {
     const t = parseTheme({ accent: '#000000', fontPair: 'system', pageBg: 'yellowish' })
     expect(t.pageBg).toBe(DEFAULT_THEME.pageBg)
   })
+
+  // #8 (v0.1.9): the dark document page is an accepted preset keyword.
+  it("accepts the 'dark' pageBg preset", () => {
+    expect(parseTheme({ accent: '#000000', fontPair: 'system', pageBg: 'dark' }).pageBg).toBe(
+      'dark',
+    )
+  })
 })
 
 describe('DEFAULT_THEME', () => {
@@ -215,6 +225,46 @@ describe('themeCssVars', () => {
     })
     expect(vars['--page-bg']).toBe('#ffe4c4')
   })
+
+  // #8 (v0.1.9): dark document page
+  const baseTheme = (pageBg: string): WorkspaceTheme => ({
+    accent: '#000000',
+    fontPair: 'system',
+    colorScheme: 'system',
+    pageBg,
+    highContrast: false,
+    dyslexicFont: false,
+  })
+
+  it("emits the dark page canvas + ink + code-bg for pageBg 'dark'", () => {
+    const vars = themeCssVars(baseTheme('dark'))
+    expect(vars['--page-bg']).toBe('#1e1f22')
+    expect(vars['--page-ink']).toBe('#e8eaed')
+    expect(vars['--page-ink-muted']).toBe('#9aa0a6')
+    expect(vars['--page-surface-muted']).toBe('#2a2c30')
+    expect(vars['--page-border']).toBe('#3c4043')
+    // Code blocks follow the dark page onto a dark surface.
+    expect(vars['--code-bg']).toBe('#1b1c1f')
+  })
+
+  it("does NOT override page-scoped vars for 'paper'/sepia/white/custom (stays light)", () => {
+    // 'paper' is not a preset keyword → parseTheme would reject it, but
+    // themeCssVars must itself never emit dark overrides for any non-'dark' value.
+    for (const pageBg of ['paper', 'sepia', 'white', '#f0e8d0']) {
+      const vars = themeCssVars(baseTheme(pageBg))
+      expect(vars['--page-ink']).toBeUndefined()
+      expect(vars['--page-ink-muted']).toBeUndefined()
+      expect(vars['--page-surface-muted']).toBeUndefined()
+      expect(vars['--page-border']).toBeUndefined()
+      expect(vars['--code-bg']).toBeUndefined()
+    }
+  })
+
+  it("'sepia' page keeps its light canvas and emits no dark code-bg", () => {
+    const vars = themeCssVars(baseTheme('sepia'))
+    expect(vars['--page-bg']).toBe('#f5efe0')
+    expect(vars['--code-bg']).toBeUndefined()
+  })
 })
 
 describe('FONT_PAIRS', () => {
@@ -265,5 +315,34 @@ describe('PAGE_BG_PRESETS', () => {
     const keys = PAGE_BG_PRESETS.map((p) => p.key)
     expect(keys).toContain('white')
     expect(keys).toContain('sepia')
+  })
+
+  // #8 (v0.1.9): the dark page is a selectable preset with a label.
+  it('includes a dark preset with a label so the settings control renders it', () => {
+    const dark = PAGE_BG_PRESETS.find((p) => p.value === 'dark')
+    expect(dark).toBeDefined()
+    expect(dark?.label).toBeTruthy()
+  })
+})
+
+// #8 (v0.1.9): dark page helpers
+describe('resolvePageBg / isDarkPage', () => {
+  it("resolves 'dark' to the dark canvas colour and flags it as a dark page", () => {
+    expect(resolvePageBg('dark')).toBe('#1e1f22')
+    expect(isDarkPage('dark')).toBe(true)
+  })
+
+  it('does not flag white / sepia / custom-hex as dark', () => {
+    expect(isDarkPage('white')).toBe(false)
+    expect(isDarkPage('sepia')).toBe(false)
+    expect(isDarkPage('#1e1f22')).toBe(false)
+    // The dark canvas colour as a literal hex is NOT the 'dark' keyword.
+    expect(resolvePageBg('white')).toBe('#ffffff')
+    expect(resolvePageBg('sepia')).toBe('#f5efe0')
+  })
+
+  it('DARK_PAGE_VARS carries the legible light-on-dark page palette + dark code-bg', () => {
+    expect(DARK_PAGE_VARS['--page-ink']).toBe('#e8eaed')
+    expect(DARK_PAGE_VARS['--code-bg']).toBe('#1b1c1f')
   })
 })

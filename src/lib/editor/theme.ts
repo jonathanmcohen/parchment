@@ -82,11 +82,45 @@ export const ACCENT_SWATCHES: readonly string[] = [
 /**
  * I1: Named page-background presets.
  * The value is stored as-is in the theme; the CSS consumer converts it to a colour.
+ *
+ * #8 (v0.1.9): added a `dark` page — a self-hostable Google-Docs-style DARK sheet.
+ * Unlike white/sepia (light sheets that stay light in every chrome scheme), the
+ * dark page flips the in-page palette (ink, surfaces, borders, code) to a
+ * legible light-on-dark set via {@link DARK_PAGE_VARS}. The `dark` keyword is a
+ * sentinel — {@link resolvePageBg} maps it to the dark canvas colour.
  */
 export const PAGE_BG_PRESETS: readonly { key: string; label: string; value: string }[] = [
   { key: 'white', label: 'White', value: 'white' },
   { key: 'sepia', label: 'Sepia', value: 'sepia' },
+  { key: 'dark', label: 'Dark', value: 'dark' },
 ]
+
+/**
+ * #8 (v0.1.9): the dark document-page palette. These override the per-scheme
+ * `--page-*` defaults from tokens.css when pageBg === 'dark', so EVERY in-page
+ * element (prose ink, inline code, tables, TOC, blockquote, callouts) follows
+ * the dark sheet regardless of the chrome colour scheme. AA-verified against the
+ * #1e1f22 canvas: #e8eaed body ink 13.7:1; #9aa0a6 muted 6.2:1 (both ≥ AA 4.5:1).
+ *
+ * `--code-bg` flips dark here too so code blocks sit on a dark surface; the Shiki
+ * plugin pairs that with the `github-dark` token theme (see code-block-shiki.ts)
+ * so the syntax colours stay legible light-on-dark.
+ */
+export const DARK_PAGE_VARS: Readonly<Record<string, string>> = {
+  '--page-ink': '#e8eaed',
+  '--page-ink-muted': '#9aa0a6',
+  '--page-surface-muted': '#2a2c30',
+  '--page-border': '#3c4043',
+  '--code-bg': '#1b1c1f',
+}
+
+/** The dark document-page canvas colour (the sheet itself). */
+const DARK_PAGE_BG = '#1e1f22'
+
+/** True when a stored pageBg value selects the dark document page. */
+export function isDarkPage(pageBg: string): boolean {
+  return pageBg === 'dark'
+}
 
 const COLOR_SCHEMES = ['light', 'dark', 'system'] as const
 
@@ -160,6 +194,8 @@ export function parseTheme(raw: unknown): WorkspaceTheme {
 export function resolvePageBg(pageBg: string): string {
   if (pageBg === 'white') return '#ffffff'
   if (pageBg === 'sepia') return '#f5efe0'
+  // #8 (v0.1.9): the dark page sheet.
+  if (pageBg === 'dark') return DARK_PAGE_BG
   // Already a hex color.
   return pageBg
 }
@@ -182,6 +218,11 @@ const DYSLEXIC_FONT_STACK = '"OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Ve
 
 export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
   const pair = findPair(theme.fontPair)
+  // #8 (v0.1.9): when the dark page is selected, override the page-scoped vars
+  // (ink / muted ink / table surfaces / borders / code-bg) so every in-page
+  // element follows the dark sheet. White/sepia/custom-hex pages emit nothing
+  // here, so their per-scheme tokens.css defaults apply UNCHANGED.
+  const darkPageVars = isDarkPage(theme.pageBg) ? DARK_PAGE_VARS : {}
   return {
     // S1-1: both accent tokens track the per-workspace picker and drive
     // IN-DOCUMENT accent ONLY — never chrome. Chrome (primary buttons, active
@@ -197,5 +238,8 @@ export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
     '--font-body': theme.dyslexicFont ? DYSLEXIC_FONT_STACK : pair.body,
     // I1: page/paper background, overrides --paper on the doc canvas.
     '--page-bg': resolvePageBg(theme.pageBg),
+    // #8 (v0.1.9): dark-page palette (spread last so it wins). Empty object for
+    // every non-dark page → no override, light/sepia/custom behave EXACTLY as before.
+    ...darkPageVars,
   }
 }

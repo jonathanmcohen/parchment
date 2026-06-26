@@ -1601,7 +1601,11 @@ body {
 }
 /* Extra decoration only for inline code (not code inside <pre>). */
 .parchment-prose :not(pre) > code {
-  background: var(--border);
+  /* #8: page-scoped surface/ink so inline code follows the page sheet (dark page
+     → dark chip + light ink). On the white/sepia sheet --page-surface-muted is
+     #f1f3f4 (was --border #dadce0) — a marginally lighter, cleaner chip. */
+  background: var(--page-surface-muted);
+  color: var(--page-ink);
   border-radius: 3px;
   padding: 1px 4px;
   font-size: 0.88em;
@@ -2038,11 +2042,14 @@ body {
 /* ── Table of Contents block (B7) ───────────────────────────────────── */
 
 .parchment-toc {
-  border: 1px solid var(--border);
+  /* #8: the TOC is an in-PAGE block → page-scoped surface/border so it follows
+     the page sheet (dark page → dark card). Light/sepia: --page-surface-muted is
+     a near-identical neutral panel to the old --background/--paper mix. */
+  border: 1px solid var(--page-border);
   border-radius: 6px;
   padding: 12px 16px;
   margin: 1em 0;
-  background: color-mix(in srgb, var(--background) 80%, var(--paper));
+  background: var(--page-surface-muted);
   user-select: none;
 }
 
@@ -2057,7 +2064,8 @@ body {
 .parchment-toc-title {
   font-weight: 600;
   font-size: 0.9rem;
-  color: var(--foreground);
+  /* #8: page-scoped ink (was chrome --foreground) so it reads on the page sheet. */
+  color: var(--page-ink);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -2072,9 +2080,12 @@ body {
   font-size: 0.75rem;
   padding: 2px 8px;
   height: 24px;
-  background: var(--paper);
-  color: var(--muted);
-  border: 1px solid var(--border);
+  /* #8: page-scoped surface/ink/border so the TOC controls follow the page. The
+     bg sits on the already-tinted TOC card → use the page canvas itself for a
+     subtle inset, with page ink. */
+  background: var(--page-bg);
+  color: var(--page-ink-muted);
+  border: 1px solid var(--page-border);
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.1s;
@@ -2082,8 +2093,8 @@ body {
 }
 
 .parchment-toc-btn:hover {
-  background: var(--border);
-  color: var(--foreground);
+  background: var(--page-surface-muted);
+  color: var(--page-ink);
 }
 
 .parchment-toc-btn[aria-pressed="true"] {
@@ -2094,7 +2105,8 @@ body {
 
 .parchment-toc-empty {
   font-size: 0.85rem;
-  color: var(--muted);
+  /* #8: page-scoped muted ink. */
+  color: var(--page-ink-muted);
   margin: 0;
   font-style: italic;
 }
@@ -2115,7 +2127,8 @@ body {
 /* Simple link mode (no page numbers) */
 .parchment-toc-link {
   font-size: 0.88rem;
-  color: var(--foreground);
+  /* #8: page-scoped ink (hover keeps --accent, which tracks the picker). */
+  color: var(--page-ink);
   text-decoration: none;
   transition: color 0.1s;
 }
@@ -2150,7 +2163,8 @@ body {
 /* Leader dots — a flex-grow spacer with a dotted bottom border */
 .parchment-toc-dots {
   flex: 1;
-  border-bottom: 1px dotted var(--muted);
+  /* #8: page-scoped muted ink for the leader dots. */
+  border-bottom: 1px dotted var(--page-ink-muted);
   margin-bottom: 3px;
   min-width: 16px;
   opacity: 0.5;
@@ -2159,7 +2173,8 @@ body {
 .parchment-toc-page {
   flex-shrink: 0;
   font-size: 0.82rem;
-  color: var(--muted);
+  /* #8: page-scoped muted ink for page numbers. */
+  color: var(--page-ink-muted);
   min-width: 1.8em;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -2558,7 +2573,8 @@ body {
   list-style: decimal;
 }
 .parchment-prose blockquote {
-  border-left: 3px solid var(--border);
+  /* #8: page-scoped border so the quote rule follows the page sheet. */
+  border-left: 3px solid var(--page-border);
   padding-left: 1em;
   /* F2: muted prose text → --page-ink-muted (page-scoped). */
   color: var(--page-ink-muted);
@@ -2566,12 +2582,12 @@ body {
 }
 .parchment-prose pre {
   /* C3/C4: Shiki token colours are applied via inline styles on individual spans.
-     I2: --code-bg is a light neutral in EVERY scheme — the code block sits on the
-     editor's always-white page sheet (F2), so it must stay light to be legible
-     (a dark code box on a white page was unreadable in dark mode). The
-     github-light Shiki tokens are tuned for exactly this light surface. */
+     #8 (v0.1.9): --code-bg is page-scoped — light on the white/sepia sheet, and
+     flipped dark (#1b1c1f) by DARK_PAGE_VARS when the dark page is selected. The
+     Shiki plugin pairs a dark code-bg with github-dark tokens so syntax stays
+     legible light-on-dark. The border follows the page via --page-border. */
   background: var(--code-bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--page-border);
   border-radius: 0.4rem;
   padding: 0.75em 1em;
   overflow-x: auto;
@@ -2597,7 +2613,8 @@ body {
  */
 .parchment-cb-wrapper {
   position: relative;
-  border: 1px solid var(--border);
+  /* #8: page-scoped border so the code block's frame follows the page sheet. */
+  border: 1px solid var(--page-border);
   border-radius: 0.4rem;
   overflow: hidden;
   margin: 0.5em 0;
@@ -2610,8 +2627,9 @@ body {
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0.5rem;
-  background: color-mix(in srgb, var(--border) 40%, transparent);
-  border-bottom: 1px solid var(--border);
+  /* #8: page-scoped surface/border so the header band follows the page sheet. */
+  background: var(--page-surface-muted);
+  border-bottom: 1px solid var(--page-border);
   font-family: var(--font-mono);
   font-size: 0.75rem;
   user-select: none;
@@ -2773,6 +2791,44 @@ body {
   box-decoration-break: clone;
 }
 
+/* ── #8 (v0.1.9): dark document page — in-page chrome-token overrides ─────────
+ *
+ *  These selectors style IN-PAGE elements that legitimately read chrome tokens
+ *  (--foreground / --muted / --accent) which look correct on a light sheet but
+ *  go dark-on-dark when the page is the dark sheet AND the chrome scheme is light
+ *  (light chrome + dark page is a valid combination — pageBg is independent of
+ *  colorScheme). Scoping the override to [data-page-bg="dark"] keeps the white /
+ *  sepia / custom-hex pages byte-identical to before; only the dark page flips
+ *  these to the page-scoped ink so every in-page glyph stays AA-legible.
+ *  --accent is the user-picked accent; on the dark sheet the default Google blue
+ *  (#1a73e8) drops below AA on links, so prose + footnote links use the brighter
+ *  --info (#8ab4f8, 7.8:1 on #1e1f22) which tracks the dark family. */
+[data-page-bg="dark"] .parchment-prose a {
+  color: var(--info);
+}
+[data-page-bg="dark"] .parchment-prose a:hover {
+  color: var(--info);
+  text-decoration: underline;
+}
+/* Code-block header controls (filename / highlight-lines inputs, action buttons,
+   line numbers) — page-scoped ink on the dark header band. */
+[data-page-bg="dark"] .parchment-cb-filename-input,
+[data-page-bg="dark"] .parchment-cb-hl-input,
+[data-page-bg="dark"] .parchment-cb-btn,
+[data-page-bg="dark"] .parchment-cb-linenum {
+  color: var(--page-ink-muted);
+}
+[data-page-bg="dark"] .parchment-cb-filename-input:focus,
+[data-page-bg="dark"] .parchment-cb-filename-input:not(:placeholder-shown),
+[data-page-bg="dark"] .parchment-cb-hl-input:focus,
+[data-page-bg="dark"] .parchment-cb-btn:hover,
+[data-page-bg="dark"] .parchment-cb-btn:focus-visible {
+  color: var(--page-ink);
+}
+/* NB: the dark-page overrides for the footnotes/endnotes block live AFTER the
+   .parchment-fn-* base rules below (a higher-specificity override must follow the
+   selector it overrides — Biome noDescendingSpecificity). */
+
 /* ── Footnotes / Endnotes (B8) ───────────────────────────────────────────── */
 
 /* Inline superscript reference */
@@ -2895,6 +2951,25 @@ body {
  *
  * For now, both 'footnote' and 'endnote' render identically at end-of-doc.
  */
+
+/* #8 (v0.1.9): dark-document-page overrides for the footnotes/endnotes block.
+   Declared AFTER all .parchment-fn-* base rules so the higher-specificity
+   [data-page-bg="dark"] selectors win by order (no descending-specificity).
+   On the dark sheet the in-page footnote ink/borders/links follow the page;
+   --accent links use the brighter --info for AA on the dark canvas. White /
+   sepia / custom-hex pages are untouched. */
+[data-page-bg="dark"] .parchment-fn-section {
+  border-top-color: var(--page-border);
+  color: var(--page-ink);
+}
+[data-page-bg="dark"] .parchment-fn-title,
+[data-page-bg="dark"] .parchment-fn-number {
+  color: var(--page-ink-muted);
+}
+[data-page-bg="dark"] .parchment-fn-ref-link,
+[data-page-bg="dark"] .parchment-fn-backlink {
+  color: var(--info);
+}
 
 /* ── Find + Replace decorations (B9) ────────────────────────────────── */
 

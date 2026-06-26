@@ -63,6 +63,24 @@ import { normalizeLang } from '@/lib/editor/shiki/languages'
 
 const shikiPluginKey = new PluginKey<DecorationSet>('shikiHighlight')
 
+// ── #8 (v0.1.9): dark-page theme follow ──────────────────────────────────────
+
+/** The dark Shiki theme paired with the dark document page (#1b1c1f code-bg). */
+const DARK_PAGE_SHIKI_THEME: ShikiTheme = 'github-dark'
+
+/**
+ * True when the editor lives inside the dark document page. The layout wrapper
+ * (an ancestor of the editor DOM) carries data-page-bg="dark" when the workspace
+ * theme's pageBg is 'dark' (see app/(app)/layout.tsx). Reading it from the live
+ * DOM lets the synchronous decoration pass follow the page WITHOUT prop-drilling
+ * the theme through the route → Editor → ProseMirror plugin. Returns false when
+ * the view is null (SSR / pre-mount) so non-dark pages are entirely unaffected.
+ */
+function isDarkDocumentPage(view: EditorView | null): boolean {
+  if (view === null) return false
+  return view.dom.closest('[data-page-bg="dark"]') !== null
+}
+
 // ── Decoration builder ─────────────────────────────────────────────────────
 
 /**
@@ -86,6 +104,12 @@ function buildDecorations(state: EditorState, view: EditorView | null): Decorati
     return DecorationSet.empty
   }
 
+  // #8: when the editor sits on the dark document page, code blocks that have NOT
+  // had an explicit theme chosen (i.e. still the github-light default) render with
+  // github-dark so the syntax colours stay legible on the dark #1b1c1f code
+  // surface. An explicit per-block theme attr is always honoured unchanged.
+  const darkPage = isDarkDocumentPage(view)
+
   state.doc.descendants((node: PMNode, pos: number) => {
     if (node.type.name !== 'codeBlock') return true
 
@@ -96,11 +120,15 @@ function buildDecorations(state: EditorState, view: EditorView | null): Decorati
     const highlightLines = (attrs.highlightLines as string | undefined) ?? ''
 
     const lang = normalizeLang(rawLang)
-    const theme: ShikiTheme =
+    const hasExplicitTheme =
       rawTheme !== undefined &&
       rawTheme !== null &&
+      rawTheme !== DEFAULT_THEME &&
       (SHIKI_THEMES as readonly string[]).includes(rawTheme)
-        ? (rawTheme as ShikiTheme)
+    const theme: ShikiTheme = hasExplicitTheme
+      ? (rawTheme as ShikiTheme)
+      : darkPage
+        ? DARK_PAGE_SHIKI_THEME
         : DEFAULT_THEME
 
     const highlightSet = parseLineRanges(highlightLines)

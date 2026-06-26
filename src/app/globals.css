@@ -289,38 +289,89 @@ body {
   cursor: default;
 }
 
-/* S2-2: HelpMenu dropdown — first CSS for the `parchment-help-*` classes that
-   were referenced in markup but had no rules (map gap closed here). Flat in S2;
-   S5-3 elevation + S5-11 dialog shell finalize the rest. */
-.parchment-help-menu-wrap {
-  position: relative;
-}
-.parchment-help-dropdown {
-  position: absolute;
-  inset-inline-start: 0;
-  bottom: calc(100% + 8px);
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  min-width: 220px;
-  padding: 4px 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-}
-.parchment-help-menuitem {
+/* S2-2 (v0.1.9 polish): cohesive sidebar footer rows.
+ *
+ * parchment-footer-row — a 36px pill-shaped row that mirrors the nav-row
+ *   height/padding/icon-gap for a unified footer feel. Used by the account
+ *   link, the HelpMenu trigger, and the SignOutButton.
+ * parchment-footer-row--danger — danger-text hover for destructive actions
+ *   (sign-out). Layered on top of the base row.
+ * parchment-footer-locale-row — the locale-switcher row: same height, lays
+ *   out a language icon + an inline minimal <select> (no extra border box).
+ * parchment-footer-locale-select — the <select> inside the locale row.
+ *
+ * HelpMenu dropdown: the trigger is a parchment-footer-row; the dropdown
+ *   opens upward and reuses the shared .px-menu shell (shadow-dropdown,
+ *   8px radius, 36px rows, --surface-hover) via class composition. */
+.parchment-footer-row {
   display: flex;
   align-items: center;
+  gap: var(--space-3, 12px);
   width: 100%;
-  height: 36px;
-  padding: 0 16px;
-  text-align: start;
+  height: var(--row-h, 36px);
+  padding-inline: var(--space-3, 12px);
+  border-radius: 9999px;
   font: 400 14px / 1 var(--font-ui);
   color: var(--foreground);
   background: transparent;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.1s ease;
 }
-.parchment-help-menuitem:hover {
+.parchment-footer-row:hover:not(:disabled) {
   background: var(--surface-hover);
+}
+.parchment-footer-row:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.parchment-footer-row--danger:hover:not(:disabled) {
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+}
+
+.parchment-footer-locale-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  width: 100%;
+  height: var(--row-h, 36px);
+  padding-inline: var(--space-3, 12px);
+}
+.parchment-footer-locale-select {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font: 400 14px / 1 var(--font-ui);
+  color: var(--foreground);
+  cursor: pointer;
+  /* Remove OS chrome on the select in most browsers */
+  appearance: auto;
+}
+.parchment-footer-locale-select:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* Dark-mode: system selects inherit the surface color from the <select>
+   element's UA sheet, which won't pick up our token. Force it via
+   color-scheme so the OS renders the popup against the right background. */
+.parchment-footer-locale-select {
+  color-scheme: inherit;
+}
+
+.parchment-help-menu-wrap {
+  position: relative;
+}
+/* The help dropdown opens upward from the footer trigger. It reuses the
+   shared .px-menu shell class for surface/radius/shadow/rows; this block
+   only adds the upward positioning (bottom anchor instead of top). */
+.parchment-help-dropdown {
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: calc(100% + 4px);
+  /* px-menu handles min-width/padding/border/bg/shadow — no duplication */
 }
 
 /* ── S2-6: responsive chrome ─────────────────────────────────────────────────

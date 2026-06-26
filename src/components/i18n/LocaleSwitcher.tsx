@@ -29,8 +29,17 @@ export function LocaleSwitcher() {
   }
 
   return (
-    <div className="flex flex-col gap-1 px-2">
-      <label htmlFor={selectId} className="text-[var(--muted)] text-xs">
+    /* K5: locale switcher row — matches the sidebar footer nav-row height/padding
+       so all footer controls feel visually cohesive. The icon + label inline the
+       switcher label; the select is visually minimal (no extra border box). */
+    <div className="parchment-footer-locale-row">
+      <span
+        aria-hidden
+        className="material-symbols-rounded text-[20px] leading-none text-[var(--muted)] shrink-0"
+      >
+        language
+      </span>
+      <label htmlFor={selectId} className="sr-only">
         {t('switcherLabel')}
       </label>
       <select
@@ -38,7 +47,8 @@ export function LocaleSwitcher() {
         value={activeLocale}
         onChange={onChange}
         disabled={isPending}
-        className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-2 py-1 text-[var(--foreground)] text-sm"
+        className="parchment-footer-locale-select"
+        title={t('switcherLabel')}
       >
         {LOCALES.map((loc) => (
           <option key={loc} value={loc}>

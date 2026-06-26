@@ -484,46 +484,42 @@ export function HelpMenu({ shortcutOverrides = {} }: HelpMenuProps) {
   return (
     <>
       <div ref={menuRef} className="parchment-help-menu-wrap">
-        {/* S2-2: icon-only Help. Dropping the "Help" text would remove the
-            accessible name, so aria-label + title carry it (full tooltip
-            styling is S5-2). The `?` is a Material Symbol glyph. */}
+        {/* S2-2: full-width help row — icon + label, matches the sidebar nav-row
+            height and spacing so all footer rows feel visually cohesive. The
+            aria-haspopup + aria-expanded expose the dropdown to AT. */}
         <button
           ref={toggleRef}
           type="button"
           aria-haspopup="true"
           aria-expanded={menuOpen}
-          aria-label="Help"
-          title="Help"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
+          className="parchment-footer-row"
           onClick={() => setMenuOpen((v) => !v)}
         >
-          <span aria-hidden className="material-symbols-rounded text-[20px]">
+          <span aria-hidden className="material-symbols-rounded text-[20px] leading-none">
             help
           </span>
+          Help
         </button>
 
         {menuOpen && (
-          <div className="parchment-help-dropdown">
-            <button
-              type="button"
-              className="parchment-help-menuitem"
-              onClick={() => openDialog('shortcuts')}
-            >
-              Keyboard shortcuts
+          <div className="parchment-help-dropdown px-menu">
+            <button type="button" className="px-menu-item" onClick={() => openDialog('shortcuts')}>
+              <span aria-hidden className="material-symbols-rounded px-menu-item-icon">
+                keyboard
+              </span>
+              <span className="px-menu-item-label">Keyboard shortcuts</span>
             </button>
-            <button
-              type="button"
-              className="parchment-help-menuitem"
-              onClick={() => openDialog('whats-new')}
-            >
-              {"What's new"}
+            <button type="button" className="px-menu-item" onClick={() => openDialog('whats-new')}>
+              <span aria-hidden className="material-symbols-rounded px-menu-item-icon">
+                new_releases
+              </span>
+              <span className="px-menu-item-label">{"What's new"}</span>
             </button>
-            <button
-              type="button"
-              className="parchment-help-menuitem"
-              onClick={() => openDialog('tour')}
-            >
-              Replay tour
+            <button type="button" className="px-menu-item" onClick={() => openDialog('tour')}>
+              <span aria-hidden className="material-symbols-rounded px-menu-item-icon">
+                play_circle
+              </span>
+              <span className="px-menu-item-label">Replay tour</span>
             </button>
           </div>
         )}

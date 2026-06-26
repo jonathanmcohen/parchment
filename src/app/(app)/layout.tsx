@@ -17,6 +17,13 @@ import { getWorkspaceTheme } from '@/lib/docs/settings-repo'
 import { themeCssVars } from '@/lib/editor/theme'
 import { getShortcutOverrides } from '@/lib/help/keymap-repo'
 
+// S2-2 polish (v0.1.9): the sidebar footer is a cohesive cluster of nav-row-
+// height controls separated by a hairline from the nav above. Controls share:
+//   • parchment-footer-row  — 36px, rounded-full, icon+label, --surface-hover
+//   • parchment-footer-locale-row — same height, inline icon+select
+// Account row links to /settings and uses the Avatar + user name.
+// Sign-out is a dedicated footer row with a logout icon (danger hover).
+
 // S2-1/S2-4: nav items pair a route with a message key and a Material Symbol.
 // Drive shape — 8 rows. `Files`/`Templates`/`Inbox`/`Settings` are real routes;
 // `Recents`/`Shared`/`Starred`/`Trash` are routeless Drive views surfaced inside
@@ -81,15 +88,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ))}
       </nav>
 
-      {/* S2-2: bottom cluster — reads as secondary (muted). LT4-5: 12px row density. */}
-      <div className="mt-auto flex flex-col gap-3 border-[var(--border)] border-t pt-4">
-        <span className="flex items-center gap-2 px-2 text-[var(--muted)] text-xs">
+      {/* S2-2 (polished v0.1.9): cohesive footer cluster. All rows are 36px tall
+          and share the nav-row pill shape — account, locale, help, sign-out. */}
+      <div className="mt-auto flex flex-col gap-[var(--space-1)] border-[var(--border)] border-t pt-3">
+        {/* Account row — avatar + name, links to settings for account management. */}
+        <Link href="/settings" className="parchment-footer-row">
           <Avatar name={user.name} size={24} />
-          <span className="truncate">{user.name}</span>
-        </span>
+          <span className="truncate text-sm">{user.name}</span>
+        </Link>
         <LocaleSwitcher />
         <HelpMenu shortcutOverrides={shortcutOverrides} />
-        <SignOutButton className="rounded-md px-2 py-1.5 text-left text-[var(--muted)] text-sm hover:bg-[var(--surface-hover)] hover:text-[var(--error)] disabled:opacity-60" />
+        <SignOutButton className="parchment-footer-row parchment-footer-row--danger" />
       </div>
     </>
   )

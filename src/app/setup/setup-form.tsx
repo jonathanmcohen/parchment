@@ -66,7 +66,7 @@ export function SetupForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-[var(--accent-contrast)] px-4 py-2 font-medium text-white disabled:opacity-60"
+        className="rounded-lg bg-[var(--accent-contrast)] px-4 py-2 font-medium text-[var(--on-primary)] disabled:opacity-60"
       >
         {pending ? 'Creating…' : 'Create owner account'}
       </button>

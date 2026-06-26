@@ -600,17 +600,19 @@ body {
   background: var(--surface);
   box-shadow: var(--shadow-dropdown);
 }
-.parchment-menu-dropdown {
-  inset-inline-start: 0;
-  top: calc(100% + 4px);
-}
-/* P2 (v0.1.7): right-anchor variant for triggers pinned to the far-right
-   toolbar edge (the ⋯ overflow + Editing-mode menus). Anchoring the panel's
-   right edge to the trigger lets it grow leftward instead of overflowing the
-   viewport. Opt-in via Menu's align="end" — the menu-bar menus stay start. */
-.parchment-menu-dropdown-end {
-  inset-inline-start: auto;
-  inset-inline-end: 0;
+/* v0.1.9 #1: the OPEN editor/menu-bar dropdown is portalled to the body-level
+   #parchment-overlay-root and positioned `fixed` from the trigger's measured
+   rect (top + left|right supplied inline by Menu.tsx; `align` decides which edge
+   anchors — superseding the old in-flow `.parchment-menu-dropdown` /
+   `.parchment-menu-dropdown-end` rules, now removed). `position:fixed` here
+   overrides the base `.px-menu { position:absolute }`; a high z-index keeps the
+   panel above the sticky toolbar (z-index:10) and all editor content. Portalling
+   to the body escapes the toolbar's `overflow-x:auto` clip that previously grew a
+   scrollbar when an absolute panel opened inside it (#1), and the P2/v0.1.7
+   right-edge overflow (the rect math handles end-anchoring directly). */
+.parchment-menu-dropdown-fixed {
+  position: fixed;
+  z-index: 9999;
 }
 .px-menu-item {
   display: flex;

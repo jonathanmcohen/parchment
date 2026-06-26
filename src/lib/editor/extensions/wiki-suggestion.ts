@@ -3,7 +3,7 @@ import { PluginKey } from '@tiptap/pm/state'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import type { WikiDoc, WikiSuggestionMenuRef } from '@/components/editor/WikiSuggestionMenu'
-import { SUGGESTION_CONTAINER } from '@/lib/editor/extensions/suggestion-container'
+import { getSuggestionContainer } from '@/lib/editor/extensions/suggestion-container'
 
 // Distinct plugin key — @tiptap/suggestion defaults to a single shared key, so
 // without this the `[[` suggestion plugin collides with the slash-menu `/`
@@ -28,8 +28,10 @@ export const WikiSuggestionExtension = Extension.create({
     return [
       Suggestion<WikiDoc>({
         editor: this.editor,
-        // V1b: mount inside the themed wrapper so dark-mode tokens resolve.
-        container: SUGGESTION_CONTAINER,
+        // v0.1.9 #9: mount into the body-level themed overlay root so dark-mode
+        // tokens resolve AND z-index:9999 wins over in-page code-block/TOC
+        // stacking contexts (re-synced per popup-open in onStart below).
+        container: getSuggestionContainer(),
         pluginKey: wikiSuggestionPluginKey,
         char: '[[',
         startOfLine: false,
@@ -63,6 +65,9 @@ export const WikiSuggestionExtension = Extension.create({
 
           return {
             onStart(props) {
+              // Re-sync the overlay root's theme attrs at popup-open time so a
+              // runtime theme switch (light↔dark / HC / dyslexic) is reflected.
+              getSuggestionContainer()
               const { WikiSuggestionMenu } = require('@/components/editor/WikiSuggestionMenu') as {
                 WikiSuggestionMenu: import('react').ForwardRefExoticComponent<
                   import('@/components/editor/WikiSuggestionMenu').WikiSuggestionMenuProps &

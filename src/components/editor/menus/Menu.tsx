@@ -1,8 +1,10 @@
 'use client'
 
-import { useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMenuDismiss } from '@/components/shell/use-menu-dismiss'
 import { useMenuKeyboard } from '@/components/shell/use-menu-keyboard'
+import { getThemedPortalRoot } from '@/components/ui/themed-portal'
 
 // S3-2: the shared, accessible dropdown-menu primitive (the load-bearing NEW
 // component the menu bar / toolbar overflow consume). It does NOT define its own
@@ -154,12 +156,57 @@ export function Menu({
   align?: 'start' | 'end'
 }) {
   const [open, setOpen] = useState(false)
+  // v0.1.9 #1: the OPEN panel is portalled to a body-level overlay root and
+  // positioned `fixed` from the trigger's measured rect. This escapes the
+  // toolbar's `overflow-x:auto` clip (an absolute panel inside it grew a
+  // scrollbar) and lets a far-right trigger's panel grow leftward without
+  // overflowing the viewport. `null` until the panel is open + measured.
+  const [panelPos, setPanelPos] = useState<React.CSSProperties | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
 
-  useMenuDismiss(open, () => setOpen(false), wrapRef, toggleRef)
+  // Measure the trigger and derive the fixed panel coordinates. `align==='end'`
+  // pins the panel's RIGHT edge to the trigger's right (grows leftward); `start`
+  // pins the LEFT edge to the trigger's left. `top` sits 4px under the trigger.
+  const measure = useCallback(() => {
+    const rect = toggleRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const base: React.CSSProperties = { position: 'fixed', top: rect.bottom + 4 }
+    setPanelPos(
+      align === 'end'
+        ? { ...base, right: window.innerWidth - rect.right }
+        : { ...base, left: rect.left },
+    )
+  }, [align])
+
+  // Measure synchronously before paint on open so the panel never flashes at the
+  // origin, and re-measure while open if the page scrolls or the window resizes
+  // (the toolbar is sticky; the document scrolls under it).
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelPos(null)
+      return
+    }
+    measure()
+  }, [open, measure])
+
+  useEffect(() => {
+    if (!open) return
+    // `true` (capture) so we still reposition when an inner scroll container —
+    // not just the window — scrolls under the open menu.
+    window.addEventListener('scroll', measure, true)
+    window.addEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('scroll', measure, true)
+      window.removeEventListener('resize', measure)
+    }
+  }, [open, measure])
+
+  // The portalled panel is NOT a DOM descendant of the wrap, so the outside-click
+  // dismiss must treat it as "inside" too — pass it as the extra exempt node.
+  useMenuDismiss(open, () => setOpen(false), wrapRef, toggleRef, menuRef)
   useMenuKeyboard(open, menuRef)
 
   function onTriggerKeyDown(e: React.KeyboardEvent) {
@@ -170,6 +217,28 @@ export function Menu({
   }
 
   const close = () => setOpen(false)
+
+  const portalRoot = open ? getThemedPortalRoot() : null
+  // Render the panel on the FIRST `open` render (not gated on panelPos) so its
+  // ref attaches during that commit — `useMenuKeyboard`'s effect (deps [open])
+  // then finds the menu and moves focus into it. Until the layout-effect measure
+  // lands the real coords, hide it (visibility:hidden) to avoid a flash at the
+  // origin; useLayoutEffect runs before paint, so the hidden frame isn't seen.
+  const panel = open ? (
+    <div
+      ref={menuRef}
+      id={menuId}
+      role="menu"
+      aria-label={label}
+      // `.parchment-menu-dropdown-fixed` carries `position:fixed`; the measured
+      // top/left|right come in via inline style. The `-end` class is no longer
+      // needed for anchoring (the rect math handles it).
+      className="px-menu parchment-menu-dropdown-fixed"
+      style={panelPos ?? { position: 'fixed', top: 0, left: 0, visibility: 'hidden' }}
+    >
+      <MenuRows items={items} close={close} />
+    </div>
+  ) : null
 
   return (
     <div ref={wrapRef} className="parchment-menu-wrap">
@@ -187,17 +256,7 @@ export function Menu({
         {triggerContent ?? label}
       </button>
 
-      {open && (
-        <div
-          ref={menuRef}
-          id={menuId}
-          role="menu"
-          aria-label={label}
-          className={`px-menu parchment-menu-dropdown${align === 'end' ? ' parchment-menu-dropdown-end' : ''}`}
-        >
-          <MenuRows items={items} close={close} />
-        </div>
-      )}
+      {portalRoot && panel ? createPortal(panel, portalRoot) : null}
     </div>
   )
 }

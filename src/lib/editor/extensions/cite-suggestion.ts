@@ -18,7 +18,7 @@ import { citeLabel } from '@/lib/citations/format'
 import type { CslEntry } from '@/lib/citations/types'
 import { parseCslEntries } from '@/lib/citations/types'
 import { citationResolveKey } from '@/lib/editor/extensions/citation'
-import { SUGGESTION_CONTAINER } from '@/lib/editor/extensions/suggestion-container'
+import { getSuggestionContainer } from '@/lib/editor/extensions/suggestion-container'
 
 // DISTINCT key — critical (F6 lesson).
 const citeSuggestionPluginKey = new PluginKey('citeSuggestion')
@@ -30,8 +30,10 @@ export const CiteSuggestionExtension = Extension.create({
     return [
       Suggestion<CslEntry>({
         editor: this.editor,
-        // V1b: mount inside the themed wrapper so dark-mode tokens resolve.
-        container: SUGGESTION_CONTAINER,
+        // v0.1.9 #9: mount into the body-level themed overlay root so dark-mode
+        // tokens resolve AND z-index:9999 wins over in-page code-block/TOC
+        // stacking contexts (re-synced per popup-open in onStart below).
+        container: getSuggestionContainer(),
         pluginKey: citeSuggestionPluginKey,
         char: '@',
         startOfLine: false,
@@ -78,6 +80,9 @@ export const CiteSuggestionExtension = Extension.create({
 
           return {
             onStart(props) {
+              // Re-sync the overlay root's theme attrs at popup-open time so a
+              // runtime theme switch (light↔dark / HC / dyslexic) is reflected.
+              getSuggestionContainer()
               const { CiteSuggestionMenu } = require('@/components/editor/CiteSuggestionMenu') as {
                 CiteSuggestionMenu: import('react').ForwardRefExoticComponent<
                   import('@/components/editor/CiteSuggestionMenu').CiteSuggestionMenuProps &

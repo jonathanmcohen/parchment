@@ -11,15 +11,20 @@ export function Tooltip({
   label,
   children,
   className,
+  placement = 'top',
 }: {
   label: string
   children: React.ReactNode
   className?: string
+  /** #7 (v0.1.9): 'bottom' opens the tooltip below the control — for top-of-page
+   *  controls (the doc title bar) whose upward tooltip clips past the viewport
+   *  top. Defaults to 'top'. */
+  placement?: 'top' | 'bottom'
 }) {
   return (
     <span className={className ? `px-tip-wrap ${className}` : 'px-tip-wrap'}>
       {children}
-      <span role="tooltip" className="px-tip">
+      <span role="tooltip" className={placement === 'bottom' ? 'px-tip px-tip--below' : 'px-tip'}>
         {label}
       </span>
     </span>

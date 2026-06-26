@@ -176,7 +176,7 @@ export function DocTitleBar({
             visibly-disabled "coming soon" placeholder (no editor-side endpoint).
             Each icon carries a visible hover/focus Tooltip (S5-2) on top of its
             aria-label / native title. */}
-        <Tooltip label={starred ? 'Unstar' : 'Star'}>
+        <Tooltip label={starred ? 'Unstar' : 'Star'} placement="bottom">
           <button
             type="button"
             className="parchment-titlebar-iconbtn"
@@ -190,7 +190,7 @@ export function DocTitleBar({
             </span>
           </button>
         </Tooltip>
-        <Tooltip label="Move (coming soon)">
+        <Tooltip label="Move (coming soon)" placement="bottom">
           <button
             type="button"
             className="parchment-titlebar-iconbtn"
@@ -218,7 +218,7 @@ export function DocTitleBar({
 
         <span className="parchment-titlebar-spacer" />
 
-        <Tooltip label="Comments">
+        <Tooltip label="Comments" placement="bottom">
           <button
             type="button"
             className="parchment-titlebar-iconbtn"
@@ -231,7 +231,7 @@ export function DocTitleBar({
             </span>
           </button>
         </Tooltip>
-        <Tooltip label="Version history">
+        <Tooltip label="Version history" placement="bottom">
           <button
             type="button"
             className="parchment-titlebar-iconbtn"

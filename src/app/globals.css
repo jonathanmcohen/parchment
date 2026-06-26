@@ -770,6 +770,13 @@ body {
 .px-tip-wrap:focus-within .px-tip {
   opacity: 1;
 }
+/* #7 (v0.1.9): open the tooltip BELOW the control instead of above — for
+   top-of-page controls (the doc title bar) whose upward tooltip would be
+   clipped by the viewport top. */
+.px-tip--below {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
 
 /* ── S5-7: page title ramp ────────────────────────────────────────────────────
  *  The files hero ("My Drive") and other page H1s read at 22px Google Sans 400

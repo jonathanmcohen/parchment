@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useId, useState } from 'react'
+import { applyThemeToDom } from '@/lib/editor/apply-theme-dom'
 import {
   ACCENT_SWATCHES,
   DEFAULT_THEME,
@@ -64,6 +65,9 @@ export function AppearanceSettings() {
 
   const save = async (next: WorkspaceTheme) => {
     setTheme(next)
+    // Instant DOM paint — makes every field (accent, font, pageBg, colorScheme,
+    // highContrast, dyslexicFont) take visible effect before the PUT completes.
+    applyThemeToDom(next)
     setSaving(true)
     setError(null)
     try {

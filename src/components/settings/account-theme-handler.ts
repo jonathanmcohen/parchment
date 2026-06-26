@@ -10,6 +10,7 @@
 // silently reset the user's accent / font / pageBg / accessibility choices. We
 // merge over the current theme exactly as AppearanceSettings.save does.
 
+import { applyThemeToDom } from '@/lib/editor/apply-theme-dom'
 import type { WorkspaceTheme } from '@/lib/editor/theme'
 
 /** The minimal slice of next/navigation's router this handler needs. */
@@ -30,6 +31,8 @@ export async function applyColorScheme(
   deps: { fetch: typeof fetch; router: ThemeRouter },
 ): Promise<WorkspaceTheme> {
   const next: WorkspaceTheme = { ...current, colorScheme: scheme }
+  // Instant DOM paint — no waiting for the server round-trip / router.refresh().
+  applyThemeToDom(next)
   // Call fetch UNQUALIFIED. Invoking `deps.fetch(...)` as a member sets `this`
   // to `deps`, and the platform window.fetch rejects a non-global `this` with
   // "Failed to execute 'fetch' on 'Window': Illegal invocation" — which silently

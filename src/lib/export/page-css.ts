@@ -17,15 +17,27 @@ function pxToInStr(px: number): string {
   return `${(px / 96).toFixed(4).replace(/\.?0+$/, '')}in`
 }
 
+/** Options for {@link pageCss}. */
+export interface PageCssOptions {
+  /**
+   * When true, emit `margin: 0` in the @page rule instead of the setup's
+   * margins. Used by the real-sheet print path (v0.1.10 #13): each sheet element
+   * carries its OWN padding as the page margin, so the @page box must be the full
+   * physical sheet with no additional browser margin (otherwise margins double).
+   */
+  marginless?: boolean
+}
+
 /**
  * Build the `@page` CSS rule (size + margins) for print from a PageSetup.
  * Examples:
  *   Letter portrait → `@page { size: 8.5in 11in; margin: 1in 1in 1in 1in; }`
  *   A4 landscape    → `@page { size: 297mm 210mm; margin: ...; }`
  *   Custom          → dimensions computed from stored px values at 96 dpi.
+ *   { marginless }  → `@page { size: 8.5in 11in; margin: 0; }`
  * Never throws — returns the default Letter rule on invalid input.
  */
-export function pageCss(setup: PageSetup): string {
+export function pageCss(setup: PageSetup, options?: PageCssOptions): string {
   try {
     if (!setup || typeof setup !== 'object') return DEFAULT_RULE
 
@@ -47,6 +59,12 @@ export function pageCss(setup: PageSetup): string {
       if (!dims) return DEFAULT_RULE
       const { w, h } = dims
       sizeStr = orientation === 'landscape' ? `${h} ${w}` : `${w} ${h}`
+    }
+
+    // #13: marginless mode — the sheet element supplies its own margin via
+    // padding, so the @page box is the full physical sheet with no extra margin.
+    if (options?.marginless) {
+      return `@page { size: ${sizeStr}; margin: 0; }`
     }
 
     // Resolve margins (stored in px at 96 dpi)

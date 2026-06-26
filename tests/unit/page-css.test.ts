@@ -104,4 +104,23 @@ describe('pageCss', () => {
     // 96px @ 96dpi = 1in; 1in * 2.54 = 2.54cm — the screen/print margins coincide.
     expect((96 / 96) * 2.54).toBeCloseTo(2.54, 10)
   })
+
+  // v0.1.10 #13: marginless mode keeps the page SIZE but emits `margin: 0` so the
+  // real-sheet print path can supply the margin via each sheet's own padding
+  // (otherwise the @page margin + sheet padding would double up).
+  it('marginless option emits margin: 0 with the size preserved', () => {
+    const css = pageCss({ ...base, size: 'Letter', orientation: 'portrait' }, { marginless: true })
+    expect(css).toContain('size: 8.5in 11in')
+    expect(css).toContain('margin: 0')
+    expect(css).not.toContain('margin: 1in')
+  })
+
+  it('marginless honours landscape + custom size', () => {
+    const css = pageCss(
+      { ...base, size: 'Custom', orientation: 'landscape', widthPx: 816, heightPx: 1056 },
+      { marginless: true },
+    )
+    expect(css).toContain('size: 11in 8.5in')
+    expect(css).toContain('margin: 0')
+  })
 })

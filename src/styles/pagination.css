@@ -55,9 +55,75 @@
   z-index: 1;
 }
 
+/* #11: per-page orientation control bar — screen-only, pinned to the sheet's top
+   edge just inside the corner. Never prints. */
+.parchment-paged-controls {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.parchment-paged-page-label {
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 0.7rem;
+  color: var(--muted, #6b6b70);
+  user-select: none;
+}
+
+.parchment-paged-orient-btn {
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-chrome, #d0d0d5);
+  background: var(--surface, #fff);
+  color: var(--foreground, #1a1a1a);
+  cursor: pointer;
+}
+
+.parchment-paged-orient-btn:hover {
+  background: var(--surface-hover, #f0f0f3);
+}
+
+@media print {
+  /* The control must never appear on paper. */
+  .parchment-paged-controls {
+    display: none;
+  }
+}
+
 /* Watermark layer behind sheet content. */
 .parchment-paged-watermark {
   z-index: 0;
+}
+
+/* ── Print overlay sheet host (PrintView) ──────────────────────────────────── */
+
+/* On-screen: the scrollable preview area below the print control bar. The print
+   overlay itself is position:fixed/overflow:hidden, so this inner host owns the
+   vertical scroll for the stack of sheets. */
+.parchment-print-sheets {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* The paper sheets carry their own background; this surrounding tray uses the
+     gutter colour so it reads like a document workspace. */
+  background: var(--editor-gutter, #e9e9ee);
+}
+
+@media print {
+  /* On paper the tray is just a pass-through — no scroll, no background. */
+  .parchment-print-sheets {
+    flex: none;
+    overflow: visible;
+    background: transparent;
+  }
 }
 
 /* ── Native print: print the real computed sheets via @page ────────────────── */
@@ -66,10 +132,17 @@
  * PaginatedDocument already produces correctly-sized sheets; for print we let the
  * browser's native paginator place each sheet on its own physical page.
  *
+ * Strategy: the PrintView overlay injects `@page { size: <sheet>; margin: 0 }`
+ * (via page-css), so the printable box equals the FULL physical sheet with NO
+ * browser margin. Each .parchment-paged-sheet then keeps its OWN inline size +
+ * padding (= the page margins) so a sheet maps 1:1 onto a printed page, and
+ * `break-after: page` forces exactly one page per sheet. We must NOT also zero
+ * the sheet padding here — that padding IS the page margin now that @page
+ * margin is 0.
+ *
  * The PrintView overlay is a direct child of <body>; globals.css already hides
- * every other body child during print. Here we flatten the sheet stack so each
- * .parchment-paged-sheet maps to one printed page (break-after) and strip the
- * on-screen chrome (gutter, shadow, border) that should not print.
+ * every other body child during print. Here we flatten the on-screen stack
+ * (gutter, shadow, border) so only clean paper prints.
  */
 @media print {
   .parchment-paged-root {
@@ -79,14 +152,9 @@
   }
 
   .parchment-paged-sheet {
-    /* On paper the @page box already provides the sheet size + margins, so the
-       sheet element itself becomes a plain content block that fills the page and
-       forces a page break after it. The inline width/min-height/padding are
-       overridden here so they don't double-apply on top of the @page margins. */
-    width: auto;
-    min-height: 0;
+    /* Keep the inline width / min-height / padding (the sheet box + its margins).
+       Drop only the on-screen decoration and force one page per sheet. */
     margin: 0;
-    padding: 0;
     border: none;
     box-shadow: none;
     background: transparent;

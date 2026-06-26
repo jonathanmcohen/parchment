@@ -1,49 +1,60 @@
 'use client'
 
-// H2: Print / PDF export overlay.
-// Lazily loads paged.js (browser-only; needs `window`) via dynamic import —
-// NEVER a static/module-level import so SSR and the build are never affected.
-// Focus management and Esc handling mirror the G15/G16 overlay pattern.
+// H2 / v0.1.10 #13: Print / PDF overlay.
+//
+// Renders the document as REAL, content-split .parchment-page sheets (via
+// PaginatedDocument) and prints those exact sheets through the browser's NATIVE
+// @page pipeline. paged.js was removed entirely — under Turbopack it never
+// produced page boxes (it always fell back), so it was dead weight; the native
+// path already yields correct output and now also gets true per-page splitting.
 //
 // Rendered via ReactDOM.createPortal(…, document.body) so the overlay is a
-// direct child of <body>. This is required for the @media print selectors in
-// globals.css (`body > .parchment-print-overlay`, `body > *:not(…)`) to match.
+// direct child of <body>. That is required for the @media print selectors in
+// globals.css (`body > .parchment-print-overlay`, `body > *:not(…)`) to match
+// and isolate the printable content.
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { renderReadOnlyDoc } from '@/components/share/render-pm'
-import type { PageSetup } from '@/lib/editor/paginate'
+import { PaginatedDocument } from '@/components/editor/PaginatedDocument'
+import type { Orientation, PageSetup } from '@/lib/editor/paginate'
+import type { PageOrientations } from '@/lib/editor/pagination'
+import type { WatermarkConfig } from '@/lib/editor/watermark'
 import { annotateDocWithShiki, EXPORT_STYLESHEET } from '@/lib/export/html'
 import { pageCss } from '@/lib/export/page-css'
 
 type Props = {
   content: unknown
   pageSetup: PageSetup
+  /** Per-page orientation overrides (sparse; inherit-by-default). */
+  pageOrientations?: PageOrientations
+  /** Doc-level watermark painted behind each sheet. */
+  watermark?: WatermarkConfig
+  /** #11: flip a single page's orientation from the preview. */
+  onSetPageOrientation?: (pageIndex: number, orientation: Orientation) => void
   onClose: () => void
 }
 
-// 'ready'    = paged.js produced .pagedjs_page boxes (best-effort preview).
-// 'fallback' = paged.js failed (it is fragile under bundlers — "s.call is not a
-//   function"); we render the content directly and rely on the browser's NATIVE
-//   print engine + the injected @page CSS to paginate. The PDF is still correct
-//   (right page size/margins); only the in-app paged preview is missing.
-type Status = 'loading' | 'ready' | 'fallback'
-
-export function PrintView({ content, pageSetup, onClose }: Props) {
-  const [status, setStatus] = useState<Status>('loading')
-
-  // #14 (v0.1.10): syntax-highlighted code blocks in print/PDF.
-  // The doc is annotated with Shiki tokens (using the LIGHT github-light theme so
-  // colors read on white paper) on mount; until that resolves we render the raw
-  // doc (plaintext code), then swap in the highlighted version. The annotated doc
-  // carries pre-built, escaped + hex-color-validated `__exportHtml` attrs that
-  // render-pm only honours under `exportHighlight: true` — the XSS gate stays shut.
+export function PrintView({
+  content,
+  pageSetup,
+  pageOrientations = [],
+  watermark,
+  onSetPageOrientation,
+  onClose,
+}: Props) {
+  // #14: syntax-highlighted code blocks in print/PDF. Annotate the snapshot with
+  // Shiki tokens (LIGHT github-light theme — reads on white paper) on mount;
+  // until it resolves we render the raw doc (plaintext code), then swap in the
+  // highlighted version. The annotated doc carries pre-built, escaped +
+  // hex-color-validated `__exportHtml` attrs that render-pm only honours under
+  // `exportHighlight: true`, so the XSS gate stays shut.
   const [annotatedContent, setAnnotatedContent] = useState<unknown>(content)
+  // Until the first paginate measurement lands the page count is unknown; the
+  // print button stays enabled (the sheets render correct content immediately).
+  const [pageCount, setPageCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    // Reset to the plain doc immediately so a content change never shows stale
-    // highlighting from the previous snapshot.
     setAnnotatedContent(content)
     void annotateDocWithShiki(content).then((annotated) => {
       if (!cancelled) setAnnotatedContent(annotated)
@@ -53,30 +64,13 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
     }
   }, [content])
 
-  // The hidden source container that we render the React tree into as HTML,
-  // and the visible render target that paged.js will paginate into.
-  const sourceRef = useRef<HTMLDivElement>(null)
-  const renderTargetRef = useRef<HTMLDivElement>(null)
-
-  // Focus management (G15 pattern): capture currently-focused element,
-  // move focus into dialog on mount, restore on unmount.
+  // Focus management (G15 pattern): capture currently-focused element, move focus
+  // into the dialog on mount, restore on unmount.
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
-  // Store the Previewer instance so we can destroy it on cleanup to prevent
-  // accumulating orphaned <style data-pagedjs-inserted-styles> in document.head
-  // and pagesArea/pageTemplate DOM nodes on every open/close cycle (issue 4).
-  const previewerRef = useRef<{
-    polisher?: { destroy?: () => void }
-    chunker?: { destroy?: () => void }
-  } | null>(null)
-
-  // On mount: save focus, move into dialog.
-  // On unmount: restore saved focus.
-  // The close button is never aria-hidden (the bar has no aria-hidden attribute),
-  // so moving focus to it is always valid (issue 5).
   useEffect(() => {
     returnFocusRef.current = document.activeElement as HTMLElement | null
     closeButtonRef.current?.focus()
@@ -129,83 +123,8 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Core: lazily import paged.js and paginate into the render target.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: content is a prop snapshot passed at open time; re-paginating when it changes is intentional.
-  useEffect(() => {
-    let cancelled = false
-
-    const run = async () => {
-      const source = sourceRef.current
-      const renderTarget = renderTargetRef.current
-      if (!source || !renderTarget) return
-
-      try {
-        // Dynamic import — paged.js accesses `window`; must NEVER be a static
-        // module-level import (breaks SSR and Next.js build).
-        const { Previewer } = await import('pagedjs')
-
-        if (cancelled) return
-
-        // Build the complete stylesheet: export body styles + @page rules.
-        const stylesheet = `${EXPORT_STYLESHEET}\n${pageCss(pageSetup)}`
-
-        // paged.js preview(content, stylesheets, renderTo):
-        //   content     — the DOM node holding the source HTML (hidden offscreen)
-        //   stylesheets — array of objects { url: cssString } or URLs to fetch.
-        //                 Pass inline CSS as { 'about:blank': cssString } — the
-        //                 object form tells paged.js to use the value as CSS text
-        //                 rather than treating it as a URL to fetch (issue 3).
-        //   renderTo    — the DOM node to paginate into
-        const previewer = new Previewer()
-        previewerRef.current = previewer as typeof previewerRef.current
-        // paged.js polisher.add() accepts objects { url: cssText } as well as
-        // URL strings, but the inferred TS types only declare string[]. Cast to
-        // unknown[] to satisfy TypeScript while passing the object form at
-        // runtime — confirmed safe by reading paged.esm.js:27500–27526.
-        await previewer.preview(
-          source,
-          [{ 'about:blank': stylesheet }] as unknown as string[],
-          renderTarget,
-        )
-
-        if (cancelled) return
-        setStatus('ready')
-      } catch (err) {
-        if (cancelled) return
-        // paged.js failed — fall back to native browser pagination (the injected
-        // @page CSS still gives the correct page size/margins). Not an error state.
-        if (process.env.NODE_ENV !== 'production') {
-          console.debug('[print] paged.js preview failed, using native print:', err)
-        }
-        setStatus('fallback')
-      }
-    }
-
-    void run()
-    return () => {
-      cancelled = true
-      // Destroy the paged.js Previewer to remove the injected <style> element
-      // and pagesArea/pageTemplate DOM nodes, preventing leaks on each
-      // open/close cycle (issue 4).
-      const p = previewerRef.current
-      if (p) {
-        try {
-          p.polisher?.destroy?.()
-        } catch {
-          /* ignore */
-        }
-        try {
-          p.chunker?.destroy?.()
-        } catch {
-          /* ignore */
-        }
-        previewerRef.current = null
-      }
-    }
-  }, [content, pageSetup])
-
-  // afterprint: optionally close the overlay once the browser print dialog
-  // is dismissed. This is best-effort (not all browsers fire afterprint reliably).
+  // afterprint: close the overlay once the browser print dialog is dismissed.
+  // Best-effort (not all browsers fire afterprint reliably).
   useEffect(() => {
     const handler = () => {
       onCloseRef.current()
@@ -214,50 +133,31 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
     return () => window.removeEventListener('afterprint', handler)
   }, [])
 
-  // Render via createPortal so the overlay is a direct child of <body>.
-  // This is required for the @media print CSS selectors in globals.css to match:
-  //   `body > .parchment-print-overlay`  (show overlay during print)
-  //   `body > *:not(.parchment-print-overlay)` (hide everything else)
-  // Without the portal, the overlay is deeply nested inside the Next.js app
-  // container and the selectors never fire, producing a blank printed page
-  // (issues 1 & 2).
+  // @page rule: marginless so the printable box is the FULL physical sheet — each
+  // .parchment-paged-sheet supplies its own padding as the page margin (#13). The
+  // size matches the document-default orientation; mixed per-page orientation
+  // still shows correctly in the on-screen preview, but native print uses one
+  // @page size for every page (a browser limitation we accept rather than fake).
+  const printStyles = `${EXPORT_STYLESHEET}\n${pageCss(pageSetup, { marginless: true })}`
+
   const overlay = (
     <div
       className="parchment-print-overlay"
-      // #10 (v0.1.9): the @media print rules key off this so the NATIVE-print
-      // fallback (paged.js failed → status!=='ready') prints the source content
-      // instead of the empty paged.js pages container (which produced a blank PDF).
-      data-print-status={status}
       role="dialog"
       aria-modal="true"
       aria-label="Print / PDF"
     >
       {/* ── Control bar (hidden during actual print via @media print) ── */}
-      {/* No aria-hidden on the bar: the close button must always be focusable
-          and announced by assistive technology (issue 5). The loading status
-          is communicated via aria-live on the status span instead. */}
       <div className="parchment-print-bar">
         <span className="parchment-print-title">Print / Save as PDF</span>
 
-        {status === 'loading' && (
-          <span className="parchment-print-status" aria-live="polite">
-            Preparing…
-          </span>
-        )}
+        <span className="parchment-print-status" aria-live="polite">
+          {pageCount > 0 ? `${pageCount} page${pageCount === 1 ? '' : 's'}` : 'Laying out…'}
+        </span>
 
-        {status === 'fallback' && (
-          <span className="parchment-print-status" aria-live="polite">
-            Using browser pagination
-          </span>
-        )}
-
-        {/* Print button: only enabled when pagination is complete (status=ready).
-            Printing during 'error' prints an empty render target; printing
-            during 'loading' races the async pagination (issue 6). */}
         <button
           type="button"
           className="parchment-print-action"
-          disabled={status === 'loading'}
           onClick={() => window.print()}
           aria-label="Print or save as PDF"
         >
@@ -275,50 +175,26 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
         </button>
       </div>
 
-      {/* @page size/margins + content styles. paged.js gets the same CSS, but
-          this <style> ALSO drives the browser's native print (the fallback path):
-          the @page rule sets the printed page size/margins to match the canvas. */}
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted local stylesheet (EXPORT_STYLESHEET + pageCss(pageSetup)) — no user-supplied HTML. */}
-      <style dangerouslySetInnerHTML={{ __html: `${EXPORT_STYLESHEET}\n${pageCss(pageSetup)}` }} />
+      {/* Export typography (bare element rules) + the marginless @page rule.
+          The @page rule sets the printed page size to match the canvas; the
+          element rules style the read-only content inside each sheet. */}
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: trusted local stylesheet (EXPORT_STYLESHEET + pageCss) — no user-supplied HTML. */}
+      <style dangerouslySetInnerHTML={{ __html: printStyles }} />
 
-      {/* Source / native-print body. paged.js reads from here; it is ALSO the
-          printable content for the fallback path. Visible + in document flow
-          unless paged.js succeeded (status 'ready'), where the page boxes show. */}
-      <div
-        className="parchment-print-source"
-        ref={sourceRef}
-        style={
-          status === 'ready'
-            ? { display: 'none' }
-            : // #10: in the native-print fallback the source IS the printable (and
-              // on-screen preview) content — fully un-hide it (the base CSS keeps it
-              // offscreen/hidden for the paged.js-reads-it case).
-              {
-                position: 'static',
-                left: 'auto',
-                top: 'auto',
-                width: 'auto',
-                height: 'auto',
-                overflow: 'visible',
-                visibility: 'visible',
-                display: 'block',
-              }
-        }
-      >
-        {/* #14: render with exportHighlight so render-pm emits the pre-built,
-            XSS-gated Shiki HTML for code blocks (annotatedContent). Before the
-            async pre-pass resolves, annotatedContent === content (plaintext). */}
-        <article className="parchment-export">
-          {renderReadOnlyDoc(annotatedContent, { exportHighlight: true })}
-        </article>
+      {/* The real, content-split sheets. This same DOM is what prints — globals.css
+          hides every other body child during print and pagination.css flattens the
+          on-screen gutter/shadow so each sheet maps to one physical page. */}
+      <div className="parchment-print-sheets">
+        <PaginatedDocument
+          content={annotatedContent}
+          pageSetup={pageSetup}
+          pageOrientations={pageOrientations}
+          {...(watermark ? { watermark } : {})}
+          {...(onSetPageOrientation ? { onSetPageOrientation } : {})}
+          exportHighlight
+          onPageCountChange={setPageCount}
+        />
       </div>
-
-      {/* ── Paged.js render target — paginated .pagedjs_page boxes land here ── */}
-      <div
-        className="parchment-print-pages"
-        ref={renderTargetRef}
-        style={{ display: status === 'ready' ? 'block' : 'none' }}
-      />
     </div>
   )
 

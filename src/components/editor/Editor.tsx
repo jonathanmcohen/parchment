@@ -66,6 +66,7 @@ import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import { WikiSuggestionExtension } from '@/lib/editor/extensions/wiki-suggestion'
 import { classifySwipe, isMobileWidth, pageFitScale } from '@/lib/editor/page-fit'
 import { DEFAULT_PAGE_SETUP, type PageSetup, resolvePageDims } from '@/lib/editor/paginate'
+import { type PageOrientations, setPageOrientation } from '@/lib/editor/pagination'
 import { type Reader, throttle } from '@/lib/editor/reading-presence'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 import { authorColor } from '@/lib/editor/track-changes'
@@ -444,6 +445,10 @@ export function Editor({
   const [pageSetup, setPageSetup] = useState<PageSetup>(DEFAULT_PAGE_SETUP)
   const [pageSetupOpen, setPageSetupOpen] = useState(false)
   const [pageCount, setPageCount] = useState(1)
+  // v0.1.10 #11: per-page orientation overrides (sparse; inherit doc default).
+  // Session-local like pageSetup; fed to the paginated print/preview surface so a
+  // single page can be landscape independently of the document default.
+  const [pageOrientations, setPageOrientations] = useState<PageOrientations>([])
 
   // G9: watermark state — seeded from server-rendered initialWatermark
   const [watermark, setWatermark] = useState<WatermarkConfig>(initialWatermark ?? DEFAULT_WATERMARK)
@@ -1837,13 +1842,20 @@ export function Editor({
           <PresenterView docJson={editor.getJSON()} onClose={() => setPresenterOpen(false)} />
         )}
 
-        {/* H2: Print / PDF overlay — paged.js paginates a read-only snapshot of the
-          doc with @page rules matching the editor canvas, then window.print()
-          sends it to the browser print dialog for "Save as PDF". */}
+        {/* H2 / v0.1.10 #13: Print / PDF overlay — renders a read-only snapshot as
+          REAL, content-split .parchment-page sheets (true pagination) and prints
+          them via the browser's native @page pipeline (paged.js removed). */}
         {printOpen && editor && (
           <PrintView
             content={editor.getJSON()}
             pageSetup={pageSetup}
+            pageOrientations={pageOrientations}
+            watermark={watermark}
+            onSetPageOrientation={(pageIndex, orientation) =>
+              setPageOrientations((prev) =>
+                setPageOrientation(pageSetup, prev, pageIndex, orientation),
+              )
+            }
             onClose={() => setPrintOpen(false)}
           />
         )}

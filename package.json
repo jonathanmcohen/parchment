@@ -72,7 +72,6 @@
     "next": "16.2.9",
     "next-intl": "4.13.0",
     "otpauth": "9.5.1",
-    "pagedjs": "0.4.3",
     "pg": "8.21.0",
     "plantuml-encoder": "1.4.0",
     "qrcode": "1.5.4",

@@ -23,7 +23,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { WatermarkLayer } from '@/components/editor/WatermarkLayer'
 import { renderReadOnlyDoc } from '@/components/share/render-pm'
-import { DEFAULT_PAGE_SETUP, type PageSetup, resolvePageDims } from '@/lib/editor/paginate'
+import {
+  DEFAULT_PAGE_SETUP,
+  type Orientation,
+  type PageSetup,
+  resolvePageDims,
+} from '@/lib/editor/paginate'
 import {
   type BlockHeight,
   computeBreakIndicesVariable,
@@ -49,6 +54,12 @@ type Props = {
   exportHighlight?: boolean
   /** Debounce for re-measuring after a content/setup change (ms). */
   reflowDelayMs?: number
+  /**
+   * v0.1.10 #11: when provided, each sheet shows a control to flip ITS orientation
+   * (portrait ↔ landscape). Receives the 0-based page index and the requested
+   * orientation. Omit to render sheets without the control (e.g. pure export).
+   */
+  onSetPageOrientation?: (pageIndex: number, orientation: Orientation) => void
 }
 
 /** Extract the top-level block nodes from a ProseMirror doc snapshot. */
@@ -91,6 +102,7 @@ export function PaginatedDocument({
   onPageCountChange,
   exportHighlight = false,
   reflowDelayMs = 250,
+  onSetPageOrientation,
 }: Props) {
   const blocks = useMemo(() => topLevelBlocks(content), [content])
 
@@ -274,6 +286,30 @@ export function PaginatedDocument({
             >
               <WatermarkLayer config={watermark} />
             </div>
+
+            {/* #11: per-page orientation control. Screen-only (pagination.css
+                hides .parchment-paged-controls in @media print). Flips THIS page
+                between portrait and landscape independently. */}
+            {onSetPageOrientation && (
+              <div className="parchment-paged-controls" contentEditable={false}>
+                <span className="parchment-paged-page-label">Page {i + 1}</span>
+                <button
+                  type="button"
+                  className="parchment-paged-orient-btn"
+                  onClick={() =>
+                    onSetPageOrientation(i, orientation === 'landscape' ? 'portrait' : 'landscape')
+                  }
+                  aria-label={`Page ${i + 1} orientation: ${orientation}. Switch to ${
+                    orientation === 'landscape' ? 'portrait' : 'landscape'
+                  }.`}
+                  title={`Rotate page ${i + 1} to ${
+                    orientation === 'landscape' ? 'portrait' : 'landscape'
+                  }`}
+                >
+                  {orientation === 'landscape' ? '⬓ Landscape' : '▯ Portrait'}
+                </button>
+              </div>
+            )}
             <div className="parchment-paged-content">{pageBodies[i]}</div>
           </div>
         )

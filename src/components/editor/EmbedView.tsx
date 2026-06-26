@@ -105,10 +105,10 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
               // Fixed aspect-ratio box (16:9) keeps layout stable while the
               // provider content loads lazily.
               aspectRatio: '16 / 9',
-              border: '1px solid #e2e2e2',
+              border: '1px solid var(--page-border)',
               borderRadius: '6px',
               overflow: 'hidden',
-              background: '#fafafa',
+              background: 'var(--page-surface-muted)',
             }}
           >
             <iframe
@@ -134,7 +134,7 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
               gap: '0.5rem',
               marginTop: '0.35rem',
               fontSize: '0.8rem',
-              color: '#666',
+              color: 'var(--page-ink-muted)',
             }}
           >
             <span>
@@ -145,13 +145,13 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
               type="button"
               onClick={openEditor}
               style={{
-                border: '1px solid #ddd',
+                border: '1px solid var(--page-border)',
                 borderRadius: '4px',
-                background: '#fff',
+                background: 'var(--page-bg)',
                 cursor: 'pointer',
                 padding: '0.1rem 0.5rem',
                 fontSize: '0.75rem',
-                color: '#444',
+                color: 'var(--page-ink-muted)',
               }}
             >
               Edit
@@ -172,13 +172,13 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
           justifyContent: 'space-between',
           gap: '0.75rem',
           padding: '0.85rem 1rem',
-          border: '1px solid #e2e2e2',
+          border: '1px solid var(--page-border)',
           borderRadius: '6px',
-          background: '#fafafa',
+          background: 'var(--page-surface-muted)',
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--page-ink-muted)' }}>
+          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--page-ink)' }}>
             {title || 'External link'}
           </div>
           {isSafeHref ? (
@@ -223,13 +223,13 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
           onClick={openEditor}
           style={{
             flexShrink: 0,
-            border: '1px solid #ddd',
+            border: '1px solid var(--page-border)',
             borderRadius: '4px',
-            background: '#fff',
+            background: 'var(--page-bg)',
             cursor: 'pointer',
             padding: '0.2rem 0.6rem',
             fontSize: '0.75rem',
-            color: '#444',
+            color: 'var(--page-ink-muted)',
           }}
         >
           Edit

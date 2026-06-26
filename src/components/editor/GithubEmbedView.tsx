@@ -45,7 +45,7 @@ const BADGE: Record<CardStatus['state'], { bg: string; fg: string; label: string
   open: { bg: '#dafbe1', fg: '#1a7f37', label: 'Open' },
   closed: { bg: '#ffebe9', fg: '#cf222e', label: 'Closed' },
   merged: { bg: '#fbefff', fg: '#8250df', label: 'Merged' },
-  draft: { bg: '#eaeef2', fg: 'var(--page-ink-muted)', label: 'Draft' },
+  draft: { bg: '#eaeef2', fg: '#57606a', label: 'Draft' },
 }
 
 function refFromAttrs(attrs: Record<string, unknown>): GithubRef | null {
@@ -175,9 +175,9 @@ export function GithubEmbedView({ node, getPos, editor }: NodeViewProps) {
           gap: '0.75rem',
           margin: 0,
           padding: '0.85rem 1rem',
-          border: '1px solid #d0d7de',
+          border: '1px solid var(--page-border)',
           borderRadius: '6px',
-          background: '#f6f8fa',
+          background: 'var(--page-surface-muted)',
         }}
       >
         <div style={{ minWidth: 0 }}>
@@ -253,13 +253,13 @@ export function GithubEmbedView({ node, getPos, editor }: NodeViewProps) {
           aria-label="Edit GitHub embed"
           style={{
             flexShrink: 0,
-            border: '1px solid #d0d7de',
+            border: '1px solid var(--page-border)',
             borderRadius: '4px',
-            background: '#fff',
+            background: 'var(--page-bg)',
             cursor: 'pointer',
             padding: '0.2rem 0.6rem',
             fontSize: '0.75rem',
-            color: '#444',
+            color: 'var(--page-ink-muted)',
           }}
         >
           Edit

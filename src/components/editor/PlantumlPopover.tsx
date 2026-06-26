@@ -120,8 +120,8 @@ export function PlantumlPopover({ editor, pos, initialSource, onClose }: Props) 
                   <pre
                     style={{
                       padding: '0.75rem',
-                      background: '#f9f9f9',
-                      border: '1px solid #eee',
+                      background: 'var(--page-surface-muted)',
+                      border: '1px solid var(--page-border)',
                       borderRadius: '4px',
                       fontFamily: 'monospace',
                       fontSize: '0.85em',
@@ -133,7 +133,7 @@ export function PlantumlPopover({ editor, pos, initialSource, onClose }: Props) 
                   </pre>
                   <p
                     style={{
-                      color: '#aaa',
+                      color: 'var(--page-ink-muted)',
                       fontStyle: 'italic',
                       fontSize: '0.8em',
                       margin: '0.25em 0 0',

@@ -52,20 +52,19 @@ export function isNavRowActive(
 }
 
 /** The files-page view-state keys reachable via the `?view=` query param. */
-export type FilesViewParam = 'all' | 'recents' | 'starred' | 'shared'
+export type FilesViewParam = 'all' | 'recents' | 'starred' | 'shared' | 'trash'
 
 /**
  * Normalize a raw `?view=` query value to a files-page view state.
  *
- * Only the ROUTELESS Drive views (Recents / Starred / Shared) are surfaced
- * through the query param — `Files` and `Trash` have their own routes, so the
- * sidebar links those directly and never round-trips through `?view=`. Anything
- * else (missing, `all`, `files`, an unknown string, a routed view) collapses to
- * the default `all`. This reads an existing query param into existing `view`
- * state; it adds no new view behavior (S2-4 is restyle + surfacing only).
+ * The ROUTELESS Drive views (Recents / Starred / Shared / Trash) are all
+ * surfaced through the query param via `/files?view=<view>`. Anything else
+ * (missing, `all`, `files`, an unknown string) collapses to the default `all`.
+ * This reads an existing query param into existing `view` state; it adds no
+ * new view behavior (S2-4 is restyle + surfacing only).
  */
 export function normalizeFilesView(raw: string | null | undefined): FilesViewParam {
-  if (raw === 'recents' || raw === 'starred' || raw === 'shared') return raw
+  if (raw === 'recents' || raw === 'starred' || raw === 'shared' || raw === 'trash') return raw
   return 'all'
 }
 

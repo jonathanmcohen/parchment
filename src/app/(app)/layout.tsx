@@ -18,11 +18,10 @@ import { themeCssVars } from '@/lib/editor/theme'
 import { getShortcutOverrides } from '@/lib/help/keymap-repo'
 
 // S2-1/S2-4: nav items pair a route with a message key and a Material Symbol.
-// Drive shape — 8 rows. `Files`/`Trash`/`Templates`/`Inbox`/`Settings` are real
-// routes; `Recents`/`Shared`/`Starred` are routeless Drive views surfaced inside
-// /files via `?view=` (S2-4 PARTIAL — no dedicated /recents, /shared or /starred
-// route yet). All five FileManager views (All via /files, plus Recents/Starred/
-// Shared via `?view=`, and Trash via /trash) are reachable from the sidebar —
+// Drive shape — 8 rows. `Files`/`Templates`/`Inbox`/`Settings` are real routes;
+// `Recents`/`Shared`/`Starred`/`Trash` are routeless Drive views surfaced inside
+// /files via `?view=` (S2-4). All five FileManager views (All via /files, plus
+// Recents/Starred/Shared/Trash via `?view=`) are reachable from the sidebar —
 // no navless gap. Labels are resolved per request via getTranslations
 // (K5: localized + RTL).
 const nav = [
@@ -32,7 +31,7 @@ const nav = [
   { href: '/inbox', key: 'inbox', icon: 'inbox' },
   { href: '/files?view=shared', key: 'shared', icon: 'group' },
   { href: '/files?view=starred', key: 'starred', icon: 'star' },
-  { href: '/trash', key: 'trash', icon: 'delete' },
+  { href: '/files?view=trash', key: 'trash', icon: 'delete' },
   { href: '/settings', key: 'settings', icon: 'settings' },
 ] as const
 

@@ -10,7 +10,6 @@ describe('isNavRowActive', () => {
   it('marks a nested route under the row prefix active', () => {
     // /settings/appearance should light the Settings row.
     expect(isNavRowActive('/settings/appearance', '/settings')).toBe(true)
-    expect(isNavRowActive('/trash/anything', '/trash')).toBe(true)
   })
 
   it('does not light a sibling route that merely shares a string prefix', () => {
@@ -67,25 +66,31 @@ describe('isNavRowActive', () => {
       expect(isNavRowActive('/files', '/files?view=starred', 'recents')).toBe(false)
     })
 
+    it('lights the Trash row (and ONLY it) on ?view=trash', () => {
+      expect(isNavRowActive('/files', '/files?view=trash', 'trash')).toBe(true)
+      expect(isNavRowActive('/files', '/files', 'trash')).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=shared', 'trash')).toBe(false)
+      expect(isNavRowActive('/files', '/files?view=starred', 'trash')).toBe(false)
+    })
+
     it('keeps exactly one active row across every files view', () => {
       const fileRows = [
         '/files',
         '/files?view=recents',
         '/files?view=shared',
         '/files?view=starred',
+        '/files?view=trash',
       ]
-      for (const view of [null, 'all', 'recents', 'shared', 'starred']) {
+      for (const view of [null, 'all', 'recents', 'shared', 'starred', 'trash']) {
         const activeCount = fileRows.filter((href) => isNavRowActive('/files', href, view)).length
         expect(activeCount).toBe(1)
       }
     })
 
     it('non-files rows ignore the view param', () => {
-      // The view param is meaningless off /files — Trash/Settings still match on
+      // The view param is meaningless off /files — Settings still matches on
       // path alone regardless of any stray ?view=.
-      expect(isNavRowActive('/trash', '/trash', 'shared')).toBe(true)
       expect(isNavRowActive('/settings', '/settings', 'starred')).toBe(true)
-      expect(isNavRowActive('/trash', '/files?view=shared', 'shared')).toBe(false)
     })
   })
 })
@@ -104,10 +109,11 @@ describe('normalizeFilesView', () => {
     expect(normalizeFilesView(undefined)).toBe('all')
   })
 
-  it('rejects unknown / routed views (trash is its own route, not a ?view=)', () => {
-    // Trash and Files have dedicated routes; only the routeless views are
-    // surfaced through ?view=. Anything unknown falls back to all.
-    expect(normalizeFilesView('trash')).toBe('all')
+  it('maps trash to the trash view (now a routeless ?view= like recents/starred/shared)', () => {
+    expect(normalizeFilesView('trash')).toBe('trash')
+  })
+
+  it('rejects unknown views', () => {
     expect(normalizeFilesView('smart')).toBe('all')
     expect(normalizeFilesView('garbage')).toBe('all')
     expect(normalizeFilesView('')).toBe('all')

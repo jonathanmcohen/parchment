@@ -487,6 +487,17 @@ body {
      24px white sliver. Horizontal centering (via each *-inner mx-auto) and the
      sticky-stack offsets (title 0 / menu 56 / toolbar 88) are unaffected. */
   margin: -2rem -2rem 0 -2rem;
+  /* v0.1.10 #14: the three inner bars are individually `position: sticky`, but a
+     sticky element only sticks within its nearest block-container's box. That box
+     was this stack itself — ~136px tall (just the bars) — so once the document
+     scrolled past 136px the bars reached the stack's bottom edge and scrolled
+     away with it. Making the STACK sticky too pins the whole chrome to the tall
+     .parchment-editor-shell (which holds both the stack AND the scrolling
+     content), so the chrome stays at the viewport top across the full document.
+     z-index 30 keeps it above the canvas (matches the title bar's own z-index). */
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 
 /* ── S3-1: doc title bar (L2: full-bleed bg/border, sticky top:0) ── */
@@ -4627,6 +4638,34 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* ── v0.1.10 #10: force printed content to a fixed light (white-paper) palette ──
+ *
+ * The print overlay sets `color: var(--foreground)` on its CHROME (themed so the
+ * on-screen control bar flips in dark mode). The v0.1.9 #10 fix made the print
+ * SOURCE visible + printed in the native-print fallback — and it inherited that
+ * themed foreground. Under OS dark mode `var(--foreground)` is #e8eaed (light
+ * gray), so the printed text rendered light-on-white (~1.1:1) — illegible, on
+ * every PDF a dark-mode user saved, regardless of the app theme.
+ *
+ * The printed page is always white paper (EXPORT_STYLESHEET hard-codes
+ * `body{background:#fff}`), so its content must always be dark ink. Pin a fixed
+ * light palette on the two printable containers (the visible source in the
+ * fallback path AND the paged.js page sheets in the ready path) so neither the
+ * inherited overlay color nor any var(--page-*)/code token can resolve to a dark-
+ * theme value. Independent of OS scheme, app theme, and the selectable dark page.
+ */
+.parchment-print-source,
+.parchment-print-pages {
+  color: #1a1a1a;
+  --foreground: #1a1a1a;
+  --page-ink: #202124;
+  --page-ink-muted: #5f6368;
+  --page-bg: #ffffff;
+  --page-surface-muted: #f1f3f4;
+  --page-border: #d0d7de;
+  --code-bg: #f6f8fa;
 }
 
 /* ── @media print — scope printing to the paginated paged.js content only ── */

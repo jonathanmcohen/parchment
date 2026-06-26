@@ -4438,19 +4438,38 @@ body {
     z-index: auto;
   }
 
-  /* Hide the control bar and offscreen source container — only pages print. */
-  body > .parchment-print-overlay .parchment-print-bar,
-  body > .parchment-print-overlay .parchment-print-source {
+  /* The control bar never prints. */
+  body > .parchment-print-overlay .parchment-print-bar {
     display: none;
     visibility: hidden;
   }
 
-  /* Pages container: visible and full-width for print. */
-  body > .parchment-print-overlay .parchment-print-pages {
+  /* #10 (v0.1.9): print the SOURCE xor the PAGES based on paged.js status.
+     ready  → paged.js produced .pagedjs_page boxes → print those, hide source.
+     else   → paged.js failed/loading → native print the source (paged.js pages
+              are empty here; printing them gave a blank PDF). */
+  body > .parchment-print-overlay[data-print-status="ready"] .parchment-print-source {
+    display: none;
+    visibility: hidden;
+  }
+  body > .parchment-print-overlay[data-print-status="ready"] .parchment-print-pages {
     display: block;
     padding: 0;
     overflow: visible;
     flex: none;
+  }
+  body > .parchment-print-overlay:not([data-print-status="ready"]) .parchment-print-source {
+    display: block;
+    visibility: visible;
+    position: static;
+    left: auto;
+    top: auto;
+    width: auto;
+    height: auto;
+    overflow: visible;
+  }
+  body > .parchment-print-overlay:not([data-print-status="ready"]) .parchment-print-pages {
+    display: none;
   }
 }
 

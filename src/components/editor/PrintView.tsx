@@ -203,6 +203,10 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
   const overlay = (
     <div
       className="parchment-print-overlay"
+      // #10 (v0.1.9): the @media print rules key off this so the NATIVE-print
+      // fallback (paged.js failed → status!=='ready') prints the source content
+      // instead of the empty paged.js pages container (which produced a blank PDF).
+      data-print-status={status}
       role="dialog"
       aria-modal="true"
       aria-label="Print / PDF"
@@ -265,7 +269,19 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
         style={
           status === 'ready'
             ? { display: 'none' }
-            : { position: 'static', left: 'auto', display: 'block' }
+            : // #10: in the native-print fallback the source IS the printable (and
+              // on-screen preview) content — fully un-hide it (the base CSS keeps it
+              // offscreen/hidden for the paged.js-reads-it case).
+              {
+                position: 'static',
+                left: 'auto',
+                top: 'auto',
+                width: 'auto',
+                height: 'auto',
+                overflow: 'visible',
+                visibility: 'visible',
+                display: 'block',
+              }
         }
       >
         <article className="parchment-export">{renderReadOnlyDoc(content)}</article>

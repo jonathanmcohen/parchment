@@ -664,12 +664,26 @@ body {
   max-height: 70vh;
   overflow-y: auto;
   scrollbar-width: thin;
+  /* 1e: theme the native scrollbar so it adapts per scheme. */
+  scrollbar-color: var(--border) transparent;
   padding: 8px 0;
   border: 1px solid var(--border-chrome);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow-dropdown);
 }
+/* 1e: Chromium-webkit thumb theming to match scrollbar-color above. */
+.px-menu::-webkit-scrollbar {
+  width: 6px;
+}
+.px-menu::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+.px-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 /* v0.1.9 #1: the OPEN editor/menu-bar dropdown is portalled to the body-level
    #parchment-overlay-root and positioned `fixed` from the trigger's measured
    rect (top + left|right supplied inline by Menu.tsx; `align` decides which edge
@@ -1384,6 +1398,8 @@ body {
   overflow-y: hidden;
   /* Thin, unobtrusive scrollbar only when the row actually overflows. */
   scrollbar-width: thin;
+  /* 1e: theme the native scrollbar so it adapts per scheme. */
+  scrollbar-color: var(--border) transparent;
 }
 
 /* S4-3/S4-4: 32×32 icon-button box (var(--icon-btn)) with 14px Roboto text and a
@@ -2789,14 +2805,16 @@ body {
 
 /* ── Diff highlighting (C7) ────────────────────────────────────────────── */
 .parchment-cb-diff-add {
-  background: color-mix(in srgb, #22c55e 18%, transparent);
+  /* 1c: token-driven so the tint adapts per scheme (was hardcoded #22c55e). */
+  background: color-mix(in srgb, var(--success) 18%, transparent);
   /* green — contrast-safe against both light and dark pre backgrounds */
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 
 .parchment-cb-diff-del {
-  background: color-mix(in srgb, #ef4444 18%, transparent);
+  /* 1c: token-driven so the tint adapts per scheme (was hardcoded #ef4444). */
+  background: color-mix(in srgb, var(--error) 18%, transparent);
   /* red — contrast-safe */
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
@@ -2979,6 +2997,36 @@ body {
 }
 [data-page-bg="dark"] .parchment-fn-ref-link,
 [data-page-bg="dark"] .parchment-fn-backlink {
+  color: var(--info);
+}
+
+/* ── #1d (v0.1.10): dark document page — interactive accent overrides ────────
+ *
+ *  The user accent (`--accent`) is a user-chosen color that may be low-contrast
+ *  on the dark sheet (#1e1f22). These `[data-page-bg="dark"]` overrides ensure
+ *  interactive in-page elements clear the WCAG 3:1 UI contrast threshold by
+ *  pointing them at `--info` (#8ab4f8, 7.8:1 on #1e1f22) rather than the raw
+ *  `--accent` or `--primary` token whose light-mode values may be dark-on-dark.
+ *  White/sepia/custom-hex pages are untouched. */
+
+/* Task-list checkbox: accent-color drives the OS-native checkbox fill color. */
+[data-page-bg="dark"] .parchment-prose ul[data-type="taskList"] li > label input[type="checkbox"] {
+  accent-color: var(--info);
+}
+
+/* Table column-resize handle: background is the drag affordance on the dark page. */
+[data-page-bg="dark"] .parchment-prose table .column-resize-handle {
+  background: var(--info);
+}
+
+/* Selected cell: outline + translucent fill uses --info on the dark sheet. */
+[data-page-bg="dark"] .parchment-prose table .selectedCell {
+  outline-color: var(--info);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+}
+
+/* TOC link hover: accent on dark may be dark-on-dark — use the brighter --info. */
+[data-page-bg="dark"] .parchment-toc-link:hover {
   color: var(--info);
 }
 
@@ -4769,4 +4817,35 @@ body {
 [data-font="dyslexic"] .parchment-prose h5,
 [data-font="dyslexic"] .parchment-prose h6 {
   font-family: "OpenDyslexic", "Comic Sans MS", "Trebuchet MS", Verdana, sans-serif;
+}
+
+/* ── K2: HC page-ink restore for non-dark pages (#15, 🔴 a11y) ─────────────────
+ *
+ *  In High-Contrast + dark-resolved scheme, tokens.css forces --page-ink:#fff
+ *  because HC-dark assumes the page sheet is BLACK (#000). But white/sepia pages
+ *  keep a LIGHT --page-bg → .parchment-prose { color: var(--page-ink) } renders
+ *  white-on-white (contrast 1:1, invisible). The tokens.css HC-dark blocks are
+ *  correct for the dark page; this rule RESTORES dark ink when the page is NOT
+ *  [data-page-bg="dark"] (i.e. white, sepia, or any custom light page-bg).
+ *
+ *  Headings, lists, blockquotes, and all other prose descendants inherit
+ *  --page-ink from .parchment-prose or .parchment-page, so this single rule
+ *  covers all of them. The explicit-dark HC form AND the @media system-dark HC
+ *  form are both overridden so the fix is symmetrical across all three dark
+ *  contexts (explicit-dark / system-dark / page-bg-dark). Verified live:
+ *  prose #fff→#000, contrast 1:1→21:1.
+ * ─────────────────────────────────────────────────────────────────────────── */
+[data-high-contrast="true"][data-color-scheme="dark"]:not([data-page-bg="dark"]) .parchment-prose,
+[data-high-contrast="true"][data-color-scheme="dark"]:not([data-page-bg="dark"]) .parchment-page {
+  --page-ink: #000000;
+  --page-ink-muted: #1a1a1a;
+}
+@media (prefers-color-scheme: dark) {
+  [data-high-contrast="true"][data-color-scheme="system"]:not([data-page-bg="dark"])
+    .parchment-prose,
+  [data-high-contrast="true"][data-color-scheme="system"]:not([data-page-bg="dark"])
+    .parchment-page {
+    --page-ink: #000000;
+    --page-ink-muted: #1a1a1a;
+  }
 }

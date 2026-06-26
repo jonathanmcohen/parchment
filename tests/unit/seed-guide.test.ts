@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GUIDE_DOC_TITLES, GUIDE_DOCS, GUIDE_FOLDER_NAME } from '@/lib/docs/seed-guide-content'
+import { CHANGELOG } from '@/lib/help/content'
 import { APP_VERSION } from '@/lib/version'
 
 // L6: the first-run guide content is PURE data (no db/React), so it is unit-
@@ -57,5 +58,33 @@ describe('L6 — Parchment Guide seed content', () => {
     // The version also appears in the rendered body text.
     const flat = JSON.stringify(releaseDoc?.content)
     expect(flat).toContain(APP_VERSION)
+  })
+
+  it('release-notes doc contains a level-2 heading for every CHANGELOG version', () => {
+    const releaseDoc = GUIDE_DOCS.find((d) => d.key === 'release-notes')
+    expect(releaseDoc).toBeDefined()
+    const nodes = (releaseDoc?.content.content ?? []) as Record<string, unknown>[]
+    const h2Texts = nodes
+      .filter((n) => n.type === 'heading' && (n.attrs as Record<string, unknown>)?.level === 2)
+      .flatMap((n) => ((n.content ?? []) as Record<string, unknown>[]).map((t) => t.text as string))
+    for (const entry of CHANGELOG) {
+      expect(h2Texts).toContain(`v${entry.version}`)
+    }
+  })
+
+  it('release-notes doc lists newest version before oldest', () => {
+    const releaseDoc = GUIDE_DOCS.find((d) => d.key === 'release-notes')
+    expect(releaseDoc).toBeDefined()
+    const nodes = (releaseDoc?.content.content ?? []) as Record<string, unknown>[]
+    const h2Texts = nodes
+      .filter((n) => n.type === 'heading' && (n.attrs as Record<string, unknown>)?.level === 2)
+      .flatMap((n) => ((n.content ?? []) as Record<string, unknown>[]).map((t) => t.text as string))
+    // biome-ignore lint/style/noNonNullAssertion: CHANGELOG always has at least one entry
+    const newestIdx = h2Texts.indexOf(`v${CHANGELOG[0]!.version}`)
+    // biome-ignore lint/style/noNonNullAssertion: CHANGELOG always has at least one entry
+    const oldestIdx = h2Texts.indexOf(`v${CHANGELOG[CHANGELOG.length - 1]!.version}`)
+    expect(newestIdx).toBeGreaterThanOrEqual(0)
+    expect(oldestIdx).toBeGreaterThanOrEqual(0)
+    expect(newestIdx).toBeLessThan(oldestIdx)
   })
 })

@@ -6,7 +6,7 @@
 // seedGuideWorkspace passes each doc's `content` straight to createDocument, so
 // the guide lands disk-mirrored + searchable + markdown-projected like any doc.
 
-import { RELEASE_NOTES } from '@/lib/help/content'
+import { CHANGELOG, RELEASE_NOTES } from '@/lib/help/content'
 
 /** A ProseMirror document node, minimal but real (same shape as builtin-templates). */
 export interface ProseMirrorDoc {
@@ -52,17 +52,21 @@ export const GUIDE_FOLDER_NAME = 'Parchment Guide'
 
 // ─── The guide docs ────────────────────────────────────────────────────────────
 
-/** Release-notes doc body: reuses I9's RELEASE_NOTES highlights, no duplication. */
+/** Release-notes doc body: renders the full CHANGELOG, newest version first. */
 function releaseNotesDoc(): ProseMirrorDoc {
+  const entries: Record<string, unknown>[] = []
+  for (const entry of CHANGELOG) {
+    entries.push(heading(2, `v${entry.version}`))
+    entries.push(bullets(...entry.notes))
+  }
   return {
     type: 'doc',
     content: [
-      heading(1, `Release notes — v${RELEASE_NOTES.version}`),
+      heading(1, 'Release notes'),
       paragraph(
-        `Highlights of the v${RELEASE_NOTES.version} release. You can always re-read these from the Help menu or the What's new page.`,
+        "What's changed in each version of Parchment. You can always re-read these from the Help menu or the What's new page.",
       ),
-      heading(2, 'Highlights'),
-      bullets(...RELEASE_NOTES.highlights),
+      ...entries,
     ],
   }
 }

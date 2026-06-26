@@ -36,25 +36,97 @@ export type ReleaseNotes = {
   highlights: string[]
 }
 
+// ── Full per-version changelog ────────────────────────────────────────────────
+
+export type ChangelogEntry = {
+  version: string
+  notes: string[]
+}
+
+/** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
+export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.1.9',
+    notes: [
+      'Reliability + polish pass: overlay/dropdown/tooltip fixes, single-scroll editor with sticky chrome, instant theme/style changes, selectable light/dark page with consistent legibility, working Trash, fixed PDF export, smarter code-block language detection, and this full changelog.',
+    ],
+  },
+  {
+    version: '0.1.8',
+    notes: [
+      'Title renames appear in the file list immediately on client-side navigation, no reload.',
+    ],
+  },
+  {
+    version: '0.1.7',
+    notes: [
+      'System-dark active-item contrast fix.',
+      'Right-edge dropdowns no longer open off-screen.',
+      'Rename via Server Action.',
+      'Code blocks auto-detect language on edit.',
+      'Code-block delete button.',
+      'HTML export with syntax highlighting.',
+    ],
+  },
+  {
+    version: '0.1.6',
+    notes: [
+      'New Parchment logo (favicon + app icon).',
+      'One-row toolbar that never scrolls.',
+      'Instant title renames across the file list.',
+    ],
+  },
+  {
+    version: '0.1.5',
+    notes: [
+      'Full-width toolbar with a ⋯ overflow menu.',
+      'Legible code blocks in dark mode.',
+      'Consistent System theme.',
+      'Paged layout option.',
+      'About moved into Settings.',
+      'Broad dark-mode + UI polish sweep.',
+    ],
+  },
+  {
+    version: '0.1.4',
+    notes: [
+      'Account-level theme save.',
+      'Dark-mode slash/wiki/cite menus.',
+      'Account name & language persistence.',
+      'Password-change hardening.',
+      'Runtime collab URL.',
+      'No editor hydration error.',
+      'Tighter editor top bar.',
+    ],
+  },
+  {
+    version: '0.1.3',
+    notes: [
+      'Live-deploy fixes + a Google-Docs layout sweep (theme save, share links, settings, sidebar/status/editor spacing).',
+    ],
+  },
+  {
+    version: '0.1.2',
+    notes: ['Function-gap fixes + Google-Docs layout + chrome polish.'],
+  },
+  {
+    version: '0.1.1',
+    notes: ['Visual-parity sweep toward the Google-Docs look.'],
+  },
+  {
+    version: '0.1.0',
+    notes: [
+      'First release: collaborative Tiptap+Yjs editor, disk-mirror Markdown, five themes, slash/wiki/cite menus + command palette, presenter mode, export to Markdown/HTML/DOCX/EPUB, public + password-protected sharing.',
+    ],
+  },
+]
+
+// CHANGELOG is non-empty by construction; the non-null assertion is safe.
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 export const RELEASE_NOTES: ReleaseNotes = {
   version: APP_VERSION,
-  highlights: [
-    'Title renames now appear in the file list immediately on client-side navigation — no manual reload needed',
-    'Legibility + polish: a readable active item in system dark mode, dropdowns that no longer open off-screen, instant title renames across the file list, code blocks that auto-highlight their language, syntax-highlighted HTML export, and a delete button on code blocks',
-    'New Parchment logo (favicon + app icon), a one-row toolbar that never scrolls, and instant title renames across the file list',
-    'Editor + theme polish: full-width toolbar with a “⋯ More” overflow (no more horizontal scroll), legible code blocks in dark mode, a consistent System theme, a Paged layout option, About moved into Settings, instant title renames, and a broad dark-mode + UI polish sweep',
-    'Reliability + polish: dark-mode slash/wiki/cite menus, Account name & language now save, password-change hardening, runtime collab URL, no editor hydration error, tighter editor top bar',
-    'Live-deploy fixes + a full Google-Docs layout sweep (theme save, share links, settings, sidebar/status/editor spacing)',
-    'Google Docs-style interface — full-width chrome, anchored outline, centered page, and a polished light/dark theme',
-    'Rich collaborative editor powered by Tiptap + Yjs — real-time co-editing with presence cursors',
-    'Disk-mirror: every document is a Markdown file on disk, git-tracked and portable',
-    'Diagrams, math (LaTeX), and citations built in — Mermaid, draw.io, PlantUML, KaTeX',
-    'Export to Markdown, HTML, DOCX, and EPUB; import from Markdown and DOCX',
-    'Sharing with public read-only links and password-protected views',
-    'Five built-in themes (paper, slate, forest, ocean, rose) plus custom CSS per document',
-    'Slash-command menu, wiki links [[ ]], @-citations, and a command palette (⌘K)',
-    'Presenter mode (F5) with speaker notes and keyboard navigation',
-  ],
+  // biome-ignore lint/style/noNonNullAssertion: CHANGELOG always has at least one entry
+  highlights: CHANGELOG[0]!.notes,
 }
 
 // ── Tour steps ────────────────────────────────────────────────────────────────

@@ -2233,6 +2233,19 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
     fetchTags()
   }, [fetchTags])
 
+  // P3 (v0.1.8): the /files RSC payload (initialDocs) can be served STALE from
+  // the client Router Cache on a client-nav — e.g. right after an editor rename,
+  // where even a Server Action's revalidatePath did not reliably bust the client
+  // cache (the recurring I6 symptom: rename persists, but client-nav to /files
+  // showed the old title until a hard reload). Refetch the current "All"-view
+  // docs once on mount so /files always reflects the latest titles, independent
+  // of the Router Cache. Flat views (recents/starred/trash) refresh via their own
+  // effect above; folder navigation refreshes via navigateTo.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only refresh — view/folder changes are handled by the flat-view effect and navigateTo, so this must NOT re-run on every change.
+  useEffect(() => {
+    if (view === 'all') fetchDocs(currentFolderId)
+  }, [])
+
   // H9: handle file import via /api/docs/import
   const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

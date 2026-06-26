@@ -39,6 +39,7 @@ export type ReleaseNotes = {
 export const RELEASE_NOTES: ReleaseNotes = {
   version: APP_VERSION,
   highlights: [
+    'Title renames now appear in the file list immediately on client-side navigation — no manual reload needed',
     'Legibility + polish: a readable active item in system dark mode, dropdowns that no longer open off-screen, instant title renames across the file list, code blocks that auto-highlight their language, syntax-highlighted HTML export, and a delete button on code blocks',
     'New Parchment logo (favicon + app icon), a one-row toolbar that never scrolls, and instant title renames across the file list',
     'Editor + theme polish: full-width toolbar with a “⋯ More” overflow (no more horizontal scroll), legible code blocks in dark mode, a consistent System theme, a Paged layout option, About moved into Settings, instant title renames, and a broad dark-mode + UI polish sweep',

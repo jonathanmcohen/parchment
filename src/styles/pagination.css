@@ -1,0 +1,109 @@
+/* ───────────────────────────────────────────────────────────────────────────
+ * True content-splitting pagination (v0.1.10 #11/#12/#13).
+ *
+ * Styles for PaginatedDocument: a read-only document rendered as REAL, discrete
+ * .parchment-page sheets (one DOM sheet per page) with a Word-style gutter
+ * between them, per-page orientation, and a native-@page print path that prints
+ * those exact computed sheets (no paged.js).
+ *
+ * NOTE: this file is imported alongside globals.css (in src/app/layout.tsx); it
+ * intentionally does NOT modify the continuous-mode editor canvas — that path is
+ * unchanged and remains the default editing experience.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Root + Word-style gutter ──────────────────────────────────────────────── */
+
+/* The stack of sheets. The translucent gutter band reads as the trough between
+   physical sheets; each sheet floats with its own paper shadow. */
+.parchment-paged-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px; /* the inter-sheet gutter — like the gap between Word pages */
+  padding: 24px 0;
+}
+
+/* Hidden measuring container: the full read-only doc, laid out at the page
+   CONTENT width so each block's height matches what a real page would show.
+   Kept in the layout (so it actually lays out + can be measured) but pulled
+   off-screen and made non-interactive / invisible to AT. */
+.parchment-paged-measure {
+  position: absolute;
+  left: -99999px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  /* width is set inline to the content-box width; height is natural so the
+     blocks flow and we can read their offsets. */
+}
+
+/* ── Sheets ────────────────────────────────────────────────────────────────── */
+
+/* Each real page sheet. Reuses the .parchment-page paper look (background,
+   border, shadow come from globals.css .parchment-page); here we only add the
+   block layout context. width / min-height / padding are set inline from the
+   resolved per-page sheet box + margins so per-page orientation is exact. */
+.parchment-paged-sheet {
+  position: relative;
+  overflow: hidden; /* clip content that overflows a single sheet (oversized blocks) */
+  /* The sheet's own paper styling is inherited from .parchment-page. */
+}
+
+/* Content column inside a sheet — sits above the watermark layer. */
+.parchment-paged-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Watermark layer behind sheet content. */
+.parchment-paged-watermark {
+  z-index: 0;
+}
+
+/* ── Native print: print the real computed sheets via @page ────────────────── */
+/*
+ * #13: paged.js never worked under Turbopack, so we removed it entirely. The
+ * PaginatedDocument already produces correctly-sized sheets; for print we let the
+ * browser's native paginator place each sheet on its own physical page.
+ *
+ * The PrintView overlay is a direct child of <body>; globals.css already hides
+ * every other body child during print. Here we flatten the sheet stack so each
+ * .parchment-paged-sheet maps to one printed page (break-after) and strip the
+ * on-screen chrome (gutter, shadow, border) that should not print.
+ */
+@media print {
+  .parchment-paged-root {
+    display: block;
+    gap: 0;
+    padding: 0;
+  }
+
+  .parchment-paged-sheet {
+    /* On paper the @page box already provides the sheet size + margins, so the
+       sheet element itself becomes a plain content block that fills the page and
+       forces a page break after it. The inline width/min-height/padding are
+       overridden here so they don't double-apply on top of the @page margins. */
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    overflow: visible;
+    break-after: page;
+    break-inside: avoid;
+  }
+
+  /* The last sheet must not emit a trailing blank page. */
+  .parchment-paged-sheet:last-child {
+    break-after: auto;
+  }
+
+  /* Ensure watermarks + code-block colors render on paper. */
+  .parchment-paged-watermark,
+  .parchment-paged-content {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

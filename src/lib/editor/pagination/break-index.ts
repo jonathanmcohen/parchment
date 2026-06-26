@@ -83,6 +83,60 @@ export function computeBreakIndices(
 }
 
 /**
+ * Variable-height variant of `computeBreakIndices`: each page may have a
+ * DIFFERENT usable height (needed for per-page orientation — a landscape page is
+ * shorter than its portrait neighbours).
+ *
+ * `usableForPage(pageIndex)` returns the usable content height (px) for the
+ * 0-based page index. Semantics otherwise match `computeBreakIndices`: greedy
+ * first-fit, atomic blocks, an oversized block keeps its own page, the returned
+ * indices are the first-block-of-each-new-page positions.
+ *
+ * A page whose usable height is `<= 0` is treated as "do not break here" so a
+ * degenerate page size can never produce an infinite page run.
+ *
+ * When `usableForPage` returns the same constant for every page, the output is
+ * identical to `computeBreakIndices(heights, thatConstant)`.
+ */
+export function computeBreakIndicesVariable(
+  heights: readonly BlockHeight[],
+  usableForPage: (pageIndex: number) => number,
+): number[] {
+  if (heights.length === 0) return []
+
+  const breaks: number[] = []
+  let pageIndex = 0
+  let used = 0
+
+  for (let i = 0; i < heights.length; i++) {
+    const blockHeight = heights[i]?.height ?? 0
+
+    if (i === 0) {
+      used = blockHeight
+      continue
+    }
+
+    const usable = usableForPage(pageIndex)
+    if (usable <= 0) {
+      // Degenerate page height — accumulate without breaking (keeps everything on
+      // the current page) rather than risk an unbounded page count.
+      used += blockHeight
+      continue
+    }
+
+    if (used + blockHeight > usable) {
+      breaks.push(i)
+      pageIndex += 1
+      used = blockHeight
+    } else {
+      used += blockHeight
+    }
+  }
+
+  return breaks
+}
+
+/**
  * Group a flat list of block indices into per-page index ranges given the
  * break indices from `computeBreakIndices`.
  *

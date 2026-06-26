@@ -3,6 +3,7 @@ import { DEFAULT_PAGE_SETUP, type PageSetup } from '@/lib/editor/paginate'
 import {
   type BlockHeight,
   computeBreakIndices,
+  computeBreakIndicesVariable,
   contentBoxFor,
   orientationForPage,
   type PageOrientations,
@@ -74,6 +75,40 @@ describe('computeBreakIndices', () => {
     const blocks = h(120, 120, 120, 120, 120, 120, 120, 120) // 8 × 120 = 960
     // 7 blocks = 840 ≤ 920; 8th = 960 > 920 → break before block7.
     expect(computeBreakIndices(blocks, 920)).toEqual([7])
+  })
+})
+
+describe('computeBreakIndicesVariable', () => {
+  it('matches computeBreakIndices when every page has the same height', () => {
+    const blocks = h(600, 600, 600, 600)
+    const constant = () => 1000
+    expect(computeBreakIndicesVariable(blocks, constant)).toEqual(computeBreakIndices(blocks, 1000))
+  })
+
+  it('returns no breaks for an empty document', () => {
+    expect(computeBreakIndicesVariable([], () => 1000)).toEqual([])
+  })
+
+  it('uses each page’s own usable height (shorter page breaks sooner)', () => {
+    // Page 0 usable 1000, page 1 usable 500 (e.g. a landscape page).
+    const usable = (p: number) => (p === 0 ? 1000 : 500)
+    // block0 (400) p0; +400=800 ≤1000; +400=1200>1000 → break at 2 (p1 starts).
+    // p1 usable 500: used=400 (block2); +400=800>500 → break at 3 (p2).
+    // p2 — usable(2) === 500: used=400 (block3), no more blocks.
+    expect(computeBreakIndicesVariable(h(400, 400, 400, 400), usable)).toEqual([2, 3])
+  })
+
+  it('treats a non-positive page height as do-not-break (no infinite pages)', () => {
+    // If a page resolves to 0 usable height, accumulate rather than break forever.
+    const usable = () => 0
+    expect(computeBreakIndicesVariable(h(100, 100, 100), usable)).toEqual([])
+  })
+
+  it('keeps an oversized block on its own page with variable heights', () => {
+    const usable = () => 800
+    // block0 (300) p0; block1 (2000) overflows → p1 (oversized, alone);
+    // block2 (300) overflows the oversized page → p2.
+    expect(computeBreakIndicesVariable(h(300, 2000, 300), usable)).toEqual([1, 2])
   })
 })
 

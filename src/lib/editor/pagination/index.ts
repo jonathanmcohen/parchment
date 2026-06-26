@@ -9,6 +9,7 @@
 export {
   type BlockHeight,
   computeBreakIndices,
+  computeBreakIndicesVariable,
   pagesFromBreaks,
 } from '@/lib/editor/pagination/break-index'
 export {

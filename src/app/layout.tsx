@@ -4,6 +4,9 @@ import { getLocale, getMessages } from 'next-intl/server'
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister'
 import { localeDir } from '@/i18n/config'
 import './globals.css'
+// v0.1.10 #11/#12/#13: true content-splitting pagination styles (sheets + native
+// print). Kept in a separate file so it never touches the continuous-mode canvas.
+import '@/styles/pagination.css'
 
 export const metadata: Metadata = {
   title: 'Parchment',

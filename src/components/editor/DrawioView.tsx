@@ -49,10 +49,10 @@ export function DrawioView({ node, getPos, editor }: NodeViewProps) {
             padding: '2rem',
             textAlign: 'center',
             cursor: 'pointer',
-            border: '2px dashed #ccc',
+            border: '2px dashed var(--page-border)',
             borderRadius: '4px',
             background: 'none',
-            color: '#999',
+            color: 'var(--page-ink-muted)',
           }}
         >
           Empty diagram — click to edit

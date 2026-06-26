@@ -110,7 +110,7 @@ export function PlantumlPopover({ editor, pos, initialSource, onClose }: Props) 
                 announcing rendered markup noise. */}
             <div className="parchment-plantuml-preview" aria-hidden="true">
               {!source.trim() ? (
-                <span style={{ color: '#999' }}>(empty diagram)</span>
+                <span style={{ color: 'var(--page-ink-muted)' }}>(empty diagram)</span>
               ) : previewUrl !== null ? (
                 // biome-ignore lint/performance/noImgElement: external PlantUML server URL cannot use next/image (dynamic src from user-configured endpoint)
                 <img src={previewUrl} alt="PlantUML diagram preview" style={{ maxWidth: '100%' }} />

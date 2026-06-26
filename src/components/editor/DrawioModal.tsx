@@ -180,7 +180,7 @@ export function DrawioModal({ editor, pos, initialXml, onClose }: Props) {
               textAlign: 'center',
             }}
           >
-            <p style={{ color: '#999', fontStyle: 'italic' }}>
+            <p style={{ color: 'var(--page-ink-muted)', fontStyle: 'italic' }}>
               {base === null
                 ? 'Drawio editing disabled — set NEXT_PUBLIC_DRAWIO_EMBED_URL'
                 : 'Drawio editing disabled — NEXT_PUBLIC_DRAWIO_EMBED_URL is not a valid URL'}

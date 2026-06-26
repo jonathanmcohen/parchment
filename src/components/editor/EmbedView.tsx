@@ -81,10 +81,10 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
             padding: '2rem',
             textAlign: 'center',
             cursor: 'pointer',
-            border: '2px dashed #ccc',
+            border: '2px dashed var(--page-border)',
             borderRadius: '4px',
             background: 'none',
-            color: '#999',
+            color: 'var(--page-ink-muted)',
           }}
         >
           Empty embed — click to add a calendar or spreadsheet URL
@@ -178,7 +178,7 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#333' }}>
+          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--page-ink-muted)' }}>
             {title || 'External link'}
           </div>
           {isSafeHref ? (
@@ -192,7 +192,7 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
                 fontSize: '0.8rem',
-                color: '#0b6bcb',
+                color: 'var(--info)',
               }}
             >
               {url}
@@ -206,13 +206,13 @@ export function EmbedView({ node, getPos, editor }: NodeViewProps) {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
                 fontSize: '0.8rem',
-                color: '#999',
+                color: 'var(--page-ink-muted)',
               }}
             >
               {url}
             </div>
           )}
-          <div style={{ fontSize: '0.72rem', color: '#999', marginTop: '0.2rem' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--page-ink-muted)', marginTop: '0.2rem' }}>
             {isSafeHref
               ? 'Not an embeddable provider — opens in a new tab.'
               : 'Unsupported link — cannot be opened.'}

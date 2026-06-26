@@ -45,7 +45,7 @@ const BADGE: Record<CardStatus['state'], { bg: string; fg: string; label: string
   open: { bg: '#dafbe1', fg: '#1a7f37', label: 'Open' },
   closed: { bg: '#ffebe9', fg: '#cf222e', label: 'Closed' },
   merged: { bg: '#fbefff', fg: '#8250df', label: 'Merged' },
-  draft: { bg: '#eaeef2', fg: '#57606a', label: 'Draft' },
+  draft: { bg: '#eaeef2', fg: 'var(--page-ink-muted)', label: 'Draft' },
 }
 
 function refFromAttrs(attrs: Record<string, unknown>): GithubRef | null {
@@ -143,10 +143,10 @@ export function GithubEmbedView({ node, getPos, editor }: NodeViewProps) {
             padding: '2rem',
             textAlign: 'center',
             cursor: 'pointer',
-            border: '2px dashed #ccc',
+            border: '2px dashed var(--page-border)',
             borderRadius: '6px',
             background: 'none',
-            color: '#999',
+            color: 'var(--page-ink-muted)',
           }}
         >
           Empty GitHub embed — click to add a PR or issue URL
@@ -190,7 +190,7 @@ export function GithubEmbedView({ node, getPos, editor }: NodeViewProps) {
               marginBottom: '0.25rem',
             }}
           >
-            <span style={{ fontSize: '0.72rem', color: '#57606a', fontWeight: 600 }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--page-ink-muted)', fontWeight: 600 }}>
               {kindLabel}
             </span>
             {/* State badge — only when live status resolved. role=status so the
@@ -211,9 +211,13 @@ export function GithubEmbedView({ node, getPos, editor }: NodeViewProps) {
                   {badge.label}
                 </span>
               ) : fetchState.phase === 'loading' ? (
-                <span style={{ fontSize: '0.72rem', color: '#999' }}>Loading status…</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--page-ink-muted)' }}>
+                  Loading status…
+                </span>
               ) : (
-                <span style={{ fontSize: '0.72rem', color: '#999' }}>Status unavailable</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--page-ink-muted)' }}>
+                  Status unavailable
+                </span>
               )}
             </span>
           </div>
@@ -228,7 +232,7 @@ export function GithubEmbedView({ node, getPos, editor }: NodeViewProps) {
               display: 'block',
               fontWeight: 600,
               fontSize: '0.92rem',
-              color: '#0969da',
+              color: 'var(--info)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -237,7 +241,7 @@ export function GithubEmbedView({ node, getPos, editor }: NodeViewProps) {
             {cardTitle}
           </a>
 
-          <div style={{ fontSize: '0.75rem', color: '#57606a', marginTop: '0.2rem' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--page-ink-muted)', marginTop: '0.2rem' }}>
             <span>{repoSlug}</span>
             {ready?.author ? <span>{` · by ${ready.author}`}</span> : null}
           </div>

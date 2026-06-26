@@ -452,7 +452,15 @@ body {
   /* F8+L3: reserve the pinned status bar's 24px so a long doc's last line is
      never hidden behind the fixed bottom bar (on top of the base 2rem). */
   padding-bottom: calc(2rem + 24px);
-  min-height: 100vh;
+  /* #12/#14 — fill the host <main> (already ≈viewport height via the
+     .parchment-app-shell min-h-screen flex column) WITHOUT forcing a second
+     scrollbar. `min-height: 100vh` measured here — inside <main>'s 2rem padding
+     box and beneath the 136px chrome — guarantees the shell exceeds the viewport
+     even for a short doc, forcing the window scrollbar to always appear (and,
+     combined with the gutter's former nested scroller, a second one). `100%`
+     fills the flex-sized <main> so the gray gutter still reaches the viewport
+     bottom for short docs, but a short doc no longer overflows the window. */
+  min-height: 100%;
 }
 
 /* ── S3: editor chrome (title bar, menu bar, shared dropdown shell) ───────────
@@ -871,24 +879,56 @@ body {
 }
 
 /* ── L5: canvas gutter container ─────────────────────────────────────────────
- * The flex:1 column to the right of the 256px outline rail. After the L6
+ * The flex:1 column to the right of the 220px outline rail. After the L6
  * de-clamp it spans the full remaining main-content width, so the fixed-width
  * .parchment-page (816px @100%, centered via its own mx-auto) floats centered in
  * the gutter field painted by .parchment-editor-shell (--editor-gutter).
  *
- * Horizontal overflow lives HERE (and only here): at high zoom×width the page can
- * exceed the viewport, so overflow-x:auto scrolls ONLY this gutter sideways — the
- * sticky chrome stack (title/menu/toolbar) and the fixed status bar never scroll.
- * 24px top/bottom padding keeps breathing room above/below the page on top of the
- * shell's own 2rem; the page is never hidden behind the 136px chrome or sidebar.
- * Desktop-only — the S2-6 mobile --page-scale path (≤768px) is untouched. */
+ * #12/#14 — SINGLE SCROLL CONTAINER: the gutter MUST NOT establish its own
+ * scroll context. The page content scrolls vertically against the WINDOW (the
+ * sole scroll container), which is also the nearest scrolling ancestor of the
+ * position:sticky chrome stack (title/menu/toolbar) and the sticky outline rail —
+ * so sticky engages and there is exactly one vertical scrollbar.
+ *
+ * Pitfall this avoids: `overflow-x: auto` with `overflow-y: visible` does NOT
+ * stay single-axis. Per the CSS Overflow spec, when one axis is `visible` and the
+ * other is `auto`/`scroll`, the `visible` axis is COERCED to `auto` — making the
+ * box a scroll container on BOTH axes. A long page then grows a SECOND (nested)
+ * vertical scrollbar inside the gutter (#12) and the window-anchored sticky chrome
+ * desyncs from the inner-scrolled content (#14). So the default here is plain
+ * `overflow: visible` — no scroll container at all; vertical scroll falls through
+ * to the window.
+ *
+ * Horizontal reachability for very wide pages (816px page at high browser zoom,
+ * which shrinks the CSS viewport until the page no longer fits beside the rails)
+ * is restored ONLY in the narrow regime via the gated rule below — so the nested
+ * scroll context can never appear at the normal desktop widths where #12/#14 are
+ * seen. The S2-6 mobile --page-scale path (≤768px) shrinks the page to fit and
+ * never needs horizontal scroll. */
 .parchment-canvas-gutter {
-  overflow-x: auto;
+  /* Default: no nested scroll context — the WINDOW owns vertical scroll so the
+     sticky chrome + outline rail stick to it and there is a single scrollbar. */
+  overflow: visible;
   /* LT2-1: page top margin ≈96px (1in @96dpi). The shell's 2rem top + the 56/32/48
      chrome already seat the page; drop the extra top breathing room (was 24px) so the
      page-top lands at the spec 96px. Bottom keeps 24px so the last page isn't flush. */
   padding-top: 0;
   padding-bottom: 24px;
+}
+
+/* #12/#14 — horizontal reach for wide pages only. The 816px page sits beside the
+ * 220px outline rail + 256px sidebar inside the 2rem-padded shell, fitting around
+ * ~1360px of viewport. Below that — including when high browser zoom shrinks the
+ * CSS viewport width — the page can exceed the gutter, so re-enable horizontal
+ * scrolling on the gutter alone to keep the right edge reachable. This is the only
+ * regime where the gutter becomes a scroll container; at the wide desktop widths
+ * where the double-scrollbar / detached-chrome bugs are reported, the rule above
+ * keeps it `overflow: visible`. The mobile path (≤768px) is handled by --page-scale,
+ * so this gate stops at 769px. */
+@media (min-width: 769px) and (max-width: 1360px) {
+  .parchment-canvas-gutter {
+    overflow-x: auto;
+  }
 }
 
 /* Page canvas (B1) */

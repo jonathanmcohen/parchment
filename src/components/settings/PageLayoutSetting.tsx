@@ -102,7 +102,7 @@ export function PageLayoutSetting() {
         })}
       </div>
       {error && (
-        <p className="mt-2 text-sm" style={{ color: '#dc2626' }} role="alert">
+        <p className="mt-2 text-sm" style={{ color: 'var(--error)' }} role="alert">
           {error}
         </p>
       )}

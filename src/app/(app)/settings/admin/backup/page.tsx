@@ -13,8 +13,8 @@ export const dynamic = 'force-dynamic'
 
 const STATUS_COLOR: Record<JobState['lastStatus'], string> = {
   never: 'var(--muted)',
-  ok: '#16803d', // green-700
-  error: '#b91c1c', // red-700
+  ok: 'var(--success)',
+  error: 'var(--error)',
 }
 const STATUS_LABEL: Record<JobState['lastStatus'], string> = {
   never: 'Never run',
@@ -112,7 +112,7 @@ export default async function BackupPage() {
               <dd className="tabular-nums">{s3Job?.runCount ?? 0}</dd>
             </dl>
             {s3Job?.lastError ? (
-              <p className="mt-2 break-words text-xs" style={{ color: '#b91c1c' }}>
+              <p className="mt-2 break-words text-xs" style={{ color: 'var(--error)' }}>
                 {s3Job.lastError}
               </p>
             ) : null}

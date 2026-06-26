@@ -12,8 +12,8 @@ export const dynamic = 'force-dynamic'
 // AA-contrast status colors against light paper (mirrors HealthPills).
 const STATUS_COLOR: Record<JobState['lastStatus'], string> = {
   never: 'var(--muted)',
-  ok: '#16803d', // green-700
-  error: '#b91c1c', // red-700
+  ok: 'var(--success)',
+  error: 'var(--error)',
 }
 const STATUS_LABEL: Record<JobState['lastStatus'], string> = {
   never: 'Never run',
@@ -125,7 +125,7 @@ export default async function SchedulesPage() {
                     {job.lastError ? (
                       <span
                         className="mt-0.5 block break-words text-xs"
-                        style={{ color: '#b91c1c' }}
+                        style={{ color: 'var(--error)' }}
                       >
                         {job.lastError}
                       </span>

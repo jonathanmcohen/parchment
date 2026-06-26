@@ -46,6 +46,12 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.11',
+    notes: [
+      'Fixed the slash, wiki-link, and citation menus rendering behind code blocks and the table of contents — they now always appear on top.',
+    ],
+  },
+  {
     version: '0.1.10',
     notes: [
       'Legible PDF/print in dark mode — printed pages are now always black-on-white regardless of your theme — and the editor toolbar/header stays pinned while you scroll long documents.',

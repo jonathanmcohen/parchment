@@ -3300,6 +3300,20 @@ body {
   z-index: 9999;
 }
 
+/* v0.1.11: the slash/wiki/cite/cairn suggestion popups + the shared Menu
+ * dropdowns are mounted into #parchment-overlay-root (a body-level child).
+ * @tiptap/suggestion wraps each popup in a `position:absolute` .react-renderer
+ * whose own z-index was `auto` — so the z-index:9999 ABOVE (on the inner static
+ * .parchment-slash-menu node) was ignored, and the whole popup painted at the
+ * root's z:auto level, BEHIND `.parchment-page-content` (position:relative;
+ * z-index:1) → the slash menu showed behind code blocks / the TOC NodeView.
+ * Put the z-index on the POSITIONED overlay-root children themselves so they
+ * out-stack the page-content stacking context. (Reading/print full-bleed
+ * overlays stay above at z-index:10000; they portal to <body>, not here.) */
+#parchment-overlay-root > * {
+  z-index: 9999;
+}
+
 /* Left category rail */
 .parchment-slash-rail {
   display: flex;

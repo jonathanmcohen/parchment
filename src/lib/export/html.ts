@@ -285,33 +285,58 @@ async function annotateCodeBlocksWithShiki(
   return { ...node, content: newContent }
 }
 
+/**
+ * Public, reusable Shiki pre-pass for the export/print pipeline.
+ *
+ * Given a ProseMirror doc JSON, returns a NEW doc whose highlightable codeBlock
+ * nodes carry a pre-built, escaped + hex-color-validated `__exportHtml` attr.
+ * That attr is ONLY honoured by render-pm when it is called with
+ * `exportHighlight: true`; the public share viewer ignores it. Combined with the
+ * defense-in-depth strip of any forged incoming `__exportHtml`, this keeps the
+ * XSS surface closed.
+ *
+ * Plantuml nodes are first downgraded to a source-in-pre codeBlock so no external
+ * resource URL is ever embedded (mirrors docToStandaloneHtml).
+ *
+ * The whole thing is wrapped in try/catch: if Shiki is unavailable or any step
+ * fails, the (plantuml-stripped) doc is returned unchanged so callers fall back
+ * to plaintext code blocks. Never throws.
+ *
+ * @param theme A Shiki theme id; defaults to the LIGHT `github-light` so the
+ *   output reads correctly on white paper (PDF/print) and white export pages.
+ */
+export async function annotateDocWithShiki(doc: unknown, theme?: string): Promise<unknown> {
+  // Strip plantuml nodes to their source-in-pre fallback before highlighting so
+  // the result never references an external resource URL.
+  const safeDoc = doc && typeof doc === 'object' ? stripPlantumlToSource(doc as PMNode) : doc
+  try {
+    const { getHighlighter, ensureLanguage, DEFAULT_THEME } = await import(
+      '@/lib/editor/shiki/highlighter'
+    )
+    const { normalizeLang, isSupportedLanguage } = await import('@/lib/editor/shiki/languages')
+    const hl = await getHighlighter()
+    return await annotateCodeBlocksWithShiki(
+      safeDoc as PMNode,
+      hl,
+      ensureLanguage,
+      normalizeLang,
+      isSupportedLanguage,
+      theme ?? DEFAULT_THEME,
+    )
+  } catch {
+    // Shiki unavailable or failed — return the (plantuml-stripped) doc so callers
+    // render plaintext code blocks.
+    return safeDoc
+  }
+}
+
 export async function docToStandaloneHtml(doc: unknown, title: string): Promise<string> {
   try {
     const { renderToStaticMarkup } = await import('react-dom/server')
-    // Strip plantuml nodes to their source-in-pre fallback before rendering
-    // so the exported file never contains an external resource URL, regardless
-    // of whether NEXT_PUBLIC_PLANTUML_SERVER_URL is configured on the server.
-    let safeDoc = doc && typeof doc === 'object' ? stripPlantumlToSource(doc as PMNode) : doc
-
-    // Pre-pass: annotate codeBlock nodes with Shiki syntax-highlighted HTML.
-    // Wrapped in try/catch so any Shiki failure falls back to plaintext.
-    try {
-      const { getHighlighter, ensureLanguage, DEFAULT_THEME } = await import(
-        '@/lib/editor/shiki/highlighter'
-      )
-      const { normalizeLang, isSupportedLanguage } = await import('@/lib/editor/shiki/languages')
-      const hl = await getHighlighter()
-      safeDoc = await annotateCodeBlocksWithShiki(
-        safeDoc as PMNode,
-        hl,
-        ensureLanguage,
-        normalizeLang,
-        isSupportedLanguage,
-        DEFAULT_THEME,
-      )
-    } catch {
-      // Shiki unavailable or failed — continue with plaintext code blocks
-    }
+    // Strip plantuml nodes + annotate codeBlocks with Shiki HTML in one pass.
+    // annotateDocWithShiki is self-contained (own try/catch) and returns the
+    // plantuml-stripped doc unchanged if Shiki is unavailable.
+    const safeDoc = await annotateDocWithShiki(doc)
 
     // exportHighlight: true authorizes render-pm to emit our pre-built code-block
     // HTML for THIS render only — no other caller (public viewer included) does.

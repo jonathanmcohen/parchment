@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { renderReadOnlyDoc } from '@/components/share/render-pm'
 import type { PageSetup } from '@/lib/editor/paginate'
-import { EXPORT_STYLESHEET } from '@/lib/export/html'
+import { annotateDocWithShiki, EXPORT_STYLESHEET } from '@/lib/export/html'
 import { pageCss } from '@/lib/export/page-css'
 
 type Props = {
@@ -31,6 +31,27 @@ type Status = 'loading' | 'ready' | 'fallback'
 
 export function PrintView({ content, pageSetup, onClose }: Props) {
   const [status, setStatus] = useState<Status>('loading')
+
+  // #14 (v0.1.10): syntax-highlighted code blocks in print/PDF.
+  // The doc is annotated with Shiki tokens (using the LIGHT github-light theme so
+  // colors read on white paper) on mount; until that resolves we render the raw
+  // doc (plaintext code), then swap in the highlighted version. The annotated doc
+  // carries pre-built, escaped + hex-color-validated `__exportHtml` attrs that
+  // render-pm only honours under `exportHighlight: true` — the XSS gate stays shut.
+  const [annotatedContent, setAnnotatedContent] = useState<unknown>(content)
+
+  useEffect(() => {
+    let cancelled = false
+    // Reset to the plain doc immediately so a content change never shows stale
+    // highlighting from the previous snapshot.
+    setAnnotatedContent(content)
+    void annotateDocWithShiki(content).then((annotated) => {
+      if (!cancelled) setAnnotatedContent(annotated)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [content])
 
   // The hidden source container that we render the React tree into as HTML,
   // and the visible render target that paged.js will paginate into.
@@ -284,7 +305,12 @@ export function PrintView({ content, pageSetup, onClose }: Props) {
               }
         }
       >
-        <article className="parchment-export">{renderReadOnlyDoc(content)}</article>
+        {/* #14: render with exportHighlight so render-pm emits the pre-built,
+            XSS-gated Shiki HTML for code blocks (annotatedContent). Before the
+            async pre-pass resolves, annotatedContent === content (plaintext). */}
+        <article className="parchment-export">
+          {renderReadOnlyDoc(annotatedContent, { exportHighlight: true })}
+        </article>
       </div>
 
       {/* ── Paged.js render target — paginated .pagedjs_page boxes land here ── */}

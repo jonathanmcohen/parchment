@@ -3,7 +3,12 @@ import type { ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { renderReadOnlyDoc } from '@/components/share/render-pm'
-import { docToStandaloneHtml, escapeHtml, tokensToExportHtml } from '@/lib/export/html'
+import {
+  annotateDocWithShiki,
+  docToStandaloneHtml,
+  escapeHtml,
+  tokensToExportHtml,
+} from '@/lib/export/html'
 
 const simpleDoc = {
   type: 'doc',
@@ -287,5 +292,68 @@ describe('render-pm export-mode gate (P7 XSS hardening)', () => {
     expect(html).not.toContain('onerror')
     expect(html).not.toContain('<img')
     expect(html).toContain('safe code')
+  })
+})
+
+// #14 (v0.1.10): annotateDocWithShiki is the shared export/print pre-pass. It is
+// the single entry point PrintView and docToStandaloneHtml both call, so its
+// contract (highlight supported langs, leave others untouched, strip forged
+// attrs, downgrade plantuml) is what keeps the XSS gate shut across both callers.
+type AnnotatedNode = {
+  type?: string
+  attrs?: Record<string, unknown>
+  content?: AnnotatedNode[]
+}
+
+describe('annotateDocWithShiki (shared export/print pre-pass)', () => {
+  it('adds a non-empty __exportHtml to a supported-language code block', async () => {
+    const out = (await annotateDocWithShiki(jsCodeDoc)) as AnnotatedNode
+    const block = out.content?.[0]
+    expect(block?.type).toBe('codeBlock')
+    const exportHtml = block?.attrs?.__exportHtml
+    expect(typeof exportHtml).toBe('string')
+    expect((exportHtml as string).length).toBeGreaterThan(0)
+    // Default theme is light (github-light) — colors are inlined hex spans.
+    expect(exportHtml as string).toContain('<span style="color:#')
+  })
+
+  it('leaves plaintext code blocks without an __exportHtml attr', async () => {
+    const out = (await annotateDocWithShiki(plaintextCodeDoc)) as AnnotatedNode
+    const block = out.content?.[0]
+    expect(block?.attrs?.__exportHtml).toBeUndefined()
+  })
+
+  it('leaves unknown-language code blocks without an __exportHtml attr', async () => {
+    const out = (await annotateDocWithShiki(unknownLangCodeDoc)) as AnnotatedNode
+    const block = out.content?.[0]
+    expect(block?.attrs?.__exportHtml).toBeUndefined()
+  })
+
+  it('strips a forged incoming __exportHtml from a plaintext block', async () => {
+    const forgedDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'codeBlock',
+          attrs: { language: 'plaintext', __exportHtml: '<img src=x onerror="alert(1)">' },
+          content: [{ type: 'text', text: 'safe code' }],
+        },
+      ],
+    }
+    const out = (await annotateDocWithShiki(forgedDoc)) as AnnotatedNode
+    const block = out.content?.[0]
+    expect(block?.attrs?.__exportHtml).toBeUndefined()
+  })
+
+  it('downgrades plantuml to a source codeBlock (no external resource leak)', async () => {
+    const out = (await annotateDocWithShiki(plantumlDoc)) as AnnotatedNode
+    const block = out.content?.[0]
+    expect(block?.type).toBe('codeBlock')
+    expect(block?.attrs?.language).toBe('plantuml')
+  })
+
+  it('never throws on non-object input', async () => {
+    await expect(annotateDocWithShiki(null)).resolves.toBeNull()
+    await expect(annotateDocWithShiki(undefined)).resolves.toBeUndefined()
   })
 })

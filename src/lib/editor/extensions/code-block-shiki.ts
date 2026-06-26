@@ -507,8 +507,34 @@ function makeShikiPlugin(): Plugin<DecorationSet> {
       _currentView = editorView
       void _initHighlighter(editorView)
       _autoDetectDriver = createAutoDetectDriver(editorView)
+
+      // Re-decorate all code blocks when the surrounding page-background changes
+      // (e.g. the user switches to/from the dark document page via the theme
+      // picker without a reload).  applyThemeToDom() updates data-page-bg on the
+      // layout wrapper; we observe that attribute and fire a shikiReady meta
+      // transaction so buildDecorations re-runs with the correct Shiki theme.
+      let _pageBgObserver: MutationObserver | null = null
+      if (typeof MutationObserver !== 'undefined') {
+        // Walk up from the editor DOM to find the nearest [data-page-bg] ancestor;
+        // fall back to document.documentElement so the observer always has a target.
+        const observeTarget: Element =
+          (editorView.dom.closest('[data-page-bg]') as Element | null) ?? document.documentElement
+
+        _pageBgObserver = new MutationObserver(() => {
+          if (!editorView.isDestroyed) {
+            editorView.dispatch(editorView.state.tr.setMeta('shikiReady', true))
+          }
+        })
+        _pageBgObserver.observe(observeTarget, {
+          attributes: true,
+          attributeFilter: ['data-page-bg'],
+        })
+      }
+
       return {
         destroy() {
+          _pageBgObserver?.disconnect()
+          _pageBgObserver = null
           _autoDetectDriver?.destroy()
           _autoDetectDriver = null
           _currentView = null

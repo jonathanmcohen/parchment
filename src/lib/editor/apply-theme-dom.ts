@@ -52,6 +52,11 @@ export function applyThemeToDom(theme: WorkspaceTheme): void {
     el.removeAttribute('data-font')
   }
 
+  // data-page-bg: mirrors the SSR logic in (app)/layout.tsx.
+  // 'dark' enables dark-document-page CSS overrides + the Shiki github-dark theme
+  // on code blocks.  'light' covers white / sepia / any other sheet colour.
+  el.dataset.pageBg = theme.pageBg === 'dark' ? 'dark' : 'light'
+
   // CSS custom properties (--accent, --font-heading, --font-body, --page-bg, …).
   // themeCssVars returns a Record<string, string> of `--*` property names.
   for (const [name, value] of Object.entries(themeCssVars(theme))) {

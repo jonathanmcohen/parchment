@@ -46,6 +46,16 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.1.10',
+    notes: [
+      'Legible PDF/print in dark mode — printed pages are now always black-on-white regardless of your theme — and the editor toolbar/header stays pinned while you scroll long documents.',
+      'Accessibility: High Contrast no longer renders document text invisibly (white-on-white) on light or sepia pages.',
+      'Dark-mode consistency sweep: embed/diagram/citation cards, admin status colours, code-block diff tints, table/checkbox/table-of-contents accents, and scrollbars all adapt to dark mode; theme and page-background changes now apply instantly without a reload.',
+      'Syntax-highlighted code blocks in PDF/print exports.',
+      'Real content-split page sheets with per-page orientation in print/preview, plus native PDF printing (the unreliable paged.js engine was removed). Note: the live editor’s Paged mode stays continuous and per-page orientation is preview/print-only this release.',
+    ],
+  },
+  {
     version: '0.1.9',
     notes: [
       'Reliability + polish pass: overlay/dropdown/tooltip fixes, single-scroll editor with sticky chrome, instant theme/style changes, selectable light/dark page with consistent legibility, working Trash, fixed PDF export, smarter code-block language detection, and this full changelog.',

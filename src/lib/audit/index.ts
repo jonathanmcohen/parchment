@@ -45,6 +45,7 @@ export type AuditAction =
   | 'backup.s3.configure'
   | 'migrate.push'
   | 'migrate.receive'
+  | 'migrate.token'
   | 'gitsync.push'
 
 export interface AuditOptions {

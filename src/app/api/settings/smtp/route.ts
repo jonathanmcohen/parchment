@@ -5,8 +5,8 @@ import {
   getSmtpConfig,
   getSmtpPasswordMasked,
   isSmtpConfigured,
-  saveSmtpConfig,
   type SmtpConfig,
+  saveSmtpConfig,
 } from '@/lib/config/smtp-config-repo'
 import { SECRET_MASK } from '@/lib/crypto/secret-box'
 
@@ -69,10 +69,16 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'port must be between 1 and 65535' }, { status: 400 })
   }
   if (!fromAddress || typeof fromAddress !== 'string' || !fromAddress.includes('@')) {
-    return NextResponse.json({ error: 'fromAddress is required and must contain @' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'fromAddress is required and must contain @' },
+      { status: 400 },
+    )
   }
   if (!tls || !TLS_VALUES.includes(tls as (typeof TLS_VALUES)[number])) {
-    return NextResponse.json({ error: `tls must be one of: ${TLS_VALUES.join(', ')}` }, { status: 400 })
+    return NextResponse.json(
+      { error: `tls must be one of: ${TLS_VALUES.join(', ')}` },
+      { status: 400 },
+    )
   }
 
   const config: SmtpConfig & { password: string } = {

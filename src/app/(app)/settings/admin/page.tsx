@@ -30,7 +30,10 @@ export default function AdminSettingsPage() {
         </ul>
       </section>
 
-      <section aria-labelledby="admin-people" className="mt-12 border-t border-[var(--border)] pt-8">
+      <section
+        aria-labelledby="admin-people"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="admin-people" className="font-medium text-lg">
           People
         </h2>

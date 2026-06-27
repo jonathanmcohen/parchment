@@ -49,7 +49,10 @@ export async function POST(req: NextRequest | Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'from is required and must contain @' }, { status: 400 })
   }
   if (!tls || !TLS_VALUES.includes(tls as TlsValue)) {
-    return NextResponse.json({ error: `tls must be one of: ${TLS_VALUES.join(', ')}` }, { status: 400 })
+    return NextResponse.json(
+      { error: `tls must be one of: ${TLS_VALUES.join(', ')}` },
+      { status: 400 },
+    )
   }
 
   // Resolve password — if the client sent the mask, read the stored one
@@ -71,9 +74,7 @@ export async function POST(req: NextRequest | Request): Promise<NextResponse> {
         : { secure: false, ignoreTLS: true }
 
   const auth =
-    smtpUser && resolvedPassword
-      ? { user: String(smtpUser), pass: resolvedPassword }
-      : undefined
+    smtpUser && resolvedPassword ? { user: String(smtpUser), pass: resolvedPassword } : undefined
 
   const transporter = nodemailer.createTransport({
     host: String(host),

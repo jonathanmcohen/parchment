@@ -151,7 +151,7 @@ describe('port is stored and retrieved as number', () => {
 
     await saveSmtpConfig({ ...VALID_CONFIG, port: 587, password: 'pw' })
 
-    const [, savedObj] = setAppConfigJson.mock.calls[0] as [string, { port: number }]
+    const [, savedObj] = setAppConfigJson.mock.calls[0] as unknown as [string, { port: number }]
     expect(typeof savedObj.port).toBe('number')
     expect(savedObj.port).toBe(587)
 

@@ -8,7 +8,7 @@ import {
   setAppConfig,
   setAppConfigJson,
 } from '@/lib/config/repo'
-import { SECRET_MASK, isMasked } from '@/lib/crypto/secret-box'
+import { isMasked, SECRET_MASK } from '@/lib/crypto/secret-box'
 
 export type SmtpConfig = {
   host: string

@@ -222,7 +222,8 @@ export function SmtpConfigForm({ initialConfig }: { initialConfig: SmtpInitialCo
           onBlur={() => {
             setPasswordFocused(false)
             // If user left the field empty after clearing the mask, restore it
-            if (password === '') setPassword(initialConfig.password === SECRET_MASK ? SECRET_MASK : '')
+            if (password === '')
+              setPassword(initialConfig.password === SECRET_MASK ? SECRET_MASK : '')
           }}
           placeholder={initialConfig.password === SECRET_MASK ? SECRET_MASK : 'Enter password'}
           className={fieldClass}

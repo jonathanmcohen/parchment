@@ -1,6 +1,10 @@
-import { requireAdmin } from '@/lib/auth/guard'
-import { getSmtpConfig, getSmtpPasswordMasked, isSmtpConfigured } from '@/lib/config/smtp-config-repo'
 import { SmtpConfigForm, type SmtpInitialConfig } from '@/components/settings/SmtpConfigForm'
+import { requireAdmin } from '@/lib/auth/guard'
+import {
+  getSmtpConfig,
+  getSmtpPasswordMasked,
+  isSmtpConfigured,
+} from '@/lib/config/smtp-config-repo'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,25 +15,26 @@ export default async function SmtpSettingsPage() {
   const config = await getSmtpConfig()
   const password = await getSmtpPasswordMasked()
 
-  const initialConfig: SmtpInitialConfig = configured && config
-    ? {
-        configured: true,
-        host: config.host,
-        port: config.port,
-        user: config.user,
-        fromAddress: config.fromAddress,
-        tls: config.tls,
-        password: password ?? '',
-      }
-    : {
-        configured: false,
-        host: '',
-        port: 587,
-        user: '',
-        fromAddress: '',
-        tls: 'starttls',
-        password: '',
-      }
+  const initialConfig: SmtpInitialConfig =
+    configured && config
+      ? {
+          configured: true,
+          host: config.host,
+          port: config.port,
+          user: config.user,
+          fromAddress: config.fromAddress,
+          tls: config.tls,
+          password: password ?? '',
+        }
+      : {
+          configured: false,
+          host: '',
+          port: 587,
+          user: '',
+          fromAddress: '',
+          tls: 'starttls',
+          password: '',
+        }
 
   return (
     <section className="max-w-2xl px-4 sm:px-6 md:px-0">

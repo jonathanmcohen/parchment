@@ -1,9 +1,9 @@
 import 'server-only'
+import { getUser } from '@/lib/auth/users-repo'
 // Notification helper for H (and any other caller needing to send email by userId).
 // Resolves the user's email from the DB then delegates to sendEmail.
 // Never throws — all error paths return { ok: false }.
 import { sendEmail } from '@/lib/email/send'
-import { getUser } from '@/lib/auth/users-repo'
 
 export type NotificationPayload = {
   userId: string // recipient user ID; resolved to email internally

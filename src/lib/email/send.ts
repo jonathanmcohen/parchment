@@ -41,8 +41,7 @@ export async function sendEmail(payload: EmailPayload): Promise<SendEmailResult>
         : { secure: false, ignoreTLS: true }
 
   // Auth is omitted when user/password are absent (unauthenticated relay)
-  const auth =
-    config.user && password ? { user: config.user, pass: password } : undefined
+  const auth = config.user && password ? { user: config.user, pass: password } : undefined
 
   const transporter = nodemailer.createTransport({
     host: config.host,

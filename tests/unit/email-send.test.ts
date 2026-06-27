@@ -3,12 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // Unit tests for src/lib/email/send.ts
 // Mock: nodemailer, smtp-config-repo, @/lib/config/repo
 
-const {
-  isSmtpConfigured,
-  getSmtpConfig,
-  sendMailMock,
-  getAppConfig,
-} = vi.hoisted(() => ({
+const { isSmtpConfigured, getSmtpConfig, sendMailMock, getAppConfig } = vi.hoisted(() => ({
   isSmtpConfigured: vi.fn<() => Promise<boolean>>(),
   getSmtpConfig: vi.fn<() => Promise<unknown>>(),
   sendMailMock: vi.fn<() => Promise<{ messageId: string }>>(),
@@ -152,10 +147,9 @@ describe('sendEmail — password security', () => {
 
     await sendEmail({ to: 'a@b.com', subject: 'S', text: 'T' })
 
-    const allLogArgs = [
-      ...logSpy.mock.calls.flat(),
-      ...errorSpy.mock.calls.flat(),
-    ].map((v) => (typeof v === 'string' ? v : JSON.stringify(v)))
+    const allLogArgs = [...logSpy.mock.calls.flat(), ...errorSpy.mock.calls.flat()].map((v) =>
+      typeof v === 'string' ? v : JSON.stringify(v),
+    )
 
     for (const arg of allLogArgs) {
       expect(arg).not.toContain(MOCK_PASSWORD)

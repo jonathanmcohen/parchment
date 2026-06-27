@@ -23,9 +23,9 @@ vi.mock('next/navigation', () => ({
 const SECRET_MASK = '••••••••'
 
 import {
+  type SmtpFormValues,
   saveSMTPConfig,
   testSmtpConfig,
-  type SmtpFormValues,
 } from '@/components/settings/SmtpConfigForm'
 
 const CONFIGURED_VALUES: SmtpFormValues = {
@@ -43,14 +43,14 @@ afterEach(() => {
 
 describe('saveSMTPConfig — PUT /api/settings/smtp', () => {
   it('PUTs with correct body and returns ok on success', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ ok: true, ...CONFIGURED_VALUES }), { status: 200 }),
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ ok: true, ...CONFIGURED_VALUES }), { status: 200 }),
     )
 
     const result = await saveSMTPConfig(CONFIGURED_VALUES, { fetch: fetchMock as typeof fetch })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('/api/settings/smtp')
     expect(init.method).toBe('PUT')
     const body = JSON.parse(init.body as string) as SmtpFormValues
@@ -60,8 +60,8 @@ describe('saveSMTPConfig — PUT /api/settings/smtp', () => {
   })
 
   it('returns error string on PUT failure (non-2xx)', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ error: 'validation failed' }), { status: 400 }),
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ error: 'validation failed' }), { status: 400 }),
     )
 
     const result = await saveSMTPConfig(CONFIGURED_VALUES, { fetch: fetchMock as typeof fetch })
@@ -70,15 +70,16 @@ describe('saveSMTPConfig — PUT /api/settings/smtp', () => {
   })
 
   it('sends password: SECRET_MASK when password field holds the mask', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }))
+
+    await saveSMTPConfig(
+      { ...CONFIGURED_VALUES, password: SECRET_MASK },
+      {
+        fetch: fetchMock as typeof fetch,
+      },
     )
 
-    await saveSMTPConfig({ ...CONFIGURED_VALUES, password: SECRET_MASK }, {
-      fetch: fetchMock as typeof fetch,
-    })
-
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     const body = JSON.parse(init.body as string) as SmtpFormValues
     // The mask is forwarded to the server; the server-side repo guards against double-encrypt
     expect(body.password).toBe(SECRET_MASK)
@@ -87,21 +88,20 @@ describe('saveSMTPConfig — PUT /api/settings/smtp', () => {
 
 describe('testSmtpConfig — POST /api/settings/smtp/test', () => {
   it('POSTs to /api/settings/smtp/test with the current form values', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ ok: true }), { status: 200 }),
-    )
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }))
 
     const result = await testSmtpConfig(CONFIGURED_VALUES, { fetch: fetchMock as typeof fetch })
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('/api/settings/smtp/test')
     expect(init.method).toBe('POST')
     expect(result.ok).toBe(true)
   })
 
   it('returns { ok: false, error } when the test endpoint fails', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ ok: false, error: 'Connection refused' }), { status: 200 }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: false, error: 'Connection refused' }), { status: 200 }),
     )
 
     const result = await testSmtpConfig(CONFIGURED_VALUES, { fetch: fetchMock as typeof fetch })

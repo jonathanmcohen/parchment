@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { db, schema } from '@/db'
+import { logAuditRequest } from '@/lib/audit'
 import { bumpPasskeyCounter, getPasskeyById } from '@/lib/auth/mfa-repo'
 import { clientIp, rateLimit } from '@/lib/auth/rate-limit'
 import { consumePendingFailure, getPendingUserId, promotePendingSession } from '@/lib/auth/session'
@@ -93,9 +93,9 @@ export async function POST(req: NextRequest) {
   const promoted = await promotePendingSession()
   if (!promoted) return NextResponse.json({ error: 'no_pending_session' }, { status: 401 })
 
-  await db.insert(schema.auditLog).values({
+  // §5.3: hash-chained audit write with ip from the request headers.
+  await logAuditRequest('login', req, {
     actorId: userId,
-    action: 'login',
     targetType: 'user',
     targetId: userId,
     meta: { factor: 'passkey' },

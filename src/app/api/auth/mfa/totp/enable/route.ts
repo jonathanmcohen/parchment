@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { logAuditRequest } from '@/lib/audit'
 import { authenticateRequest } from '@/lib/auth/guard'
 import { verifyTotpStep } from '@/lib/auth/mfa'
 import { enableTotp, getMfa, recordTotpStep } from '@/lib/auth/mfa-repo'
@@ -45,5 +46,11 @@ export async function POST(req: NextRequest) {
   // Record the confirming code's step so it cannot be replayed as the first
   // login's second factor (RFC-6238 §5.2).
   await recordTotpStep(user.id, step)
+  // §5.3: audit the second-factor enablement (canonical dotted verb 'mfa.enable').
+  await logAuditRequest('mfa.enable', req, {
+    actorId: user.id,
+    targetType: 'user',
+    targetId: user.id,
+  })
   return NextResponse.json({ enabled: true })
 }

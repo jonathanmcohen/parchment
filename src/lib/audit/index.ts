@@ -160,6 +160,40 @@ function redactQueryParams(err: unknown): string {
   return msg.split(/\n?\s*param(?:eter)?s?:/i)[0]?.trim() ?? ''
 }
 
+// Extract a best-effort client IP from a request's headers: the first
+// X-Forwarded-For hop (closest the app can get behind a proxy), else x-real-ip.
+// Returns undefined when neither is present so logAudit writes a NULL ip column
+// (NOT the string "unknown"). Never throws — a hostile/odd headers object is
+// swallowed and yields undefined.
+function ipFromHeaders(req: { headers: Headers }): string | undefined {
+  try {
+    const xff = req.headers.get('x-forwarded-for')
+    if (xff) {
+      const first = xff.split(',')[0]?.trim()
+      if (first) return first
+    }
+    const real = req.headers.get('x-real-ip')?.trim()
+    return real || undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Convenience wrapper for route handlers (§5.1): resolves the caller's IP from the
+ * request headers and forwards it to logAudit. Like logAudit it NEVER throws —
+ * auditing is a side-effect and must not be able to fail the real action. `opts.ip`
+ * is not expected (the IP is derived from `req`); any other AuditOptions pass through.
+ */
+export async function logAuditRequest(
+  action: AuditAction,
+  req: { headers: Headers },
+  opts: Omit<AuditOptions, 'ip'> = {},
+): Promise<void> {
+  const ip = ipFromHeaders(req)
+  await logAudit(action, ip === undefined ? opts : { ...opts, ip })
+}
+
 /**
  * Re-hash the prev_hash→entry_hash chain for every row in audit_log (created_at ASC)
  * and return the first row whose stored entry_hash does not match the recomputed value.

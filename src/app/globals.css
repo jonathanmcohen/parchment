@@ -2852,6 +2852,15 @@ body {
   color: var(--info);
   text-decoration: underline;
 }
+/* H Task 16 — suggestion (insertion/deletion) marks carry an inline per-author
+ *  color from the WCAG-AA-on-WHITE palette; on a DARK page some of those mid-tone
+ *  hues drop below AA. Lift them with a brightness/saturation filter so the text +
+ *  underline/strikethrough stay legible while keeping the per-author hue distinct.
+ *  (The inline color stays the source of truth; the filter only adapts it to dark.) */
+[data-page-bg="dark"] .parchment-suggest-ins,
+[data-page-bg="dark"] .parchment-suggest-del {
+  filter: brightness(1.45) saturate(0.9);
+}
 /* Code-block header controls (filename / highlight-lines inputs, action buttons,
    line numbers) — page-scoped ink on the dark header band. */
 [data-page-bg="dark"] .parchment-cb-filename-input,

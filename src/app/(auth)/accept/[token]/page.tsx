@@ -4,11 +4,7 @@ import { AcceptForm } from './accept-form'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AcceptInvitePage({
-  params,
-}: {
-  params: Promise<{ token: string }>
-}) {
+export default async function AcceptInvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const invite = await getInviteByToken(token)
   if (!invite) notFound() // expired / used / unknown → 404, no detail leak

@@ -29,9 +29,7 @@ beforeAll(async () => {
   }
 
   // Seed exactly one bootstrap owner — the owner-invariant tests rely on this.
-  await c.query(
-    "INSERT INTO users (email, name, role) VALUES ('owner@p.local','Owner','owner')",
-  )
+  await c.query("INSERT INTO users (email, name, role) VALUES ('owner@p.local','Owner','owner')")
 
   await c.end()
   process.env.DATABASE_URL = url
@@ -64,10 +62,7 @@ describe('A3/A6 — disabled-user enforcement', () => {
 
     expect(await getUserByToken(token)).not.toBeNull() // active → resolves
 
-    await db
-      .update(schema.users)
-      .set({ disabledAt: new Date() })
-      .where(eq(schema.users.id, u!.id))
+    await db.update(schema.users).set({ disabledAt: new Date() }).where(eq(schema.users.id, u!.id))
 
     expect(await getUserByToken(token)).toBeNull() // disabled → null
   })

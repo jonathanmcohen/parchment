@@ -128,12 +128,8 @@ describe('A1/A2/A6 — user-management actions (authorization boundary)', () => 
   })
 
   it('A6 composed: owner is never lockable-out across the action layer', async () => {
-    const {
-      deleteUserAction,
-      setUserRoleAction,
-      setUserDisabledAction,
-      transferOwnershipAction,
-    } = await import('@/app/(app)/settings/users/actions')
+    const { deleteUserAction, setUserRoleAction, setUserDisabledAction, transferOwnershipAction } =
+      await import('@/app/(app)/settings/users/actions')
     const usersRepo = await import('@/lib/auth/users-repo')
 
     // Ensure we start with exactly one owner

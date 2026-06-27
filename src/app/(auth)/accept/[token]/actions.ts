@@ -18,8 +18,7 @@ export async function acceptInviteAction(
   // validateNewPassword returns an error CODE ('password_too_short' | null), not a
   // display string — map it to a user-facing message (mirrors /setup's 8-char rule).
   const pwCode = validateNewPassword(password)
-  if (pwCode === 'password_too_short')
-    return { error: 'Password must be at least 8 characters.' }
+  if (pwCode === 'password_too_short') return { error: 'Password must be at least 8 characters.' }
 
   const res = await acceptInvite(token, { name, password })
   if (!res.ok) return { error: 'This invitation is no longer valid.' }

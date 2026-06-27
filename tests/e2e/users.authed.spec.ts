@@ -13,7 +13,10 @@ test('owner sees the Users admin page and can open the invite form', async ({ pa
   const ownerRow = page.getByTestId('user-row').filter({ hasText: '@' }).first()
   await expect(ownerRow).toBeVisible()
   // invite form is reachable
-  await page.getByRole('button', { name: /invite/i }).first().click()
+  await page
+    .getByRole('button', { name: /invite/i })
+    .first()
+    .click()
   await expect(page.getByLabel(/email/i).first()).toBeVisible()
   await expect(page.getByLabel(/role/i).first()).toBeVisible()
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AuditAction } from '@/lib/audit'
 
-describe("A audit verbs — Phase-0 union already includes these (compile-time check)", () => {
+describe('A audit verbs — Phase-0 union already includes these (compile-time check)', () => {
   it('Phase-0 union contains all verbs A emits', () => {
     // This test is a compile-time assertion: if any of these literals is NOT in the
     // Phase-0 AuditAction union, TypeScript will error here — catching a missing

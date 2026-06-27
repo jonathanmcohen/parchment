@@ -164,7 +164,10 @@ describe('A4 — document_permissions repo', () => {
     expect(self.status).toBe(400)
 
     // owner revokes
-    const del = await DELETE(bearerJson(ownerToken, JSON.stringify({ userId: strangerId }), 'DELETE'), ctx)
+    const del = await DELETE(
+      bearerJson(ownerToken, JSON.stringify({ userId: strangerId }), 'DELETE'),
+      ctx,
+    )
     expect(del.status).toBe(204)
   })
 
@@ -196,9 +199,6 @@ describe('A4 — document_permissions repo', () => {
       expect(Object.keys(u).sort()).toEqual(['email', 'id', 'name'])
     }
     // restore
-    await db
-      .update(schema.users)
-      .set({ disabledAt: null })
-      .where(eq(schema.users.id, strangerId))
+    await db.update(schema.users).set({ disabledAt: null }).where(eq(schema.users.id, strangerId))
   })
 })

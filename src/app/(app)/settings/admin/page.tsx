@@ -146,7 +146,7 @@ export default function AdminSettingsPage() {
           </li>
           <li>
             <Link
-              href="/settings/admin/backup"
+              href="/settings/backup"
               className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
             >
               <span className="font-medium text-sm">Backup</span>

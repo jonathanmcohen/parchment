@@ -10,6 +10,8 @@ const groups = [
   // A1: admin-only Users page. The link is cosmetic — the page's own requireAdmin
   // redirect is the security boundary; a non-admin who clicks it is sent to '/'.
   { href: '/settings/users', label: 'Users' },
+  // backup-sync: promoted top-level Backup page (was /settings/admin/backup).
+  { href: '/settings/backup', label: 'Backup' },
   { href: '/settings/developer', label: 'Developer' },
   // B4: Notifications is now visible — SMTP is configured via /settings/admin/smtp.
   { href: '/settings/notifications', label: 'Notifications' },

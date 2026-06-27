@@ -11,8 +11,12 @@ export interface AuditRow {
   targetType: string | null
   targetId: string | null
   meta: Record<string, unknown> | null
+  ip: string | null
   createdAt: Date
 }
+
+// Result of verifyAuditChain() (Phase-0 canonical export), surfaced as a banner.
+export type AuditIntegrity = { ok: boolean; brokenAt?: string }
 
 const ACTIONS: readonly AuditAction[] = ['create', 'delete', 'share', 'export', 'login']
 
@@ -37,7 +41,13 @@ function formatDetails(meta: Record<string, unknown> | null): string {
   return JSON.stringify(meta)
 }
 
-export function AuditLogView({ rows }: { rows: AuditRow[] }) {
+export function AuditLogView({
+  rows,
+  integrity,
+}: {
+  rows: AuditRow[]
+  integrity?: AuditIntegrity
+}) {
   const [filter, setFilter] = useState<'all' | AuditAction>('all')
   const filterId = useId()
 
@@ -48,6 +58,28 @@ export function AuditLogView({ rows }: { rows: AuditRow[] }) {
 
   return (
     <div className="mt-6">
+      {/* §5.4: tamper-evidence banner — verifyAuditChain re-hashes the chain. */}
+      {integrity ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={
+            integrity.ok
+              ? 'mb-4 rounded-md border border-[var(--success,#16a34a)] bg-[var(--success-bg,#f0fdf4)] px-3 py-2 text-sm text-[var(--success,#16a34a)]'
+              : 'mb-4 rounded-md border border-[var(--error,#dc2626)] bg-[var(--error-bg,#fef2f2)] px-3 py-2 text-sm text-[var(--error,#dc2626)]'
+          }
+        >
+          {integrity.ok ? (
+            <span>Integrity verified — the audit chain is intact.</span>
+          ) : (
+            <span>
+              Integrity check FAILED — the chain is broken
+              {integrity.brokenAt ? ` at entry ${integrity.brokenAt}` : ''}.
+            </span>
+          )}
+        </div>
+      ) : null}
+
       <div className="mb-4 flex items-center gap-2">
         <label htmlFor={filterId} className="text-[var(--muted)] text-sm">
           Filter by action
@@ -85,6 +117,9 @@ export function AuditLogView({ rows }: { rows: AuditRow[] }) {
                 Target
               </th>
               <th scope="col" className="px-3 py-2 font-semibold">
+                IP
+              </th>
+              <th scope="col" className="px-3 py-2 font-semibold">
                 Details
               </th>
             </tr>
@@ -92,7 +127,7 @@ export function AuditLogView({ rows }: { rows: AuditRow[] }) {
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-[var(--muted)]">
+                <td colSpan={6} className="px-3 py-6 text-center text-[var(--muted)]">
                   No audit entries.
                 </td>
               </tr>
@@ -105,6 +140,9 @@ export function AuditLogView({ rows }: { rows: AuditRow[] }) {
                   <td className="px-3 py-2">{row.action}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{row.actorId ?? '—'}</td>
                   <td className="px-3 py-2">{formatTarget(row)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-mono text-[var(--muted)] text-xs">
+                    {row.ip ?? '—'}
+                  </td>
                   <td className="px-3 py-2 font-mono text-[var(--muted)] text-xs">
                     {formatDetails(row.meta)}
                   </td>

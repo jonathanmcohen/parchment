@@ -195,4 +195,86 @@ describe('collectChanges', () => {
     const doc = { type: 'doc', content: [] }
     expect(collectChanges(doc)).toHaveLength(0)
   })
+
+  // ── Task 5 — merge predicate must NOT cross author OR type ────────────────
+  it('does NOT merge an A-insertion immediately followed by a B-deletion (different author AND type)', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'aaa',
+              marks: [{ type: 'insertion', attrs: { author: 'alice', color: '#1a73e8' } }],
+            },
+            {
+              type: 'text',
+              text: 'bbb',
+              marks: [{ type: 'deletion', attrs: { author: 'bob', color: '#be123c' } }],
+            },
+          ],
+        },
+      ],
+    }
+    const changes = collectChanges(doc)
+    expect(changes).toHaveLength(2)
+    expect(changes[0]).toMatchObject({ type: 'insertion', author: 'alice', text: 'aaa' })
+    expect(changes[1]).toMatchObject({ type: 'deletion', author: 'bob', text: 'bbb' })
+  })
+
+  it('does NOT merge two adjacent SAME-type runs by DIFFERENT authors', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'aaa',
+              marks: [{ type: 'insertion', attrs: { author: 'alice', color: '#1a73e8' } }],
+            },
+            {
+              type: 'text',
+              text: 'ccc',
+              marks: [{ type: 'insertion', attrs: { author: 'carol', color: '#15803d' } }],
+            },
+          ],
+        },
+      ],
+    }
+    const changes = collectChanges(doc)
+    expect(changes).toHaveLength(2)
+    expect(changes[0]?.author).toBe('alice')
+    expect(changes[1]?.author).toBe('carol')
+  })
+
+  it('does NOT merge two adjacent SAME-author runs of DIFFERENT type', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'iii',
+              marks: [{ type: 'insertion', attrs: { author: 'alice', color: '#1a73e8' } }],
+            },
+            {
+              type: 'text',
+              text: 'ddd',
+              marks: [{ type: 'deletion', attrs: { author: 'alice', color: '#be123c' } }],
+            },
+          ],
+        },
+      ],
+    }
+    const changes = collectChanges(doc)
+    expect(changes).toHaveLength(2)
+    expect(changes[0]?.type).toBe('insertion')
+    expect(changes[1]?.type).toBe('deletion')
+  })
 })

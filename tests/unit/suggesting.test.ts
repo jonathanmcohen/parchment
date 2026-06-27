@@ -305,3 +305,90 @@ describe('D2 Suggesting — Task 4 tracked-change integrity gaps', () => {
     expect(marks.some((m) => m.type === 'deletion')).toBe(true)
   })
 })
+
+// ── Task 5 — accept/reject application under interleaved authors ────────────
+describe('D2 Suggesting — accept/reject under interleaved authors (Task 5)', () => {
+  let editor: Editor
+
+  afterEach(() => {
+    editor?.destroy()
+  })
+
+  /** Apply a mark of `type` over [from,to) by `author`. */
+  function mark(
+    ed: Editor,
+    from: number,
+    to: number,
+    type: 'insertion' | 'deletion',
+    author: string,
+  ) {
+    ed.commands.command(({ tr, dispatch, state }) => {
+      const mt = state.schema.marks[type]
+      if (dispatch && mt) {
+        tr.addMark(from, to, mt.create({ author, color: '#1a73e8' }))
+        dispatch(tr)
+      }
+      return true
+    })
+  }
+
+  it('acceptAllChanges on A-ins / B-del / A-ins keeps insertions, removes deletion, no corruption', () => {
+    // Doc text: "AAAxxxBBB" → positions 1..4 "AAA"(ins A), 4..7 "xxx"(del B), 7..10 "BBB"(ins A)
+    editor = new Editor({ extensions: baseExtensions, content: '<p>AAAxxxBBB</p>' })
+    mark(editor, 1, 4, 'insertion', 'alice')
+    mark(editor, 4, 7, 'deletion', 'bob')
+    mark(editor, 7, 10, 'insertion', 'alice')
+
+    editor.commands.acceptAllChanges()
+
+    const json = editor.getJSON() as DocJson
+    const text = collectText(json)
+    const marks = collectMarks(json)
+    // Both insertions survive as text, no marks; the deletion's "xxx" removed.
+    expect(text).toBe('AAABBB')
+    expect(marks.some((m) => m.type === 'insertion')).toBe(false)
+    expect(marks.some((m) => m.type === 'deletion')).toBe(false)
+  })
+
+  it('rejectAllChanges on the same interleaved doc removes insertions, restores deletion text', () => {
+    editor = new Editor({ extensions: baseExtensions, content: '<p>AAAxxxBBB</p>' })
+    mark(editor, 1, 4, 'insertion', 'alice')
+    mark(editor, 4, 7, 'deletion', 'bob')
+    mark(editor, 7, 10, 'insertion', 'alice')
+
+    editor.commands.rejectAllChanges()
+
+    const json = editor.getJSON() as DocJson
+    const text = collectText(json)
+    const marks = collectMarks(json)
+    // Insertions gone, the deletion-marked "xxx" restored (kept, mark dropped).
+    expect(text).toBe('xxx')
+    expect(marks.some((m) => m.type === 'insertion')).toBe(false)
+    expect(marks.some((m) => m.type === 'deletion')).toBe(false)
+  })
+
+  it('single accept of a NON-edge change leaves later changes intact + correctly located', () => {
+    // "keepAAAtail" : 1..5 "keep" plain, 5..8 "AAA"(ins alice), 8..12 "tail" → but
+    // we want a change after the accepted one. Use: "preINSmidDELend"
+    // text: "preMIDend" with INS over "pre"(1..4 alice) and DEL over "end"(7..10 bob).
+    editor = new Editor({ extensions: baseExtensions, content: '<p>preMIDend</p>' })
+    mark(editor, 1, 4, 'insertion', 'alice') // "pre"
+    mark(editor, 7, 10, 'deletion', 'bob') // "end"
+
+    // Accept the FIRST change (the insertion "pre", not at the doc end). The later
+    // deletion must remain a tracked change over "end".
+    editor.commands.acceptChange(1, 4, 'insertion')
+
+    const json = editor.getJSON() as DocJson
+    const marks = collectMarks(json)
+    const text = collectText(json)
+    // "pre" kept as plain text (insertion accepted); "end" still deletion-marked.
+    expect(text).toContain('pre')
+    expect(text).toContain('end')
+    expect(marks.some((m) => m.type === 'insertion')).toBe(false)
+    expect(marks.some((m) => m.type === 'deletion')).toBe(true)
+    // The deletion run is still over "end" — re-collect and check.
+    const dels = marks.filter((m) => m.type === 'deletion')
+    expect(dels).toHaveLength(1)
+  })
+})

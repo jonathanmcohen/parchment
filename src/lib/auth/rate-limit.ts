@@ -60,7 +60,16 @@ export function rateLimit(key: string, limit: number, windowSeconds: number): Ra
 // so the IP limiter is only one layer — the per-session DB failure cap is the
 // authoritative bound and does not depend on the IP being honest.
 export async function clientIp(): Promise<string> {
-  const h = await headers()
+  // headers() throws if called outside a request scope (e.g. a Server Action invoked
+  // in a test harness, or a background job). Best-effort IP is allowed to be unknown,
+  // so swallow that and fall back rather than crash the caller — the per-account
+  // lockout is the authoritative bound and does not depend on a real IP.
+  let h: Headers
+  try {
+    h = await headers()
+  } catch {
+    return 'unknown'
+  }
   const xff = h.get('x-forwarded-for')
   if (xff) {
     const first = xff.split(',')[0]?.trim()

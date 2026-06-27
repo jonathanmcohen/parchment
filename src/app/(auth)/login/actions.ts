@@ -38,6 +38,9 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   if (!email || !password) return { error: 'Enter your email and password.' }
 
   const ip = await clientIp()
+  // For the audit IP column we want a real address or NULL — never the literal
+  // "unknown" sentinel (which is fine as a rate-limit bucket key but not as data).
+  const auditIp = ip === 'unknown' ? undefined : ip
 
   // 1. Per-IP throttle FIRST: on trip, return before any argon2 work — saves CPU
   //    under a flood and removes a timing oracle. ip 'unknown' still keys a bucket.
@@ -68,7 +71,10 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     const status = await recordLoginFailure(email)
     // Audit a fresh lockout trip — no email/PII in meta, ip only.
     if (status.locked) {
-      await logAudit('login.locked', { targetType: 'account', ip })
+      await logAudit('login.locked', {
+        targetType: 'account',
+        ...(auditIp ? { ip: auditIp } : {}),
+      })
     }
     return { error: GENERIC_CREDENTIAL_ERROR }
   }
@@ -103,7 +109,12 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   }
 
   // §5.3: hash-chained audit (with ip) instead of the prior raw db.insert.
-  await logAudit('login', { actorId: user.id, targetType: 'user', targetId: user.id, ip })
+  await logAudit('login', {
+    actorId: user.id,
+    targetType: 'user',
+    targetId: user.id,
+    ...(auditIp ? { ip: auditIp } : {}),
+  })
 
   await createSession(user.id)
   redirect('/')

@@ -10,6 +10,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
   vector,
 } from 'drizzle-orm/pg-core'
@@ -483,6 +484,61 @@ export const templates = pgTable(
   },
   (t) => [index('templates_owner_idx').on(t.ownerId)],
 )
+
+// ─── OIDC identities (G2) — link a workspace user to an external IdP identity ──
+// One row per (issuer, subject) — the SECURITY-CORRECT link anchor: `subject` is
+// the IdP's stable per-user id and `issuer` namespaces it. We key on (issuer,
+// subject), NOT email, because email is mutable at the IdP and an attacker who
+// controls an email at a second IdP must not be able to hijack a Parchment
+// account. `email` is stored for display/audit only and is never the match key.
+// Cascades on user delete. Created in migration 0023.
+export const oidcIdentities = pgTable(
+  'oidc_identities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    issuer: text('issuer').notNull(), // the IdP `iss`
+    subject: text('subject').notNull(), // the IdP `sub` (stable per-user id)
+    email: text('email'), // email at link time — audit/debug ONLY, never the match key
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  },
+  (t) => [
+    unique('oidc_identities_issuer_subject_uq').on(t.issuer, t.subject), // one identity per IdP user
+    index('oidc_identities_user_idx').on(t.userId),
+  ],
+)
+
+// ─── OIDC login flows (G2) — short-lived server-side PKCE/state/nonce store ────
+// The PKCE `codeVerifier`, `state`, and `nonce` are NEVER trusted from the client:
+// they live here (a DB row, not a cookie) so they are unforgeable and single-use.
+// `state` is the CSPRNG lookup key. The row is DELETED atomically on callback
+// consumption (DELETE … WHERE state=$1 AND expiresAt>now() RETURNING *), so a
+// replayed callback finds nothing. Expired rows (`expiresAt`, ~10 min) are
+// rejected by that same predicate and swept. Created in migration 0023.
+export const oidcLoginFlows = pgTable('oidc_login_flows', {
+  state: text('state').primaryKey(), // CSPRNG; also the lookup key
+  codeVerifier: text('code_verifier').notNull(), // PKCE; never leaves the server
+  nonce: text('nonce').notNull(), // bound into the ID-token check
+  redirectTo: text('redirect_to'), // post-login landing (validated app-relative only)
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(), // ~10 min
+})
+
+// ─── Login lockouts (G4) — per-account brute-force lockout ─────────────────────
+// Keyed on `emailHash` (sha256 of the normalised email) — NEVER the raw email —
+// so the lockout table can't be mined for the set of registered addresses. After
+// N consecutive password failures the account is locked until `lockedUntil`
+// regardless of source IP (per-IP throttling alone is bypassable behind a botnet /
+// spoofed XFF). A successful login resets the row. Created in migration 0023.
+export const loginLockouts = pgTable('login_lockouts', {
+  emailHash: text('email_hash').primaryKey(), // sha256 of the normalised email; never raw
+  failedCount: integer('failed_count').notNull().default(0),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
 
 // ─── app_config (Phase 0, §1b) — instance-level ENCRYPTED config ─────────────
 // All instance secrets (SMTP, S3, git-sync, OIDC client secret, etc.) live here

@@ -10,6 +10,7 @@ import type { WatermarkConfig } from '@/lib/editor/watermark'
 import { dispatchWebhooks } from '@/lib/integrations/webhook-dispatch'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
+import { removeAssetsForDoc } from '@/lib/uploads/store'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
 // it touches `db` (pg) and is only imported by server routes/components in app code.
@@ -281,8 +282,11 @@ export async function listStarred(ownerId: string): Promise<DocRow[]> {
     .orderBy(desc(schema.documents.updatedAt))
 }
 
+/** A trashed doc row also carries trashedAt so the UI can show days-until-purge. */
+export type TrashedDocRow = DocRow & { trashedAt: Date | null }
+
 /** Trashed docs (trashedAt not null), most-recently-trashed first. */
-export async function listTrashed(ownerId: string): Promise<DocRow[]> {
+export async function listTrashed(ownerId: string): Promise<TrashedDocRow[]> {
   return db
     .select({
       id: schema.documents.id,
@@ -293,6 +297,8 @@ export async function listTrashed(ownerId: string): Promise<DocRow[]> {
       createdAt: schema.documents.createdAt,
       size: sql<number>`length(${schema.documents.markdown})`.as('size'),
       preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
+      // J11-3: surface when the doc was trashed so the list can show the countdown.
+      trashedAt: schema.documents.trashedAt,
     })
     .from(schema.documents)
     .where(and(eq(schema.documents.ownerId, ownerId), isNotNull(schema.documents.trashedAt)))
@@ -336,6 +342,42 @@ export async function restoreDocument(ownerId: string, id: string): Promise<void
 
   // Best-effort disk mirror — re-mirror on restore.
   await syncDocToDisk(id)
+}
+
+/**
+ * J11-1: PERMANENTLY delete a single TRASHED doc (owner-scoped). Only deletes when
+ * the doc is owned by `ownerId` AND already in the trash (trashedAt IS NOT NULL) —
+ * a live doc is never hard-deleted by this path. Removes the disk mirror (BEFORE the
+ * row, since removeDocFromDisk reads diskPath) and the asset directory (AFTER). FK
+ * cascades clear shares / permissions / links / comments. Returns true if a row was
+ * deleted. NEVER throws on the best-effort fs cleanup.
+ */
+export async function deleteDocumentPermanently(ownerId: string, id: string): Promise<boolean> {
+  // Gate: must be owned AND trashed.
+  const [doc] = await db
+    .select({ id: schema.documents.id })
+    .from(schema.documents)
+    .where(
+      and(
+        eq(schema.documents.id, id),
+        eq(schema.documents.ownerId, ownerId),
+        isNotNull(schema.documents.trashedAt),
+      ),
+    )
+    .limit(1)
+  if (!doc) return false
+
+  // Remove the mirrored file first (reads diskPath off the still-present row).
+  await removeDocFromDisk(id)
+
+  const result = await db
+    .delete(schema.documents)
+    .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
+
+  // Clean the asset directory after the row is gone (best-effort, never throws).
+  await removeAssetsForDoc({ id })
+
+  return (result.rowCount ?? 0) > 0
 }
 
 /**

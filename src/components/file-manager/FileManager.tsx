@@ -14,6 +14,7 @@ import { buildTree, folderPath } from '@/lib/docs/folder-tree'
 import { rangeBetween, selectOnly, toggle as toggleSelection } from '@/lib/docs/selection'
 import { describeCriteria, parseCriteria } from '@/lib/docs/smart-folder-criteria'
 import { resolveTagColor, TAG_COLORS } from '@/lib/docs/tag-colors'
+import { daysUntilPurge, describePurge } from '@/lib/docs/trash'
 import { normalizeFilesView } from '@/lib/shell/nav'
 
 export type FolderDTO = {
@@ -31,6 +32,8 @@ export type DocDTO = {
   starred?: boolean
   size: number
   preview: string
+  /** J11-3: ISO timestamp when the doc was trashed (trash view only). */
+  trashedAt?: string | null
 }
 
 type SmartFolderDTO = {
@@ -1179,6 +1182,9 @@ interface BulkActionBarProps {
   onClear: () => void
   onRefresh: () => void
   onTagsChanged?: () => void
+  /** J11-3: in the trash view the bar shows Restore / Delete-forever instead of
+   * move / tag / export / trash. */
+  view?: 'recents' | 'starred' | 'trash' | 'tag' | 'all' | 'smart' | 'shared'
 }
 
 function BulkActionBar({
@@ -1189,9 +1195,11 @@ function BulkActionBar({
   onClear,
   onRefresh,
   onTagsChanged,
+  view,
 }: BulkActionBarProps) {
   const count = selected.size
   const [exporting, setExporting] = useState(false)
+  const isTrash = view === 'trash'
 
   if (count === 0) return null
 
@@ -1241,6 +1249,28 @@ function BulkActionBar({
     }
   }
 
+  // J11-3: bulk restore (trash → live) and bulk permanent delete (trash only).
+  const handleBulkRestore = async () => {
+    const ok = await bulkPost({ action: 'restore' })
+    if (ok) {
+      onClear()
+      onRefresh()
+    }
+  }
+
+  const handleBulkDeleteForever = async () => {
+    const n = selected.size
+    const confirmed = window.confirm(
+      `Permanently delete ${n} ${n === 1 ? 'item' : 'items'}? This cannot be undone.`,
+    )
+    if (!confirmed) return
+    const ok = await bulkPost({ action: 'delete' })
+    if (ok) {
+      onClear()
+      onRefresh()
+    }
+  }
+
   const handleExportZip = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const format = e.target.value
     // reset the select immediately so it looks like a trigger, not a persistent choice
@@ -1269,6 +1299,51 @@ function BulkActionBar({
     } finally {
       setExporting(false)
     }
+  }
+
+  // J11-3: TRASH bulk bar — Restore / Delete forever only (move/tag/export/trash
+  // are meaningless on already-trashed docs).
+  if (isTrash) {
+    return (
+      <section
+        aria-label="Bulk actions"
+        data-testid="bulk-bar-trash"
+        className="flex items-center gap-3 px-3 py-2 mb-3 rounded-md border border-[var(--primary)] bg-[var(--paper)] flex-wrap"
+      >
+        <span className="text-sm font-medium text-[var(--foreground)] shrink-0">
+          {count} of {total} selected
+        </span>
+        <button
+          type="button"
+          onClick={handleBulkRestore}
+          data-testid="bulk-restore"
+          className="px-2 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--primary)] hover:border-[var(--primary)] inline-flex items-center gap-1"
+        >
+          <span aria-hidden className="material-symbols-rounded text-[16px]">
+            restore_from_trash
+          </span>
+          Restore
+        </button>
+        <button
+          type="button"
+          onClick={handleBulkDeleteForever}
+          data-testid="bulk-delete-forever"
+          className="px-2 py-1 text-xs rounded border border-red-400 text-red-600 hover:bg-red-50 inline-flex items-center gap-1"
+        >
+          <span aria-hidden className="material-symbols-rounded text-[16px]">
+            delete_forever
+          </span>
+          Delete forever
+        </button>
+        <button
+          type="button"
+          onClick={onClear}
+          className="px-2 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] ml-auto"
+        >
+          Clear
+        </button>
+      </section>
+    )
   }
 
   return (
@@ -1393,6 +1468,8 @@ interface DocListRowProps {
   onTagsChanged?: (() => void) | undefined
   navigateTo: (folderId: string | null) => void
   onSetView: (v: 'all') => void
+  /** J11-3: trash-retention window (days) — drives the purge countdown in trash. */
+  retentionDays?: number | undefined
 }
 
 function DocListRow({
@@ -1409,8 +1486,13 @@ function DocListRow({
   onTagsChanged,
   navigateTo,
   onSetView,
+  retentionDays,
 }: DocListRowProps) {
   const [rowContextMenu, setRowContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  // J11-3: in the trash view, compute the purge countdown for this row.
+  const purgeDays = view === 'trash' ? daysUntilPurge(doc.trashedAt, retentionDays ?? 0) : null
+  const purgeLabel = view === 'trash' ? describePurge(purgeDays) : null
 
   return (
     <li>
@@ -1464,6 +1546,15 @@ function DocListRow({
         <time dateTime={doc.updatedAt} className="text-[var(--muted)] text-xs shrink-0">
           {fmt.format(new Date(doc.updatedAt))}
         </time>
+        {purgeLabel && (
+          <span
+            data-testid="trash-purge-countdown"
+            className="text-xs shrink-0 text-[var(--muted)]"
+            data-purge-soon={purgeDays !== null && purgeDays <= 1 ? 'true' : undefined}
+          >
+            {purgeLabel}
+          </span>
+        )}
         <DocActions
           doc={doc}
           view={view}
@@ -1515,6 +1606,8 @@ interface DocListProps {
   onSelectAll: (allIds: string[]) => void
   navigateTo: (folderId: string | null) => void
   onSetView: (v: 'all') => void
+  /** J11-3: owner's trash-retention window (days) so trash rows show a purge countdown. */
+  retentionDays?: number | undefined
 }
 
 function DocList({
@@ -1536,6 +1629,7 @@ function DocList({
   onSelectAll,
   navigateTo,
   onSetView,
+  retentionDays,
 }: DocListProps) {
   const fmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -1605,6 +1699,7 @@ function DocList({
               onTagsChanged={onTagsChanged}
               navigateTo={navigateTo}
               onSetView={onSetView}
+              retentionDays={retentionDays}
             />
           ))}
         </ul>
@@ -2152,6 +2247,23 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   const importInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
   const [importWarnings, setImportWarnings] = useState<string[]>([])
+
+  // J11-3: owner's trash-retention window (days) — used to show a purge countdown
+  // on each trashed row. Fetched lazily when the trash view is opened. 0 = forever.
+  const [retentionDays, setRetentionDays] = useState(30)
+  useEffect(() => {
+    if (view !== 'trash') return
+    let cancelled = false
+    fetch('/api/settings/trash-retention')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { days?: number } | null) => {
+        if (!cancelled && data && typeof data.days === 'number') setRetentionDays(data.days)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [view])
 
   // ─── Selection state ──────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -3164,6 +3276,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 onClear={clearSelection}
                 onRefresh={handleFlatRefresh}
                 onTagsChanged={fetchTags}
+                view={view}
               />
               <DocList
                 docs={sortedFlatDocs}
@@ -3184,6 +3297,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 onSelectAll={handleSelectAll}
                 navigateTo={navigateTo}
                 onSetView={(v) => setView(v)}
+                retentionDays={retentionDays}
               />
             </>
           )}

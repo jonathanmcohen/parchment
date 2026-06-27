@@ -7,11 +7,11 @@
 // No 'server-only' guard so it stays unit-testable (it is only pulled into the
 // nodejs-runtime asset routes in app code).
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { getObjectFromS3, isS3Configured, uploadToS3 } from '@/lib/backup/s3'
 import { absPath } from '@/lib/disk/mirror'
-import { assetRelPath } from '@/lib/uploads/asset-path'
+import { assetDirRelPath, assetRelPath } from '@/lib/uploads/asset-path'
 
 /** S3 key for a doc asset — the relative disk path under an `assets/` prefix. */
 function s3Key(doc: { id: string }, name: string): string {
@@ -53,5 +53,20 @@ export async function getAsset(doc: { id: string }, name: string): Promise<Uint8
     return new Uint8Array(buf)
   } catch {
     return null
+  }
+}
+
+/**
+ * J11-1: best-effort removal of ALL of a doc's assets on PERMANENT delete. Removes
+ * the on-disk `.assets/<docId>/` directory (recursive, force). NEVER throws. On S3
+ * we cannot list+delete without an extra API surface, so disk is handled here and
+ * the S3 objects (if any) are left as orphans for the bucket lifecycle policy — the
+ * primary (disk) store is always cleaned. Called only after the row is gone.
+ */
+export async function removeAssetsForDoc(doc: { id: string }): Promise<void> {
+  try {
+    await rm(absPath(assetDirRelPath(doc)), { recursive: true, force: true })
+  } catch {
+    // best-effort — a missing dir or unsafe id is a no-op
   }
 }

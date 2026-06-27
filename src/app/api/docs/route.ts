@@ -71,6 +71,8 @@ export async function GET(req: NextRequest) {
         starred: d.starred,
         size: Number(d.size),
         preview: d.preview,
+        // J11-3: ISO trashed-at so the trash list can show the purge countdown.
+        trashedAt: d.trashedAt ? d.trashedAt.toISOString() : null,
       })),
     )
   }

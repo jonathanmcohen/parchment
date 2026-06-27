@@ -63,10 +63,7 @@ describe('§7b — setup emits a chained audit row', () => {
 
     const { db, schema } = await import('@/db')
     const { eq } = await import('drizzle-orm')
-    const rows = await db
-      .select()
-      .from(schema.auditLog)
-      .where(eq(schema.auditLog.action, 'setup'))
+    const rows = await db.select().from(schema.auditLog).where(eq(schema.auditLog.action, 'setup'))
     expect(rows.length).toBe(1)
     // The raw-insert bug left entry_hash NULL; logAudit back-fills it.
     expect(rows[0]?.entryHash).toMatch(/^[0-9a-f]{64}$/)

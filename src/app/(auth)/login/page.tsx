@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { ownerExists } from '@/lib/auth/bootstrap'
+import { isOidcEnabled } from '@/lib/auth/oidc-config'
 import { getCurrentUser } from '@/lib/auth/session'
 import { LoginForm } from './login-form'
 
@@ -10,6 +11,10 @@ export default async function LoginPage() {
   if (!(await ownerExists())) redirect('/setup')
   // Already signed in → nothing to do here.
   if (await getCurrentUser()) redirect('/')
+
+  // Show the SSO button only when OIDC is configured + enabled. We pass a BOOLEAN —
+  // the OIDC config (incl. the client secret) never reaches the client.
+  const ssoEnabled = await isOidcEnabled()
 
   return (
     // S5-13: Docs sign-in framing — a white --surface card with --border-chrome,
@@ -27,7 +32,7 @@ export default async function LoginPage() {
           </h1>
           <p className="text-[var(--muted)] text-sm">Welcome back to Parchment.</p>
         </div>
-        <LoginForm />
+        <LoginForm ssoEnabled={ssoEnabled} />
       </div>
     </main>
   )

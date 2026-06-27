@@ -56,14 +56,14 @@ beforeAll(async () => {
     await c.query(readFileSync(path.join(migrationsDir, f), 'utf8'))
   }
   const pw = await argonHash('correct-password', argonOptions)
-  await c.query("insert into users (email, name, password_hash, role) values ($1,'V',$2,'editor')", [
-    'victim@example.com',
-    pw,
-  ])
-  await c.query("insert into users (email, name, password_hash, role) values ($1,'O',$2,'editor')", [
-    'other@example.com',
-    pw,
-  ])
+  await c.query(
+    "insert into users (email, name, password_hash, role) values ($1,'V',$2,'editor')",
+    ['victim@example.com', pw],
+  )
+  await c.query(
+    "insert into users (email, name, password_hash, role) values ($1,'O',$2,'editor')",
+    ['other@example.com', pw],
+  )
   await c.end()
   process.env.DATABASE_URL = url
 }, 180_000)

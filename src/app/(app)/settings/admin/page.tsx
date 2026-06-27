@@ -52,6 +52,17 @@ export default function AdminSettingsPage() {
               </span>
             </Link>
           </li>
+          <li>
+            <Link
+              href="/settings/admin/sso"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Single sign-on (OIDC)</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Connect an OpenID Connect identity provider for SSO login (Plan G2).
+              </span>
+            </Link>
+          </li>
         </ul>
       </section>
 

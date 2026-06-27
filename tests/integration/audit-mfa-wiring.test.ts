@@ -55,7 +55,12 @@ beforeAll(async () => {
     "insert into users (email, name, role) values ('mfa-wire@example.com', 'W', 'editor') returning id",
   )
   await c.end()
-  ACTOR = { id: u.rows[0]?.id as string, email: 'mfa-wire@example.com', role: 'editor', disabledAt: null }
+  ACTOR = {
+    id: u.rows[0]?.id as string,
+    email: 'mfa-wire@example.com',
+    role: 'editor',
+    disabledAt: null,
+  }
   process.env.DATABASE_URL = url
 }, 180_000)
 
@@ -88,7 +93,9 @@ describe('§5.3 — MFA enable/disable emit audit verbs + keep the chain valid',
     const { POST: disablePost } = await import('@/app/api/auth/mfa/totp/disable/route')
     // getMfa returns the decrypted secret; compute a fresh code to re-auth the disable.
     const row = await getMfa(ACTOR?.id as string)
-    const disableRes = await disablePost(reqJson({ token: codeFor(row?.totpSecret as string) }) as never)
+    const disableRes = await disablePost(
+      reqJson({ token: codeFor(row?.totpSecret as string) }) as never,
+    )
     expect(disableRes.status).toBe(200)
 
     const c = await client()

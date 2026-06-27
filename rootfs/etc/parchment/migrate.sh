@@ -5,10 +5,14 @@ set -e
 # Expected format: postgres://user:pass@host:port/db  (or postgresql://...)
 DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/]+)[:/].*|\1|')
 DB_USER=$(echo "$DATABASE_URL" | sed -E 's|.*://([^:]+):.*|\1|')
+DB_PASS=$(echo "$DATABASE_URL" | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|')
 DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|' | grep -E '^[0-9]+$' || echo "5432")
 # DB_NAME: parsed from URL path; fall back to $POSTGRES_DB (never hardcode 'parchment').
 DB_NAME=$(echo "$DATABASE_URL" | sed -E 's|.*/([^?]+)(\?.*)?$|\1|')
 DB_NAME="${DB_NAME:-${POSTGRES_DB:-parchment}}"
+
+# Export PGPASSWORD so pg client tools don't prompt interactively.
+export PGPASSWORD="$DB_PASS"
 
 # ── 1. Wait for Postgres ───────────────────────────────────────────────────────
 echo "[parchment] waiting for postgres at $DB_HOST:$DB_PORT as $DB_USER ..."

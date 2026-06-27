@@ -538,6 +538,9 @@ export function CommentsSidebar({
           filteredRoots.map((root) => {
             const replies = (threadMap.get(root.threadId) ?? []).filter((c) => c.id !== c.threadId)
             const isFocused = focusedThreadId === root.threadId
+            // H1: the anchored text was deleted — the highlight is gone, so flag the
+            // thread as orphaned instead of letting it look anchored to nothing.
+            const isOrphaned = orphanedThreadIds.has(root.threadId)
 
             return (
               <article
@@ -546,6 +549,7 @@ export function CommentsSidebar({
                   focusRefs.current[root.threadId] = el
                 }}
                 aria-label="Comment thread"
+                data-orphaned={isOrphaned ? 'true' : undefined}
                 onClick={() => setFocusedThreadId(root.threadId)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') setFocusedThreadId(root.threadId)
@@ -559,6 +563,19 @@ export function CommentsSidebar({
                   outlineOffset: -2,
                 }}
               >
+                {isOrphaned && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--muted)',
+                      marginBottom: 4,
+                      fontStyle: 'italic',
+                    }}
+                    title="The text this comment was anchored to was deleted."
+                  >
+                    Orphaned — anchored text deleted
+                  </div>
+                )}
                 {/* Root comment */}
                 <CommentCard comment={root} />
 

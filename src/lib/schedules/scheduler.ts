@@ -1,5 +1,6 @@
 import { db, schema } from '@/db'
 import { isS3Configured, uploadToS3 } from '@/lib/backup/s3'
+import { isS3Active } from '@/lib/backup/s3-config'
 import { createWorkspaceBackup } from '@/lib/backup/service'
 import { purgeExpiredTrash } from '@/lib/docs/repo'
 import { getTrashRetentionDays } from '@/lib/docs/settings-repo'
@@ -45,11 +46,21 @@ class SchedulerSingleton {
    * IDEMPOTENT: a second call while already started is a no-op — it never
    * creates a duplicate timer. Safe to call from `register()` across HMR.
    */
-  start(): void {
+  async start(): Promise<void> {
     if (this.started) return
     this.started = true
 
     this.registerDefaults()
+
+    // DB-config awareness: registerDefaults() only sees the env-based S3 toggle
+    // (sync). At boot, additionally consult the DB-backed config (env OR DB) so a
+    // UI-configured S3 backup is registered without a restart. Best-effort — a
+    // config-read failure must never block boot.
+    try {
+      if (await isS3Active()) this.reconfigureS3Job(true)
+    } catch {
+      // ignore — the job can still be live-registered later via the settings UI
+    }
 
     // Kick a tick on the next macrotask so a due-on-boot job runs shortly after
     // start without blocking the server boot path.
@@ -60,6 +71,23 @@ class SchedulerSingleton {
     }, TICK_INTERVAL_MS)
     // Don't keep the process alive solely for the scheduler (clean test/CLI exit).
     this.timer.unref?.()
+  }
+
+  /**
+   * Live add/remove the 's3-backup' job without a restart (called after the
+   * settings UI saves the S3 config). Idempotent: registering when already
+   * present is a no-op; disabling when absent is a no-op. The job runs on the
+   * same 24h cadence as the env-configured path.
+   */
+  reconfigureS3Job(enabled: boolean): void {
+    this.registerDefaults()
+    if (enabled) {
+      if (!this.core.has('s3-backup')) {
+        this.core.register({ name: 's3-backup', intervalMs: DAY_MS, run: s3BackupJob })
+      }
+    } else if (this.core.has('s3-backup')) {
+      this.core.unregister('s3-backup')
+    }
   }
 
   /**

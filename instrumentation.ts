@@ -20,7 +20,7 @@ export async function register(): Promise<void> {
 
   try {
     const { scheduler } = await import('@/lib/schedules/scheduler')
-    scheduler.start()
+    await scheduler.start()
   } catch {
     // A scheduler failure must never crash boot — the app still serves.
   }

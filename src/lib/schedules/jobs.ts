@@ -68,6 +68,16 @@ export class Scheduler {
     return this.jobs.has(name)
   }
 
+  /**
+   * Remove a job from the schedule. No-op if the name is unknown. An in-flight
+   * run is NOT interrupted (it runs to completion); only the registration and
+   * its observable state are dropped, so it will not be scheduled again.
+   */
+  unregister(name: string): void {
+    this.jobs.delete(name)
+    this.state.delete(name)
+  }
+
   /** Snapshot of every job's state (stable order = registration order). */
   getState(): JobState[] {
     return [...this.state.values()].map((s) => ({ ...s }))

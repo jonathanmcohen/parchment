@@ -116,6 +116,8 @@ export type DocTitleBarProps = {
   onOpenShare: () => void
   /** S2-5 avatar cluster, rendered at the far right. */
   avatar?: React.ReactNode
+  /** H Task 14: live presence cluster (who's editing/viewing), left of the avatar. */
+  presence?: React.ReactNode
 }
 
 export function DocTitleBar({
@@ -128,6 +130,7 @@ export function DocTitleBar({
   onToggleVersionHistory,
   onOpenShare,
   avatar,
+  presence,
 }: DocTitleBarProps) {
   const t = useTranslations('editor.saveStatus')
   // C4: seed from the server-rendered starred flag so the icon reflects reality
@@ -252,6 +255,7 @@ export function DocTitleBar({
           Share
         </button>
 
+        {presence}
         {avatar}
       </div>
     </header>

@@ -33,6 +33,7 @@ import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
 import { PlantumlPopover } from '@/components/editor/PlantumlPopover'
+import { PresenceCluster } from '@/components/editor/PresenceCluster'
 import { PresenterView } from '@/components/editor/PresenterView'
 import { PrintView } from '@/components/editor/PrintView'
 import { ReadingPresence } from '@/components/editor/ReadingPresence'
@@ -1478,6 +1479,7 @@ export function Editor({
           onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
           onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
           onOpenShare={() => setShareDialogOpen(true)}
+          presence={<PresenceCluster provider={provider} />}
           avatar={<UserCluster name={currentUserName} />}
         />
 

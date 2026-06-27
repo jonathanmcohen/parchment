@@ -1,7 +1,10 @@
 /**
- * src/middleware.ts — maintenance mode + request-count metrics (I1/I6/§1k/§7m).
+ * src/proxy.ts — maintenance mode + request-count metrics (I1/I6/§1k/§7m).
  *
- * SECURITY NOTE (§1k): This middleware performs ONLY:
+ * Next 16 renamed the `middleware.ts` file convention to `proxy.ts` (the old
+ * name is deprecated). This file is that proxy: it runs before matched routes.
+ *
+ * SECURITY NOTE (§1k): This proxy performs ONLY:
  *   1. Maintenance-mode 503 blocks on non-GET/HEAD API mutations.
  *   2. Request counter increment for Prometheus.
  *
@@ -19,7 +22,7 @@ import { incrementCounter } from '@/lib/metrics'
 //   - The setup wizard (a fresh install must be able to bootstrap)
 const ALWAYS_ALLOWED_PREFIXES = ['/api/healthz', '/api/readyz', '/api/metrics', '/setup']
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
   const method = req.method
 
@@ -51,6 +54,13 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next()
 }
 
+// I6 bugfix root cause: the previous `src/middleware.ts` read the maintenance
+// lock-file via `node:fs` (@/lib/maintenance), but Next's *middleware* runtime
+// was Edge, where `node:fs` is unavailable → every mutating /api/* request 500'd
+// under the prod build (caught by H's e2e; invisible to integration tests that
+// call route handlers directly). The Next 16 `proxy` convention ALWAYS runs on
+// the Node.js runtime, so the fs-backed maintenance check works natively — no
+// `runtime` config is needed (and route-segment config is disallowed here).
 export const config = {
   matcher: ['/api/:path*', '/setup/:path*'],
 }

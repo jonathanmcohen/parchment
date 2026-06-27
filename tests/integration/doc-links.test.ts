@@ -194,3 +194,79 @@ describe('F6 — doc_links repo', () => {
     expect((await backlinks(b, ownerId)).map((l) => l.id)).toContain(a)
   })
 })
+
+describe('J5-2 — graphEdges (link graph)', () => {
+  it('returns owned nodes + edges only between owned, non-trashed docs', async () => {
+    const { createDocument } = await import('@/lib/docs/repo')
+    const { setDocLinks, graphEdges } = await import('@/lib/docs/doc-links-repo')
+
+    const { id: a } = await createDocument(ownerId, { title: 'GraphA' })
+    const { id: b } = await createDocument(ownerId, { title: 'GraphB' })
+    const { id: c } = await createDocument(ownerId, { title: 'GraphC' })
+    await setDocLinks(a, [b])
+    await setDocLinks(b, [c])
+
+    const graph = await graphEdges(ownerId)
+    const nodeIds = graph.nodes.map((n) => n.id)
+    expect(nodeIds).toEqual(expect.arrayContaining([a, b, c]))
+
+    const edgeSet = graph.edges.map((e) => `${e.from}->${e.to}`)
+    expect(edgeSet).toContain(`${a}->${b}`)
+    expect(edgeSet).toContain(`${b}->${c}`)
+  })
+
+  it('excludes another owner’s docs and edges', async () => {
+    const { createDocument } = await import('@/lib/docs/repo')
+    const { setDocLinks, graphEdges } = await import('@/lib/docs/doc-links-repo')
+
+    const { id: mine } = await createDocument(ownerId, { title: 'MineGraph' })
+    const { id: theirsA } = await createDocument(otherOwnerId, { title: 'TheirsA' })
+    const { id: theirsB } = await createDocument(otherOwnerId, { title: 'TheirsB' })
+    await setDocLinks(theirsA, [theirsB])
+
+    const graph = await graphEdges(ownerId)
+    const nodeIds = graph.nodes.map((n) => n.id)
+    expect(nodeIds).toContain(mine)
+    expect(nodeIds).not.toContain(theirsA)
+    expect(graph.edges.some((e) => e.from === theirsA || e.to === theirsB)).toBe(false)
+  })
+
+  it('drops a node + its edges when a target doc is trashed (no dangling edge)', async () => {
+    const { createDocument, trashDocument } = await import('@/lib/docs/repo')
+    const { setDocLinks, graphEdges } = await import('@/lib/docs/doc-links-repo')
+
+    const { id: src } = await createDocument(ownerId, { title: 'TrashSrc' })
+    const { id: tgt } = await createDocument(ownerId, { title: 'TrashTgt' })
+    await setDocLinks(src, [tgt])
+    await trashDocument(ownerId, tgt)
+
+    const graph = await graphEdges(ownerId)
+    expect(graph.nodes.map((n) => n.id)).not.toContain(tgt)
+    // the edge src->tgt must not survive (target is no longer an owned node)
+    expect(graph.edges.some((e) => e.to === tgt)).toBe(false)
+  })
+
+  it('GET /api/graph returns the graph for a docs:read PAT', async () => {
+    const { createDocument } = await import('@/lib/docs/repo')
+    const { setDocLinks } = await import('@/lib/docs/doc-links-repo')
+    const { issuePat } = await import('@/lib/auth/pat')
+    const { NextRequest } = await import('next/server')
+
+    const { id: x } = await createDocument(ownerId, { title: 'RouteGraphX' })
+    const { id: y } = await createDocument(ownerId, { title: 'RouteGraphY' })
+    await setDocLinks(x, [y])
+
+    const { token } = await issuePat(ownerId, 'graph-read', ['docs:read'])
+    const { GET } = await import('@/app/api/graph/route')
+    const res = await GET(
+      new NextRequest('http://x/api/graph', {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+      }),
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { nodes: { id: string }[]; edges: { from: string }[] }
+    expect(body.nodes.map((n) => n.id)).toEqual(expect.arrayContaining([x, y]))
+    expect(body.edges.some((e) => e.from === x)).toBe(true)
+  })
+})

@@ -36,6 +36,7 @@ const nav = [
   { href: '/files', key: 'files', icon: 'folder' },
   { href: '/files?view=recents', key: 'recents', icon: 'schedule' },
   { href: '/templates', key: 'templates', icon: 'grid_view' },
+  { href: '/graph', key: 'graph', icon: 'hub' },
   { href: '/inbox', key: 'inbox', icon: 'inbox' },
   { href: '/files?view=shared', key: 'shared', icon: 'group' },
   { href: '/files?view=starred', key: 'starred', icon: 'star' },

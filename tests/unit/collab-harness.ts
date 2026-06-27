@@ -42,7 +42,15 @@ export function makePeer(initialContent?: string): Peer {
   const ydoc = new Y.Doc()
   const awareness = new Awareness(ydoc)
 
+  // Mount to a real (jsdom) element: the y-prosemirror ySync plugin only creates
+  // its prosemirror↔yjs binding inside the EditorView `view()` lifecycle, which
+  // runs only when the editor is attached to a DOM node. Without an element the
+  // binding never exists and serializeAnchor would always return null.
+  const element = document.createElement('div')
+  document.body.appendChild(element)
+
   const editor = new Editor({
+    element,
     extensions: [...baseExtensions, Collaboration.configure({ document: ydoc, field: FIELD })],
     // Collaboration ignores the `content` option (the Y.Doc is the source of
     // truth), so seed via setContent below instead.
@@ -80,6 +88,7 @@ export function makePeer(initialContent?: string): Peer {
       awareness.destroy()
       editor.destroy()
       ydoc.destroy()
+      element.remove()
     },
   }
 

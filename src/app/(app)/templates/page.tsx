@@ -12,6 +12,8 @@ export default async function TemplatesPage() {
     key: t.key,
     name: t.name,
     description: t.description,
+    category: t.category,
+    content: t.content,
   }))
 
   const initialUserTemplates: UserTemplateDTO[] = userTemplates.map((t) => ({

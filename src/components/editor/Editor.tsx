@@ -1079,6 +1079,25 @@ export function Editor({
     setOpenComposerSignal((n) => n + 1)
   }, [editor])
 
+  // J3-1: capture the current document's content as a reusable user template.
+  // Prompts for a name, then POSTs the live ProseMirror JSON to /api/templates.
+  const handleSaveAsTemplate = useCallback(() => {
+    if (!editor) return
+    const name = window.prompt('Template name')
+    if (name === null || name.trim() === '') return
+    const content = editor.getJSON()
+    void fetch('/api/templates', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), content }),
+    })
+      .then((res) => {
+        if (res.ok) window.alert(`Saved “${name.trim()}” to your templates.`)
+        else window.alert('Could not save the template.')
+      })
+      .catch(() => window.alert('Could not save the template.'))
+  }, [editor])
+
   // F3: once the sidebar has consumed the open-composer intent, clear it so a
   // later rail toggle (which re-mounts CommentsSidebar) does not re-open the
   // composer for a stale signal value. Stable so it doesn't re-fire the child's
@@ -1555,6 +1574,7 @@ export function Editor({
             suggestionsOpen={suggestionsOpen}
             onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
             backlinksOpen={backlinksOpen}
+            onSaveAsTemplate={handleSaveAsTemplate}
             onToggleGrammar={() => setGrammarPanelOpen((v) => !v)}
             grammarOpen={grammarPanelOpen}
             grammarEnabled={grammarEnabled}

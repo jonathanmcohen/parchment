@@ -11,10 +11,14 @@ export interface ProseMirrorDoc {
   content: Record<string, unknown>[]
 }
 
+/** J3-2: gallery grouping. Stable, human-readable section labels. */
+export type TemplateCategory = 'Work' | 'Writing' | 'Personal'
+
 export interface BuiltinTemplate {
   key: string
   name: string
   description: string
+  category: TemplateCategory
   content: ProseMirrorDoc
 }
 
@@ -49,12 +53,14 @@ export const BUILTIN_TEMPLATES: readonly BuiltinTemplate[] = [
     key: 'blank',
     name: 'Blank document',
     description: 'An empty page to start writing from scratch.',
+    category: 'Writing',
     content: { type: 'doc', content: [paragraph()] },
   },
   {
     key: 'meeting-notes',
     name: 'Meeting notes',
     description: 'Agenda, attendees, discussion, and action items.',
+    category: 'Work',
     content: {
       type: 'doc',
       content: [
@@ -75,6 +81,7 @@ export const BUILTIN_TEMPLATES: readonly BuiltinTemplate[] = [
     key: 'letter',
     name: 'Formal letter',
     description: 'A dated letter with recipient, body, and signature.',
+    category: 'Personal',
     content: {
       type: 'doc',
       content: [
@@ -93,6 +100,7 @@ export const BUILTIN_TEMPLATES: readonly BuiltinTemplate[] = [
     key: 'weekly-report',
     name: 'Weekly report',
     description: 'Highlights, progress, blockers, and next steps.',
+    category: 'Work',
     content: {
       type: 'doc',
       content: [
@@ -113,6 +121,7 @@ export const BUILTIN_TEMPLATES: readonly BuiltinTemplate[] = [
     key: 'project-brief',
     name: 'Project brief',
     description: 'Overview, goals, scope, and timeline for a new project.',
+    category: 'Work',
     content: {
       type: 'doc',
       content: [
@@ -125,6 +134,66 @@ export const BUILTIN_TEMPLATES: readonly BuiltinTemplate[] = [
         paragraph('What is in and out of scope.'),
         heading(2, 'Timeline'),
         bullets('Milestone — date'),
+      ],
+    },
+  },
+  {
+    key: 'prd',
+    name: 'Product requirements (PRD)',
+    description: 'Problem, goals, requirements, and success metrics for a feature.',
+    category: 'Work',
+    content: {
+      type: 'doc',
+      content: [
+        heading(1, 'Product requirements'),
+        heading(2, 'Problem'),
+        paragraph('What problem are we solving, and for whom?'),
+        heading(2, 'Goals & non-goals'),
+        bullets('Goal: …', 'Non-goal: …'),
+        heading(2, 'Requirements'),
+        bullets('Must: …', 'Should: …', 'Could: …'),
+        heading(2, 'Success metrics'),
+        bullets('Metric — target'),
+        heading(2, 'Open questions'),
+        bullets('Question one'),
+      ],
+    },
+  },
+  {
+    key: 'weekly-review',
+    name: 'Weekly review',
+    description: 'A personal retrospective: wins, lessons, and next-week focus.',
+    category: 'Personal',
+    content: {
+      type: 'doc',
+      content: [
+        heading(1, 'Weekly review'),
+        paragraph('Week of: '),
+        heading(2, 'Wins'),
+        bullets('Something that went well'),
+        heading(2, 'Lessons'),
+        bullets('Something I learned'),
+        heading(2, 'Focus for next week'),
+        bullets('One thing to prioritize'),
+      ],
+    },
+  },
+  {
+    key: 'blog-post',
+    name: 'Blog post',
+    description: 'A title, hook, sections, and a closing call to action.',
+    category: 'Writing',
+    content: {
+      type: 'doc',
+      content: [
+        heading(1, 'Post title'),
+        paragraph('Open with a hook that draws the reader in.'),
+        heading(2, 'Section one'),
+        paragraph('Develop your first point here.'),
+        heading(2, 'Section two'),
+        paragraph('Develop your second point here.'),
+        heading(2, 'Conclusion'),
+        paragraph('Wrap up and end with a call to action.'),
       ],
     },
   },

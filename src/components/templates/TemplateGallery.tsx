@@ -1,16 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { TemplatePreview } from '@/components/templates/TemplatePreview'
 
-// G2: the templates gallery. Renders two sections — bundled templates (shipped
-// in code) and the user's saved templates. "Use template" POSTs to
-// /api/docs/from-template and navigates to the new doc; user templates get a
-// delete (✕) action. Client component — never imports @/db.
+// G2 + J3-2: the templates gallery. Bundled templates are grouped into category
+// sections; each card has a "Preview" toggle (a read-only render of the
+// template's ProseMirror JSON) and a "Use template" action that POSTs to
+// /api/docs/from-template and navigates to the new doc. User templates get a
+// delete (✕). Client component — never imports @/db.
 
 export interface BundledTemplateDTO {
   key: string
   name: string
   description: string
+  category: string
+  content: unknown
 }
 
 export interface UserTemplateDTO {
@@ -27,7 +31,24 @@ interface Props {
 export default function TemplateGallery({ bundled, initialUserTemplates }: Props) {
   const [userTemplates, setUserTemplates] = useState<UserTemplateDTO[]>(initialUserTemplates)
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [previewKey, setPreviewKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // J3-2: stable category order; any unexpected category falls to the end.
+  const grouped = useMemo(() => {
+    const order = ['Work', 'Writing', 'Personal']
+    const byCat = new Map<string, BundledTemplateDTO[]>()
+    for (const t of bundled) {
+      const list = byCat.get(t.category) ?? []
+      list.push(t)
+      byCat.set(t.category, list)
+    }
+    return [...byCat.entries()].sort(
+      (a, b) =>
+        (order.indexOf(a[0]) === -1 ? 99 : order.indexOf(a[0])) -
+        (order.indexOf(b[0]) === -1 ? 99 : order.indexOf(b[0])),
+    )
+  }, [bundled])
 
   const instantiate = async (
     busyId: string,
@@ -73,30 +94,47 @@ export default function TemplateGallery({ bundled, initialUserTemplates }: Props
         </p>
       )}
 
-      <section aria-labelledby="bundled-heading">
-        <h2 id="bundled-heading" className="mb-3 font-semibold text-lg text-[var(--foreground)]">
-          Bundled
-        </h2>
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {bundled.map((t) => (
-            <li
-              key={t.key}
-              className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--paper)] p-4"
-            >
-              <h3 className="font-medium text-[var(--foreground)]">{t.name}</h3>
-              <p className="flex-1 text-[var(--muted)] text-sm">{t.description}</p>
-              <button
-                type="button"
-                disabled={busyKey !== null}
-                onClick={() => instantiate(`builtin:${t.key}`, { builtinKey: t.key })}
-                className="self-start rounded-md bg-[var(--primary)] px-3 py-1.5 font-medium text-sm text-[var(--on-primary)] disabled:opacity-50"
+      {grouped.map(([category, items]) => (
+        <section key={category} aria-labelledby={`cat-${category}`}>
+          <h2
+            id={`cat-${category}`}
+            data-template-category={category}
+            className="mb-3 font-semibold text-lg text-[var(--foreground)]"
+          >
+            {category}
+          </h2>
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((t) => (
+              <li
+                key={t.key}
+                className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--paper)] p-4"
               >
-                {busyKey === `builtin:${t.key}` ? 'Creating…' : 'Use template'}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+                <h3 className="font-medium text-[var(--foreground)]">{t.name}</h3>
+                <p className="flex-1 text-[var(--muted)] text-sm">{t.description}</p>
+                {previewKey === t.key && <TemplatePreview doc={t.content as { content?: [] }} />}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busyKey !== null}
+                    onClick={() => instantiate(`builtin:${t.key}`, { builtinKey: t.key })}
+                    className="rounded-md bg-[var(--primary)] px-3 py-1.5 font-medium text-sm text-[var(--on-primary)] disabled:opacity-50"
+                  >
+                    {busyKey === `builtin:${t.key}` ? 'Creating…' : 'Use template'}
+                  </button>
+                  <button
+                    type="button"
+                    aria-expanded={previewKey === t.key}
+                    onClick={() => setPreviewKey((cur) => (cur === t.key ? null : t.key))}
+                    className="rounded-md border border-[var(--border)] px-3 py-1.5 font-medium text-sm text-[var(--muted)] hover:text-[var(--foreground)]"
+                  >
+                    {previewKey === t.key ? 'Hide preview' : 'Preview'}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
 
       <section aria-labelledby="your-templates-heading">
         <h2

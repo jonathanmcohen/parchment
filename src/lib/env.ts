@@ -30,12 +30,47 @@ export const env = {
   // scheme/port); RP_ORIGIN is the full scheme://host[:port].
   webauthnRpId: process.env.PARCHMENT_RP_ID,
   webauthnOrigin: process.env.PARCHMENT_RP_ORIGIN,
-  // CF4: the public base URL (scheme://host[:port]) for user-facing absolute
-  // links — currently the share-viewer URL. It MUST be fixed server config, never
-  // derived from request headers: behind a TLS-terminating reverse proxy (Caddy)
-  // the app's `req.nextUrl.origin` is the internal `0.0.0.0:3000` bind, which
-  // would leak into copyable share links. Defaults to PARCHMENT_RP_ORIGIN — the
-  // public host the deploy already sets for WebAuthn — so a redeploy self-corrects
-  // the share link WITHOUT any new config; PUBLIC_URL is an explicit override.
-  publicUrl: process.env.PUBLIC_URL || process.env.PARCHMENT_RP_ORIGIN || 'http://localhost:3000',
+  // PARCHMENT_SECRET_KEY (Phase 0 §1a/§3c — required for encrypted config writes).
+  // base64-encoded 32 bytes; the AES-256-GCM master key for src/lib/crypto/secret-box.ts.
+  // If ABSENT, the module still loads — secret WRITES return 503 at the route level and
+  // reads of unencrypted/legacy config still work (secretKeyConfigured === false).
+  // If PRESENT but malformed (not valid base64, or not exactly 32 decoded bytes), the
+  // process fails fast at boot — a half-configured key is worse than none. The error
+  // NEVER echoes the key value (it could be a real secret in a misconfigured deploy).
+  secretKey: (() => {
+    const raw = process.env.PARCHMENT_SECRET_KEY
+    if (!raw) return null
+    const buf = Buffer.from(raw, 'base64')
+    // Buffer.from(.,'base64') silently DROPS non-base64 chars instead of throwing,
+    // so re-encode and compare (ignoring '=' padding differences) to reject garbage.
+    const normalized = raw.replace(/=+$/, '')
+    if (buf.toString('base64').replace(/=+$/, '') !== normalized) {
+      throw new Error('PARCHMENT_SECRET_KEY is not valid base64')
+    }
+    if (buf.length !== 32) {
+      throw new Error(`PARCHMENT_SECRET_KEY must decode to exactly 32 bytes, got ${buf.length}`)
+    }
+    return raw // keep as base64 string; secret-box re-decodes at call time
+  })(),
+  secretKeyConfigured: !!process.env.PARCHMENT_SECRET_KEY,
+
+  // PARCHMENT_PUBLIC_URL (Phase 0 §7a — REQUIRED external base URL, e.g.
+  // "https://notes.example.com"). No trailing slash. It MUST be fixed server config,
+  // NEVER derived from request headers: behind a TLS-terminating reverse proxy (Caddy)
+  // the app's `req.nextUrl.origin` is the internal `0.0.0.0:3000` bind, which would
+  // leak into user-facing absolute links. Used by:
+  //   • CF4 — copyable share-viewer links (`${publicUrl}/share/<token>`)
+  //   • Group A — invite-accept links     (`${publicUrl}/invite/accept?token=...`)
+  //   • Group G — OIDC redirect_uri        (`${publicUrl}/api/auth/oidc/callback`)
+  // The process throws at boot if this is absent, because A and G produce broken URLs
+  // without it (invite emails land on the wrong domain; OIDC callback registration
+  // fails at the IdP). This REPLACES the old PUBLIC_URL/PARCHMENT_RP_ORIGIN fallback —
+  // operators must set PARCHMENT_PUBLIC_URL explicitly.
+  publicUrl: (() => {
+    const raw = process.env.PARCHMENT_PUBLIC_URL
+    if (!raw) {
+      throw new Error('PARCHMENT_PUBLIC_URL is required (e.g. https://notes.example.com)')
+    }
+    return raw.replace(/\/$/, '') // strip trailing slash for safe URL concatenation
+  })(),
 }

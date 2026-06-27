@@ -1,71 +1,81 @@
 # Parchment
 
-Parchment is a self-hostable, Google-Docs-style writing app with a Drive-style
-file manager. It is **markdown-first** — every document is mirrored to a real
-`.md` file on disk (git-tracked and portable) — with a rich, page-bounded editor,
-real-time collaboration, and a single all-in-one container you can `docker run` on
-your own homelab. No external services are required to run it.
+A self-hostable, Google-Docs-style writing app with a Drive-style file manager.
+**Markdown-first** — every document is mirrored to a real `.md` file on disk
+(git-tracked and portable). One container. No external services required.
 
-- **v0.1** — single-user (owner only).
-- **v0.2** — multi-user + sharing.
+- Real-time collaboration (Yjs + Hocuspocus)
+- Page-bounded rich editor (Tiptap / ProseMirror)
+- Disk-mirrored Markdown (portable, git-trackable)
+- Export to DOCX, HTML, EPUB, PDF (native `@page` printing)
+- Dark mode, high-contrast, OpenDyslexic font, full keyboard navigation
+- Multi-user with sharing (v0.2)
 
-Multi-arch image (amd64 + arm64) at `ghcr.io/jonathanmcohen/parchment` (mirrors
-Cairn's release pattern).
-
-## Stack
-
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 16 (App Router + RSC + Turbopack), React 19 |
-| Language | TypeScript 6 (strict), Biome v2 |
-| DB | Postgres 18 + pgvector, Drizzle ORM |
-| Editor | Tiptap / ProseMirror + markdown extension |
-| Collab | Yjs + Hocuspocus (`parchment-collab`) — own Node process, **same container** |
-| UI | Tailwind + shadcn/ui |
-| Print/PDF | paged.js |
-| docx | mammoth (round-trip) |
-| Code render | shiki (render) + highlight.js/auto (classify) |
-| Test | Testcontainers + Vitest 4 + Playwright e2e + axe-core a11y |
-| Docker base | `node:24-bookworm-slim` |
+Multi-arch image (`amd64` + `arm64`) at `ghcr.io/jonathanmcohen/parchment`.
 
 ---
 
-## Quick start (Docker)
+## Quick start
 
-The production artifact is **one image** — Postgres 18 + pgvector, the Hocuspocus
-collab server, and the Next.js app, all supervised by [s6-overlay](https://github.com/just-containers/s6-overlay)
-(see the [`Dockerfile`](./Dockerfile)). `docker run` it with two volumes and the
-two ports and you have a working Parchment:
+The production artifact is a **single image** — Postgres 18 + pgvector, the
+Hocuspocus collab server, and the Next.js app — all supervised by
+[s6-overlay](https://github.com/just-containers/s6-overlay).
 
-```bash
-docker run -d --name parchment \
-  -p 3000:3000 \            # Next.js app
-  -p 1234:1234 \            # Hocuspocus collab websocket
-  -v parchment_pg:/var/lib/postgresql \   # Postgres data
-  -v parchment_data:/data \               # disk-mirrored Markdown files
-  ghcr.io/jonathanmcohen/parchment:v0.1.0
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  app:
+    image: ghcr.io/jonathanmcohen/parchment:latest
+    ports:
+      - "3000:3000"   # web app
+      - "1234:1234"   # collab websocket
+    volumes:
+      - parchment_pg:/var/lib/postgresql
+      - parchment_data:/data
+    environment:
+      SECURE_COOKIES: "true"          # set if served over HTTPS
+      PARCHMENT_RP_ID: "example.com"  # bare domain for passkeys (production)
+      PARCHMENT_RP_ORIGIN: "https://example.com"  # full origin for passkeys
+
+volumes:
+  parchment_pg:
+  parchment_data:
 ```
 
-Then open `http://localhost:3000` and complete **first-run setup at `/setup`** to
-create the owner account. A small **Parchment Guide** workspace is seeded on first
-run so the install isn't empty.
+Then:
+
+```bash
+docker compose up -d
+```
+
+Open `http://localhost:3000` and complete **first-run setup at `/setup`** to
+create the owner account. A **Parchment Guide** workspace is seeded on first
+run.
 
 The two volumes hold all your state:
 
 - `/var/lib/postgresql` — the bundled Postgres data directory.
-- `/data` — the disk-mirrored Markdown files (`PARCHMENT_FILES_ROOT` defaults to
-  `/data/files`).
+- `/data` — the disk-mirrored Markdown files (`PARCHMENT_FILES_ROOT` defaults
+  to `/data/files`).
 
-> `docker-compose.yml` exists for **development only** (live source mount + a
-> standalone dev Postgres). Production is the single image above.
+### Upgrading
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Migrations run automatically on boot (idempotent). Data lives in the volumes
+and survives upgrades.
 
 ---
 
 ## Environment reference
 
 Every variable below is read somewhere in the codebase. **Core** vars have safe
-defaults baked into the image; the **optional integrations are off by default** —
-leaving them unset simply disables that feature (no external call is ever made).
+defaults baked into the image; the **optional integrations are off by default**
+— leaving them unset simply disables that feature (no external call is ever
+made).
 
 ### Core
 
@@ -77,34 +87,33 @@ leaving them unset simply disables that feature (no external call is ever made).
 | `COLLAB_URL` | `ws://localhost:1234` | Server-side collab URL (health probes). |
 | `NEXT_PUBLIC_COLLAB_URL` | `ws://localhost:1234` | **Browser-facing** collab websocket URL the editor connects to. Set this to your public origin when the collab port is reached through a different host/proxy. |
 | `PARCHMENT_FILES_ROOT` | `/data/files` (image) | Root directory for the disk-mirrored Markdown files. |
-| `NODE_ENV` | `production` (image) | Standard Node mode. In `production` the session cookie is sent `Secure` (https-only). Run the image **with `NODE_ENV=production`** when it's served over https. |
-| `SECURE_COOKIES` | unset | Set to `true` to force the `Secure` flag on the session cookie even when `NODE_ENV` is not `production` — needed behind a TLS-terminating reverse proxy (Caddy/nginx) if the container runs with the default `NODE_ENV`. Leave unset (or `false`) for plain http (local dev), otherwise the browser drops the cookie and login/theme-save fail. |
-| `PUBLIC_URL` | falls back to `PARCHMENT_RP_ORIGIN`, then `http://localhost:3000` | The **public** base URL (`scheme://host[:port]`) used to build copyable absolute share links (`/share/<token>`). MUST be your public host as seen by browsers — behind a reverse proxy the app's own request origin is the internal `0.0.0.0:3000` bind, which would otherwise leak into the link. Optional: if unset it defaults to `PARCHMENT_RP_ORIGIN` (which the deploy already sets for passkeys), so a **redeploy** self-corrects existing share links with no new config. Set it explicitly only to override that. A change takes effect on redeploy. |
+| `NODE_ENV` | `production` (image) | Standard Node mode. |
+| `SECURE_COOKIES` | unset | Set to `true` to force the `Secure` flag on the session cookie — needed behind a TLS-terminating reverse proxy (Caddy/nginx). Leave unset for plain http (local dev). |
+| `PUBLIC_URL` | falls back to `PARCHMENT_RP_ORIGIN`, then `http://localhost:3000` | The **public** base URL (`scheme://host[:port]`) used to build copyable absolute share links. MUST be your public host as seen by browsers. |
 
 ### Authentication / passkeys
 
 | Variable | Default | What it does |
 |---|---|---|
-| `PARCHMENT_RP_ID` | `localhost` (dev) | WebAuthn Relying Party ID — the bare domain (no scheme/port). **Required in production** for passkeys; never derived from request headers. |
+| `PARCHMENT_RP_ID` | `localhost` (dev) | WebAuthn Relying Party ID — the bare domain (no scheme/port). **Required in production** for passkeys. |
 | `PARCHMENT_RP_ORIGIN` | `http://localhost:3000` (dev) | WebAuthn origin — the full `scheme://host[:port]`. **Required in production** for passkeys. |
 
 ### Optional integrations (off by default)
 
 | Variable(s) | Enables |
 |---|---|
-| `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | AI compose sleeve. Point at any OpenAI-compatible chat endpoint to enable the in-editor AI writing actions. Unset → the AI menu/endpoints are disabled. |
-| `EMBEDDINGS_URL`, `EMBEDDINGS_API_KEY`, `EMBEDDINGS_MODEL` | Semantic (similarity) search. Set the embeddings endpoint to generate document vectors and enable semantic search; unset → keyword search only. |
-| `NEXT_PUBLIC_PLANTUML_SERVER_URL` | PlantUML diagram rendering. URL of a PlantUML server used to render `plantuml` diagram blocks. |
-| `NEXT_PUBLIC_DRAWIO_EMBED_URL` | draw.io diagram editing. URL of the embedded draw.io editor used by the drawing modal. |
-| `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY`, `BACKUP_S3_REGION` | Off-site backups. Configure an S3-compatible bucket to enable scheduled/on-demand backup uploads; unset → local backup export only. |
-| `CAIRN_BASE_URL` | Cairn integration. Base URL of a Cairn instance for `[[cairn://…]]` link search/preview/backlinks. |
-| `GITHUB_TOKEN` | GitHub embeds. Token used to fetch file/gist content for GitHub embed blocks (raises rate limits / private access). |
-| `LANGUAGETOOL_URL`, `LANGUAGETOOL_API_KEY`, `LANGUAGETOOL_USERNAME` | Grammar checking via LanguageTool. Set `LANGUAGETOOL_URL` to a self-hosted or cloud instance to enable the grammar action (proxied server-side, so the key never reaches the browser); unset → the grammar endpoint 404s. |
-| `INBOUND_EMAIL_DOMAIN`, `INBOUND_EMAIL_SECRET` | Email-in. Domain + shared secret for the inbound-email webhook that appends emailed content to a document. |
+| `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | AI compose sleeve. Point at any OpenAI-compatible chat endpoint. |
+| `EMBEDDINGS_URL`, `EMBEDDINGS_API_KEY`, `EMBEDDINGS_MODEL` | Semantic search. |
+| `NEXT_PUBLIC_PLANTUML_SERVER_URL` | PlantUML diagram rendering. |
+| `NEXT_PUBLIC_DRAWIO_EMBED_URL` | draw.io diagram editing. |
+| `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY`, `BACKUP_S3_REGION` | Off-site S3-compatible backups. |
+| `CAIRN_BASE_URL` | Cairn integration for `[[cairn://…]]` links. |
+| `GITHUB_TOKEN` | GitHub embeds (file/gist content). |
+| `LANGUAGETOOL_URL`, `LANGUAGETOOL_API_KEY`, `LANGUAGETOOL_USERNAME` | Grammar checking via LanguageTool. |
+| `INBOUND_EMAIL_DOMAIN`, `INBOUND_EMAIL_SECRET` | Email-in webhook. |
 
-> **Accuracy note:** this list is derived from the actual `process.env` reads in
-> the source (`grep -rhoE 'process\.env\.[A-Z_]+' src`). If you add a new env var,
-> update this table — see the GAP note at the bottom.
+> **Accuracy note:** this list is derived from `grep -rhoE 'process\.env\.[A-Z_]+' src`.
+> If you add a new env var, update this table.
 
 ---
 
@@ -115,14 +124,13 @@ leaving them unset simply disables that feature (no external call is ever made).
 This setup runs two dev Postgres instances on non-standard host ports because
 **host `5432` is already taken** here:
 
-- **`5433`** — dev database (used by `pnpm dev` / `pnpm collab`; container
-  `parchment-pg-dev`, also the `db` service in `docker-compose.yml`).
-- **`5434`** — e2e/test database (container `parchment-e2e-pg`).
+- **`5433`** — dev database (used by `pnpm dev` / `pnpm collab`).
+- **`5434`** — e2e/test database.
 
 ```bash
 pnpm install
 
-# .env (dev) — point DATABASE_URL at the 5433 dev DB:
+# .env (dev):
 #   DATABASE_URL=postgres://parchment:parchment@localhost:5433/parchment
 #   COLLAB_PORT=1234
 #   COLLAB_URL=ws://localhost:1234
@@ -132,8 +140,12 @@ pnpm dev        # Next.js dev server (http://localhost:3000)
 pnpm collab     # Hocuspocus collab server — needs DATABASE_URL set
 ```
 
-The collab process (`pnpm collab`) talks to the same Postgres as the app, so it
-needs `DATABASE_URL` in its environment too.
+The collab process (`pnpm collab`) talks to the same Postgres as the app, so
+it needs `DATABASE_URL` in its environment too.
+
+> The `docker-compose.yml` at the repo root is **development only** — it mounts
+> the source tree and spins up a standalone dev Postgres. It is not the
+> production deployment path.
 
 ---
 
@@ -153,25 +165,21 @@ needs `DATABASE_URL` in its environment too.
 
 ---
 
-## Upgrade
+## Stack
 
-Parchment ships as a single image, so upgrading is just pulling the new tag:
-
-```bash
-docker pull ghcr.io/jonathanmcohen/parchment:vX.Y.0
-docker rm -f parchment
-docker run -d --name parchment \
-  -p 3000:3000 -p 1234:1234 \
-  -v parchment_pg:/var/lib/postgresql \
-  -v parchment_data:/data \
-  ghcr.io/jonathanmcohen/parchment:vX.Y.0
-```
-
-**Migrations run automatically on boot.** The s6 `migrate` service applies SQL
-migrations in order once Postgres is ready and **before** the `next` app service
-starts (it is idempotent and skips when the schema is already present). Your data
-survives the upgrade because it lives in the two persistent volumes
-(`/var/lib/postgresql` and `/data`).
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router + RSC + Turbopack), React 19 |
+| Language | TypeScript 6 (strict), Biome v2 |
+| DB | Postgres 18 + pgvector, Drizzle ORM |
+| Editor | Tiptap / ProseMirror + markdown extension |
+| Collab | Yjs + Hocuspocus (`parchment-collab`) — own Node process, **same container** |
+| UI | Tailwind |
+| Print/PDF | Native `@page` printing per content-split sheet |
+| DOCX | mammoth (round-trip) |
+| Code render | shiki (render) + highlight.js/auto (classify) |
+| Test | Testcontainers + Vitest 4 + Playwright e2e + axe-core a11y |
+| Docker base | `node:24-bookworm-slim` |
 
 ---
 
@@ -196,7 +204,7 @@ parchment/
 
 ## Honesty constraint
 
-No item is "done" until browser-verified. Per-PR artifacts: spec path · RED-on-main
-· GREEN-on-branch · live-deploy screenshot · axe-core zero-violations report on the
-affected route. Anything that doesn't ship is logged `GAP` in `scope.md`, not
-silently dropped.
+No item is "done" until browser-verified. Per-PR artifacts: spec path ·
+RED-on-main · GREEN-on-branch · live-deploy screenshot · axe-core
+zero-violations report on the affected route. Anything that doesn't ship is
+logged `GAP` in `scope.md`, not silently dropped.

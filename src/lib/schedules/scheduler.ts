@@ -8,6 +8,8 @@ import { getTrashRetentionDays } from '@/lib/docs/settings-repo'
 import { resolveGitSyncConfig } from '@/lib/git/sync-config'
 import { gitSyncJob } from '@/lib/git/sync-job'
 import { type JobState, Scheduler } from '@/lib/schedules/jobs'
+import { runEmbeddingBackfill } from '@/lib/search/backfill'
+import { isSemanticEnabled } from '@/lib/search/embeddings'
 
 // I10 — the in-process scheduler SINGLETON. This is the server-only composition
 // layer over the pure, timer-free core in `./jobs.ts`: it registers the real,
@@ -203,6 +205,17 @@ class SchedulerSingleton {
         run: s3BackupJob,
       })
     }
+
+    // J4-2 OFF-UNLESS-CONFIGURED: the embedding backfill is registered ONLY when
+    // EMBEDDINGS_URL is set. It fills vectors for docs created before semantic
+    // search was configured (embedding IS NULL); best-effort and bounded per run.
+    if (isSemanticEnabled()) {
+      this.core.register({
+        name: 'embed-backfill',
+        intervalMs: 6 * 60 * 60 * 1000, // 6h
+        run: embedBackfillJob,
+      })
+    }
   }
 }
 
@@ -223,6 +236,15 @@ async function trashPurgeJob(): Promise<void> {
 /** Cheap liveness check: confirm the DB answers a trivial query. */
 async function heartbeatJob(): Promise<void> {
   await db.select({ id: schema.users.id }).from(schema.users).limit(1)
+}
+
+/**
+ * J4-2: fill embeddings for docs that have none yet (embedding IS NULL). Bounded
+ * per run; best-effort (runEmbeddingBackfill never throws). Only registered when
+ * EMBEDDINGS_URL is set, so this never runs on an install without semantic search.
+ */
+async function embedBackfillJob(): Promise<void> {
+  await runEmbeddingBackfill()
 }
 
 /**

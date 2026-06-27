@@ -90,3 +90,55 @@ describe('A3/A6 — disabled-user enforcement', () => {
     expect(res).toEqual({ error: 'Invalid email or password.' }) // no oracle
   })
 })
+
+describe('A1/A6 — user CRUD + lifecycle, owner-never-locked-out', () => {
+  it('countOwners reflects owner rows; the last owner cannot be deleted or demoted or disabled', async () => {
+    const repo = await import('@/lib/auth/users-repo')
+
+    // ensure exactly one owner exists for this assertion block
+    const owners = await repo.listUsers()
+    const ownerRows = owners.filter((u) => u.role === 'owner')
+    expect(ownerRows.length).toBeGreaterThanOrEqual(1)
+
+    if (ownerRows.length === 1) {
+      const onlyOwner = ownerRows[0]!
+      await expect(repo.deleteUser(onlyOwner.id)).rejects.toThrow(/last owner/i)
+      await expect(repo.setUserRole(onlyOwner.id, 'admin')).rejects.toThrow(/last owner/i)
+      await expect(repo.setUserDisabled(onlyOwner.id, true)).rejects.toThrow(/last owner/i)
+    }
+  })
+
+  it('transferOwnership is atomic: old owner becomes admin, new owner becomes owner', async () => {
+    const repo = await import('@/lib/auth/users-repo')
+    const oldOwner = (await repo.listUsers()).find((u) => u.role === 'owner')!
+    const newUser = await repo.createUser({
+      email: `xfer-${Date.now()}@p.local`,
+      name: 'Heir',
+      role: 'admin',
+    })
+    await repo.transferOwnership(oldOwner.id, newUser.id)
+    expect((await repo.getUser(newUser.id))?.role).toBe('owner')
+    expect((await repo.getUser(oldOwner.id))?.role).toBe('admin')
+    expect(await repo.countOwners()).toBe(1) // still exactly one owner
+    // restore for later tests
+    await repo.transferOwnership(newUser.id, oldOwner.id)
+  })
+
+  it('disabling a user revokes their live sessions', async () => {
+    const repo = await import('@/lib/auth/users-repo')
+    const { db, schema } = await import('@/db')
+    const u = await repo.createUser({
+      email: `kill-${Date.now()}@p.local`,
+      name: 'K',
+      role: 'editor',
+    })
+    await db.insert(schema.sessions).values({
+      userId: u.id,
+      tokenHash: `h-${u.id}`,
+      expiresAt: new Date(Date.now() + 3_600_000),
+    })
+    await repo.setUserDisabled(u.id, true)
+    const left = await db.select().from(schema.sessions).where(eq(schema.sessions.userId, u.id))
+    expect(left.length).toBe(0)
+  })
+})

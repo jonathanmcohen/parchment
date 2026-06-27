@@ -53,3 +53,20 @@ export async function listUserSessions(userId: string): Promise<SessionView[]> {
     current: currentHash !== null && r.tokenHash === currentHash,
   }))
 }
+
+// G5 §6.1 — revoke a single session by id, SCOPED to userId so a user can only kill
+// their OWN sessions (cross-user revoke is impossible — the delete simply matches no
+// row). Revoking the CURRENT session is allowed (acts as logout). Returns true iff a
+// row was actually deleted.
+//
+// Security property — a revoked session is dead IMMEDIATELY: getUserByToken /
+// getCurrentUser look the row up in the DB on every request (no in-memory session
+// cache), so deleting the row makes the next request with that cookie return null.
+// The DB row IS the authority; no token blacklist is needed.
+export async function revokeSession(userId: string, sessionId: string): Promise<boolean> {
+  const deleted = await db
+    .delete(schema.sessions)
+    .where(and(eq(schema.sessions.id, sessionId), eq(schema.sessions.userId, userId)))
+    .returning({ id: schema.sessions.id })
+  return deleted.length > 0
+}

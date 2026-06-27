@@ -83,6 +83,45 @@ jobs:
           node-version: 24
       - run: node scripts/verify-carry-forward-closed.mjs
 
+  compose-lint:
+    # C6: Validate docker-compose.yml and docker-compose.dev.yml parse cleanly.
+    # Required env vars with :? are supplied so the validation does not abort.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate docker-compose.yml
+        env:
+          POSTGRES_PASSWORD: ci_test_pw
+          POSTGRES_USER: parchment
+          POSTGRES_DB: parchment
+          PARCHMENT_SECRET_KEY: Y2ktdGVzdC1rZXktMzItYnl0ZXMtZm9yLWNpLW9ubHk=
+          PARCHMENT_PUBLIC_URL: https://ci.example.com
+        run: docker compose config --quiet
+      - name: Validate docker-compose.dev.yml
+        run: docker compose -f docker-compose.dev.yml config --quiet
+
+  image-size:
+    # C1: Gate image size — must be under 600 MB after stripping the Postgres server.
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build app image
+        run: docker build -t parchment-size-check .
+      - name: Check image size (must be under 600 MB)
+        run: |
+          SIZE=$(docker image inspect parchment-size-check \
+            --format '{{.Size}}')
+          MAX=$((600 * 1024 * 1024))
+          echo "Image size: $SIZE bytes (max $MAX)"
+          [ "$SIZE" -lt "$MAX" ] || { echo "Image too large!"; exit 1; }
+
   e2e-a11y:
     # The K4 19-route axe-core a11y harness (Playwright + @axe-core/playwright),
     # 0 WCAG 2 A/AA violations. Needs a pgvector-capable Postgres 18 for the

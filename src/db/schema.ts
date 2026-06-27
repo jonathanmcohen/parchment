@@ -37,6 +37,9 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   passwordHash: text('password_hash'), // null until owner sets a password
   role: text('role').notNull().default('owner'),
+  // A6: a disabled user keeps all rows but can never authenticate. null = active.
+  // Enforced server-side in getUserByToken/authenticateRequest (defense in depth).
+  disabledAt: timestamp('disabled_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -91,6 +94,53 @@ export const documents = pgTable(
     index('documents_search_idx').using('gin', t.searchVector),
     index('documents_embedding_idx').using('hnsw', t.embedding.op('vector_cosine_ops')),
   ],
+)
+
+// ─── Document permissions (A4) — per-user ACL layered over public/password links ─
+// A row grants `user` a `role` on `doc`. The doc OWNER is implicit (no row needed)
+// and always has full control. `role` is a doc-scoped capability, distinct from the
+// workspace `users.role`: viewer (read) < commenter (read+comment) < editor (write).
+// Composite PK (doc_id, user_id) — one role per (doc, user). Both FKs cascade so a
+// deleted doc or user leaves no dangling grant. Enforced server-side by
+// canAccessDoc/resolveDocAccess — NEVER a UI-only gate.
+export const documentPermissions = pgTable(
+  'document_permissions',
+  {
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('viewer'), // viewer | commenter | editor
+    grantedBy: uuid('granted_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.docId, t.userId] }),
+    index('document_permissions_user_idx').on(t.userId),
+  ],
+)
+
+// ─── Invites (A5) — pending user invitations; accepted → a real user + password ─
+// An invite is created by an admin/owner with a target email + workspace role. The
+// `tokenHash` is the sha256 of the single-use accept token carried in the email
+// link (the plaintext token is shown/sent once and never persisted). Accepting
+// within `expiresAt` creates the user (or sets the password on a pre-created
+// disabled placeholder) and deletes the invite. `acceptedAt` marks consumed.
+export const invites = pgTable(
+  'invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    email: text('email').notNull(),
+    role: text('role').notNull().default('editor'), // workspace role to grant on accept; canonical default is 'editor' (never 'member')
+    tokenHash: text('token_hash').notNull().unique(), // sha256 of the accept token
+    invitedBy: uuid('invited_by').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }), // null until consumed
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('invites_email_idx').on(t.email)],
 )
 
 // ─── Audit log (A4 / I5 / Phase 0 §1d) — append-only, hash-chained ───

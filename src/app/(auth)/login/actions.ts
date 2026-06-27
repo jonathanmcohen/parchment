@@ -26,9 +26,14 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
   // Verify against the stored hash. A single generic error for both "no such
   // user" and "wrong password" avoids confirming which emails are registered.
-  const ok = user?.passwordHash ? await verifyPassword(user.passwordHash, password) : false
+  // A6: a disabled user is treated EXACTLY like a bad credential — no separate
+  // "account disabled" message, which would be an account-status oracle.
+  const ok =
+    user && user.disabledAt === null && user.passwordHash
+      ? await verifyPassword(user.passwordHash, password)
+      : false
 
-  if (!user || !ok) {
+  if (!user || user.disabledAt !== null || !ok) {
     return { error: 'Invalid email or password.' }
   }
 

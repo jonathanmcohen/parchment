@@ -40,8 +40,10 @@ export async function authenticateRequest(req: NextRequest): Promise<SessionUser
   const auth = req.headers.get('authorization')
   if (auth?.startsWith('Bearer ')) {
     const token = auth.slice('Bearer '.length).trim()
+    // A6: a disabled user cannot authenticate via PAT either. verifyPat returns the
+    // full user row, so disabledAt is present after migration 0022.
     const user = await verifyPat(token)
-    if (user) return user
+    if (user && user.disabledAt === null) return user
   }
 
   const cookie = req.cookies.get(SESSION_COOKIE)?.value

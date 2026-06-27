@@ -99,6 +99,28 @@ export default function AdminSettingsPage() {
               </span>
             </Link>
           </li>
+          <li>
+            <Link
+              href="/settings/admin/usage"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Usage</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Per-user document count, content size, asset storage, and quota overview (I2).
+              </span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/settings/admin/migrations"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Migrations</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                View applied database migrations (I5). Migrations run automatically on startup.
+              </span>
+            </Link>
+          </li>
         </ul>
       </section>
 
@@ -130,6 +152,17 @@ export default function AdminSettingsPage() {
               <span className="font-medium text-sm">Backup</span>
               <span className="mt-0.5 block text-[var(--muted)] text-sm">
                 Download, restore, and configure scheduled off-site backups (Plan I4).
+              </span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/settings/admin/maintenance"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Maintenance mode</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Block all write operations while keeping reads available (I6).
               </span>
             </Link>
           </li>

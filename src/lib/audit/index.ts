@@ -38,6 +38,9 @@ export type AuditAction =
   | 'mfa.disable'
   | 'oidc.config'
   | 'login.locked'
+  // I6: maintenance mode lifecycle — ALL DOTTED per §1d canonical list.
+  | 'maintenance.enable'
+  | 'maintenance.disable'
 
 export interface AuditOptions {
   actorId?: string

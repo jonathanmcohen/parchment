@@ -13,6 +13,7 @@ import { TopbarUserCluster } from '@/components/shell/TopbarUserCluster'
 import { GlobalShortcuts } from '@/components/shortcuts/GlobalShortcuts'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
+import { isMaintenanceMode } from '@/lib/maintenance'
 import { getWorkspaceTheme } from '@/lib/docs/settings-repo'
 import { themeCssVars } from '@/lib/editor/theme'
 import { getShortcutOverrides } from '@/lib/help/keymap-repo'
@@ -64,6 +65,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // I2: the owner's persisted shortcut overrides, merged with DEFAULT_BINDINGS by
   // the GlobalShortcuts dispatcher (key routing) and the HelpMenu (cheat sheet).
   const shortcutOverrides = await getShortcutOverrides(user.id)
+
+  const maintenanceActive = await isMaintenanceMode()
 
   const sidebar = (
     <>
@@ -129,6 +132,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <a href="#main-content" className="parchment-skip-link">
         {t('shell.skipToContent')}
       </a>
+      {/* I6: maintenance-mode banner — injected server-side when the lock file exists. */}
+      {maintenanceActive && (
+        <div
+          role="alert"
+          data-testid="maintenance-banner"
+          style={{
+            background: 'var(--warning, #b45309)',
+            color: '#fff',
+            padding: '8px 16px',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            textAlign: 'center',
+            position: 'sticky',
+            top: 0,
+            zIndex: 9999,
+          }}
+        >
+          Maintenance mode is active. The workspace is read-only until an admin disables it.
+        </div>
+      )}
       <AppShell
         sidebar={sidebar}
         topbarRight={

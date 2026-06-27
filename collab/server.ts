@@ -3,12 +3,19 @@ import { Server } from '@hocuspocus/server'
 import { getSchema } from '@tiptap/core'
 import { Pool } from 'pg'
 import { updateYFragment } from 'y-prosemirror'
+import { authorizeCollab } from '../src/lib/collab/authorize'
 import { setApplyToYDoc } from '../src/lib/disk/reverse-sync'
 import { startDiskWatcher } from '../src/lib/disk/watcher'
 import { baseExtensions } from '../src/lib/editor/tiptap-extensions'
 
+// SECURITY: Bind to 127.0.0.1 only. Never expose this port to external traffic —
+// all WS connections are proxied through the Next.js server or the compose reverse
+// proxy. Publishing this port directly bypasses onAuthenticate. The onAuthenticate
+// gate (§7h) rejects any connection without a valid session/PAT/collab-token/
+// share-grant that maps to EDIT on the requested documentName.
+//
 // Hocuspocus collab server — own process, same container as Next (single-image deploy).
-// v0.1: persists Yjs document state to Postgres. Auth bridge (PAT) lands in A2/D.
+// Persists Yjs document state to Postgres.
 //
 // F2b: this process ALSO owns the disk reverse-sync watcher and the bridge from
 // an external .md edit into the live collab Y.Doc. The bridge needs the
@@ -30,6 +37,21 @@ const port = Number(process.env.COLLAB_PORT ?? '1234')
 
 const server = new Server({
   port,
+  // SECURITY (§7h): bind to loopback only — the collab WS is reached via the Next.js
+  // proxy / compose reverse proxy, NEVER published directly (that would bypass
+  // onAuthenticate). Hocuspocus passes `address` to the underlying ws/http listener.
+  address: '127.0.0.1',
+  // §7h REQUIRED — reject any connection that does not carry a token granting EDIT on
+  // the requested document. `token` is what the client passed to HocuspocusProvider
+  // ({ token }); `documentName` is the doc id. authorizeCollab handles minted collab
+  // tokens, share tokens, and session/PAT tokens, rejecting view-only/expired/cross-
+  // doc. Throwing rejects the WS handshake (Hocuspocus closes the socket).
+  onAuthenticate: async ({ token, documentName }) => {
+    const ok = await authorizeCollab(token, documentName)
+    if (!ok) {
+      throw new Error('unauthorized')
+    }
+  },
   extensions: [
     new Database({
       fetch: async ({ documentName }) => {

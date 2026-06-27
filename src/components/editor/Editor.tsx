@@ -382,6 +382,25 @@ export function Editor({
         url: getCollabUrl(),
         name: docId,
         document: ydoc,
+        // H Task 15 (§7h): authenticate the WS handshake. The collab server's
+        // onAuthenticate requires a token granting EDIT on this doc; we mint a
+        // short-lived one from the session-authenticated /api/collab-token. A
+        // function token is re-invoked on reconnect, so the token never goes stale.
+        // On failure return '' (the server rejects it → offline fallback fires).
+        token: async () => {
+          try {
+            const res = await fetch('/api/collab-token', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ docId }),
+            })
+            if (!res.ok) return ''
+            const data = (await res.json()) as { token?: string }
+            return data.token ?? ''
+          } catch {
+            return ''
+          }
+        },
         onSynced: () => {
           if (settled) return
           settled = true

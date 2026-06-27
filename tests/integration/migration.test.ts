@@ -42,13 +42,15 @@ afterAll(async () => {
 })
 
 describe('A1 — migration + schema', () => {
-  it('creates exactly the v0.1 tables', async () => {
+  it('creates exactly the expected tables (v0.1 + Phase 0 app_config)', async () => {
     const c = await client()
     const { rows } = await c.query<{ tablename: string }>(
       "select tablename from pg_tables where schemaname = 'public' order by 1",
     )
     await c.end()
     expect(rows.map((r) => r.tablename)).toEqual([
+      // Phase 0 §1b — instance encrypted config (migration 0020).
+      'app_config',
       'audit_log',
       'cairn_links',
       'collab_state',

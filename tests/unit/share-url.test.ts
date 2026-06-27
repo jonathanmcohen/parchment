@@ -7,7 +7,9 @@ import { buildShareUrl } from '@/lib/docs/share-link'
 //
 // Two layers are proven here:
 //   1. buildShareUrl(baseUrl, token) — pure: the host always comes from baseUrl.
-//   2. env.publicUrl — resolves PUBLIC_URL > PARCHMENT_RP_ORIGIN > localhost.
+//   2. env.publicUrl — Phase 0 §7a: now resolves from the REQUIRED PARCHMENT_PUBLIC_URL
+//      (trailing slash stripped; the process throws at boot if it is absent). This
+//      replaced the old PUBLIC_URL > PARCHMENT_RP_ORIGIN > localhost fallback.
 // `env` is an eager module-load snapshot, so env tests stub process.env then
 // re-import via vi.resetModules() (the email-in.test.ts idiom).
 
@@ -33,37 +35,29 @@ describe('CF4 — buildShareUrl (pure)', () => {
   })
 })
 
-describe('CF4 — shareUrl is built from env.publicUrl (not the request origin)', () => {
-  const KEYS = ['PUBLIC_URL', 'PARCHMENT_RP_ORIGIN'] as const
-  let saved: Record<string, string | undefined>
+describe('CF4 / §7a — shareUrl is built from env.publicUrl (PARCHMENT_PUBLIC_URL)', () => {
+  let saved: string | undefined
 
   beforeEach(() => {
-    saved = {}
-    for (const k of KEYS) {
-      saved[k] = process.env[k]
-      delete process.env[k]
-    }
+    saved = process.env.PARCHMENT_PUBLIC_URL
     vi.resetModules()
   })
 
   afterEach(() => {
-    for (const k of KEYS) {
-      if (saved[k] === undefined) delete process.env[k]
-      else process.env[k] = saved[k]
-    }
+    if (saved === undefined) delete process.env.PARCHMENT_PUBLIC_URL
+    else process.env.PARCHMENT_PUBLIC_URL = saved
     vi.resetModules()
   })
 
-  it('PUBLIC_URL wins: the share url uses that host', async () => {
-    process.env.PUBLIC_URL = 'https://share.public.example'
-    process.env.PARCHMENT_RP_ORIGIN = 'https://auth.example'
+  it('uses PARCHMENT_PUBLIC_URL as the share-link host', async () => {
+    process.env.PARCHMENT_PUBLIC_URL = 'https://share.public.example'
     const { env } = await import('@/lib/env')
     expect(env.publicUrl).toBe('https://share.public.example')
     expect(buildShareUrl(env.publicUrl, TOKEN)).toBe(`https://share.public.example/share/${TOKEN}`)
   })
 
-  it('falls back to PARCHMENT_RP_ORIGIN when PUBLIC_URL is unset (deploy self-corrects)', async () => {
-    process.env.PARCHMENT_RP_ORIGIN = 'https://parchment.local.jonco.dev'
+  it('strips a trailing slash from PARCHMENT_PUBLIC_URL', async () => {
+    process.env.PARCHMENT_PUBLIC_URL = 'https://parchment.local.jonco.dev/'
     const { env } = await import('@/lib/env')
     expect(env.publicUrl).toBe('https://parchment.local.jonco.dev')
     expect(buildShareUrl(env.publicUrl, TOKEN)).toBe(
@@ -71,9 +65,8 @@ describe('CF4 — shareUrl is built from env.publicUrl (not the request origin)'
     )
   })
 
-  it('defaults to http://localhost:3000 when neither is set (dev)', async () => {
-    const { env } = await import('@/lib/env')
-    expect(env.publicUrl).toBe('http://localhost:3000')
-    expect(buildShareUrl(env.publicUrl, TOKEN)).toBe(`http://localhost:3000/share/${TOKEN}`)
+  it('throws at boot when PARCHMENT_PUBLIC_URL is absent (§7a — required)', async () => {
+    delete process.env.PARCHMENT_PUBLIC_URL
+    await expect(import('@/lib/env')).rejects.toThrow(/PARCHMENT_PUBLIC_URL is required/)
   })
 })

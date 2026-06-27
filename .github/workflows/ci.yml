@@ -72,6 +72,11 @@ jobs:
       - run: pnpm build
         env:
           NEXT_TELEMETRY_DISABLED: '1'
+          # Phase 0 §7a/§1a: env.ts hard-requires PARCHMENT_PUBLIC_URL at import time,
+          # and rejects a malformed PARCHMENT_SECRET_KEY; `next build` evaluates env.ts
+          # while compiling the route modules. Provide deterministic build-time values.
+          PARCHMENT_PUBLIC_URL: https://ci.parchment.example.com
+          PARCHMENT_SECRET_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 
   verify-carry-forward-closed:
     # The Cairn "carry-forward closed" gate: fail if scope.md has any Open item.
@@ -148,6 +153,10 @@ jobs:
       E2E_DATABASE_URL: postgres://parchment:parchment@127.0.0.1:5434/parchment
       NEXT_TELEMETRY_DISABLED: '1'
       CI: 'true'
+      # Phase 0 §7a/§1a: required by env.ts at both `pnpm build` and `pnpm start` (the
+      # Playwright webServer). Without PARCHMENT_PUBLIC_URL the server refuses to boot.
+      PARCHMENT_PUBLIC_URL: http://127.0.0.1:3000
+      PARCHMENT_SECRET_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

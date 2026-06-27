@@ -2,6 +2,7 @@ import { db, schema } from '@/db'
 import { isS3Configured, uploadToS3 } from '@/lib/backup/s3'
 import { isS3Active } from '@/lib/backup/s3-config'
 import { createWorkspaceBackup } from '@/lib/backup/service'
+import { backupVerifyJob } from '@/lib/backup/verify-job'
 import { purgeExpiredTrash } from '@/lib/docs/repo'
 import { getTrashRetentionDays } from '@/lib/docs/settings-repo'
 import { resolveGitSyncConfig } from '@/lib/git/sync-config'
@@ -179,6 +180,15 @@ class SchedulerSingleton {
       name: 'db-heartbeat',
       intervalMs: 5 * 60_000, // 5 min
       run: heartbeatJob,
+    })
+
+    // I3 (backup-sync OWNS this — §7l/§1g): backup-verify is ON BY DEFAULT with
+    // NO env gate. Weekly, it builds a real backup for the first user and parses
+    // it back; any warning/corruption sets lastStatus:'error'. Zero-config.
+    this.core.register({
+      name: 'backup-verify',
+      intervalMs: 7 * DAY_MS,
+      run: backupVerifyJob,
     })
 
     // OFF-UNLESS-CONFIGURED (E9 / Cairn CFG-2): the scheduled S3 backup job is

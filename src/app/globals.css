@@ -422,6 +422,19 @@ body {
   }
 }
 
+/* F7: sidebar sticky at desktop — the sidebar column stays fixed in the
+ * viewport while the main content scrolls, matching the Google-Docs sidebar
+ * pattern. Only applies at >=768px; the mobile off-canvas drawer is unaffected. */
+@media (min-width: 768px) {
+  .parchment-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    overflow-y: auto;
+  }
+}
+
 /* V7: collapse the empty top bar on the editor at desktop width.
  * The editor supplies its own full-width chrome (title/menu/toolbar) and the
  * user-menu avatar lives in that title bar (C1), so on the editor the global
@@ -1064,8 +1077,8 @@ body {
  * giving each region the lifted "floating sheet" edge without any opaque fill. */
 .parchment-page[data-page-layout="paged"] .parchment-page-boundary {
   box-shadow:
-    0 7px 9px -7px color-mix(in srgb, var(--foreground) 30%, transparent),
-    0 -7px 9px -7px color-mix(in srgb, var(--foreground) 22%, transparent);
+    0 18px 18px -12px color-mix(in srgb, var(--foreground) 38%, transparent),
+    0 -18px 18px -12px color-mix(in srgb, var(--foreground) 30%, transparent);
 }
 
 /* Paged seam = a visible band of the GUTTER colour straddling the break, so the
@@ -1097,9 +1110,9 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  /* 14px gutter band centred on the seam line (top:0 of the zero-height divider) */
-  top: -7px;
-  height: 14px;
+  /* 36px gutter band centred on the seam line (top:0 of the zero-height divider) */
+  top: -18px;
+  height: 36px;
   pointer-events: none;
   /* Translucent gutter fill — reads as the gutter trough, yet straddling text
      bleeds through because the content underneath is continuous/unsplit. */

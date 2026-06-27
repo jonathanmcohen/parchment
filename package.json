@@ -8,11 +8,15 @@
   "engines": {
     "node": ">=24"
   },
+  "bin": {
+    "parchment": "cli/parchment.ts"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
     "collab": "tsx collab/server.ts",
+    "cli": "tsx cli/parchment.ts",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",

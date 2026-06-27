@@ -32,14 +32,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # healthcheck targets /api/healthz — a minimal stub shipped by C (Task C5).
-    # Group I later enhances this endpoint with DB-ready/memory/build checks.
+    # I1: healthcheck targets /api/healthz (C's liveness route — always returns 200
+    # as long as the Next.js process is up). For deeper readiness checks use /api/readyz.
+    # Sequenced after C (C owns /api/healthz; I adds the healthcheck stanza here).
     healthcheck:
-      test: ['CMD-SHELL', 'curl -sf http://localhost:3000/api/healthz || exit 1']
-      interval: 15s
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/healthz"]
+      interval: 30s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 3
+      start_period: 60s
     environment:
       # ── Core (required) ────────────────────────────────────────────────────
       DATABASE_URL: postgres://${POSTGRES_USER:-parchment}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:-parchment}

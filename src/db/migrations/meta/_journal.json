@@ -141,6 +141,20 @@
       "when": 1782174481150,
       "tag": "0019_breezy_reptil",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1782522547570,
+      "tag": "0020_app_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1782522547574,
+      "tag": "0021_audit_hardening",
+      "breakpoints": true
     }
   ]
 }

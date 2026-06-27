@@ -423,5 +423,16 @@ export const templates = pgTable(
   (t) => [index('templates_owner_idx').on(t.ownerId)],
 )
 
+// ─── app_config (Phase 0, §1b) — instance-level ENCRYPTED config ─────────────
+// All instance secrets (SMTP, S3, git-sync, OIDC client secret, etc.) live here
+// encrypted via src/lib/crypto/secret-box.ts and accessed ONLY through
+// src/lib/config/repo.ts. Created in migration 0020 (hand-written, NOT drizzle-kit
+// managed). No other module reads/writes this table directly.
+export const appConfig = pgTable('app_config', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 // Hint for the migration generator: ensure extensions exist.
 export const _extensions = sql`create extension if not exists vector;`

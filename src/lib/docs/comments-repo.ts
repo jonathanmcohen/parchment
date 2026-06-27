@@ -1,5 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { db, schema } from '@/db'
+import type { AnchorJson } from '@/lib/docs/comments-shared'
 import { dispatchWebhooks } from '@/lib/integrations/webhook-dispatch'
 
 // D1 comments data layer. No 'server-only' guard so the repo stays unit-testable.
@@ -39,7 +40,15 @@ function fireCommentCreated(docId: string, body: string): void {
 export async function createThread(
   docId: string,
   authorId: string | null,
-  opts: { body: string; anchorFrom?: number; anchorTo?: number; mentions?: string[] },
+  opts: {
+    body: string
+    anchorFrom?: number
+    anchorTo?: number
+    // H1: durable Yjs RelativePosition anchors (relativePositionToJSON shape).
+    anchorStart?: AnchorJson | null
+    anchorEnd?: AnchorJson | null
+    mentions?: string[]
+  },
 ): Promise<{ id: string; threadId: string }> {
   const [row] = await db
     .insert(schema.comments)
@@ -51,6 +60,8 @@ export async function createThread(
       mentions: opts.mentions ?? [],
       anchorFrom: opts.anchorFrom ?? null,
       anchorTo: opts.anchorTo ?? null,
+      anchorStart: opts.anchorStart ?? null,
+      anchorEnd: opts.anchorEnd ?? null,
       resolved: false,
     })
     .returning({ id: schema.comments.id })

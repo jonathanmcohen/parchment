@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
 import { resolveDocAccess } from '@/lib/authz/doc-access'
+import { notifyMentions } from '@/lib/docs/comment-notify'
 import { addReply, createThread, listComments, parseMentions } from '@/lib/docs/comments-repo'
 
 export const dynamic = 'force-dynamic'
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
     threadId?: string
     anchorFrom?: number
     anchorTo?: number
+    anchorStart?: Record<string, unknown>
+    anchorEnd?: Record<string, unknown>
     mentions?: string[]
   }
 
@@ -46,15 +49,20 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
       body: body.body,
       mentions,
     })
+    // H1/H Task 11: @mention → notification (best-effort, non-blocking).
+    notifyMentions(id, user.id, body.body, mentions)
     return NextResponse.json(result, { status: 201 })
   }
 
-  // New thread
+  // New thread — persist BOTH the durable JSON anchor and the integer fallback.
   const result = await createThread(id, user.id, {
     body: body.body,
     ...(body.anchorFrom !== undefined ? { anchorFrom: body.anchorFrom } : {}),
     ...(body.anchorTo !== undefined ? { anchorTo: body.anchorTo } : {}),
+    ...(body.anchorStart !== undefined ? { anchorStart: body.anchorStart } : {}),
+    ...(body.anchorEnd !== undefined ? { anchorEnd: body.anchorEnd } : {}),
     mentions,
   })
+  notifyMentions(id, user.id, body.body, mentions)
   return NextResponse.json(result, { status: 201 })
 }

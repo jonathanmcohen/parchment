@@ -70,27 +70,47 @@ type YSyncBinding = {
   doc: Y.Doc
 }
 
-// y-prosemirror registers its sync plugin under the STABLE key string `y-sync$`.
-// We look it up by that string rather than via the imported `ySyncPluginKey`
-// object: pnpm gives @tiptap/extension-collaboration its own bundled copy of
-// y-prosemirror, so the package-level `ySyncPluginKey` we'd import is a DIFFERENT
-// PluginKey instance whose `.key` string is `y-sync$1` (the global PluginKey
-// counter incremented) and therefore never matches the registered `y-sync$`.
-// Name-based lookup is the only reference-stable way to reach the live binding.
-const Y_SYNC_KEY = 'y-sync$'
-
+// Locate the y-prosemirror ySync plugin by SCANNING the registered plugins for the
+// one whose state carries a `binding`. We CANNOT key off a fixed string:
+// y-prosemirror's plugin key is `createKey('y-sync')`, and the GLOBAL ProseMirror
+// PluginKey counter means the registered key is `y-sync$` OR `y-sync$1`, `y-sync$2`,
+// … depending on how many PluginKey('y-sync')s were constructed at module-eval time
+// (importing y-prosemirror HERE — for the relpos helpers — itself constructs one,
+// bumping the counter, so the editor's bundled ySync plugin can register as
+// `y-sync$1`). Scanning for the binding-bearing plugin is the only resolution-stable
+// approach. We match a plugin whose key starts with `y-sync` AND whose state exposes
+// a `binding` with the fields we read.
 type PluginWithState = {
-  getState: (state: unknown) => { binding?: YSyncBinding } | undefined
+  getState: (state: unknown) => unknown
+}
+
+function isYSyncBinding(b: unknown): b is YSyncBinding {
+  return (
+    !!b &&
+    typeof b === 'object' &&
+    'type' in b &&
+    'mapping' in b &&
+    'doc' in b &&
+    (b as { type: unknown }).type != null
+  )
 }
 
 function getBinding(editor: Editor): YSyncBinding | null {
-  const config = (
-    editor.state as unknown as { config?: { pluginsByKey?: Record<string, PluginWithState> } }
-  ).config
-  const plugin = config?.pluginsByKey?.[Y_SYNC_KEY]
-  if (!plugin) return null
-  const pluginState = plugin.getState(editor.state)
-  return pluginState?.binding ?? null
+  // The ySync binding is created in the plugin's `view()` lifecycle (once the
+  // EditorView is realized) and stored on the plugin state. We read it from
+  // `editor.state` (the binding is shared across the editor/view state once built).
+  const state = editor.state as unknown as {
+    config?: { pluginsByKey?: Record<string, PluginWithState> }
+  }
+  const byKey = state.config?.pluginsByKey
+  if (!byKey) return null
+
+  for (const [key, plugin] of Object.entries(byKey)) {
+    if (!key.startsWith('y-sync')) continue
+    const ps = plugin.getState(editor.state) as { binding?: unknown } | undefined
+    if (ps && isYSyncBinding(ps.binding)) return ps.binding
+  }
+  return null
 }
 
 /**

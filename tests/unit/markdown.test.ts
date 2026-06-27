@@ -73,4 +73,15 @@ describe('serializeMarkdown', () => {
   it('escapes markdown special characters in text', () => {
     expect(serializeMarkdown(doc(p(text('a*b_c'))))).toBe('a\\*b\\_c\n')
   })
+
+  // ── H1 Task 10 — comments stay DB-only; the markdown sidecar stays clean ──
+  it('does NOT emit the comment mark / data-thread-id (comments are DB-only)', () => {
+    const md = serializeMarkdown(
+      doc(p(text('hello', [{ type: 'comment', attrs: { threadId: 'abc-123' } }]))),
+    )
+    expect(md).toBe('hello\n')
+    expect(md).not.toContain('data-thread-id')
+    expect(md).not.toContain('abc-123')
+    expect(md).not.toContain('comment')
+  })
 })

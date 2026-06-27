@@ -24,11 +24,14 @@ CREATE TABLE IF NOT EXISTS "comments" (
   "mentions" jsonb NOT NULL DEFAULT '[]',
   "anchor_from" integer,
   "anchor_to" integer,
+  "anchor_start" jsonb,
+  "anchor_end" jsonb,
   "resolved" boolean NOT NULL DEFAULT false,
   "created_at" timestamp with time zone NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS "comments_doc_idx" ON "comments" ("doc_id");
 CREATE INDEX IF NOT EXISTS "comments_thread_idx" ON "comments" ("thread_id");
+CREATE INDEX IF NOT EXISTS "comments_doc_resolved_idx" ON "comments" ("doc_id", "resolved");
 `
 
 beforeAll(async () => {
@@ -131,5 +134,27 @@ describe('D1 — comments repo', () => {
     expect(await deleteComment(id, docId)).toBe(1)
     const all = await listComments(docId)
     expect(all.find((c) => c.id === id)).toBeUndefined()
+  })
+
+  // ── H1 Task 10 — durable anchor JSON persists + returns ───────────────────
+  it('createThread persists anchorStart/anchorEnd JSON; listComments returns them', async () => {
+    const { createThread, listComments } = await import('@/lib/docs/comments-repo')
+    const start = { tname: 'default', item: { client: 1, clock: 2 }, assoc: 0 }
+    const end = { tname: 'default', item: { client: 1, clock: 5 }, assoc: 0 }
+    const { id } = await createThread(docId, ownerId, {
+      body: 'durable',
+      anchorFrom: 3,
+      anchorTo: 6,
+      anchorStart: start,
+      anchorEnd: end,
+    })
+    const all = await listComments(docId)
+    const row = all.find((c) => c.id === id)
+    expect(row).toBeDefined()
+    expect(row?.anchorStart).toEqual(start)
+    expect(row?.anchorEnd).toEqual(end)
+    // integer fallback still stored alongside.
+    expect(row?.anchorFrom).toBe(3)
+    expect(row?.anchorTo).toBe(6)
   })
 })

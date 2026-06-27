@@ -66,12 +66,12 @@ export function matchesSelectiveFilter(
   filter: SelectiveRestoreFilter,
   folders: { id: string; name: string; parentId: string | null }[],
 ): boolean {
-  const hasPrefixes = !!filter.folderPrefixes && filter.folderPrefixes.length > 0
-  const hasTitles = !!filter.docTitles && filter.docTitles.length > 0
-  if (!hasPrefixes && !hasTitles) return true
-  const path = hasPrefixes ? entryFolderPath(entry, folders) : ''
-  const prefixMatch = hasPrefixes && filter.folderPrefixes!.some((p) => path.startsWith(p))
-  const titleMatch = hasTitles && filter.docTitles!.includes(entry.meta.title)
+  const prefixes = filter.folderPrefixes ?? []
+  const titles = filter.docTitles ?? []
+  if (prefixes.length === 0 && titles.length === 0) return true
+  const path = prefixes.length > 0 ? entryFolderPath(entry, folders) : ''
+  const prefixMatch = prefixes.some((p) => path.startsWith(p))
+  const titleMatch = titles.includes(entry.meta.title)
   return prefixMatch || titleMatch
 }
 

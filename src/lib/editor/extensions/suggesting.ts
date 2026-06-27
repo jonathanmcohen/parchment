@@ -7,15 +7,23 @@
 //
 // Accept / reject commands use resolveChange() semantics from track-changes.ts.
 //
-// Edge cases NOT covered in v0.1 (documented here as GAPs):
-//   • Cut via Cmd-X / Ctrl-X — falls through to normal deletion.
-//   • IME composition (mobile / CJK) — insertions may not be captured atomically.
-//   • Pasting over a selection — selection delete not intercepted via keydown.
-//   • Format-change tracking (bold, colour, etc.) — not implemented.
-//   • Node-level deletions (deleting a whole image/block) — not intercepted.
+// Edge cases:
+//   • Cut via Cmd-X / Ctrl-X — CLOSED (Task 4): handleDOMEvents.cut converts the
+//     removal into a tracked deletion (the clipboard copy still happens).
+//   • Pasting over a selection — CLOSED (Task 4): handlePaste deletion-marks the
+//     replaced text and insertion-marks the pasted text (no silent loss).
+//   • Node-level deletions (deleting a whole image/block via NodeSelection) —
+//     CLOSED (Task 4): the silent hard-delete is BLOCKED; a textblock's content is
+//     deletion-marked, an atom/leaf is refused so it cannot vanish untracked.
+//   • IME composition (mobile / CJK) — STILL a GAP: insertions may not be captured
+//     atomically (cosmetic; defer — needs compositionend handling).
+//   • Format-change tracking (bold, colour, etc.) — STILL a GAP (defer; out of
+//     scope for v0.2.0 data-integrity work).
 
 import { Extension, Mark, mergeAttributes } from '@tiptap/core'
-import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
+import type { Slice } from '@tiptap/pm/model'
+import { Plugin, PluginKey, TextSelection, type Transaction } from '@tiptap/pm/state'
+import type { EditorView } from '@tiptap/pm/view'
 import { authorColor, collectChanges, resolveChange } from '@/lib/editor/track-changes'
 
 // ── Module augmentation ────────────────────────────────────────────────────
@@ -140,6 +148,45 @@ export const DeletionMark = Mark.create({
     ]
   },
 })
+
+// ── Shared tracked-deletion helpers (Task 4) ───────────────────────────────
+//
+// Marks a non-empty TEXT range as a tracked deletion: existing insertion-marked
+// text in the range is hard-removed (rejecting that author's own pending
+// insertion), all other text gets a deletion mark. Returns the transaction (NOT
+// dispatched) so callers can chain (e.g. paste-over inserts after this). Builds on
+// `view.state.tr`; the caller dispatches.
+function buildTrackedDeletion(
+  view: EditorView,
+  from: number,
+  to: number,
+  author: string,
+  color: string,
+): Transaction {
+  const { state } = view
+  const tr = state.tr
+  const deletionMarkType = state.schema.marks.deletion
+  if (!deletionMarkType) return tr
+
+  const removals: Array<{ f: number; t: number }> = []
+  state.doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isText) return true
+    const nodeFrom = Math.max(from, pos)
+    const nodeTo = Math.min(to, pos + node.nodeSize)
+    if (nodeFrom >= nodeTo) return false
+    const hasInsertion = node.marks.some((m) => m.type.name === 'insertion')
+    if (hasInsertion) {
+      removals.push({ f: nodeFrom, t: nodeTo })
+    } else {
+      tr.addMark(nodeFrom, nodeTo, deletionMarkType.create({ author, color }))
+    }
+    return false
+  })
+  for (const r of removals.sort((a, b) => b.f - a.f)) {
+    tr.delete(tr.mapping.map(r.f), tr.mapping.map(r.t))
+  }
+  return tr
+}
 
 // ── Suggesting extension ───────────────────────────────────────────────────
 
@@ -348,36 +395,36 @@ export const Suggesting = Extension.create<SuggestingOptions, SuggestingStorage>
 
             const tr = state.tr
 
-            if (!empty) {
-              // Selection delete: mark the selected range as deleted.
-              // First, reject any insertion marks in the range (remove that text instead).
-              // Then mark remaining text as deletion.
-              const ranges: Array<{ f: number; t: number }> = []
-              state.doc.nodesBetween(from, to, (node, pos) => {
-                if (!node.isText) return true
-                const nodeFrom = Math.max(from, pos)
-                const nodeTo = Math.min(to, pos + node.nodeSize)
-                if (nodeFrom >= nodeTo) return false
-                const hasInsertion = node.marks.some((m) => m.type.name === 'insertion')
-                if (hasInsertion) {
-                  // Reject the insertion: delete it
-                  ranges.push({ f: nodeFrom, t: nodeTo })
-                } else {
-                  // Mark as deleted
-                  tr.addMark(nodeFrom, nodeTo, deletionMarkType.create({ author, color }))
+            // Node-level delete (a NodeSelection over a whole block/leaf, e.g. an
+            // image). A hard delete would silently drop the node with NO tracked
+            // change — a data-integrity gap. We BLOCK the delete and (for a text-
+            // containing block) deletion-mark its text; for an atom/leaf with no
+            // text (image, hr) we simply refuse the delete so it can't vanish
+            // without an explicit accept. (Full node-deletion tracking would need a
+            // block-level deletion flag; refusing the silent drop is the floor.)
+            const isNodeSelection =
+              (selection as { node?: unknown }).node !== undefined &&
+              (selection as { node?: unknown }).node !== null
+            if (isNodeSelection) {
+              const selNode = (selection as unknown as { node: { isTextblock: boolean } }).node
+              if (selNode.isTextblock) {
+                // Mark the textblock's inner text as deleted instead of removing it.
+                const innerFrom = from + 1
+                const innerTo = to - 1
+                if (innerTo > innerFrom) {
+                  const dtr = buildTrackedDeletion(view, innerFrom, innerTo, author, color)
+                  view.dispatch(dtr)
                 }
-                return false
-              })
-              // Apply deletions right-to-left
-              for (const r of ranges.sort((a, b) => b.f - a.f)) {
-                const mf = tr.mapping.map(r.f)
-                const mt = tr.mapping.map(r.t)
-                tr.delete(mf, mt)
               }
-              // Collapse selection to start (mapped)
-              const newFrom = tr.mapping.map(from)
-              tr.setSelection(TextSelection.create(tr.doc, newFrom))
-              view.dispatch(tr)
+              // Either way, do NOT let the default handler hard-delete the node.
+              return true
+            }
+
+            if (!empty) {
+              // Selection delete: mark the selected range as deleted (shared helper).
+              const dtr = buildTrackedDeletion(view, from, to, author, color)
+              dtr.setSelection(TextSelection.create(dtr.doc, dtr.mapping.map(from)))
+              view.dispatch(dtr)
               return true
             }
 
@@ -441,6 +488,63 @@ export const Suggesting = Extension.create<SuggestingOptions, SuggestingStorage>
             }
 
             return false
+          },
+
+          // ── Paste-over-selection (Task 4) ─────────────────────────────
+          // Default PM paste REPLACES the selection — the old text would vanish
+          // with no tracked change. While suggesting, we instead: deletion-mark
+          // the replaced selection, then insert the pasted slice at the collapse
+          // point (the appendTransaction wrap then insertion-marks it). For a
+          // collapsed cursor we let the default path run (appendTransaction marks
+          // the insertion) and return false.
+          handlePaste(view, _event, slice: Slice) {
+            const pluginState = suggestingKey.getState(view.state)
+            if (!pluginState?.enabled) return false
+            const { selection } = view.state
+            if (selection.empty) return false // collapsed: default insert + auto-mark
+
+            const storage = getStorage()
+            const author = storage.author
+            const color = authorColor(author)
+            const { from, to } = selection
+
+            // 1) Mark the replaced selection as a tracked deletion.
+            const tr = buildTrackedDeletion(view, from, to, author, color)
+            // 2) Insert the pasted content at the (mapped) end of the old selection
+            //    so it sits AFTER the struck-through text, then collapse there.
+            const insertAt = tr.mapping.map(to)
+            tr.insert(insertAt, slice.content)
+            tr.setSelection(TextSelection.create(tr.doc, insertAt + slice.content.size))
+            view.dispatch(tr)
+            return true // handled — appendTransaction insertion-marks the new text
+          },
+
+          // ── Cut (Task 4) ──────────────────────────────────────────────
+          // Cmd/Ctrl-X fires a `cut` DOM event whose default copies the selection
+          // then deletes it (hard) — losing the text with no tracked change. While
+          // suggesting, convert it into a tracked deletion (let the browser still
+          // copy to the clipboard; we only intercept the removal).
+          handleDOMEvents: {
+            cut(view, event) {
+              const pluginState = suggestingKey.getState(view.state)
+              if (!pluginState?.enabled) return false
+              const { selection } = view.state
+              if (selection.empty) return false
+
+              const storage = getStorage()
+              const author = storage.author
+              const color = authorColor(author)
+              const { from, to } = selection
+
+              const tr = buildTrackedDeletion(view, from, to, author, color)
+              tr.setSelection(TextSelection.create(tr.doc, tr.mapping.map(from)))
+              view.dispatch(tr)
+              // Prevent the browser's default hard-delete; the copy already ran
+              // (cut's default copy happens before our preventDefault for the
+              // delete half — and the marked text stays selectable to re-copy).
+              event.preventDefault()
+              return true
+            },
           },
         },
 

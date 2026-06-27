@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { Editor } from '@tiptap/core'
+import { Slice } from '@tiptap/pm/model'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 
@@ -194,5 +195,113 @@ describe('D2 Suggesting extension', () => {
 
     const marks = collectMarks(editor.getJSON() as DocJson)
     expect(marks.some((m) => m.type === 'insertion')).toBe(false)
+  })
+})
+
+// ── Task 4 — close the documented data-integrity gaps ───────────────────────
+// These need a real EditorView (mounted) so handlePaste / handleDOMEvents.cut
+// run, and to build a paste Slice from the schema.
+
+function mountedEditor(content: string): { editor: Editor; el: HTMLElement } {
+  const el = document.createElement('div')
+  document.body.appendChild(el)
+  const ed = new Editor({ element: el, extensions: baseExtensions, content })
+  return { editor: ed, el }
+}
+
+/** Build a one-text-node Slice carrying `text` (openStart/openEnd 0). */
+function textSlice(editor: Editor, text: string): Slice {
+  const node = editor.schema.text(text)
+  const paragraph = editor.schema.nodes.paragraph
+  if (!paragraph) throw new Error('no paragraph node in schema')
+  const frag = paragraph.create(null, node).content
+  // The pasted slice's content is the inline fragment (the text node), depth 0.
+  return new Slice(frag, 0, 0)
+}
+
+describe('D2 Suggesting — Task 4 tracked-change integrity gaps', () => {
+  let editor: Editor
+  let el: HTMLElement
+
+  afterEach(() => {
+    editor?.destroy()
+    el?.remove()
+  })
+
+  it('paste OVER a selection: replaced text is deletion-marked, pasted text is insertion-marked', () => {
+    ;({ editor, el } = mountedEditor('<p>hello world</p>'))
+    editor.commands.setSuggesting(true)
+    // Select "hello" (positions 1..6).
+    editor.commands.setTextSelection({ from: 1, to: 6 })
+    const slice = textSlice(editor, 'HI')
+
+    // Invoke the registered handlePaste prop directly (jsdom has no ClipboardEvent).
+    const handled = editor.view.someProp('handlePaste', (fn) =>
+      fn(editor.view, new Event('paste') as ClipboardEvent, slice),
+    )
+    expect(handled).toBe(true)
+
+    const json = editor.getJSON() as DocJson
+    const marks = collectMarks(json)
+    const text = collectText(json)
+    // The old "hello" survives as deletion-marked (tracked), not vanished.
+    expect(marks.some((m) => m.type === 'deletion')).toBe(true)
+    expect(text).toContain('hello')
+    // The pasted "HI" is present and insertion-marked.
+    expect(text).toContain('HI')
+    expect(marks.some((m) => m.type === 'insertion')).toBe(true)
+  })
+
+  it('node-level delete of a whole block while suggesting does NOT silently remove it', () => {
+    // A doc with an image block (leaf) followed by a paragraph; select the image
+    // and press Backspace. The image must NOT just disappear without a tracked change.
+    ;({ editor, el } = mountedEditor(
+      '<p>before</p><img src="https://example.com/y.png" /><p>after</p>',
+    ))
+    editor.commands.setSuggesting(true)
+
+    // Find the image node position.
+    let imgPos = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'image') imgPos = pos
+      return true
+    })
+    expect(imgPos).toBeGreaterThanOrEqual(0)
+
+    const sizeBefore = editor.state.doc.nodeSize
+    // Select the image node (NodeSelection) and Backspace.
+    editor.commands.setNodeSelection(imgPos)
+    const ev = new KeyboardEvent('keydown', { key: 'Backspace' })
+    editor.view.someProp('handleKeyDown', (fn) => fn(editor.view, ev))
+
+    // The image must still be in the doc (not hard-removed) — either block-flagged
+    // deleted or left intact; it must NOT have silently vanished.
+    let stillThere = false
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'image') stillThere = true
+      return true
+    })
+    expect(stillThere).toBe(true)
+    expect(editor.state.doc.nodeSize).toBe(sizeBefore)
+  })
+
+  it('Cut (Cmd-X) over a selection while suggesting behaves like a tracked deletion', () => {
+    ;({ editor, el } = mountedEditor('<p>hello world</p>'))
+    editor.commands.setSuggesting(true)
+    editor.commands.setTextSelection({ from: 1, to: 6 }) // "hello"
+
+    const handled = editor.view.someProp('handleDOMEvents', (handlers) => {
+      const cut = (handlers as Record<string, (v: unknown, e: Event) => boolean>).cut
+      if (!cut) return false
+      return cut(editor.view, new Event('cut'))
+    })
+    expect(handled).toBe(true)
+
+    const json = editor.getJSON() as DocJson
+    const text = collectText(json)
+    const marks = collectMarks(json)
+    // Cut must NOT hard-delete: "hello" stays as deletion-marked text.
+    expect(text).toContain('hello')
+    expect(marks.some((m) => m.type === 'deletion')).toBe(true)
   })
 })

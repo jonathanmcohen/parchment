@@ -169,6 +169,13 @@
       "when": 1782700000000,
       "tag": "0023_g_oidc_lockouts",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1782800000000,
+      "tag": "0024_quota",
+      "breakpoints": true
     }
   ]
 }

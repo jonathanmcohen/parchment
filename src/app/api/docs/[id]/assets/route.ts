@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { extname } from 'node:path'
+import { extname, join } from 'node:path'
+import { eq } from 'drizzle-orm'
 import { type NextRequest, NextResponse } from 'next/server'
+import { db, schema } from '@/db'
 import { authenticateRequest } from '@/lib/auth/guard'
+import { listDocuments } from '@/lib/docs/repo'
 import { getDocument } from '@/lib/docs/repo'
 import { env } from '@/lib/env'
+import { checkQuota, getUsedAssetBytes } from '@/lib/quota'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +62,33 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const bytes = await file.arrayBuffer()
   if (bytes.byteLength > MAX_BYTES) {
     return NextResponse.json({ error: 'file_too_large', maxBytes: MAX_BYTES }, { status: 400 })
+  }
+
+  // I2: quota enforcement (§7v — use userRow, never shadow the `user` variable).
+  // Fetch the DB row to get quotaMb; 0 = unlimited.
+  const [userRow] = await db
+    .select({ quotaMb: schema.users.quotaMb })
+    .from(schema.users)
+    .where(eq(schema.users.id, user.id))
+    .limit(1)
+
+  if (userRow && userRow.quotaMb > 0) {
+    // Measure all asset bytes for this user's docs.
+    const docs = await listDocuments(user.id)
+    const docIds = docs.map((d) => d.id)
+    const assetsRoot = join(env.filesRoot, '.assets')
+    const usedBytes = await getUsedAssetBytes(docIds, assetsRoot)
+
+    if (!checkQuota({ quotaMb: userRow.quotaMb, usedBytes, fileBytes: bytes.byteLength })) {
+      return NextResponse.json(
+        {
+          error: 'quota_exceeded',
+          usedMb: usedBytes / (1024 * 1024),
+          quotaMb: userRow.quotaMb,
+        },
+        { status: 413 },
+      )
+    }
   }
 
   const ext = EXT_MAP[contentType] ?? (extname(file.name).replace(/^\./, '') || 'bin')

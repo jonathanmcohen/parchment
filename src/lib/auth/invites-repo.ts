@@ -114,7 +114,21 @@ export async function acceptInvite(
 
     const [created] = await tx
       .insert(schema.users)
-      .values({ email: invite.email, name: profile.name, passwordHash, role: invite.role })
+      .values({
+        email: invite.email,
+        name: profile.name,
+        passwordHash,
+        role: invite.role,
+        // I2: apply the configured default quota for new invited users (§7d:
+        // this is the invited path; setup/actions.ts owner stays unaffected).
+        quotaMb: (() => {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { env } = require('@/lib/env') as { env: { defaultQuotaMb: number } }
+            return env.defaultQuotaMb
+          } catch { return 0 }
+        })(),
+      })
       .returning({ id: schema.users.id })
     if (!created) return { ok: false as const }
     return { ok: true as const, userId: created.id }

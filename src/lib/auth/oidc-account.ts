@@ -104,7 +104,21 @@ export async function resolveOidcUser(claims: OidcClaims): Promise<ResolveResult
   const name = claims.name?.trim() || claims.preferred_username?.trim() || provisionEmail
   const [created] = await db
     .insert(schema.users)
-    .values({ email: provisionEmail, name, passwordHash: null, role: 'editor' })
+    .values({
+      email: provisionEmail,
+      name,
+      passwordHash: null,
+      role: 'editor',
+      // I2: apply default quota for JIT-provisioned OIDC users (§7d: owner path
+      // in setup/actions.ts stays untouched; only invited/OIDC paths get this).
+      quotaMb: (() => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { env } = require('@/lib/env') as { env: { defaultQuotaMb: number } }
+          return env.defaultQuotaMb
+        } catch { return 0 }
+      })(),
+    })
     .onConflictDoNothing({ target: schema.users.email })
     .returning({ id: schema.users.id })
 

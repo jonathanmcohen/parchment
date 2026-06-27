@@ -41,6 +41,9 @@ export const users = pgTable('users', {
   // A6: a disabled user keeps all rows but can never authenticate. null = active.
   // Enforced server-side in getUserByToken/authenticateRequest (defense in depth).
   disabledAt: timestamp('disabled_at', { withTimezone: true }),
+  // I2 (migration 0024): per-user storage quota in MiB. 0 = unlimited (default).
+  // Checked at asset-upload time. Set via admin usage dashboard or env default.
+  quotaMb: integer('quota_mb').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

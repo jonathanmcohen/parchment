@@ -8,6 +8,7 @@ import { ownerExists } from '@/lib/auth/bootstrap'
 import { hashPassword } from '@/lib/auth/password'
 import { createSession } from '@/lib/auth/session'
 import { seedGuideWorkspace } from '@/lib/docs/seed-guide'
+import { env } from '@/lib/env'
 
 export type SetupState = { error: string } | null
 
@@ -33,7 +34,13 @@ export async function createOwner(_prev: SetupState, formData: FormData): Promis
 
   const [user] = await db
     .insert(schema.users)
-    .values({ name, email, passwordHash, role: 'owner' })
+    .values({
+      name,
+      email,
+      passwordHash,
+      role: 'owner', // §7d: owner role MUST NOT be downgraded; only quotaMb is added here
+      quotaMb: env.defaultQuotaMb,
+    })
     .onConflictDoNothing({ target: schema.users.email })
     .returning({ id: schema.users.id })
 
@@ -66,5 +73,7 @@ export async function createOwner(_prev: SetupState, formData: FormData): Promis
     // ignore — the guide is a nicety; owner creation already succeeded.
   }
 
-  redirect('/')
+  // I4: after account creation, redirect to the setup config wizard step.
+  // The wizard shows DB status, SMTP config, and S3 checklist — informational only.
+  redirect('/setup/config')
 }

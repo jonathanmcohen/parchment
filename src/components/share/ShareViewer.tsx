@@ -34,6 +34,7 @@ type ViewerState =
       body: ReactNode
       permission: string
       customCss: string
+      themeVars: Record<string, string>
       comments: PublicComment[]
     }
 
@@ -44,8 +45,24 @@ type ShareResponse = {
   permission: string
   /** G17: owner's raw custom CSS — sanitized+scoped at render. */
   customCss?: unknown
+  /** J12: per-doc theme token vars (server-resolved; token-only). */
+  themeVars?: unknown
   /** H2: read-only public comments (open threads only). */
   comments?: PublicComment[]
+}
+
+// J12: defensively accept only `--token: <safe value>` pairs from the share payload.
+// The server already emits token-only values, but the client re-validates so a value
+// can never contain a CSS break-out character even if the payload were tampered with.
+function sanitizeThemeVars(raw: unknown): Record<string, string> {
+  if (typeof raw !== 'object' || raw === null) return {}
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (k.startsWith('--') && typeof v === 'string' && !/[{};<]/.test(v)) {
+      out[k] = v
+    }
+  }
+  return out
 }
 
 export function ShareViewer({ token }: { token: string }) {
@@ -84,6 +101,7 @@ export function ShareViewer({ token }: { token: string }) {
           body: renderReadOnlyDoc(data.contentJson),
           permission: data.permission,
           customCss: typeof data.customCss === 'string' ? data.customCss : '',
+          themeVars: sanitizeThemeVars(data.themeVars),
           comments: Array.isArray(data.comments) ? data.comments : [],
         })
       } catch {
@@ -162,7 +180,13 @@ export function ShareViewer({ token }: { token: string }) {
 
   return (
     <main className="parchment-share-shell">
-      <article className="parchment-share-doc">
+      {/* J12: per-doc theme token vars applied on the doc wrapper (token-only, so it
+          is share-safe — never raw CSS). Re-validated client-side in sanitizeThemeVars. */}
+      <article
+        className="parchment-share-doc"
+        style={state.themeVars as React.CSSProperties}
+        data-doc-themed={Object.keys(state.themeVars).length > 0 ? 'true' : undefined}
+      >
         <h1 className="parchment-share-title">{state.title}</h1>
         {/* G17: scope class wraps doc content; CustomCssStyle injects sanitized+scoped style. */}
         <div className={`parchment-prose ${CUSTOM_CSS_SCOPE}`}>

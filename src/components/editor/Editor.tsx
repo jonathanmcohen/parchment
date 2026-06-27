@@ -59,6 +59,7 @@ import { clampAutosaveMs } from '@/lib/docs/autosave-config'
 import { getCollabUrl } from '@/lib/editor/collab-url'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
+import { type DocTheme, resolveDocThemeVars } from '@/lib/editor/doc-theme'
 import { resolveProvider } from '@/lib/editor/embed-providers'
 import { CairnSuggestionExtension } from '@/lib/editor/extensions/cairn-suggestion'
 import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
@@ -115,6 +116,8 @@ type Props = {
   initialCustomCss?: string
   /** J10: per-doc writing-goal target in words (0 = no goal) from documents.meta.writingGoal. */
   initialWritingGoal?: number
+  /** J12: per-doc theme override (validated DocTheme) from documents.meta.theme. */
+  initialDocTheme?: DocTheme
   /** G13: true when AI_BASE_URL is configured server-side. Never derived client-side. */
   aiEnabled?: boolean
   /** I3: autosave version-snapshot interval in ms (clamped to 5s–5min, default 30s). */
@@ -144,6 +147,7 @@ export function Editor({
   initialWatermark,
   initialCustomCss,
   initialWritingGoal = 0,
+  initialDocTheme,
   aiEnabled = false,
   autosaveIntervalMs = 30_000,
   spellcheckEnabled = true,
@@ -494,6 +498,12 @@ export function Editor({
   // G17: custom CSS state — seeded from server-rendered initialCustomCss
   const [customCss, setCustomCss] = useState(initialCustomCss ?? '')
   const [customCssOpen, setCustomCssOpen] = useState(false)
+
+  // J12: per-doc theme override state — seeded from server-rendered initialDocTheme.
+  // Resolved to inline token vars applied on the doc canvas wrapper (token-only, so
+  // it is export/share safe). The Custom-CSS dialog edits it alongside the CSS.
+  const [docTheme, setDocTheme] = useState<DocTheme>(initialDocTheme ?? {})
+  const docThemeVars = resolveDocThemeVars(docTheme)
 
   // B5: image dialog state — null = closed; string = prefill src for paste/drop flow
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
@@ -1697,7 +1707,16 @@ export function Editor({
               on un-transformed dimensions and are never corrupted by the scale. */}
             {/* G17: scope class wraps doc content ONLY (not toolbar/chrome).
               CustomCssStyle injects the sanitized+scoped <style> here. */}
-            <div ref={scaledHostRef} className={`parchment-canvas-scaled-host ${CUSTOM_CSS_SCOPE}`}>
+            <div
+              ref={scaledHostRef}
+              className={`parchment-canvas-scaled-host ${CUSTOM_CSS_SCOPE}`}
+              // J12: per-doc theme token vars (page bg / ink / accent). Token-only —
+              // values are validated hex/keywords, never raw CSS.
+              style={docThemeVars as React.CSSProperties}
+              data-doc-theme={
+                docTheme.preset ?? (docTheme.pageBg || docTheme.accent ? 'custom' : undefined)
+              }
+            >
               <CustomCssStyle css={customCss} />
               <PageCanvas
                 pageSetup={pageSetup}
@@ -1905,12 +1924,14 @@ export function Editor({
           />
         )}
 
-        {/* G17: Custom CSS dialog */}
+        {/* G17 + J12: Custom CSS + per-doc theme dialog */}
         {customCssOpen && (
           <CustomCssDialog
             initial={customCss}
             docId={docId}
+            initialTheme={docTheme}
             onApply={setCustomCss}
+            onApplyTheme={setDocTheme}
             onClose={() => setCustomCssOpen(false)}
           />
         )}

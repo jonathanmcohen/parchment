@@ -611,3 +611,18 @@ export async function setDocumentWritingGoal(
   const writingGoal = target > 0 ? { targetWords: target } : null
   return mergeDocMeta(ownerId, docId, { writingGoal })
 }
+
+/**
+ * J12-2: persist the per-doc theme override into documents.meta.theme (owner-scoped).
+ * `theme` is the ALREADY-VALIDATED DocTheme (parseDocTheme'd by the route) — an empty
+ * object clears the override. Returns false if not owned. Token-only by construction
+ * (no raw CSS ever stored here).
+ */
+export async function setDocumentTheme(
+  ownerId: string,
+  docId: string,
+  theme: Record<string, unknown>,
+): Promise<boolean> {
+  const value = Object.keys(theme).length > 0 ? theme : null
+  return mergeDocMeta(ownerId, docId, { theme: value })
+}

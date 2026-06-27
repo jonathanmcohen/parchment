@@ -3,6 +3,7 @@ import { listComments } from '@/lib/docs/comments-repo'
 import { getDocument } from '@/lib/docs/repo'
 import { resolveShare, verifySharePassword } from '@/lib/docs/shares-repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
+import { parseDocTheme, resolveDocThemeVars } from '@/lib/editor/doc-theme'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   const docMeta = doc.meta as Record<string, unknown> | null
   const customCss = parseCustomCss(docMeta?.customCss)
 
+  // J12: per-doc theme — resolve to TOKEN VARS server-side. Only validated hex/keyword
+  // values cross to the anonymous viewer (resolveDocThemeVars can never emit raw CSS or
+  // a break-out character), so this is export/share-safe by construction.
+  const themeVars = resolveDocThemeVars(parseDocTheme(docMeta?.theme))
+
   // H2 publish-to-web: include a READ-ONLY comments list (open threads only by
   // default). SAFE shape — display data only, NEVER authorId, email, or mentions
   // (which could carry usernames). An anonymous viewer sees the comment bodies +
@@ -100,6 +106,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
     contentJson: doc.content,
     permission: share.permission,
     customCss,
+    themeVars,
     comments,
   })
 }

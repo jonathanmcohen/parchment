@@ -10,6 +10,7 @@ import {
   getSpellcheckEnabled,
 } from '@/lib/docs/settings-repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
+import { parseDocTheme } from '@/lib/editor/doc-theme'
 import { parseWritingGoal } from '@/lib/editor/goals'
 import { parseWatermark } from '@/lib/editor/watermark'
 import { isLanguageToolEnabled } from '@/lib/integrations/languagetool'
@@ -38,6 +39,9 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
   // J10: per-doc writing-goal target (words) from documents.meta.writingGoal.
   // 0 = no goal. Validated; never throws.
   const initialWritingGoal = parseWritingGoal(docMeta?.writingGoal)
+
+  // J12: per-doc theme override from documents.meta.theme (allow-listed; never throws).
+  const initialDocTheme = parseDocTheme(docMeta?.theme)
 
   // G13: AI is off by default — only enabled when AI_BASE_URL is configured.
   // Computed server-side so the client never reads process.env directly.
@@ -69,6 +73,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
       initialWatermark={initialWatermark}
       initialCustomCss={initialCustomCss}
       initialWritingGoal={initialWritingGoal}
+      initialDocTheme={initialDocTheme}
       aiEnabled={aiEnabled}
       autosaveIntervalMs={autosaveIntervalMs}
       spellcheckEnabled={spellcheckEnabled}

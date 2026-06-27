@@ -15,7 +15,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "collab": "tsx collab/server.ts",
+    "collab": "node --import tsx --import ./collab/register-loader.mjs collab/server.ts",
     "cli": "tsx cli/parchment.ts",
     "lint": "biome check .",
     "format": "biome format --write .",

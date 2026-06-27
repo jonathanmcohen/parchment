@@ -1,3 +1,8 @@
 #!/command/with-contenv sh
 cd /app
-exec ./node_modules/.bin/tsx collab/server.ts
+# --import ./collab/register-loader.mjs stubs the `server-only`/`client-only`
+# guard packages for this standalone Node process: collab/server.ts pulls in
+# server-only-marked modules (auth/session, authz/doc-access, disk/mirror), which
+# throw outside an RSC condition. Without this the collab service crashes on boot
+# and real-time collaboration is down. See collab/loader-server-only.mjs.
+exec node --import tsx --import ./collab/register-loader.mjs collab/server.ts

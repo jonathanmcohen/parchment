@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import {
   listDocumentsInFolder,
   listRecents,
@@ -18,8 +18,9 @@ export const dynamic = 'force-dynamic'
  * GET /api/docs?view=trash        — trashed docs
  */
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const view = req.nextUrl.searchParams.get('view')
 

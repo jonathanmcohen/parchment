@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { getDocument } from '@/lib/docs/repo'
 import { buildShareUrl } from '@/lib/docs/share-link'
 import { createShare, listShares, PERMISSIONS, type Permission } from '@/lib/docs/shares-repo'
@@ -21,8 +21,9 @@ function isPermission(value: unknown): value is Permission {
 // GET /api/docs/[id]/shares — list the doc's shares (owner-only). Maps each row
 // to a safe client shape: NEVER sends passwordHash; exposes only hasPassword.
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const { id } = await ctx.params
   const doc = await getDocument(id)
@@ -46,8 +47,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 // POST /api/docs/[id]/shares — create a share (owner-only).
 // Body: { permission, password?, expiresAt? (ISO string | null) }.
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const { id } = await ctx.params
   const doc = await getDocument(id)

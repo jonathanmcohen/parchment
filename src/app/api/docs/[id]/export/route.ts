@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { resolveDocAccess } from '@/lib/authz/doc-access'
 import { exportDoc, exportFilename, parseExportFormat } from '@/lib/export'
 
@@ -13,8 +13,9 @@ export const dynamic = 'force-dynamic'
  * Returns Content-Disposition: attachment with a filesystem-safe filename.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const { id } = await params
   const format = parseExportFormat(req.nextUrl.searchParams.get('format'))

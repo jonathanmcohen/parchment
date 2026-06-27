@@ -5,7 +5,7 @@
 // (not a zip / no manifest) → 400 with the message. nodejs runtime.
 
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { restoreWorkspaceBackup } from '@/lib/backup/service'
 
 export const runtime = 'nodejs'
@@ -14,8 +14,10 @@ export const dynamic = 'force-dynamic'
 const MAX_BYTES = 100 * 1024 * 1024 // 100 MB (matches the H9 total-size cap)
 
 export async function POST(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // J8 §7i: restore is a workspace-mutating write — a docs:read PAT CANNOT restore.
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   // Reject obviously-too-large payloads before buffering the body.
   const contentLength = req.headers.get('content-length')

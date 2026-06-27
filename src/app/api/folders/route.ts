@@ -1,20 +1,22 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { createFolder, listFolders } from '@/lib/docs/folders-repo'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const folders = await listFolders(user.id)
   return NextResponse.json(folders)
 }
 
 export async function POST(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const body = (await req.json()) as { name?: unknown; parentId?: unknown }
   const name = typeof body.name === 'string' ? body.name : ''

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { resolveDocAccess } from '@/lib/authz/doc-access'
 import { deleteComment, setResolved } from '@/lib/docs/comments-repo'
 
@@ -14,8 +14,9 @@ type RouteCtx = { params: Promise<{ id: string; commentId: string }> }
 // §7e IDOR: deleteComment/setResolved double-filter on (commentId, docId); a
 // commentId belonging to another doc affects 0 rows → 404 (no existence leak).
 export async function PATCH(req: NextRequest, ctx: RouteCtx) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
   const { id, commentId } = await ctx.params
 
   const body = (await req.json()) as { resolved?: boolean; deleted?: boolean }
@@ -45,8 +46,9 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
 // DELETE /api/docs/[id]/comments/[commentId] — manage-level + IDOR. Provided as an
 // explicit verb (the registry lists it) in addition to the PATCH { deleted } form.
 export async function DELETE(req: NextRequest, ctx: RouteCtx) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
   const { id, commentId } = await ctx.params
   const doc = await resolveDocAccess(user, id, 'manage')
   if (!doc) return NextResponse.json({ error: 'not_found' }, { status: 404 })

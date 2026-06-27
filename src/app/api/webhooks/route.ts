@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { createWebhook, listWebhooks, type WebhookRow } from '@/lib/docs/webhooks-repo'
 import {
   isValidWebhookKind,
@@ -31,8 +31,9 @@ function toClient(w: WebhookRow) {
 
 // GET /api/webhooks — list the owner's webhooks (never the secret).
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const webhooks = await listWebhooks(user.id)
   return NextResponse.json({ webhooks: webhooks.map(toClient) })
@@ -42,8 +43,9 @@ export async function GET(req: NextRequest) {
 // Body: { url, kind: generic|slack|discord, events: WebhookEvent[] }.
 // The signing secret is generated server-side and returned EXACTLY ONCE here.
 export async function POST(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const body = (await req.json().catch(() => ({}))) as {
     url?: unknown

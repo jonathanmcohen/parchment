@@ -1,7 +1,7 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { type NextRequest, NextResponse } from 'next/server'
 import { db, schema } from '@/db'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic'
 // Returns the rich row shape the FileManager's flat-list renderer expects
 // (size/preview/starred/createdAt), joined through document_permissions.
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const rows = await db
     .select({

@@ -11,7 +11,17 @@ const { authenticateRequest, getDocument, renameDocument, revalidatePath } = vi.
   revalidatePath: vi.fn(),
 }))
 
-vi.mock('@/lib/auth/guard', () => ({ authenticateRequest }))
+vi.mock('@/lib/auth/guard', async () => {
+  const { NextResponse } = await import('next/server')
+  return {
+    authenticateRequest,
+    apiAuthFailure: (status: 401 | 403) =>
+      NextResponse.json(
+        { error: status === 403 ? 'insufficient_scope' : 'unauthorized' },
+        { status },
+      ),
+  }
+})
 vi.mock('@/lib/docs/repo', () => ({ getDocument, renameDocument }))
 vi.mock('next/cache', () => ({ revalidatePath }))
 
@@ -25,7 +35,7 @@ const params = Promise.resolve({ id: ID })
 
 beforeEach(() => {
   vi.clearAllMocks()
-  authenticateRequest.mockResolvedValue({ id: 'u1' })
+  authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'u1' } })
   getDocument.mockResolvedValue({ id: ID, ownerId: 'u1' })
   renameDocument.mockResolvedValue(undefined)
 })
@@ -40,7 +50,7 @@ describe('POST /api/docs/[id]/rename — I6 revalidation', () => {
   })
 
   it('does NOT revalidate when unauthenticated', async () => {
-    authenticateRequest.mockResolvedValue(null)
+    authenticateRequest.mockResolvedValue({ ok: false, status: 401 })
     const res = await POST(makeReq({ title: 'Renamed' }), { params })
     expect(res.status).toBe(401)
     expect(revalidatePath).not.toHaveBeenCalled()

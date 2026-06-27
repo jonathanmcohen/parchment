@@ -50,7 +50,7 @@ beforeAll(async () => {
   docBId = b.rows[0]?.id ?? ''
 
   const { issuePat } = await import('@/lib/auth/pat')
-  ownerToken = (await issuePat(ownerId, 'owner-pat')).token
+  ownerToken = (await issuePat(ownerId, 'owner-pat', ['docs:write'])).token
 }, 180_000)
 
 afterAll(async () => {

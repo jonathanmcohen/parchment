@@ -2,15 +2,21 @@ import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import { db, schema } from '@/db'
+import { normalizeScopes, type Scope } from '@/lib/auth/scopes'
 
 export const PAT_PREFIX = 'pat_'
 
 export type PatUser = typeof schema.users.$inferSelect
 
+// J8: verifyPat now returns the user AND the token's granted scopes so the guard can
+// enforce per-route scope requirements. Cookie sessions are full-access (no scopes).
+export type VerifiedPat = { user: PatUser; scopes: Scope[] }
+
 export type IssuedPat = {
   id: string
   name: string
   tokenPrefix: string
+  scopes: Scope[]
   // Plaintext token — shown to the caller exactly once, never persisted.
   token: string
 }
@@ -30,22 +36,39 @@ function prefixOf(token: string): string {
   return token.slice(0, PAT_PREFIX.length + 6)
 }
 
-export async function issuePat(ownerId: string, name: string): Promise<IssuedPat> {
+export async function issuePat(
+  ownerId: string,
+  name: string,
+  scopes: Scope[] = [],
+): Promise<IssuedPat> {
+  // normalizeScopes drops bare 'read'/'write' + unknowns; only canonical scopes persist.
+  const safeScopes = normalizeScopes(scopes)
   const token = PAT_PREFIX + randomBytes(32).toString('base64url')
   const tokenHash = sha256(token)
   const tokenPrefix = prefixOf(token)
 
   const [row] = await db
     .insert(schema.pats)
-    .values({ name, tokenHash, tokenPrefix, ownerId })
-    .returning({ id: schema.pats.id, name: schema.pats.name, tokenPrefix: schema.pats.tokenPrefix })
+    .values({ name, tokenHash, tokenPrefix, ownerId, scopes: safeScopes })
+    .returning({
+      id: schema.pats.id,
+      name: schema.pats.name,
+      tokenPrefix: schema.pats.tokenPrefix,
+      scopes: schema.pats.scopes,
+    })
 
   if (!row) throw new Error('Failed to issue personal access token')
 
-  return { id: row.id, name: row.name, tokenPrefix: row.tokenPrefix, token }
+  return {
+    id: row.id,
+    name: row.name,
+    tokenPrefix: row.tokenPrefix,
+    scopes: normalizeScopes(row.scopes),
+    token,
+  }
 }
 
-export async function verifyPat(token: string): Promise<PatUser | null> {
+export async function verifyPat(token: string): Promise<VerifiedPat | null> {
   if (!token.startsWith(PAT_PREFIX)) return null
 
   const tokenHash = sha256(token)
@@ -70,7 +93,7 @@ export async function verifyPat(token: string): Promise<PatUser | null> {
     db.update(schema.pats).set({ lastUsedAt: new Date() }).where(eq(schema.pats.id, pat.id)),
   ).catch(() => {})
 
-  return user
+  return { user, scopes: normalizeScopes(pat.scopes) }
 }
 
 export async function revokePat(ownerId: string, id: string): Promise<boolean> {
@@ -88,6 +111,7 @@ export async function listPats(ownerId: string) {
       id: schema.pats.id,
       name: schema.pats.name,
       tokenPrefix: schema.pats.tokenPrefix,
+      scopes: schema.pats.scopes,
       lastUsedAt: schema.pats.lastUsedAt,
       createdAt: schema.pats.createdAt,
     })

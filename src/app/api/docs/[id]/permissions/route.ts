@@ -4,7 +4,7 @@
 // 'owner'/'admin' are NOT doc-roles and are rejected 400.
 import { type NextRequest, NextResponse } from 'next/server'
 import { logAudit } from '@/lib/audit'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { authorizeDocRoute } from '@/lib/authz/doc-access'
 import {
   grantDocPermission,
@@ -17,7 +17,9 @@ export const dynamic = 'force-dynamic'
 const DOC_PERM_ROLES = new Set(['viewer', 'commenter', 'editor'])
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const user = await authenticateRequest(req)
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
   const { id } = await ctx.params
   const gate = await authorizeDocRoute(user, id, 'manage')
   if (!gate.ok) return NextResponse.json({ error: 'not_found' }, { status: gate.status })
@@ -25,7 +27,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const user = await authenticateRequest(req)
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
   const { id } = await ctx.params
   const gate = await authorizeDocRoute(user, id, 'manage')
   if (!gate.ok) return NextResponse.json({ error: 'not_found' }, { status: gate.status })
@@ -59,7 +63,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const user = await authenticateRequest(req)
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
   const { id } = await ctx.params
   const gate = await authorizeDocRoute(user, id, 'manage')
   if (!gate.ok) return NextResponse.json({ error: 'not_found' }, { status: gate.status })

@@ -78,8 +78,8 @@ beforeAll(async () => {
   process.env.DATABASE_URL = url
 
   const { issuePat } = await import('@/lib/auth/pat')
-  ownerToken = (await issuePat(ownerId, 'owner-pat')).token
-  editorToken = (await issuePat(editorId, 'editor-pat')).token
+  ownerToken = (await issuePat(ownerId, 'owner-pat', ['docs:write'])).token
+  editorToken = (await issuePat(editorId, 'editor-pat', ['docs:write'])).token
 }, 180_000)
 
 afterAll(async () => {

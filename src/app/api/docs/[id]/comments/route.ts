@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { resolveDocAccess } from '@/lib/authz/doc-access'
 import { notifyMentions } from '@/lib/docs/comment-notify'
 import { addReply, createThread, listComments, parseMentions } from '@/lib/docs/comments-repo'
@@ -9,8 +9,9 @@ export const dynamic = 'force-dynamic'
 type RouteCtx = { params: Promise<{ id: string }> }
 
 export async function GET(req: NextRequest, ctx: RouteCtx) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
   const { id } = await ctx.params
   // view access: owner, admin, or any doc-permission grant (viewer+) may read.
   const doc = await resolveDocAccess(user, id, 'view')
@@ -20,8 +21,9 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
 }
 
 export async function POST(req: NextRequest, ctx: RouteCtx) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
   const { id } = await ctx.params
   // comment access: a 'commenter' grant (or editor/owner/admin) may post; a bare
   // 'viewer' grant cannot — view ≠ comment.

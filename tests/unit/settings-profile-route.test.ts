@@ -10,7 +10,19 @@ const { authenticateRequest, dbUpdateSet, dbUpdateWhere } = vi.hoisted(() => ({
   dbUpdateWhere: vi.fn(),
 }))
 
-vi.mock('@/lib/auth/guard', () => ({ authenticateRequest }))
+// J8: the route now calls the scoped overload (returns { ok, user } | { ok, status })
+// and apiAuthFailure. Mirror both in the mock.
+vi.mock('@/lib/auth/guard', async () => {
+  const { NextResponse } = await import('next/server')
+  return {
+    authenticateRequest,
+    apiAuthFailure: (status: 401 | 403) =>
+      NextResponse.json(
+        { error: status === 403 ? 'insufficient_scope' : 'unauthorized' },
+        { status },
+      ),
+  }
+})
 vi.mock('@/db', () => ({
   schema: { users: { id: 'users.id' } },
   db: {
@@ -36,12 +48,15 @@ function makeReq(body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  authenticateRequest.mockResolvedValue({ id: 'u1', name: 'Old Name', email: 'u@x.dev' })
+  authenticateRequest.mockResolvedValue({
+    ok: true,
+    user: { id: 'u1', name: 'Old Name', email: 'u@x.dev' },
+  })
 })
 
 describe('PUT /api/settings/profile', () => {
   it('401 when unauthenticated (no write)', async () => {
-    authenticateRequest.mockResolvedValue(null)
+    authenticateRequest.mockResolvedValue({ ok: false, status: 401 })
     const res = await PUT(makeReq({ name: 'New' }))
     expect(res.status).toBe(401)
     expect(dbUpdateSet).not.toHaveBeenCalled()

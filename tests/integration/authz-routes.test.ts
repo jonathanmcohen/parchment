@@ -154,13 +154,15 @@ beforeAll(async () => {
   await c.end()
   process.env.DATABASE_URL = url
 
-  // mint PATs via the real issuer
+  // mint PATs via the real issuer. J8: these probe the DOC-AUTHZ layer (owner/grant),
+  // so they all carry docs:write (which implies docs:read) — scope is NOT what's under
+  // test here; scope enforcement is covered by pat-scope-enforcement.test.ts.
   const { issuePat } = await import('@/lib/auth/pat')
-  ownerToken = (await issuePat(ownerId, 'owner-pat')).token
-  viewerToken = (await issuePat(viewerId, 'viewer-pat')).token
-  editorToken = (await issuePat(editorId, 'editor-pat')).token
-  commenterToken = (await issuePat(commenterId, 'commenter-pat')).token
-  strangerToken = (await issuePat(strangerId, 'stranger-pat')).token
+  ownerToken = (await issuePat(ownerId, 'owner-pat', ['docs:write'])).token
+  viewerToken = (await issuePat(viewerId, 'viewer-pat', ['docs:write'])).token
+  editorToken = (await issuePat(editorId, 'editor-pat', ['docs:write'])).token
+  commenterToken = (await issuePat(commenterId, 'commenter-pat', ['docs:write'])).token
+  strangerToken = (await issuePat(strangerId, 'stranger-pat', ['docs:write'])).token
 }, 180_000)
 
 afterAll(async () => {

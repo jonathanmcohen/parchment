@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { getDocument, moveDocument, trashDocument } from '@/lib/docs/repo'
 import { addTagToDoc } from '@/lib/docs/tags-repo'
 
@@ -15,8 +15,9 @@ interface BulkBody {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const body = (await req.json()) as BulkBody
 

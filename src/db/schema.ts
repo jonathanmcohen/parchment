@@ -254,6 +254,8 @@ export const pats = pgTable(
     ownerId: uuid('owner_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    // J8: canonical scope strings ('docs:read' | 'docs:write'); default '{}' = none.
+    scopes: text('scopes').array().notNull().default([]),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

@@ -77,8 +77,8 @@ describe('A4 — Shared-with-me listing', () => {
   it('GET /api/docs/shared returns the granted doc for the viewer and nothing for a stranger', async () => {
     const { GET } = await import('@/app/api/docs/shared/route')
     const { issuePat } = await import('@/lib/auth/pat')
-    const viewerToken = (await issuePat(viewerId, 'v')).token
-    const strangerToken = (await issuePat(strangerId, 's')).token
+    const viewerToken = (await issuePat(viewerId, 'v', ['docs:write'])).token
+    const strangerToken = (await issuePat(strangerId, 's', ['docs:write'])).token
     const mk = (token: string) =>
       new NextRequest('http://x/api/docs/shared', {
         headers: { authorization: `Bearer ${token}` },

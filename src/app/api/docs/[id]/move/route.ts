@@ -1,12 +1,14 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { authorizeDocRoute } from '@/lib/authz/doc-access'
 import { moveDocument } from '@/lib/docs/repo'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await authenticateRequest(req)
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
   const { id } = await params
   // moving a doc is a manage-level operation on the doc.
   const gate = await authorizeDocRoute(user, id, 'manage')

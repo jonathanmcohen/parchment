@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import type { DocRow } from '@/lib/docs/repo'
 import { searchFullText, searchSemantic } from '@/lib/docs/search-repo'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
@@ -20,8 +20,9 @@ function serializeRow(row: DocRow) {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const params = req.nextUrl.searchParams
   const q = params.get('q') ?? ''

@@ -165,8 +165,8 @@ describe('POST /api/collab-token (mint route)', () => {
   it('an editor PAT mints a token; a viewer PAT is 403; no auth is 401', async () => {
     const { issuePat } = await import('@/lib/auth/pat')
     const { POST } = await import('@/app/api/collab-token/route')
-    const edToken = (await issuePat(editorUserId, 'ed')).token
-    const vwToken = (await issuePat(viewerUserId, 'vw')).token
+    const edToken = (await issuePat(editorUserId, 'ed', ['docs:write'])).token
+    const vwToken = (await issuePat(viewerUserId, 'vw', ['docs:write'])).token
 
     const noAuth = await POST(patReq(null, docId))
     expect(noAuth.status).toBe(401)

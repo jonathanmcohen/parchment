@@ -19,6 +19,84 @@ export interface ImportResult {
   warnings: string[]
 }
 
+// J7-1: the user-facing import flow is LOCKED to markdown + docx only. The lib
+// still understands html / notion-zip (kept intact behind this flag so the
+// conversion code paths and their tests remain), but the /api/docs/import route
+// gates on `isUserImportType` and answers 415 for everything else.
+const USER_IMPORT_TYPES: ReadonlySet<ImportType> = new Set<ImportType>(['md', 'docx'])
+
+/** True when an ImportType is permitted in the user-facing import flow (md+docx). */
+export function isUserImportType(type: ImportType): boolean {
+  return USER_IMPORT_TYPES.has(type)
+}
+
+/**
+ * J7-4: persist callback used to extract embedded (data-URI) images during import.
+ * Returns the rewritten `src` URL (e.g. `/api/docs/<id>/assets/<file>`) on success,
+ * or `null` to keep the original data URI. Best-effort — the route supplies a
+ * closure over the J1 upload store + the freshly created doc id.
+ */
+export type PersistImage = (bytes: Uint8Array, mime: string) => Promise<string | null>
+
+// Matches a markdown image whose URL is a base64 data URI: ![alt](data:<mime>;base64,<payload>)
+// The alt text and the trailing `)` are preserved; only the URL is rewritten.
+const DATA_URI_IMAGE_RE = /!\[([^\]]*)\]\(\s*(data:([^;]+);base64,([^)\s]+))\s*\)/g
+
+/** Decode a base64 string to bytes without relying on a DOM atob. NEVER throws. */
+function base64ToBytes(b64: string): Uint8Array | null {
+  try {
+    return new Uint8Array(Buffer.from(b64, 'base64'))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * J7-4: rewrite every base64 data-URI image in `md` by persisting its bytes via
+ * `persist` and swapping the `src` for the returned URL. On any failure (decode or
+ * persist) the original data URI is kept and a warning is pushed. NEVER throws.
+ */
+export async function rewriteDataUriImages(
+  md: string,
+  warnings: string[],
+  persist: PersistImage,
+): Promise<string> {
+  // Collect matches first (regex.exec with the global flag + async work don't mix).
+  const matches = [...md.matchAll(DATA_URI_IMAGE_RE)]
+  if (matches.length === 0) return md
+
+  // Map each full data-URI token → its replacement URL (or keep on failure).
+  const replacements = new Map<string, string>()
+  for (const m of matches) {
+    const fullDataUri = m[2]
+    const mime = m[3]
+    const payload = m[4]
+    if (!fullDataUri || !mime || !payload || replacements.has(fullDataUri)) continue
+    const bytes = base64ToBytes(payload)
+    if (!bytes) {
+      warnings.push('Skipped an embedded image: could not decode base64 payload.')
+      continue
+    }
+    let url: string | null = null
+    try {
+      url = await persist(bytes, mime)
+    } catch {
+      url = null
+    }
+    if (url) {
+      replacements.set(fullDataUri, url)
+    } else {
+      warnings.push('Kept an embedded image inline: failed to extract it to asset storage.')
+    }
+  }
+
+  if (replacements.size === 0) return md
+  return md.replace(DATA_URI_IMAGE_RE, (full, alt: string, dataUri: string) => {
+    const url = replacements.get(dataUri)
+    return url ? `![${alt}](${url})` : full
+  })
+}
+
 // PK = Zip magic bytes (0x50 0x4B 0x03 0x04)
 const PK_MAGIC = [0x50, 0x4b, 0x03, 0x04]
 
@@ -176,6 +254,7 @@ export async function importToPmJson(
   type: ImportType,
   bytes: Uint8Array,
   filename: string,
+  opts?: { persistImage?: PersistImage },
 ): Promise<ImportResult> {
   const warnings: string[] = []
   const fallback: ImportResult = {
@@ -238,6 +317,13 @@ export async function importToPmJson(
         } catch (err) {
           warnings.push(`docx HTML→Markdown failed: ${String(err)}`)
         }
+      }
+      // J7-4: mammoth emits embedded images as base64 data URIs; extract them to
+      // asset storage so the imported doc doesn't carry megabytes of base64. The
+      // caller (the route) supplies a persist closure bound to the new doc id.
+      // Best-effort — on failure the data URI is kept (rewriteDataUriImages warns).
+      if (md && opts?.persistImage) {
+        md = await rewriteDataUriImages(md, warnings, opts.persistImage)
       }
       const json = markdownToJson(md)
       return { json, title: titleFromMd(md, filename), warnings }

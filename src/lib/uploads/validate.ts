@@ -184,3 +184,25 @@ export function classifyUpload(
 
 /** The set of declared mime types the upload route advertises as accepted. */
 export const ALLOWED_UPLOAD_TYPES = Object.freeze(Object.keys(ALLOW))
+
+// J7-4: image content-types a docx may embed → a safe file extension. Used by the
+// import route to name extracted assets. Returns null for any mime we don't store
+// as an image (the caller then keeps the original data URI). Distinct from ALLOW
+// (the upload allow-list) because docx can legitimately carry e.g. bmp/tiff that we
+// still want to persist on import; on the upload route those stay rejected.
+const IMAGE_EXT_BY_MIME: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/bmp': 'bmp',
+  'image/tiff': 'tiff',
+  'image/x-emf': 'emf',
+  'image/svg+xml': 'svg',
+}
+
+/** Safe lowercase file extension for an embedded-image mime, or null if unknown. */
+export function extForMime(mime: string): string | null {
+  return IMAGE_EXT_BY_MIME[mime.trim().toLowerCase()] ?? null
+}

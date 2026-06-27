@@ -2401,7 +2401,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
       body.append('file', file)
       const res = await fetch('/api/docs/import', { method: 'POST', body })
       if (res.status === 415) {
-        window.alert('Unsupported file type. Please upload a .docx, .md, .html, or Notion .zip.')
+        window.alert('Unsupported file type. Please upload a .md or .docx file.')
         return
       }
       if (res.status === 413) {
@@ -2537,8 +2537,9 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               <input
                 ref={importInputRef}
                 type="file"
-                accept=".docx,.md,.markdown,.html,.htm,.zip"
+                accept=".md,.markdown,.docx"
                 className="sr-only"
+                data-testid="import-file-input"
                 onChange={handleImportFile}
               />
             </label>

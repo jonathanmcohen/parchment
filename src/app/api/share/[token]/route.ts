@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { listComments } from '@/lib/docs/comments-repo'
 import { getDocument } from '@/lib/docs/repo'
 import { resolveShare, verifySharePassword } from '@/lib/docs/shares-repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
@@ -56,6 +57,41 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   const docMeta = doc.meta as Record<string, unknown> | null
   const customCss = parseCustomCss(docMeta?.customCss)
 
+  // H2 publish-to-web: include a READ-ONLY comments list (open threads only by
+  // default). SAFE shape — display data only, NEVER authorId, email, or mentions
+  // (which could carry usernames). An anonymous viewer sees the comment bodies +
+  // positions but never who authored them. Root threads only (replies share the
+  // root's anchor; the public viewer renders the thread head). Best-effort: a
+  // comments-table read failure must not break the read-only doc render.
+  let comments: Array<{
+    id: string
+    threadId: string
+    body: string
+    resolved: boolean
+    createdAt: string
+    anchorFrom: number | null
+    anchorTo: number | null
+  }> = []
+  try {
+    const all = await listComments(doc.id)
+    comments = all
+      .filter((c) => c.threadId === c.id && !c.resolved)
+      .map((c) => ({
+        id: c.id,
+        threadId: c.threadId,
+        body: c.body,
+        resolved: c.resolved,
+        createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
+        // Integer fallback positions only — the public page has no Y.Doc to resolve
+        // the durable JSON anchor against (documented limitation: minor drift on a
+        // stale published snapshot). NEVER expose anchorStart/anchorEnd internals.
+        anchorFrom: c.anchorFrom,
+        anchorTo: c.anchorTo,
+      }))
+  } catch {
+    comments = []
+  }
+
   // Return ONLY the public viewer shape — no ownerId, no passwordHash, no
   // disk/sync/embedding internals.
   return NextResponse.json({
@@ -64,5 +100,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
     contentJson: doc.content,
     permission: share.permission,
     customCss,
+    comments,
   })
 }

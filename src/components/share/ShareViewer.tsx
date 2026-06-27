@@ -13,11 +13,29 @@ import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
 // stored permission is a write perm it shows a muted "view-only in v0.1" note —
 // anonymous writes are an explicit v0.2 GAP. A 404 shows "link expired or invalid".
 
+/** H2: safe-shape public comment (display data only — never authorId/email). */
+type PublicComment = {
+  id: string
+  threadId: string
+  body: string
+  resolved: boolean
+  createdAt: string
+  anchorFrom: number | null
+  anchorTo: number | null
+}
+
 type ViewerState =
   | { kind: 'loading' }
   | { kind: 'password'; wrong: boolean }
   | { kind: 'invalid' }
-  | { kind: 'ok'; title: string; body: ReactNode; permission: string; customCss: string }
+  | {
+      kind: 'ok'
+      title: string
+      body: ReactNode
+      permission: string
+      customCss: string
+      comments: PublicComment[]
+    }
 
 type ShareResponse = {
   docId: string
@@ -26,10 +44,8 @@ type ShareResponse = {
   permission: string
   /** G17: owner's raw custom CSS — sanitized+scoped at render. */
   customCss?: unknown
-}
-
-function isWritePermission(permission: string): boolean {
-  return permission === 'comment' || permission === 'edit' || permission === 'suggest'
+  /** H2: read-only public comments (open threads only). */
+  comments?: PublicComment[]
 }
 
 export function ShareViewer({ token }: { token: string }) {
@@ -68,6 +84,7 @@ export function ShareViewer({ token }: { token: string }) {
           body: renderReadOnlyDoc(data.contentJson),
           permission: data.permission,
           customCss: typeof data.customCss === 'string' ? data.customCss : '',
+          comments: Array.isArray(data.comments) ? data.comments : [],
         })
       } catch {
         setState({ kind: 'invalid' })
@@ -147,18 +164,40 @@ export function ShareViewer({ token }: { token: string }) {
     <main className="parchment-share-shell">
       <article className="parchment-share-doc">
         <h1 className="parchment-share-title">{state.title}</h1>
-        {isWritePermission(state.permission) && (
-          <p className="parchment-share-note" role="note">
-            View-only in v0.1. Editing, commenting, and suggesting over a share link are coming in a
-            later release.
-          </p>
-        )}
         {/* G17: scope class wraps doc content; CustomCssStyle injects sanitized+scoped style. */}
         <div className={`parchment-prose ${CUSTOM_CSS_SCOPE}`}>
           <CustomCssStyle css={state.customCss} />
           {state.body}
         </div>
+        {state.comments.length > 0 && (
+          <aside className="parchment-share-comments" aria-label="Comments">
+            <h2 className="parchment-share-comments-heading">Comments</h2>
+            <ul className="parchment-share-comments-list">
+              {state.comments.map((c) => (
+                <li key={c.id} className="parchment-share-comment" data-thread-id={c.threadId}>
+                  <p className="parchment-share-comment-body">{c.body}</p>
+                  <time className="parchment-share-comment-time" dateTime={c.createdAt}>
+                    {formatCommentTime(c.createdAt)}
+                  </time>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
       </article>
     </main>
   )
+}
+
+function formatCommentTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
 }

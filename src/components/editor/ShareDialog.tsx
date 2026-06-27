@@ -337,7 +337,9 @@ export function ShareDialog({ docId, onClose }: Props) {
           </div>
           <p className="parchment-share-toggle-hint">
             {isPublic
-              ? 'Anyone with the link can access this document.'
+              ? permission === 'view'
+                ? 'Published to the web — anyone with the link sees a read-only page (comments shown read-only).'
+                : 'Anyone with the link can access this document.'
               : 'Only people you share with directly can access this document.'}
           </p>
         </fieldset>

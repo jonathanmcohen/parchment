@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, eq, gte, ilike, isNotNull, isNull, lte, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import type { DocRow } from '@/lib/docs/repo'
 
@@ -6,6 +6,12 @@ export interface SearchFilters {
   folderId?: string | null
   tagId?: string
   starred?: boolean
+  /** J6: substring match on title (the `title:` operator). */
+  titleContains?: string
+  /** J6: updatedAt strictly before this ISO date (YYYY-MM-DD), exclusive end-of-day. */
+  before?: string
+  /** J6: updatedAt on/after this ISO date (YYYY-MM-DD). */
+  after?: string
 }
 
 const docRowSelect = {
@@ -31,6 +37,16 @@ function buildFilterConditions(ownerId: string, filters?: SearchFilters) {
     }
     if (filters.starred === true) {
       conditions.push(eq(schema.documents.starred, true))
+    }
+    if (filters.titleContains !== undefined && filters.titleContains.trim().length > 0) {
+      conditions.push(ilike(schema.documents.title, `%${filters.titleContains.trim()}%`))
+    }
+    if (filters.after !== undefined) {
+      conditions.push(gte(schema.documents.updatedAt, new Date(`${filters.after}T00:00:00.000Z`)))
+    }
+    if (filters.before !== undefined) {
+      // exclusive: strictly before the start of the given day
+      conditions.push(lte(schema.documents.updatedAt, new Date(`${filters.before}T23:59:59.999Z`)))
     }
   }
 

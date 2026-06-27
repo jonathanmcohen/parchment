@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, ilike } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { wouldCreateCycle } from '@/lib/docs/folder-tree'
 
@@ -21,6 +21,22 @@ export async function createFolder(
 /** All folders owned by `ownerId` (flat). */
 export async function listFolders(ownerId: string): Promise<Folder[]> {
   return db.select().from(schema.folders).where(eq(schema.folders.ownerId, ownerId))
+}
+
+/**
+ * J6: resolve a folder NAME → its id for the owner (case-insensitive exact
+ * match), or null when no such folder exists. Backs the `folder:bar` search
+ * operator. If multiple folders share a name, the first by creation is used.
+ */
+export async function findFolderByName(ownerId: string, name: string): Promise<string | null> {
+  const trimmed = name.trim()
+  if (trimmed.length === 0) return null
+  const [row] = await db
+    .select({ id: schema.folders.id })
+    .from(schema.folders)
+    .where(and(eq(schema.folders.ownerId, ownerId), ilike(schema.folders.name, trimmed)))
+    .limit(1)
+  return row?.id ?? null
 }
 
 export async function renameFolder(ownerId: string, id: string, name: string): Promise<void> {

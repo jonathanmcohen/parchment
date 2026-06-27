@@ -73,4 +73,26 @@ export const env = {
     }
     return raw.replace(/\/$/, '') // strip trailing slash for safe URL concatenation
   })(),
+
+  // I7 — Structured logging. LOG_LEVEL gates which levels pass through
+  // (error < warn < info < debug). Default: 'info'. LOG_FORMAT=json emits
+  // newline-delimited JSON; otherwise emits '[ns] message' text (default).
+  // No network telemetry ping (§1j — local logging only).
+  logLevel: (process.env.LOG_LEVEL ?? 'info') as 'error' | 'warn' | 'info' | 'debug',
+  logFormat: process.env.LOG_FORMAT === 'json' ? ('json' as const) : ('text' as const),
+
+  // I2 — Per-user quota (default 0 = unlimited). Applied when creating invited
+  // or OIDC JIT-provisioned users. The bootstrap owner always gets this too but
+  // keeps role:'owner' (§7d). Admin can override per-user via the usage dashboard.
+  defaultQuotaMb: Number(process.env.PARCHMENT_DEFAULT_QUOTA_MB ?? '0'),
+
+  // I1/§7v — Prometheus metrics auth token. When non-empty, a Bearer token
+  // matching this value is accepted at GET /api/metrics (alongside admin sessions).
+  // When EMPTY or UNSET the endpoint is admin-session-only — NEVER open to the public.
+  // Set to a strong random string (e.g. openssl rand -base64 32) to enable scraping.
+  metricsToken: process.env.METRICS_TOKEN ?? '',
+
+  // I6 — Lock-file directory for maintenance mode flag. Defaults to filesRoot
+  // parent so it's on the same volume. Override with PARCHMENT_LOCK_DIR.
+  lockDir: process.env.PARCHMENT_LOCK_DIR ?? '',
 }

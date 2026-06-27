@@ -42,8 +42,17 @@ export type AuditAction =
 export interface AuditOptions {
   actorId?: string
   targetType?: string
-  /** text, not uuid — any identifier string is valid post-migration 0021. */
+  /**
+   * text, not uuid — any identifier string is valid post-migration 0021.
+   * MUST NOT contain a secret: it is persisted in plaintext and is bound as a query
+   * param (so a DB error could surface it). Redact with SECRET_MASK first if needed.
+   */
   targetId?: string
+  /**
+   * Arbitrary structured context, stored as plaintext jsonb. MUST NOT contain secrets
+   * (passwords, tokens, keys) — audit rows are not encrypted and meta is bound as a
+   * query param. Callers redact sensitive fields (e.g. via redactSecret) before passing.
+   */
   meta?: Record<string, unknown>
   /** Caller's best-effort client IP. Stored in audit_log.ip. */
   ip?: string
@@ -127,10 +136,28 @@ export async function logAudit(action: AuditAction, opts: AuditOptions = {}): Pr
       await tx.update(schema.auditLog).set({ entryHash }).where(eq(schema.auditLog.id, inserted.id))
     })
   } catch (err) {
-    // Never log opts.meta values — they may contain secrets. Only the action + the
-    // top-level option key names.
-    console.error('audit write failed', { action, optKeys: Object.keys(opts), err })
+    // Never log opts.meta/targetId VALUES — they may carry secrets — only the action
+    // and the top-level option key names. Crucially we DON'T log the raw `err` either:
+    // DrizzleQueryError builds its `.message` as `Failed query: <sql>\nparams: <values>`
+    // and exposes `.params` — i.e. the BOUND param values (which include meta/targetId/
+    // ip) are embedded in the message. A misused secret in those would otherwise leak.
+    // So we log only the error class name and a param-stripped message (everything from
+    // a `params:` marker onward is dropped; our own thrown errors are literal + safe).
+    console.error('audit write failed', {
+      action,
+      optKeys: Object.keys(opts),
+      errName: err instanceof Error ? err.name : 'Error',
+      errMessage: redactQueryParams(err),
+    })
   }
+}
+
+// Strip bound-parameter VALUES from an error message so a secret a caller may have
+// (mis)placed in meta/targetId/ip cannot surface via the log. Drops everything from the
+// first `params:`/`parameters:` marker onward; non-query errors pass through unchanged.
+function redactQueryParams(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  return msg.split(/\n?\s*param(?:eter)?s?:/i)[0]?.trim() ?? ''
 }
 
 /**

@@ -3900,6 +3900,15 @@ body {
   flex-shrink: 0;
 }
 
+/* A4: add-people row in the per-user document ACL panel. */
+.parchment-share-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
 .parchment-share-error {
   color: var(--error);
   font-size: 0.8rem;

@@ -167,4 +167,38 @@ describe('A4 — document_permissions repo', () => {
     const del = await DELETE(bearerJson(ownerToken, JSON.stringify({ userId: strangerId }), 'DELETE'), ctx)
     expect(del.status).toBe(204)
   })
+
+  it('GET /api/users/pickable excludes the caller, omits hashes/disabledAt/role, and hides disabled users', async () => {
+    const { GET } = await import('@/app/api/users/pickable/route')
+    const { db, schema } = await import('@/db')
+    const { eq } = await import('drizzle-orm')
+    // disable the stranger so it must NOT appear in the directory
+    await db
+      .update(schema.users)
+      .set({ disabledAt: new Date() })
+      .where(eq(schema.users.id, strangerId))
+
+    const req = new NextRequest('http://x/api/users/pickable', {
+      headers: { authorization: `Bearer ${ownerToken}` },
+    })
+    const res = await GET(req)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      users: Array<Record<string, unknown>>
+    }
+    // caller (owner) excluded; disabled stranger excluded
+    expect(body.users.some((u) => u.id === ownerId)).toBe(false)
+    expect(body.users.some((u) => u.id === strangerId)).toBe(false)
+    // active editor/viewer present
+    expect(body.users.some((u) => u.id === editorId)).toBe(true)
+    // only safe columns — no hashes, no role, no disabledAt
+    for (const u of body.users) {
+      expect(Object.keys(u).sort()).toEqual(['email', 'id', 'name'])
+    }
+    // restore
+    await db
+      .update(schema.users)
+      .set({ disabledAt: null })
+      .where(eq(schema.users.id, strangerId))
+  })
 })

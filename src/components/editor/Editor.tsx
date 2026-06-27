@@ -432,6 +432,19 @@ export function Editor({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // H Task 18 (DEV-ONLY): expose the collab provider on window for the e2e DOM/
+  // awareness probes (bar #7). Guarded behind NODE_ENV !== 'production' so it never
+  // ships to a real deploy. The Playwright collaboration spec reads
+  // `window.__parchmentProvider.awareness.getStates().size` and the editor doc.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return
+    const w = window as unknown as { __parchmentProvider?: HocuspocusProvider | null }
+    w.__parchmentProvider = provider
+    return () => {
+      w.__parchmentProvider = null
+    }
+  }, [provider])
+
   // Destroy the provider on unmount; also clear the offline-fallback timer so it
   // can't fire goOffline() after the component is gone.
   useEffect(() => {

@@ -311,10 +311,19 @@ export const comments = pgTable(
     mentions: jsonb('mentions').notNull().default([]),
     anchorFrom: integer('anchor_from'),
     anchorTo: integer('anchor_to'),
+    // H1: durable Yjs RelativePosition anchors (relativePositionToJSON shape). Null
+    // on replies and on legacy rows; integer anchorFrom/anchorTo stay as fallback.
+    anchorStart: jsonb('anchor_start'),
+    anchorEnd: jsonb('anchor_end'),
     resolved: boolean('resolved').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('comments_doc_idx').on(t.docId), index('comments_thread_idx').on(t.threadId)],
+  (t) => [
+    index('comments_doc_idx').on(t.docId),
+    index('comments_thread_idx').on(t.threadId),
+    // H1: the sidebar open/resolved filter + published-doc comment count hit this.
+    index('comments_doc_resolved_idx').on(t.docId, t.resolved),
+  ],
 )
 
 // ─── Document version history (D3) ──────────────────────────────────────────

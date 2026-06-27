@@ -39,9 +39,11 @@
 // This is the DECISION RECORD task — types only; the implementation lands in Task 3.
 
 import type { Editor } from '@tiptap/core'
+// AnchorJson is the canonical `relativePositionToJSON` boundary shape; it lives in
+// the client-safe shared module so both the repo row type and these helpers agree.
+import type { AnchorJson } from '@/lib/docs/comments-shared'
 
-/** The JSON shape produced by Yjs `relativePositionToJSON` for one boundary. */
-export type AnchorJson = Record<string, unknown>
+export type { AnchorJson }
 
 /**
  * Serialize a PM selection range [from, to) to a durable RelativePosition pair.

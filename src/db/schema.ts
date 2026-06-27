@@ -93,16 +93,27 @@ export const documents = pgTable(
   ],
 )
 
-// ─── Audit log (A4 / I5) — append-only ───
+// ─── Audit log (A4 / I5 / Phase 0 §1d) — append-only, hash-chained ───
+// `action` is the merged AuditAction union (see src/lib/audit/index.ts): the legacy
+// flat verbs (create|delete|share|export|login|setup) plus A's + G's dotted verbs.
+// `targetId` is text (migration 0021, was uuid) so any identifier — user/doc id, OIDC
+// subject, session hash, config key — stores without a cast. `ip` is the caller's
+// best-effort client IP. `prevHash`/`entryHash` form the sha256 integrity chain
+// (entry_hash is computed from the PERSISTED created_at and back-filled by logAudit;
+// the append-only trigger permits ONLY that NULL->hash transition). verifyAuditChain
+// re-derives and compares the chain.
 export const auditLog = pgTable(
   'audit_log',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
-    action: text('action').notNull(), // create | delete | share | export | login
+    action: text('action').notNull(),
     targetType: text('target_type'),
-    targetId: uuid('target_id'),
+    targetId: text('target_id'),
     meta: jsonb('meta'),
+    ip: text('ip'),
+    prevHash: text('prev_hash'),
+    entryHash: text('entry_hash'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('audit_log_created_idx').on(t.createdAt)],

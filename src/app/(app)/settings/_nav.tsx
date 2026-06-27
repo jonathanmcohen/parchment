@@ -11,8 +11,8 @@ const groups = [
   // redirect is the security boundary; a non-admin who clicks it is sent to '/'.
   { href: '/settings/users', label: 'Users' },
   { href: '/settings/developer', label: 'Developer' },
-  // CF2: Notifications hidden from the nav — no SMTP/notification delivery
-  // shipped yet. The route file stays in the tree but is not linked.
+  // B4: Notifications is now visible — SMTP is configured via /settings/admin/smtp.
+  { href: '/settings/notifications', label: 'Notifications' },
   { href: '/settings/security', label: 'Security' },
   // I5: About lives inside the settings shell (was the standalone /whats-new).
   { href: '/settings/about', label: 'About' },

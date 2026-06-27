@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildGdprManifest, buildGdprProfile, buildGdprDocEntry } from '../../src/lib/export/gdpr'
+import { buildGdprDocEntry, buildGdprManifest, buildGdprProfile } from '../../src/lib/export/gdpr'
 
 /**
  * Unit tests for src/lib/export/gdpr.ts (I9).

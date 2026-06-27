@@ -6,10 +6,7 @@ import { describe, expect, it } from 'vitest'
  * integration-tested against Testcontainers in the integration suite.
  */
 
-import {
-  formatBytes,
-  buildUsageSummaryRow,
-} from '../../src/lib/admin/usage'
+import { buildUsageSummaryRow, formatBytes } from '../../src/lib/admin/usage'
 
 describe('formatBytes (re-exported from quota)', () => {
   it('formats 0 as 0.0 MB', () => {

@@ -1,8 +1,8 @@
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { getUsedAssetBytes, formatBytes, checkQuota } from '../../src/lib/quota'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { checkQuota, formatBytes, getUsedAssetBytes } from '../../src/lib/quota'
 
 /**
  * Unit tests for src/lib/quota.ts (I2).
@@ -78,15 +78,15 @@ describe('checkQuota', () => {
 
   it('allows upload when used + file <= quota', () => {
     const quotaMb = 10
-    const usedBytes = 9 * 1024 * 1024  // 9 MB
-    const fileBytes = 512 * 1024        // 0.5 MB — total 9.5 MB <= 10 MB
+    const usedBytes = 9 * 1024 * 1024 // 9 MB
+    const fileBytes = 512 * 1024 // 0.5 MB — total 9.5 MB <= 10 MB
     expect(checkQuota({ quotaMb, usedBytes, fileBytes })).toBe(true)
   })
 
   it('blocks upload when used + file > quota', () => {
     const quotaMb = 10
     const usedBytes = 10 * 1024 * 1024 // 10 MB already used
-    const fileBytes = 1                  // 1 extra byte would exceed quota
+    const fileBytes = 1 // 1 extra byte would exceed quota
     expect(checkQuota({ quotaMb, usedBytes, fileBytes })).toBe(false)
   })
 

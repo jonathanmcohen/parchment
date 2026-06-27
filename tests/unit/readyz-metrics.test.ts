@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isBearerAuthorized, checkMetricsAuth } from '../../src/lib/metrics-auth'
 import { incrementCounter, serializePrometheus } from '../../src/lib/metrics'
+import { checkMetricsAuth, isBearerAuthorized } from '../../src/lib/metrics-auth'
 
 /**
  * Unit tests for I1: /api/readyz and /api/metrics route contracts.

@@ -13,10 +13,10 @@ import { TopbarUserCluster } from '@/components/shell/TopbarUserCluster'
 import { GlobalShortcuts } from '@/components/shortcuts/GlobalShortcuts'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
-import { isMaintenanceMode } from '@/lib/maintenance'
 import { getWorkspaceTheme } from '@/lib/docs/settings-repo'
 import { themeCssVars } from '@/lib/editor/theme'
 import { getShortcutOverrides } from '@/lib/help/keymap-repo'
+import { isMaintenanceMode } from '@/lib/maintenance'
 
 // S2-2 polish (v0.1.9): the sidebar footer is a cohesive cluster of nav-row-
 // height controls separated by a hairline from the nav above. Controls share:

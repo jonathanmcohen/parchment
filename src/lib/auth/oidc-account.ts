@@ -116,7 +116,9 @@ export async function resolveOidcUser(claims: OidcClaims): Promise<ResolveResult
           // eslint-disable-next-line @typescript-eslint/no-require-imports
           const { env } = require('@/lib/env') as { env: { defaultQuotaMb: number } }
           return env.defaultQuotaMb
-        } catch { return 0 }
+        } catch {
+          return 0
+        }
       })(),
     })
     .onConflictDoNothing({ target: schema.users.email })

@@ -9,7 +9,7 @@
  * pure (no @/db import) and testable with only the fs.
  */
 
-import { stat, readdir } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
 /**

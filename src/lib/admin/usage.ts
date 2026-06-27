@@ -8,11 +8,11 @@ import 'server-only'
  * NOT hardcoded to a specific DB name (§7v).
  */
 
-import { sql } from 'drizzle-orm'
 import { join } from 'node:path'
+import { sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { env } from '@/lib/env'
-import { formatBytes as _formatBytes, getUsedAssetBytes } from '@/lib/quota'
+import { getUsedAssetBytes } from '@/lib/quota'
 
 export { formatBytes } from '@/lib/quota'
 
@@ -63,11 +63,8 @@ export async function getWorkspaceUsage(): Promise<WorkspaceUsage> {
     .from(schema.users)
 
   // 2. Per-user doc count + content size (non-trashed docs only).
-  const docStats = await db.execute<{
-    owner_id: string
-    doc_count: string
-    content_size: string
-  }>(sql`
+  // db.execute returns a QueryResult; access .rows to iterate (node-postgres shape).
+  const docStatsResult = await db.execute(sql`
     SELECT
       owner_id,
       COUNT(*)::text AS doc_count,
@@ -76,9 +73,15 @@ export async function getWorkspaceUsage(): Promise<WorkspaceUsage> {
     WHERE trashed_at IS NULL
     GROUP BY owner_id
   `)
+  // Support both array-like and rows-property shapes from different driver versions.
+  const docStatsRows = (
+    Array.isArray(docStatsResult)
+      ? docStatsResult
+      : ((docStatsResult as { rows?: unknown[] }).rows ?? [])
+  ) as Array<{ owner_id: string; doc_count: string; content_size: string }>
 
   const docStatMap = new Map<string, { docCount: number; contentSizeBytes: number }>()
-  for (const row of docStats) {
+  for (const row of docStatsRows) {
     docStatMap.set(row.owner_id, {
       docCount: Number(row.doc_count),
       contentSizeBytes: Number(row.content_size),
@@ -86,9 +89,12 @@ export async function getWorkspaceUsage(): Promise<WorkspaceUsage> {
   }
 
   // 3. DB total size — uses current_database() so it works regardless of DB name (§7v).
-  const sizeRows = await db.execute<{ db_size: string }>(
+  const sizeResult = await db.execute(
     sql`SELECT pg_database_size(current_database())::text AS db_size`,
   )
+  const sizeRows = (
+    Array.isArray(sizeResult) ? sizeResult : ((sizeResult as { rows?: unknown[] }).rows ?? [])
+  ) as Array<{ db_size: string }>
   const dbSizeBytes = Number(sizeRows[0]?.db_size ?? 0)
 
   // 4. Per-user asset disk usage — requires knowing each user's doc IDs.

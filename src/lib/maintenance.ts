@@ -21,7 +21,7 @@
 
 import { existsSync } from 'node:fs'
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
-import { join, dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 
 const LOCK_FILE_NAME = 'maintenance.lock'
 
@@ -67,7 +67,10 @@ function getDefaultLockDir(): string {
     return dirname(env.filesRoot)
   } catch {
     // Fallback for edge runtime / test environments where require is unavailable.
-    return process.env.PARCHMENT_LOCK_DIR || dirname(process.env.PARCHMENT_FILES_ROOT || '/data/parchment/files')
+    return (
+      process.env.PARCHMENT_LOCK_DIR ||
+      dirname(process.env.PARCHMENT_FILES_ROOT || '/data/parchment/files')
+    )
   }
 }
 

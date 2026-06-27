@@ -11,8 +11,8 @@
 
 import type { NextRequest } from 'next/server'
 import { env } from '@/lib/env'
-import { checkMetricsAuth } from '@/lib/metrics-auth'
 import { serializePrometheus } from '@/lib/metrics'
+import { checkMetricsAuth } from '@/lib/metrics-auth'
 
 export const dynamic = 'force-dynamic'
 

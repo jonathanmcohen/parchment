@@ -72,5 +72,5 @@ export function serializePrometheus(): string {
     }
   }
 
-  return lines.join('\n') + '\n'
+  return `${lines.join('\n')}\n`
 }

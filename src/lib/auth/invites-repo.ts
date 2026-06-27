@@ -126,7 +126,9 @@ export async function acceptInvite(
             // eslint-disable-next-line @typescript-eslint/no-require-imports
             const { env } = require('@/lib/env') as { env: { defaultQuotaMb: number } }
             return env.defaultQuotaMb
-          } catch { return 0 }
+          } catch {
+            return 0
+          }
         })(),
       })
       .returning({ id: schema.users.id })

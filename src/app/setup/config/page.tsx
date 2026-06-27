@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { probeDatabase } from '@/lib/health/probes'
 import { isSmtpConfigured } from '@/lib/config/smtp-config-repo'
+import { probeDatabase } from '@/lib/health/probes'
 
 /**
  * Post-setup configuration wizard (I4-T3).

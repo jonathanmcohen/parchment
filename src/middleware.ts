@@ -11,18 +11,13 @@
  */
 
 import { type NextRequest, NextResponse } from 'next/server'
-import { incrementCounter } from '@/lib/metrics'
 import { isMaintenanceMode } from '@/lib/maintenance'
+import { incrementCounter } from '@/lib/metrics'
 
 // Paths that are always allowed, even in maintenance mode:
 //   - Health/readiness probes (must remain reachable for monitoring)
 //   - The setup wizard (a fresh install must be able to bootstrap)
-const ALWAYS_ALLOWED_PREFIXES = [
-  '/api/healthz',
-  '/api/readyz',
-  '/api/metrics',
-  '/setup',
-]
+const ALWAYS_ALLOWED_PREFIXES = ['/api/healthz', '/api/readyz', '/api/metrics', '/setup']
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl

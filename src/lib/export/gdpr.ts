@@ -15,8 +15,8 @@ import 'server-only'
  *   - Trashed docs are EXCLUDED (post-fetch filter on trashedAt).
  */
 
-import JSZip from 'jszip'
 import { and, eq, isNull } from 'drizzle-orm'
+import JSZip from 'jszip'
 import { db, schema } from '@/db'
 import { APP_VERSION } from '@/lib/version'
 
@@ -113,9 +113,7 @@ export async function buildGdprExport(userId: string): Promise<Uint8Array> {
       updatedAt: schema.documents.updatedAt,
     })
     .from(schema.documents)
-    .where(
-      and(eq(schema.documents.ownerId, userId), isNull(schema.documents.trashedAt)),
-    )
+    .where(and(eq(schema.documents.ownerId, userId), isNull(schema.documents.trashedAt)))
 
   // 3. Build ZIP.
   const zip = new JSZip()

@@ -82,10 +82,7 @@ export default async function AccountSettingsPage() {
       </section>
 
       {/* I9: GDPR data portability export */}
-      <section
-        aria-labelledby="export-data"
-        className="mt-12 border-t border-[var(--border)] pt-8"
-      >
+      <section aria-labelledby="export-data" className="mt-12 border-t border-[var(--border)] pt-8">
         <h2 id="export-data" className="font-medium text-lg">
           Your data
         </h2>

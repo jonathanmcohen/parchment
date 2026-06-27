@@ -1,5 +1,5 @@
-import { requireAdmin } from '@/lib/auth/guard'
 import { formatBytes, getWorkspaceUsage } from '@/lib/admin/usage'
+import { requireAdmin } from '@/lib/auth/guard'
 
 /**
  * Admin usage dashboard (I2-T8).
@@ -22,10 +22,7 @@ export default async function UsagePage() {
       </div>
 
       <div className="mt-6 overflow-x-auto">
-        <table
-          data-testid="usage-table"
-          className="w-full border-collapse text-sm"
-        >
+        <table data-testid="usage-table" className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-[var(--border)] text-left">
               <th className="py-2 pr-4 font-medium">User</th>
@@ -38,7 +35,10 @@ export default async function UsagePage() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.userId} className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)]">
+              <tr
+                key={u.userId}
+                className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)]"
+              >
                 <td className="py-2 pr-4">{u.name}</td>
                 <td className="py-2 pr-4 text-[var(--muted)]">{u.email}</td>
                 <td className="py-2 pr-4 text-right">{u.docCount}</td>

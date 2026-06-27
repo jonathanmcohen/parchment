@@ -39,7 +39,12 @@ export async function createUserAction(_p: ActionState, fd: FormData): Promise<A
     return { error: 'You do not have permission to assign that role.' }
   try {
     const u = await createUser({ email, name, role, disabled: true }) // no password yet → must be invited/reset
-    await logAudit('user.create', { actorId: actor.id, targetType: 'user', targetId: u.id, meta: { role } })
+    await logAudit('user.create', {
+      actorId: actor.id,
+      targetType: 'user',
+      targetId: u.id,
+      meta: { role },
+    })
   } catch {
     return { error: 'Could not create the user (email may already exist).' }
   }
@@ -63,7 +68,12 @@ export async function inviteUserAction(_p: InviteState, fd: FormData): Promise<I
   const { token } = await createInvite({ email, role, invitedBy: actor.id, ttlHours: 72 })
   // invite link uses env.publicUrl (§7n); call sendInviteEmail with the OBJECT form
   const acceptUrl = `${env.publicUrl.replace(/\/$/, '')}/accept/${token}`
-  await sendInviteEmail({ to: email, inviterName: actor.name, workspaceName: 'Parchment', acceptUrl }) // never throws / never blocks
+  await sendInviteEmail({
+    to: email,
+    inviterName: actor.name,
+    workspaceName: 'Parchment',
+    acceptUrl,
+  }) // never throws / never blocks
   await logAudit('user.invite', { actorId: actor.id, targetType: 'user', meta: { email, role } })
   revalidatePath('/settings/users')
   return { acceptUrl }
@@ -78,7 +88,12 @@ export async function setUserRoleAction(_p: ActionState, fd: FormData): Promise<
     return { error: 'You do not have permission to assign that role.' }
   try {
     await setUserRole(userId, role)
-    await logAudit('user.role', { actorId: actor.id, targetType: 'user', targetId: userId, meta: { role } })
+    await logAudit('user.role', {
+      actorId: actor.id,
+      targetType: 'user',
+      targetId: userId,
+      meta: { role },
+    })
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Could not change the role.' }
   }

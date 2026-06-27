@@ -11,13 +11,18 @@ import { env } from '@/lib/env'
 // When B is merged, replace the `type` import below with a static import.
 type EmailPayload = { to: string; subject: string; text: string; html?: string; replyTo?: string }
 
+// B's module specifier. Held in a variable (not a string literal in the import())
+// so TypeScript does NOT eagerly resolve it at build time — A must compile BEFORE
+// Group B ships src/lib/email/send.ts. When B is merged, switch to a static import.
+const EMAIL_MODULE = '@/lib/email/send'
+
 // Dynamic lookup so A does not hard-depend on B at build time.
 // When B ships src/lib/email/send.ts this resolves automatically.
 async function deliver(msg: EmailPayload): Promise<void> {
   try {
-    const mod = (await import('@/lib/email/send').catch(() => null)) as
-      | { sendEmail?: (m: EmailPayload) => Promise<unknown> }
-      | null
+    const mod = (await import(EMAIL_MODULE).catch(() => null)) as {
+      sendEmail?: (m: EmailPayload) => Promise<unknown>
+    } | null
     if (mod?.sendEmail) {
       await mod.sendEmail(msg)
       return
@@ -46,16 +51,14 @@ export async function sendInviteEmail(input: {
   const { to, inviterName, workspaceName, acceptUrl } = input
   let payload: EmailPayload
   try {
-    const mod = (await import('@/lib/email/send').catch(() => null)) as
-      | {
-          inviteEmailPayload?: (opts: {
-            to: string
-            inviterName: string
-            workspaceName: string
-            acceptUrl: string
-          }) => EmailPayload
-        }
-      | null
+    const mod = (await import(EMAIL_MODULE).catch(() => null)) as {
+      inviteEmailPayload?: (opts: {
+        to: string
+        inviterName: string
+        workspaceName: string
+        acceptUrl: string
+      }) => EmailPayload
+    } | null
     // Call with the OBJECT form (§7n — not positional):
     payload = mod?.inviteEmailPayload?.({ to, inviterName, workspaceName, acceptUrl }) ?? {
       to,

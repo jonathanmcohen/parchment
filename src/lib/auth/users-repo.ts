@@ -183,7 +183,7 @@ export async function transferOwnership(fromId: string, toId: string): Promise<v
       .from(schema.users)
       .where(eq(schema.users.id, fromId))
       .limit(1)
-    if (!from || from.role !== 'owner') throw new Error('source is not the owner')
+    if (from?.role !== 'owner') throw new Error('source is not the owner')
     const [to] = await tx
       .select({ id: schema.users.id, disabledAt: schema.users.disabledAt })
       .from(schema.users)

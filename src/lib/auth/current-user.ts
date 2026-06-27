@@ -4,6 +4,7 @@
 // refactors don't churn every consumer. getCurrentUser already returns null for
 // missing/expired/pending AND (Task 3) disabled sessions.
 import 'server-only'
+
+export { requireAdmin, requireRole, requireUser } from '@/lib/auth/guard'
 export type { SessionUser } from '@/lib/auth/session'
 export { getCurrentUser } from '@/lib/auth/session'
-export { requireAdmin, requireRole, requireUser } from '@/lib/auth/guard'

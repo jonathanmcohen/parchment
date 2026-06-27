@@ -862,7 +862,7 @@ function ContextMenu({ state, onClose, onRefresh, navigateTo, onSetView }: Conte
 
 interface DocActionsProps {
   doc: DocDTO
-  view: 'recents' | 'starred' | 'trash' | 'tag' | 'all'
+  view: 'recents' | 'starred' | 'trash' | 'tag' | 'all' | 'shared'
   onRefresh: () => void
   allTags: TagDTO[]
   onTagsChanged?: (() => void) | undefined
@@ -1237,7 +1237,7 @@ function BulkActionBar({
 
 interface DocListRowProps {
   doc: DocDTO
-  view: 'recents' | 'starred' | 'trash' | 'tag' | 'all'
+  view: 'recents' | 'starred' | 'trash' | 'tag' | 'all' | 'shared'
   fmt: Intl.DateTimeFormat
   selected: boolean
   orderedIds: string[]
@@ -1358,7 +1358,7 @@ interface DocListProps {
   sortDir: SortDir
   onSortKey: (key: SortKey) => void
   onSortDir: (dir: SortDir) => void
-  view: 'recents' | 'starred' | 'trash' | 'tag' | 'all'
+  view: 'recents' | 'starred' | 'trash' | 'tag' | 'all' | 'shared'
   onRefresh: () => void
   allTags: TagDTO[]
   onTagsChanged?: () => void
@@ -2122,10 +2122,12 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
     }
   }, [])
 
-  // Fetch flat docs for Recents / Starred / Trash views
-  const fetchFlatDocs = useCallback(async (v: 'recents' | 'starred' | 'trash') => {
+  // Fetch flat docs for Recents / Starred / Trash / Shared views. 'shared' (A4) is
+  // sourced from the dedicated ACL endpoint (docs granted via document_permissions),
+  // the others from the owner-scoped ?view= list.
+  const fetchFlatDocs = useCallback(async (v: 'recents' | 'starred' | 'trash' | 'shared') => {
     try {
-      const res = await fetch(`/api/docs?view=${v}`)
+      const res = await fetch(v === 'shared' ? '/api/docs/shared' : `/api/docs?view=${v}`)
       if (res.ok) {
         const data = (await res.json()) as DocDTO[]
         setFlatDocs(data)
@@ -2218,7 +2220,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
 
   // When switching to a flat view, fetch that view's docs
   useEffect(() => {
-    if (view === 'recents' || view === 'starred' || view === 'trash') {
+    if (view === 'recents' || view === 'starred' || view === 'trash' || view === 'shared') {
       fetchFlatDocs(view)
     }
   }, [view, fetchFlatDocs])
@@ -2345,7 +2347,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   const onDropped = () => refreshAll(currentFolderId)
 
   const handleFlatRefresh = useCallback(() => {
-    if (view === 'recents' || view === 'starred' || view === 'trash') {
+    if (view === 'recents' || view === 'starred' || view === 'trash' || view === 'shared') {
       fetchFlatDocs(view)
     }
   }, [view, fetchFlatDocs])
@@ -2964,16 +2966,21 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
         </div>
       )}
 
-      {(view === 'recents' || view === 'starred' || view === 'trash') && (
+      {(view === 'recents' || view === 'starred' || view === 'trash' || view === 'shared') && (
         // Plain wrapper, not a <main> landmark (see note above): the layout owns
-        // the page's single <main>.
+        // the page's single <main>. A4: 'shared' renders the same flat list, sourced
+        // from /api/docs/shared (docs granted via document_permissions).
         <div className="flex-1 min-w-0">
           {view === 'trash' && (
             <TrashToolbar docCount={flatDocs.length} onAfterEmpty={() => fetchFlatDocs('trash')} />
           )}
           {flatDocs.length === 0 ? (
             <p className="text-[var(--muted)]">
-              {view === 'trash' ? 'Trash is empty.' : 'Nothing here yet.'}
+              {view === 'trash'
+                ? 'Trash is empty.'
+                : view === 'shared'
+                  ? 'No documents have been shared with you yet.'
+                  : 'Nothing here yet.'}
             </p>
           ) : (
             <>
@@ -3016,16 +3023,6 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               />
             </>
           )}
-        </div>
-      )}
-
-      {view === 'shared' && (
-        // Plain wrapper, not a <main> landmark (see note above): the layout owns
-        // the page's single <main>.
-        <div className="flex-1 min-w-0 flex items-center justify-center">
-          <p className="text-[var(--muted)] text-center">
-            Shared documents arrive in v0.2. Parchment v0.1 is single-owner.
-          </p>
         </div>
       )}
     </div>

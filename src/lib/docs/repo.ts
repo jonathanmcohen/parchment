@@ -125,6 +125,25 @@ export async function getDocument(id: string): Promise<Doc | null> {
   return row ?? null
 }
 
+/** A4: docs shared WITH this user via document_permissions (not owned by them),
+ *  newest-first, excludes trashed. Backs the "Shared with me" view. */
+export async function listSharedWithMe(userId: string): Promise<DocSummary[]> {
+  return db
+    .select({
+      id: schema.documents.id,
+      title: schema.documents.title,
+      updatedAt: schema.documents.updatedAt,
+      folderId: schema.documents.folderId,
+    })
+    .from(schema.documents)
+    .innerJoin(
+      schema.documentPermissions,
+      eq(schema.documentPermissions.docId, schema.documents.id),
+    )
+    .where(and(eq(schema.documentPermissions.userId, userId), isNull(schema.documents.trashedAt)))
+    .orderBy(desc(schema.documents.updatedAt))
+}
+
 /**
  * D4: Does the collab server already hold a persisted Yjs snapshot for this doc?
  * The editor uses this as the authoritative gate for first-open seeding: when a

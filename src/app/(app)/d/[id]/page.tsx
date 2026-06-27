@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation'
 import { Editor } from '@/components/editor/Editor'
 import { isAiEnabled } from '@/lib/ai/compose'
 import { requireUser } from '@/lib/auth/guard'
-import { getDocument, hasCollabState } from '@/lib/docs/repo'
+import { resolveDocAccess } from '@/lib/authz/doc-access'
+import { hasCollabState } from '@/lib/docs/repo'
 import {
   getAutosaveInterval,
   getPageLayoutMode,
@@ -15,8 +16,10 @@ import { isLanguageToolEnabled } from '@/lib/integrations/languagetool'
 export default async function DocPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const user = await requireUser()
-  const doc = await getDocument(id)
-  if (!doc || doc.ownerId !== user.id) notFound()
+  // A4: open if the user can VIEW the doc — owner, workspace admin, or any
+  // document_permissions grant (viewer+). A denied/missing doc 404s (no leak).
+  const doc = await resolveDocAccess(user, id, 'view')
+  if (!doc) notFound()
 
   // D4: whether the collab server already holds a Yjs snapshot — gates first-open
   // seeding so the client never seeds on top of authoritative server state.

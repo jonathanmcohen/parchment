@@ -47,6 +47,7 @@ export type AuditAction =
   | 'migrate.receive'
   | 'migrate.token'
   | 'gitsync.push'
+  | 'gitsync.config'
 
 export interface AuditOptions {
   actorId?: string

@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, ilike, isNull, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import type { DocRow } from '@/lib/docs/repo'
 import type { SmartCriteria } from '@/lib/docs/smart-folder-criteria'
@@ -70,17 +70,35 @@ export async function runSmartFolder(ownerId: string, criteria: SmartCriteria): 
     }
   }
 
+  // J2-2: "updated in the last N days" — updatedAt at/after the cutoff.
+  if (criteria.updatedWithinDays !== undefined) {
+    const cutoff = new Date(Date.now() - criteria.updatedWithinDays * 24 * 60 * 60 * 1000)
+    conditions.push(gte(schema.documents.updatedAt, cutoff))
+  }
+
+  const rowSelect = {
+    id: schema.documents.id,
+    title: schema.documents.title,
+    updatedAt: schema.documents.updatedAt,
+    folderId: schema.documents.folderId,
+    starred: schema.documents.starred,
+    createdAt: schema.documents.createdAt,
+    size: sql<number>`length(${schema.documents.markdown})`.as('size'),
+    preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
+  }
+
+  // J2-2: tagId joins through document_tags (only docs carrying that tag).
+  if (criteria.tagId !== undefined) {
+    return db
+      .select(rowSelect)
+      .from(schema.documents)
+      .innerJoin(schema.documentTags, eq(schema.documentTags.docId, schema.documents.id))
+      .where(and(...conditions, eq(schema.documentTags.tagId, criteria.tagId)))
+      .orderBy(desc(schema.documents.updatedAt))
+  }
+
   return db
-    .select({
-      id: schema.documents.id,
-      title: schema.documents.title,
-      updatedAt: schema.documents.updatedAt,
-      folderId: schema.documents.folderId,
-      starred: schema.documents.starred,
-      createdAt: schema.documents.createdAt,
-      size: sql<number>`length(${schema.documents.markdown})`.as('size'),
-      preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
-    })
+    .select(rowSelect)
     .from(schema.documents)
     .where(and(...conditions))
     .orderBy(desc(schema.documents.updatedAt))

@@ -101,12 +101,16 @@ interface Props {
 interface SmartFolderCreateFormProps {
   onCreated: () => void
   onCancel: () => void
+  /** J2-2: the owner's tags, so a smart folder can filter on a tag. */
+  tags: TagDTO[]
 }
 
-function SmartFolderCreateForm({ onCreated, onCancel }: SmartFolderCreateFormProps) {
+function SmartFolderCreateForm({ onCreated, onCancel, tags }: SmartFolderCreateFormProps) {
   const [name, setName] = useState('')
   const [titleContains, setTitleContains] = useState('')
   const [starredOnly, setStarredOnly] = useState(false)
+  const [tagId, setTagId] = useState('')
+  const [updatedWithinDays, setUpdatedWithinDays] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,6 +122,9 @@ function SmartFolderCreateForm({ onCreated, onCancel }: SmartFolderCreateFormPro
     const criteria: Record<string, unknown> = {}
     if (titleContains.trim()) criteria.titleContains = titleContains.trim()
     if (starredOnly) criteria.starred = true
+    if (tagId) criteria.tagId = tagId
+    const days = Number.parseInt(updatedWithinDays, 10)
+    if (Number.isInteger(days) && days > 0) criteria.updatedWithinDays = days
 
     try {
       const res = await fetch('/api/smart-folders', {
@@ -178,6 +185,40 @@ function SmartFolderCreateForm({ onCreated, onCancel }: SmartFolderCreateFormPro
         <label htmlFor="sf-starred" className="text-xs font-medium text-[var(--foreground)]">
           Starred only
         </label>
+      </div>
+      {tags.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="sf-tag" className="text-xs font-medium text-[var(--foreground)]">
+            Tagged
+          </label>
+          <select
+            id="sf-tag"
+            value={tagId}
+            onChange={(e) => setTagId(e.target.value)}
+            className="px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+          >
+            <option value="">Any tag</option>
+            {tags.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="flex flex-col gap-1">
+        <label htmlFor="sf-recent" className="text-xs font-medium text-[var(--foreground)]">
+          Updated within (days)
+        </label>
+        <input
+          id="sf-recent"
+          type="number"
+          min="1"
+          value={updatedWithinDays}
+          onChange={(e) => setUpdatedWithinDays(e.target.value)}
+          placeholder="e.g. 7 (blank = any)"
+          className="px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+        />
       </div>
       {error !== null && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-2 mt-1">
@@ -280,6 +321,103 @@ function TagCreateForm({ onCreated, onCancel }: TagCreateFormProps) {
         <button
           type="button"
           onClick={onCancel}
+          className="px-3 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)]"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ─── Tag edit popover (rename + recolor) ──────────────────────────────────────
+
+interface TagEditPopoverProps {
+  tag: TagDTO
+  onSaved: () => void
+  onClose: () => void
+}
+
+// J2-3: rename + recolor an existing tag via PATCH /api/tags/[id]. Color is a
+// swatch grid (the canonical TAG_COLORS palette); Save persists name + color.
+function TagEditPopover({ tag, onSaved, onClose }: TagEditPopoverProps) {
+  const [name, setName] = useState(tag.name)
+  const [color, setColor] = useState(tag.color)
+  const [saving, setSaving] = useState(false)
+  const ref = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/tags/${tag.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), color }),
+      })
+      if (res.ok) onSaved()
+    } catch {
+      // leave state unchanged
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form
+      ref={ref}
+      onSubmit={handleSave}
+      aria-label={`Edit tag ${tag.name}`}
+      className="px-overlay-enter absolute z-50 left-0 top-7 w-56 rounded-lg border border-[var(--border-chrome)] bg-[var(--surface)] p-3 flex flex-col gap-2 shadow-[var(--shadow-dropdown)]"
+    >
+      <label htmlFor={`tag-edit-name-${tag.id}`} className="sr-only">
+        Tag name
+      </label>
+      <input
+        id={`tag-edit-name-${tag.id}`}
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="px-2 py-1 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)]"
+      />
+      {/* biome-ignore lint/a11y/useSemanticElements: a swatch grid; radios here would impose list semantics inappropriate for a color picker */}
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Tag color">
+        {TAG_COLORS.map((c) => (
+          <button
+            key={c.name}
+            type="button"
+            aria-label={`Color ${c.name}`}
+            aria-pressed={color === c.name}
+            data-tag-color={c.name}
+            onClick={() => setColor(c.name)}
+            className={[
+              'h-5 w-5 rounded-full border-2',
+              color === c.name ? 'border-[var(--foreground)]' : 'border-transparent',
+            ].join(' ')}
+            style={{ backgroundColor: c.bg }}
+          />
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="px-3 py-1 text-xs rounded bg-[var(--primary)] text-[var(--on-primary)] font-medium disabled:opacity-50"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
           className="px-3 py-1 text-xs rounded border border-[var(--border)] text-[var(--muted)]"
         >
           Cancel
@@ -2007,6 +2145,8 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
   const [activeTagId, setActiveTagId] = useState<string | null>(null)
   const [tagDocs, setTagDocs] = useState<DocDTO[]>([])
   const [showTagCreateForm, setShowTagCreateForm] = useState(false)
+  // J2-3: the tag whose rename/recolor popover is open (null = none).
+  const [editingTagId, setEditingTagId] = useState<string | null>(null)
 
   // H9: Import state
   const importInputRef = useRef<HTMLInputElement>(null)
@@ -2534,6 +2674,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
               </button>
               {showCreateForm && (
                 <SmartFolderCreateForm
+                  tags={tags}
                   onCreated={async () => {
                     await fetchSmartFolders()
                     setShowCreateForm(false)
@@ -2553,7 +2694,7 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                 {tags.map((tag) => {
                   const tc = resolveTagColor(tag.color)
                   return (
-                    <li key={tag.id} className="flex items-center gap-1">
+                    <li key={tag.id} className="relative flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => {
@@ -2580,6 +2721,18 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           {tag.count}
                         </span>
                       </button>
+                      <Tooltip label={`Edit tag ${tag.name}`} className="shrink-0">
+                        <button
+                          type="button"
+                          aria-label={`Edit tag ${tag.name}`}
+                          onClick={() => setEditingTagId((cur) => (cur === tag.id ? null : tag.id))}
+                          className="flex h-6 w-6 items-center justify-center text-[var(--muted)] hover:text-[var(--primary)]"
+                        >
+                          <span aria-hidden className="material-symbols-rounded text-[16px]">
+                            edit
+                          </span>
+                        </button>
+                      </Tooltip>
                       <Tooltip label={`Delete tag ${tag.name}`} className="shrink-0">
                         <button
                           type="button"
@@ -2605,6 +2758,16 @@ export default function FileManager({ initialFolders, initialDocs }: Props) {
                           </span>
                         </button>
                       </Tooltip>
+                      {editingTagId === tag.id && (
+                        <TagEditPopover
+                          tag={tag}
+                          onClose={() => setEditingTagId(null)}
+                          onSaved={async () => {
+                            setEditingTagId(null)
+                            await fetchTags()
+                          }}
+                        />
+                      )}
                     </li>
                   )
                 })}

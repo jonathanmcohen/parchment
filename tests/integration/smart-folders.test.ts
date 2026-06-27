@@ -204,4 +204,63 @@ describe('E3 — smart folders repo', () => {
     expect(ids).toContain(doc1)
     expect(ids).toContain(doc2)
   })
+
+  // J2-2 — broadened criteria
+  it('runSmartFolder: tagId returns only docs carrying that tag', async () => {
+    const { createDocument } = await import('@/lib/docs/repo')
+    const { createTag, addTagToDoc } = await import('@/lib/docs/tags-repo')
+    const { runSmartFolder } = await import('@/lib/docs/smart-folders-repo')
+    const { id: tagId } = await createTag(ownerId, { name: 'sf-tag', color: 'red' })
+    const { id: tagged } = await createDocument(ownerId, { title: 'Tagged for SF' })
+    const { id: untagged } = await createDocument(ownerId, { title: 'Untagged for SF' })
+    await addTagToDoc(ownerId, tagged, tagId)
+
+    const results = await runSmartFolder(ownerId, { tagId })
+    const ids = results.map((d) => d.id)
+    expect(ids).toContain(tagged)
+    expect(ids).not.toContain(untagged)
+  })
+
+  it('runSmartFolder: tagId + updatedWithinDays AND together', async () => {
+    const { createDocument } = await import('@/lib/docs/repo')
+    const { createTag, addTagToDoc } = await import('@/lib/docs/tags-repo')
+    const { runSmartFolder } = await import('@/lib/docs/smart-folders-repo')
+    const { db, schema } = await import('@/db')
+    const { eq } = await import('drizzle-orm')
+
+    const { id: tagId } = await createTag(ownerId, { name: 'sf-recent', color: 'teal' })
+    const { id: recent } = await createDocument(ownerId, { title: 'Recent Tagged' })
+    const { id: old } = await createDocument(ownerId, { title: 'Old Tagged' })
+    await addTagToDoc(ownerId, recent, tagId)
+    await addTagToDoc(ownerId, old, tagId)
+    // Push `old` outside the 7-day window.
+    await db
+      .update(schema.documents)
+      .set({ updatedAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000) })
+      .where(eq(schema.documents.id, old))
+
+    const results = await runSmartFolder(ownerId, { tagId, updatedWithinDays: 7 })
+    const ids = results.map((d) => d.id)
+    expect(ids).toContain(recent)
+    expect(ids).not.toContain(old)
+  })
+
+  it('runSmartFolder: updatedWithinDays excludes stale docs', async () => {
+    const { createDocument } = await import('@/lib/docs/repo')
+    const { runSmartFolder } = await import('@/lib/docs/smart-folders-repo')
+    const { db, schema } = await import('@/db')
+    const { eq } = await import('drizzle-orm')
+
+    const { id: fresh } = await createDocument(ownerId, { title: 'Fresh Doc UWD' })
+    const { id: stale } = await createDocument(ownerId, { title: 'Stale Doc UWD' })
+    await db
+      .update(schema.documents)
+      .set({ updatedAt: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000) })
+      .where(eq(schema.documents.id, stale))
+
+    const results = await runSmartFolder(ownerId, { updatedWithinDays: 30 })
+    const ids = results.map((d) => d.id)
+    expect(ids).toContain(fresh)
+    expect(ids).not.toContain(stale)
+  })
 })

@@ -4,6 +4,10 @@ export interface SmartCriteria {
   titleContains?: string
   starred?: boolean
   folderId?: string | null
+  /** J2-1: docs carrying this tag id. */
+  tagId?: string
+  /** J2-1: docs whose updatedAt is within the last N days (positive integer). */
+  updatedWithinDays?: number
 }
 
 /**
@@ -36,6 +40,26 @@ export function parseCriteria(raw: unknown): SmartCriteria {
     }
   }
 
+  if (typeof obj.tagId === 'string') {
+    const trimmed = obj.tagId.trim()
+    if (trimmed.length > 0) {
+      result.tagId = trimmed
+    }
+  }
+
+  // Accept a number or a numeric string; keep only a positive integer.
+  if (obj.updatedWithinDays !== undefined) {
+    const n =
+      typeof obj.updatedWithinDays === 'number'
+        ? obj.updatedWithinDays
+        : typeof obj.updatedWithinDays === 'string'
+          ? Number(obj.updatedWithinDays)
+          : Number.NaN
+    if (Number.isInteger(n) && n > 0) {
+      result.updatedWithinDays = n
+    }
+  }
+
   return result
 }
 
@@ -60,6 +84,18 @@ export function describeCriteria(c: SmartCriteria): string {
     } else {
       parts.push(`in folder ${c.folderId}`)
     }
+  }
+
+  if (c.tagId !== undefined) {
+    parts.push(`tagged ${c.tagId}`)
+  }
+
+  if (c.updatedWithinDays !== undefined) {
+    parts.push(
+      c.updatedWithinDays === 1
+        ? 'updated in the last day'
+        : `updated in the last ${c.updatedWithinDays} days`,
+    )
   }
 
   return parts.length === 0 ? 'all documents' : parts.join(' · ')

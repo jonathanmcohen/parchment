@@ -41,6 +41,11 @@ export type AuditAction =
   // I6: maintenance mode lifecycle — ALL DOTTED per §1d canonical list.
   | 'maintenance.enable'
   | 'maintenance.disable'
+  // backup-sync: instance migrate + git sync + S3 config (ALL DOTTED).
+  | 'backup.s3.configure'
+  | 'migrate.push'
+  | 'migrate.receive'
+  | 'gitsync.push'
 
 export interface AuditOptions {
   actorId?: string

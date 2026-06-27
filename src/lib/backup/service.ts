@@ -17,6 +17,11 @@ import { folderPath } from '@/lib/docs/folder-tree'
 import { listFolders } from '@/lib/docs/folders-repo'
 import { createDocument, getDocument, listDocuments } from '@/lib/docs/repo'
 
+// Re-export the pure archive parser (reconciliation §7q) so consumers that mock
+// `@/lib/backup/service` get one cohesive surface. The implementation lives in
+// `./archive` — this is NOT a re-definition.
+export { parseWorkspaceBackup } from '@/lib/backup/archive'
+
 export interface RestoreResult {
   created: number
   skipped: number

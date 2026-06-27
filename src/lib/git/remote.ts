@@ -103,7 +103,9 @@ function sanitize(msg: string, token: string): string {
 export async function maybePushOnChange(): Promise<void> {
   try {
     const config = await resolveGitSyncConfig()
-    if (!config || config.scheduleHours !== 0) return
+    if (!config) return
+    // push-on-change mode only (the periodic git-sync job handles scheduleHours > 0).
+    if (config.scheduleHours !== 0) return
     const result = await pushToRemote(config)
     if (!result.ok) {
       await setAppConfigJson('git.lastError', {

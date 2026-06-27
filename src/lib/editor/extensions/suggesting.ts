@@ -7,6 +7,16 @@
 //
 // Accept / reject commands use resolveChange() semantics from track-changes.ts.
 //
+// YJS INTERACTION (Task 6 — RESOLVED): insertion/deletion are plain ProseMirror
+// MARKS stored in the doc content, so they sync through Yjs natively like any other
+// formatting — two clients in suggestion mode produce a correctly-merged set of
+// tracked changes with NO suggestion-specific awareness, locking, or extra CRDT
+// plumbing. Accept/reject is a LOCAL transaction that the CRDT merges: tests in
+// suggesting-collab.test.ts prove that (a) an accept on one client converges back
+// to the other with the mark gone and the docs byte-identical, and (b) the hazard
+// case — a peer typing a separate insertion while another accepts — converges with
+// both runs intact. No change to accept/reject was needed for collaboration.
+//
 // Edge cases:
 //   • Cut via Cmd-X / Ctrl-X — CLOSED (Task 4): handleDOMEvents.cut converts the
 //     removal into a tracked deletion (the clipboard copy still happens).

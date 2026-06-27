@@ -1,42 +1,41 @@
-import { randomUUID } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { type NextRequest, NextResponse } from 'next/server'
 import { db, schema } from '@/db'
-import { authenticateRequest } from '@/lib/auth/guard'
-import { getDocument, listDocuments } from '@/lib/docs/repo'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
+import { authorizeDocRoute } from '@/lib/authz/doc-access'
+import { listDocuments } from '@/lib/docs/repo'
 import { env } from '@/lib/env'
 import { checkQuota, getUsedAssetBytes } from '@/lib/quota'
+import { safeAssetName } from '@/lib/uploads/asset-path'
+import { putAsset } from '@/lib/uploads/store'
+import { ALLOWED_UPLOAD_TYPES, classifyUpload } from '@/lib/uploads/validate'
 
+// J1-4: upload an attachment (image OR file) for a doc. Storage dispatches disk vs
+// S3 via the shared adapter (lib/uploads/store). Validation is the pure validator
+// (magic-byte sniff, SVG-script rejection, size caps). Authorization is the canonical
+// authz module — `edit` covers the owner AND a shared-editor grant; a non-owner /
+// shared-viewer / stranger gets 404 (no existence oracle).
+
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const ALLOWED_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'image/svg+xml',
-])
-
-const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
-
-const EXT_MAP: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
-  'image/svg+xml': 'svg',
+const errStatus: Record<string, number> = {
+  empty: 400,
+  unsupported_type: 400,
+  content_mismatch: 400,
+  unsafe_svg: 400,
+  too_large: 413,
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const { id } = await ctx.params
-  const doc = await getDocument(id)
-  if (!doc || doc.ownerId !== user.id)
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  // `edit` = owner OR shared-editor grant; denied/missing → 404 (no existence leak).
+  const access = await authorizeDocRoute(user, id, 'edit')
+  if (!access.ok) return NextResponse.json({ error: 'not_found' }, { status: access.status })
 
   let form: FormData
   try {
@@ -50,21 +49,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ error: 'file field required' }, { status: 400 })
   }
 
-  const contentType = file.type
-  if (!ALLOWED_TYPES.has(contentType)) {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const result = classifyUpload({ name: file.name, type: file.type, size: file.size }, bytes)
+  if (!result.ok) {
     return NextResponse.json(
-      { error: 'unsupported_type', allowed: [...ALLOWED_TYPES] },
-      { status: 400 },
+      { error: result.error, allowed: ALLOWED_UPLOAD_TYPES },
+      { status: errStatus[result.error] ?? 400 },
     )
   }
 
-  const bytes = await file.arrayBuffer()
-  if (bytes.byteLength > MAX_BYTES) {
-    return NextResponse.json({ error: 'file_too_large', maxBytes: MAX_BYTES }, { status: 400 })
-  }
-
-  // I2: quota enforcement (§7v — use userRow, never shadow the `user` variable).
-  // Fetch the DB row to get quotaMb; 0 = unlimited.
+  // I2: per-user storage quota. 0 = unlimited.
   const [userRow] = await db
     .select({ quotaMb: schema.users.quotaMb })
     .from(schema.users)
@@ -72,31 +66,23 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     .limit(1)
 
   if (userRow && userRow.quotaMb > 0) {
-    // Measure all asset bytes for this user's docs.
     const docs = await listDocuments(user.id)
     const docIds = docs.map((d) => d.id)
-    const assetsRoot = join(env.filesRoot, '.assets')
+    const assetsRoot = `${env.filesRoot}/.assets`
     const usedBytes = await getUsedAssetBytes(docIds, assetsRoot)
-
     if (!checkQuota({ quotaMb: userRow.quotaMb, usedBytes, fileBytes: bytes.byteLength })) {
       return NextResponse.json(
-        {
-          error: 'quota_exceeded',
-          usedMb: usedBytes / (1024 * 1024),
-          quotaMb: userRow.quotaMb,
-        },
+        { error: 'quota_exceeded', usedMb: usedBytes / (1024 * 1024), quotaMb: userRow.quotaMb },
         { status: 413 },
       )
     }
   }
 
-  const ext = EXT_MAP[contentType] ?? (extname(file.name).replace(/^\./, '') || 'bin')
-  const filename = `${randomUUID()}.${ext}`
-  const dir = `${env.filesRoot}/.assets/${id}`
-  const filepath = `${dir}/${filename}`
+  const name = safeAssetName(file.name, result.ext)
+  await putAsset({ id }, name, bytes, result.contentType)
 
-  await mkdir(dir, { recursive: true })
-  await writeFile(filepath, Buffer.from(bytes))
-
-  return NextResponse.json({ url: `/api/docs/${id}/assets/${filename}` }, { status: 201 })
+  return NextResponse.json(
+    { url: `/api/docs/${id}/assets/${name}`, kind: result.kind },
+    { status: 201 },
+  )
 }

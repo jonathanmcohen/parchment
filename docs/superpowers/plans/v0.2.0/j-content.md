@@ -48,6 +48,19 @@
 ### J1-0 — Decision spike (write findings into this file, no code)
 - Resolve: (a) asset key layout — alongside the doc's `disk_path` (locked) vs the current flat `.assets/<id>/`; propose a `<docDir>/<docbase>.assets/` sibling folder so a moved/renamed doc relocates its assets via `syncDocToDisk`. Determine whether a `documents` schema column is needed to record the new layout (if yes, this column lands in migration **0027**). (b) S3 config: **mandate `BACKUP_S3_*` reuse** (canonical per §4 of the reconciliation — no new `ASSETS_S3_*` env set; use an `assets/`-prefixed key within the same bucket). (c) share-viewer asset auth: use `getDocAccess` from `@/lib/authz/doc-access` (canonical §1c) to check `canView` before serving — do NOT implement a bespoke share/token auth path here. **Output: a short ADR block appended below this task.** Blocks J1-1..J1-7.
 
+#### ADR J1-0 (decided)
+**Context.** Assets today live flat at `${filesRoot}/.assets/<docId>/<uuid>.<ext>`, keyed by the **stable doc id**, written by `POST /api/docs/[id]/assets` and read by `GET .../[file]`. The per-user quota measurer (`src/lib/quota.ts#getUsedAssetBytes`) walks exactly this layout. The disk-mirror (`syncDocToDisk`) relocates the `.md` on rename/move.
+
+**(a) Asset layout — KEEP `.assets/<docId>/`, identity-keyed (NOT a `<docbase>.assets/` sibling).** Rationale:
+1. **Stable identity beats co-location.** `.assets/<docId>/` survives every rename/move with zero relocation; the asset URL (`/api/docs/<id>/assets/<file>`) is already id-addressed, so a sibling folder buys nothing the URL doesn't already encode. A `<docbase>.assets/` sibling would force `syncDocToDisk` to move N asset files on every rename — adding fs work and a new failure window to the critical disk-sync path (which today is a single `writeFile`).
+2. **Don't pollute the user's mirror.** The disk mirror's whole point (the differentiator) is a clean, human-/git-friendly tree of `.md` files. Dropping opaque `<uuid>.png` siblings next to every doc degrades that. `.assets/` is a single dot-prefixed sidecar dir the user can ignore.
+3. **No schema column needed.** Because the layout is derived purely from the stable `docId` (no per-doc path to record), **migration 0027 carries ONLY `pats.scopes`** — no `documents` asset-layout column.
+4. The pure resolver (`asset-path.ts`) still takes the `doc` so the decision is centralized and a future move to co-location is a one-function change. Cleanup on permanent delete (J11-1) removes `.assets/<docId>/`.
+
+**(b) S3 — REUSE `BACKUP_S3_*` (no `ASSETS_S3_*`), `assets/<docId>/<file>` key prefix** within the same bucket; add a `getObject` sibling to `src/lib/backup/s3.ts`. Dispatch disk-vs-S3 on the shared `isS3Configured()`. Separate-bucket deployers remount different values at the same `BACKUP_S3_*` keys (documented in `docs/api.md`).
+
+**(c) Share-viewer asset auth — `getDocAccess({ user?, shareGrant? }, docId).canView`.** The GET route resolves an optional `?token`/`X-Share-Token` (+ `?password`) via `resolveShareGrant` (H's module, returns `{ role }`) and passes `shareGrant: { role }`; authenticated callers also pass `user`. Deny unless `canView`. NO bespoke token path. POST (upload) stays `authorizeDocRoute(user, id, 'edit')` (owner + shared-editor), no share-token writes.
+
 ### J1-1 — Upload validator module *(pure, TDD)* — NEW FILE
 - File: `src/lib/uploads/validate.ts`. Functions: `classifyUpload({name, type, size})` → `{ ok, kind:'image'|'file', ext, error? }`; `MAX_IMAGE_BYTES`, `MAX_FILE_BYTES`; allow-list for images (current set) + files (`application/pdf`, `text/plain`, `text/csv`, common office). **Magic-byte sniff** for images/pdf (do not trust `file.type` alone).
 - Test: `tests/unit/uploads-validate.test.ts` — rejects `image/svg+xml` with `<script>` payload (or strips/flags it), rejects oversize, rejects mismatched magic-bytes vs extension, accepts valid png/jpg/pdf, normalizes double extensions (`x.php.png`).

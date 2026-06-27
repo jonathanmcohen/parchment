@@ -23,6 +23,7 @@ The 9 group plans were authored in parallel and collided. This document is the *
 - The ONLY doc-authz authority. A builds it and MUST expose BOTH:
   - action gate: `authorizeDocRoute(user, docId, action) → {ok, status}` with `DocAction = 'view'|'comment'|'edit'|'manage'`.
   - capability set + share-grant union: `getDocAccess({user?, shareGrant?}, docId) → {canView, canComment, canEdit, canManage}` (folds in `document_permissions` + share-token grant + owner).
+  - **CANONICAL `ShareGrant` shape (locked — resolves 5th-pass R2):** `shareGrant?: { role: DocPermRole } | null` where `DocPermRole = 'viewer'|'commenter'|'editor'`. A's `getDocAccess` maps that `role` to capabilities via `PERM_ALLOWS` (A's existing impl — unchanged). H's `resolveShareGrant` MUST return `{ role }` (derive the role from the share row's permission level), and J's asset call passes `{ role }`. NO `{ share, capabilities }` shape anywhere — H/J conform to A's `{ role }`.
 - H MUST import these from `@/lib/authz/doc-access` and MUST NOT create `src/lib/docs/access.ts`. H's `getDocAccess` is deleted; the capability-set lives in A's module. A ships the capability-set surface up front so H can consume it. Freeze both signatures before A starts Task 6.
 
 ### 1d. Audit — `src/lib/audit/index.ts`, built in Phase 0 (merges A + G)
@@ -93,7 +94,7 @@ No plan runs `drizzle-kit generate` off a stale base; each hand-writes its assig
 
 ## 4. Env-var registry (C's `docker-compose.yml` + `.env.example` MUST document ALL of these)
 
-`DATABASE_URL`, `COLLAB_URL`/`COLLAB_PORT`, `PARCHMENT_FILES_ROOT`, `PARCHMENT_VERSION`, `PORT`, `SECURE_COOKIES`, `POSTGRES_USER/PASSWORD/DB` (compose db service) — **plus the new**: `PARCHMENT_SECRET_KEY` (REQUIRED for all encrypted config), `BACKUP_S3_ENDPOINT/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY` (optional, env-precedence over UI), `METRICS_TOKEN` (optional, gates `/metrics`), `LOG_LEVEL`/`LOG_FORMAT`, `PARCHMENT_DEFAULT_QUOTA_MB`, `PARCHMENT_LOCK_DIR`, `EMBEDDINGS_URL`/`EMBEDDINGS_API_KEY`/`EMBEDDINGS_MODEL` (optional, semantic search). BANNED: `APP_SECRET`, `SMTP_*`, `PARCHMENT_TELEMETRY` network ping, `BACKUP_VERIFY`. C owns updating compose + `.env.example`; the integrated build verifies every var here is present in both.
+`DATABASE_URL`, `COLLAB_URL`/`COLLAB_PORT`, `PARCHMENT_FILES_ROOT`, `PARCHMENT_VERSION`, `PORT`, `SECURE_COOKIES`, `POSTGRES_USER/PASSWORD/DB` (compose db service) — **plus the new**: `PARCHMENT_SECRET_KEY` (REQUIRED for all encrypted config), `PARCHMENT_PUBLIC_URL` (REQUIRED — external base URL for invite-accept links + OIDC `redirect_uri`; phase0 boot-fails if absent), `BACKUP_S3_ENDPOINT/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY` (optional, env-precedence over UI), `METRICS_TOKEN` (optional, gates `/metrics`), `LOG_LEVEL`/`LOG_FORMAT`, `PARCHMENT_DEFAULT_QUOTA_MB`, `PARCHMENT_LOCK_DIR`, `EMBEDDINGS_URL`/`EMBEDDINGS_API_KEY`/`EMBEDDINGS_MODEL` (optional, semantic search). BANNED: `APP_SECRET`, `SMTP_*`, `PARCHMENT_TELEMETRY` network ping, `BACKUP_VERIFY`. C owns updating compose + `.env.example`; the integrated build verifies every var here is present in both.
 
 ---
 
@@ -113,3 +114,41 @@ No plan runs `drizzle-kit generate` off a stale base; each hand-writes its assig
 
 ## 6. New foundation plan
 A new `phase0-foundation.md` plan implements 1a/1b/1d (secret-box, app_config 0020, unified audit 0021 + merged logAudit) as the first build phase. It is the prerequisite for B, G, backup-sync, A(audit), and H.
+
+---
+
+## 7. 4th-pass fixes (LOCKED — security + internal-soundness + accuracy)
+
+The 3-lens 4th pass found real defects. These are binding; affected plans must conform.
+
+**Foundation (Phase 0):**
+- 7a `PARCHMENT_PUBLIC_URL` is a NEW required env (base URL). Add to §4 registry + `src/lib/env.ts` (`publicUrl`). A's invite-accept links AND G's OIDC `redirect_uri` use it. (Was dangling in both.)
+- 7b Audit union must INCLUDE `'setup'` (existing raw call-site in `src/app/setup/actions.ts`; G converts it to typed `logAudit` → must be in the union or typecheck fails). Add to the legacy-verb line.
+- 7c Audit hash chain: compute `entry_hash` from the PERSISTED row's stored `created_at` (read-back or pass the DB value), NEVER `Date.now()` — else `verifyAuditChain` never re-verifies.
+
+**Bootstrap / roles:**
+- 7d The setup bootstrap OWNER stays `role:'owner'` (I only adds `quotaMb` there). The `editor` default applies ONLY to invited + OIDC-JIT users. I must NOT downgrade `setup/actions.ts`.
+
+**Security — IDOR & authz (NEW, binding):**
+- 7e Sub-resource routes (`/api/docs/[id]/comments/[commentId]`, `/versions/[versionId]`(+restore), `/assets/[file]`, threads, any `[childId]`) MUST verify `child.docId === [id]`. The repos (`comments-repo`, `versions-repo`) take + filter on `docId` (`and(eq(id), eq(docId))`). A's Task 6 + H's Task 9 both bind this.
+- 7f A's doc-route authz sweep (Task 6) is a CLOSED ENUMERATION of every `/api/docs/[id]/*` + `bulk` + `export/bulk` route with a per-route verdict, backed by a CI-enforced `tests/integration/authz-routes.test.ts` (non-owner-non-shared → 404 read+write; `viewer` can't mutate; CI fails if a new doc route lacks an entry). No "decide per feature" prose.
+- 7g `moveDocument(id, folderId)` (and any folderId-accepting write) verifies the target folder is owned by the same user.
+- 7h Collab server (`collab/server.ts`) MUST add `onAuthenticate` — reject unless a session/PAT/share-grant matches `documentName` with the needed capability (reject expired / view-only for edit). H Task 15 is promoted from "stretch/deferrable" to **REQUIRED**. Also bind the collab port to `127.0.0.1` and document "never publish it".
+- 7i PAT scopes (J8): canonical strings `docs:read`/`docs:write` (fix the `'read'` vs `'docs:read'` inconsistency); enforce over ALL mutating routes — `docs`, `folders`, `tags`, `smart-folders`, `templates`, `settings`, `webhooks`, `backup` — not just `/api/docs/*`. `/api/backup/export|restore` stay self-service but require `docs:read`/`docs:write` scope (a read-scoped PAT can't restore).
+- 7j OIDC JIT must respect `disabledAt` — a disabled user's email cannot re-activate via OIDC.
+
+**Single-owner collisions:**
+- 7k `/api/healthz`: C owns it (liveness, `{status:'ok'}`) + its test. I does NOT rewrite it; I adds `/api/readyz` for the deep readiness checks. One test owner.
+- 7l backup-verify dashboard: backup-sync owns BOTH the job AND the dashboard on `/settings/backup`. I builds NO verify block on `/settings/admin/backup` (which backup-sync turns into a redirect).
+- 7m `src/middleware.ts`: ONE owner = I (maintenance + metrics, no auth). No second writer.
+
+**Seams / correctness:**
+- 7n `inviteEmailPayload`: B re-exports it from `@/lib/email/send` with the OBJECT arg `{to, inviterName, workspaceName, acceptUrl}`; A calls it with that object (not positional).
+- 7o `migrate.sh`: EVERY `psql`/`pg_dump`/`createdb` uses `$POSTGRES_USER`/`$POSTGRES_DB` (incl. the schema-check + apply loop), never hardcoded `parchment`.
+- 7p C: resolve the PGDG keep-vs-remove contradiction (keep `postgresql-client-18`, remove the server + s6 service); the CI compose-lint job sets `POSTGRES_PASSWORD`.
+- 7q backup-sync: add explicit tasks for the NEW git helpers `gitDir()` + `ensureRepo()` (don't dangle). `parseWorkspaceBackup` ALREADY exists (`src/lib/backup/service.ts`) — import it.
+- 7r H: Task 7's return type is mapped to Task 8's `getDocAccess` param (one shape); the concurrency harness (Task 13) is sequenced BEFORE the tasks that use it.
+- 7s A: Task 14 Step 5 invariant test has REAL assertions (not comment-only); Task 11's `_user-row.tsx` + `_create-invite-forms.tsx` have actual code, not "similar to mfa-section". Test refs use `issuePat` (not `createPat`).
+- 7t G: remove the Task 5.1 remnant that re-adds verbs Phase 0 already has; flesh out the OIDC stub-provider test + state-race handling; `requireAdmin` already exists at `src/lib/auth/guard.ts` (G only adds the admin `layout.tsx`).
+- 7u D2 selective restore: ADD a real selective-restore task (pick docs/folders) to backup-sync.
+- 7v `/metrics`: default-deny when `METRICS_TOKEN` is empty (admin-session-only), never open. i-ops cleanups: no `const user` shadow; `pg_database_size(current_database())` not hardcoded `'parchment'`; drop the phantom `sendBootPing` removal note.

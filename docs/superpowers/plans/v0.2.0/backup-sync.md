@@ -2,6 +2,8 @@
 
 **Spec items:** F1 (S3 config UI), D1–D2 (instance-to-instance migrate), E1–E4 (git sync), I3 (backup verification).
 
+> **7l fix — ownership boundary:** backup-sync OWNS both the `backup-verify` scheduler job AND its dashboard surface on `/settings/backup`. The old `/settings/admin/backup` becomes a `redirect('/settings/backup')`. The I (ops) cluster does NOT build any verify block — it only reads the job state from backup-sync's job registration for its own admin overview. The verify-status block (I3-T5 below) is built HERE, not in I.
+
 **Locked decisions (do not revisit):**
 
 - Encrypted secrets: the `app_config` table (key/value, `value` is AES-256-GCM ciphertext) is created ONCE in migration **0020** by Phase 0 — backup-sync does NOT create this table or its migration. The master key is `PARCHMENT_SECRET_KEY` env (**base64-encoded 32 bytes**, required when any secret is stored). S3 creds, git token/SSH key, and migrate token all go here. The `settings` table stores non-secret config JSON by owner; `app_config` stores instance-level secrets (no ownerId).
@@ -14,9 +16,9 @@
 
 **Migration:** backup-sync has NO migration of its own — S3, git, and migrate config all live in the Phase-0 `app_config` table (migration 0020). Migration **0026** is reserved for backup-sync ONLY if a non-`app_config` table is later found necessary; as of this plan, it is not needed.
 
-**Build order:** Phase 0 (secret-box + app_config 0020) must land first → F1 (S3 UI) → D (migrate) → E (git sync) → I3 (backup verify) → nav wiring.
+**Build order:** Phase 0 (secret-box + app_config 0020) must land first → F1 (S3 UI) → D (migrate) → D2 (selective restore) → E (git sync) → I3 (backup verify) → nav wiring. D2 depends on D (shares the restore route + `service.ts`); E is independent of D2.
 
-**Task count: 30 tasks** (lettered F, D, E, I, N for nav — FOUND-T1 through FOUND-T4 removed; those belong to Phase 0).
+**Task count: 36 tasks** (lettered F, D, D2, E, I, N for nav — FOUND-T1 through FOUND-T4 removed; those belong to Phase 0; +6 D2 selective-restore tasks added per §7u).
 
 ---
 
@@ -361,6 +363,172 @@ No new test needed (covered by e2e or manual verify).
 
 ---
 
+## D2 — Selective restore
+
+> **7u fix — real selective-restore task.** `restoreWorkspaceBackup` currently restores the WHOLE workspace. This section adds a doc/folder picker that filters which documents are re-created, plus a dry-run mode that already exists in the migrate receive route. TDD throughout.
+
+### D2-T1 — Failing test: `restoreWorkspaceBackupSelective` (doc/folder filter)
+
+**File:** `tests/unit/selective-restore.test.ts`
+
+New function in `src/lib/backup/service.ts`:
+
+```ts
+export interface SelectiveRestoreFilter {
+  /** Include only docs whose disk_path matches one of these folder prefixes (e.g. 'work/', 'notes/').
+   *  Empty array = include all. */
+  folderPrefixes?: string[]
+  /** Include only these exact doc titles (case-sensitive). Empty = include all. */
+  docTitles?: string[]
+  /** If both folderPrefixes and docTitles are non-empty, a doc must match EITHER (union, not intersection). */
+}
+
+export interface SelectiveRestoreResult extends RestoreResult {
+  filtered: number   // entries present in the backup but excluded by the filter
+}
+
+export async function restoreWorkspaceBackupSelective(
+  ownerId: string,
+  bytes: Uint8Array,
+  filter: SelectiveRestoreFilter,
+): Promise<SelectiveRestoreResult>
+```
+
+Tests (mock `@/lib/backup/archive`, `@/lib/docs/repo`, `@/lib/docs/folders-repo`):
+
+- `filter = {}` (empty = no filter): behaves identically to `restoreWorkspaceBackup` — all entries restored, `filtered === 0`.
+- `filter = { docTitles: ['Note A'] }` with a backup containing Note A + Note B: only Note A is restored; Note B is skipped; `filtered === 1`, `created === 1`.
+- `filter = { folderPrefixes: ['work/'] }` with docs at `work/todo.md` and `personal/diary.md`: only `work/todo.md` entry is included; `filtered === 1`.
+- `filter = { folderPrefixes: ['work/'], docTitles: ['diary'] }` (union): both match; no entry is filtered.
+- `filter = { docTitles: ['Ghost'] }` where Ghost is not in the backup: `created === 0`, `filtered === (total entries)`, no throw.
+- A doc that already exists (matching title+owner) is skipped (`skipped` incremented), NOT filtered (`filtered` counts backup entries excluded before the restore attempt).
+
+Run: `pnpm test tests/unit/selective-restore.test.ts` — must fail.
+
+### D2-T2 — Implement: `restoreWorkspaceBackupSelective` in `src/lib/backup/service.ts`
+
+Import `parseWorkspaceBackup` from `./archive` (already exists — DO NOT recreate). Add the new export alongside the existing `restoreWorkspaceBackup`:
+
+```ts
+export async function restoreWorkspaceBackupSelective(
+  ownerId: string,
+  bytes: Uint8Array,
+  filter: SelectiveRestoreFilter,
+): Promise<SelectiveRestoreResult> {
+  const { entries, warnings } = await parseWorkspaceBackup(bytes)
+  const result: SelectiveRestoreResult = { created: 0, skipped: 0, warnings: [...warnings], filtered: 0 }
+  for (const entry of entries) {
+    if (!matchesFilter(entry, filter)) {
+      result.filtered++
+      continue
+    }
+    // same per-doc restore logic as restoreWorkspaceBackup
+    try {
+      const existing = await getDocument(ownerId, /* ... */)
+      if (existing) { result.skipped++; continue }
+      await createDocument(ownerId, entry)
+      result.created++
+    } catch (err) {
+      result.skipped++
+      result.warnings.push(`Failed to restore "${entry.title}": ${(err as Error).message}`)
+    }
+  }
+  return result
+}
+
+function matchesFilter(entry: ParsedBackupEntry, filter: SelectiveRestoreFilter): boolean {
+  const hasPrefixes = filter.folderPrefixes && filter.folderPrefixes.length > 0
+  const hasTitles = filter.docTitles && filter.docTitles.length > 0
+  if (!hasPrefixes && !hasTitles) return true  // empty filter = include all
+  const prefixMatch = hasPrefixes && filter.folderPrefixes!.some(p => entry.diskPath.startsWith(p))
+  const titleMatch = hasTitles && filter.docTitles!.includes(entry.title)
+  return prefixMatch || titleMatch  // union semantics
+}
+```
+
+Run: `pnpm test tests/unit/selective-restore.test.ts` — must now pass.
+
+### D2-T3 — Failing test: selective-restore dry-run route
+
+**File:** `tests/unit/selective-restore-dryrun.test.ts`
+
+`POST /api/settings/backup/restore/dry-run` with multipart body `{ zip: <file>, filter?: { folderPrefixes?, docTitles? } }`:
+
+- Admin-only (403 for non-admin).
+- Parses the backup zip via `parseWorkspaceBackup`.
+- Applies the filter (same `matchesFilter` logic) WITHOUT writing any docs.
+- Returns `{ dryRun: true, wouldCreate: number, wouldSkip: number, filtered: number, entries: Array<{ title, diskPath, included: boolean }> }`.
+- If no filter body: all entries included (same as a full restore dry-run).
+- If the zip is malformed: returns 400.
+- Max body size 100 MB; 413 if exceeded.
+
+Mock `@/lib/backup/service`, `@/lib/backup/archive`.
+
+Run: `pnpm test tests/unit/selective-restore-dryrun.test.ts` — must fail.
+
+### D2-T4 — Implement: `src/app/api/settings/backup/restore/dry-run/route.ts`
+
+```ts
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+export async function POST(req: NextRequest) { ... }
+```
+
+Logic:
+1. `requireAdmin`.
+2. Buffer body as `Uint8Array` (max 100 MB; 413 if exceeded).
+3. Parse `filter` from query params or JSON body (optional).
+4. `parseWorkspaceBackup(bytes)` — 400 if throws.
+5. Apply `matchesFilter` to each entry (extracted from `service.ts` into a shared helper — see D2-T2 note).
+6. Compare `included` entries against `listDocuments(adminUser.id)` to count `wouldSkip` vs `wouldCreate`.
+7. Return `{ dryRun: true, wouldCreate, wouldSkip, filtered, entries: [{title, diskPath, included}] }`.
+
+Run: `pnpm test tests/unit/selective-restore-dryrun.test.ts` — must pass. Run `pnpm typecheck`.
+
+### D2-T5 — Failing e2e DOM probe: selective-restore picker renders
+
+**File:** `tests/e2e/selective-restore.authed.spec.ts`
+
+```ts
+test('selective restore — picker shows entry list + filter works', async ({ page }) => {
+  await page.goto('/settings/backup')
+  // Upload a backup zip and open the selective restore picker
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Selective restore…' }).click(),
+  ])
+  // The picker modal is visible with a doc entry list
+  await expect(page.getByRole('dialog', { name: /selective restore/i })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Document' })).toBeVisible()
+  // A "Dry run" button is present
+  await expect(page.getByRole('button', { name: 'Dry run' })).toBeVisible()
+})
+```
+
+This requires the `SelectiveRestorePicker.tsx` component and `/settings/backup` page update to exist. Run — must fail (button not found).
+
+### D2-T6 — Implement: `SelectiveRestorePicker.tsx` client island + wire into `/settings/backup`
+
+New file `src/app/(app)/settings/backup/SelectiveRestorePicker.tsx`:
+
+- A "Selective restore…" button that opens a modal/dialog.
+- Inside the dialog:
+  - A file input (`accept=".zip"`) — on file select, POSTs to `/api/settings/backup/restore/dry-run` with the zip and any active filter.
+  - A list of backup entries (once dry-run returns) with checkboxes per entry. Checkboxes are ON by default (all included); unchecking an entry adds its title to a `docTitles` exclusion list that is inverted (filter = the CHECKED titles only).
+  - A filter bar: text input that filters the visible list (client-side substring match on title/diskPath).
+  - Shows `{ wouldCreate, wouldSkip, filtered }` counts from the dry-run response.
+  - "Restore selected" button → POSTs to `POST /api/settings/backup/s3/restore` (for S3-sourced backups) or `POST /api/settings/backup/restore` (for uploaded zip) with `{ filter: { docTitles: [...checkedTitles] } }`.
+  - "Cancel" closes without restoring.
+
+Update the existing `POST /api/settings/backup/s3/restore` route (F1-T8) to also accept an optional `filter` param and call `restoreWorkspaceBackupSelective` when present (and `restoreWorkspaceBackup` when absent — backwards compatible).
+
+Add `<SelectiveRestorePicker />` to the `/settings/backup` page server component's Download/Restore section, alongside the existing full-restore button.
+
+Run: `pnpm test tests/e2e/selective-restore.authed.spec.ts` — must now pass. Run `pnpm lint && pnpm typecheck`.
+
+---
+
 ## E — Git sync
 
 ### E-T1 — Failing test: `GitSyncConfig` parse + validate
@@ -399,6 +567,24 @@ Implement `parseGitSyncConfig` as described. Export the type and the defaults.
 
 Run: `pnpm test tests/unit/git-sync-config.test.ts` — must pass.
 
+### E-T2b — Verify: `gitDir()` and `ensureRepo()` are importable from `src/lib/git/repo.ts`
+
+> **7q fix — these helpers already exist. Do NOT create them.**
+
+`src/lib/git/repo.ts` already exports:
+- `gitDir(): string` — returns `process.env.PARCHMENT_FILES_ROOT` (or a default). Returns the absolute path to the files-root git repo. This is the dir all isomorphic-git calls should use.
+- `ensureRepo(): Promise<void>` — idempotent `git.init` + local identity config. Best-effort, never throws.
+
+The E-T3 / E-T4 `remote.ts` module and the E-T6 sync-job / scheduler wiring MUST import both from `@/lib/git/repo`:
+
+```ts
+import { gitDir, ensureRepo } from '@/lib/git/repo'
+```
+
+No task in backup-sync creates these helpers. If Phase 0 or an earlier cluster has altered `repo.ts` signatures, reconcile before starting E-T3. Run `pnpm typecheck` to confirm the import is clean.
+
+---
+
 ### E-T3 — Failing test: `pushToRemote` (the isomorphic-git push wrapper)
 
 **File:** `tests/unit/git-push.test.ts`
@@ -430,7 +616,7 @@ import git from 'isomorphic-git'
 import http from 'isomorphic-git/http/node'
 import fs from 'node:fs'
 import type { GitSyncConfig } from './sync-config'
-import { gitDir } from './repo'
+import { gitDir } from '@/lib/git/repo'   // already exists — DO NOT recreate
 
 export async function pushToRemote(config: GitSyncConfig): Promise<PushResult> {
   if (!config.enabled) return { ok: false, error: 'not_configured', message: 'git sync is disabled' }
@@ -510,7 +696,7 @@ Run: `pnpm test tests/unit/git-sync-job.test.ts` — must pass. Run `pnpm typech
 
 `POST /api/settings/git-sync/init`:
 - Admin-only.
-- Calls `ensureRepo()` (idempotent) then `pushToRemote(config)` (first-push).
+- Calls `ensureRepo()` (imported from `@/lib/git/repo` — already exists, idempotent) then `pushToRemote(config)` (first-push).
 - Returns `{ ok: true, oid? }` or error.
 
 Run: `pnpm test tests/unit/git-sync-api.test.ts` — must fail.
@@ -572,12 +758,14 @@ Run: `pnpm test tests/unit/backup-verify-job.test.ts` — must fail.
 
 ### I3-T2 — Implement: `src/lib/backup/verify-job.ts`
 
+> **7q fix — `parseWorkspaceBackup` already exists at `src/lib/backup/archive.ts` (also re-exported via `src/lib/backup/service.ts`). Import it; do NOT recreate.**
+
 ```ts
 import 'server-only'
 import { db, schema } from '@/db'
 import { setAppConfigJson } from '@/lib/config/repo'
 import { createWorkspaceBackup } from './service'
-import { parseWorkspaceBackup } from './archive'
+import { parseWorkspaceBackup } from './archive'  // already exists — DO NOT recreate
 
 export async function backupVerifyJob(): Promise<void> {
   const [firstUser] = await db.select({ id: schema.users.id }).from(schema.users).limit(1)
@@ -621,6 +809,8 @@ this.core.register({
 Run: `pnpm test tests/unit/backup-verify-scheduler.test.ts` — must pass.
 
 ### I3-T5 — Implement: `GET /api/settings/backup/verify-status` + UI section
+
+> **7l fix — backup-sync owns this surface.** The verify-status block on `/settings/backup` is built HERE. I (ops) does NOT build a verify block anywhere. `/settings/admin/backup` is already a redirect to `/settings/backup` (see N-T1). I's admin overview page may link to `/settings/backup` but builds no verify block of its own.
 
 Route `src/app/api/settings/backup/verify-status/route.ts`:
 - Admin-only.
@@ -700,7 +890,13 @@ The following must be true before any PR is merged:
 | Scheduler live re-register | `tests/unit/scheduler-reconfig.test.ts` — add/remove s3-backup without restart |
 | Migrate token forged-token rejected | `tests/unit/migrate-receive-api.test.ts` — wrong token → 403 |
 | Git non-fast-forward surfaced | `tests/unit/git-push.test.ts` — PushRejectedError → non_fast_forward result; NOT a silent no-op |
+| gitDir/ensureRepo not re-created | `pnpm typecheck` — `@/lib/git/repo` import resolves cleanly; no duplicate definition |
+| parseWorkspaceBackup not re-created | `pnpm typecheck` — `@/lib/backup/archive` import resolves; no duplicate export |
 | Backup verify detects corrupt | `tests/unit/backup-verify-job.test.ts` — parseWorkspaceBackup throw → job throws + records error |
+| Backup verify owns dashboard | `/settings/backup` page includes "Backup health" section; `/settings/admin/backup` redirects |
+| Selective restore filter logic | `tests/unit/selective-restore.test.ts` — empty filter = full restore; title/prefix filter; union semantics |
+| Selective restore dry-run route | `tests/unit/selective-restore-dryrun.test.ts` — returns wouldCreate/filtered without writing |
+| Selective restore picker DOM probe | `tests/e2e/selective-restore.authed.spec.ts` — picker dialog renders + dry-run button present |
 | S3 config form DOM probe | `tests/e2e/backup-s3-config.authed.spec.ts` — form renders, save masks key |
 | Full test suite | `pnpm test` (lint + typecheck + unit + integration + e2e-a11y) green |
 

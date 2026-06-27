@@ -65,7 +65,7 @@
 - Test: route-level vitest (mirror existing route tests) — 401 unauth, 404 not-owner, 400 bad type, 413 oversize, 201 success returns a URL under `/api/docs/<id>/assets/`.
 
 ### J1-5 — Rewire GET `/api/docs/[id]/assets/[file]` + share-viewer access — EDIT
-- File: `src/app/api/docs/[id]/assets/[file]/route.ts`. Serve via J1-3; **add share-viewer read path** using `getDocAccess({user?, shareGrant?}, docId)` from `@/lib/authz/doc-access` (canonical §1c — do NOT reuse a private `share/[token]` helper here). Pass `shareGrant` if a share token is present in the request, `user` if authenticated. Deny if `!canView`. Keep the path-traversal guard (already present) and add content-type from the validator map. Set `Content-Disposition: inline` for images, `attachment` for files.
+- File: `src/app/api/docs/[id]/assets/[file]/route.ts`. Serve via J1-3; **add share-viewer read path** using `getDocAccess({ user?, shareGrant? }, docId)` from `@/lib/authz/doc-access` (canonical §1c — do NOT reuse a private `share/[token]` helper here). If a share token is present in the request, call `resolveShareGrant(token, password)` from `@/lib/docs/share-grant` (H's module — returns `{ role: DocPermRole } | null`) and pass the result as `shareGrant: { role }`; pass `user` if authenticated. The call is `getDocAccess({ shareGrant: { role } }, docId)` — `{ role: DocPermRole }`, NOT `{ share, capabilities }`. Deny if `!canView`. Keep the path-traversal guard (already present) and add content-type from the validator map. Set `Content-Disposition: inline` for images, `attachment` for files.
 - Test: traversal still blocked; owner GET 200; share-token GET 200; random token 404.
 
 ### J1-6 — Editor + dialogs accept files — EDIT
@@ -182,19 +182,52 @@
 
 ### J8-1 — Add `scopes` to the PAT model — MIGRATION + EDIT
 - Files: `src/db/schema.ts` (`pats.scopes text[] notnull default '{}'` or a `scope text` enum-ish), hand-written migration **0027** (J's allocated number per the integrated journal — hand-write it, do NOT run `drizzle-kit generate` off a stale base). `pat.ts` `issuePat(ownerId, name, scopes)` persists+returns scopes; `verifyPat` returns `{user, scopes}` (change the return type — update `guard.ts` callers). If J1-0's spike concludes a `documents` asset-layout column is also needed, it shares this same migration file.
-- Test: `tests/unit/pat-scopes.test.ts` — issue with `['read']`; verify returns those scopes; default empty.
+- **Canonical scope strings are `docs:read` and `docs:write` — bare `'read'` / `'write'` are BANNED.** The array stored in `pats.scopes` and returned by `verifyPat` uses only these namespaced strings.
+- Test: `tests/unit/pat-scopes.test.ts` — issue with `['docs:read']`; verify returns `['docs:read']`; default empty; issuing with bare `'read'` is rejected (type error or runtime validation).
 
 ### J8-2 — Scope matcher + guard enforcement *(pure, TDD)* — NEW + EDIT
-- Files: `src/lib/auth/scopes.ts` (`hasScope(granted, required)`, scope hierarchy: `write` implies `read`; resource scopes like `docs:read`/`docs:write` — **decide the scope taxonomy in J8-0 spike**). `guard.ts` gains `authenticateRequest(req, {require?: Scope})` returning null/403 when a Bearer token lacks the scope (cookie sessions are full-access — unchanged).
-- Test: read token + write route → denied; write token + read route → allowed (implication); cookie session → allowed; missing scope on Bearer → 403, not 404 (this is authz of a known principal, distinct from IDOR).
+- Files: `src/lib/auth/scopes.ts` (`hasScope(granted: string[], required: string): boolean`, scope hierarchy: `docs:write` implies `docs:read`; canonical scope taxonomy = **`docs:read`** (read-only access to all doc-surface routes) and **`docs:write`** (read + all mutations) — these are the ONLY two scopes in v0.2.0; no bare `'read'`/`'write'` strings anywhere in this module). `guard.ts` gains `authenticateRequest(req, {require?: Scope})` returning null/403 when a Bearer token lacks the scope (cookie sessions are full-access — unchanged).
+- Test: `docs:read` token + write route → 403; `docs:write` token + read route → allowed (implication: `docs:write` satisfies `docs:read`); cookie session → allowed regardless of scope; missing scope on Bearer → 403, not 404 (this is authz of a known principal, distinct from IDOR).
 
 ### J8-3 — Apply scope requirements to the REST surface — EDIT
-- Files: mutating routes under `src/app/api/docs/*` (`route.ts` POST/PUT/PATCH/DELETE, `rename`,`move`,`trash`,`restore`,`star`,`bulk`,`tags`,`import`,`assets` POST) require `docs:write`; GET/list/search/export require `docs:read`. PAT-management routes stay session-only (already enforced in `pat/route.ts#requireSessionUser`).
-- Test: a `read`-scoped token gets 200 on GET `/api/docs`, 403 on POST `/api/docs`, 403 on bulk-trash. (THE bar: "a read token can't write.")
+
+**Exhaustive mutating-route enforcement (binding — not just `/api/docs/*`):**
+
+All routes below require `docs:write` for any state-mutating method (POST/PUT/PATCH/DELETE). GET/list routes on the same prefixes require `docs:read`. Cookie sessions bypass scope checks (full-access, unchanged).
+
+| Route prefix | Mutating methods requiring `docs:write` |
+|---|---|
+| `/api/docs` | POST (create), and all nested `[id]/*` mutations: PUT/PATCH body, DELETE, POST rename/move/trash/restore/star/bulk/tags/import/assets |
+| `/api/folders` | POST (create), PUT/PATCH (rename/move), DELETE |
+| `/api/tags` | POST (create), PATCH `[id]` (rename/recolor), DELETE `[id]` |
+| `/api/smart-folders` | POST (create), PUT/PATCH `[id]`, DELETE `[id]` |
+| `/api/templates` | POST (create user template), DELETE `[id]` |
+| `/api/settings/*` | ALL PUT/PATCH (profile, workspace, styles, trash-retention, etc.) |
+| `/api/webhooks` | POST (create), PUT/PATCH `[id]`, DELETE `[id]` |
+| `/api/backup/restore` | POST — requires `docs:write` (a `docs:read` PAT CANNOT restore) |
+| `/api/backup/export` | GET/POST — requires `docs:read` (self-service, read-only export) |
+
+Notes:
+- PAT-management routes (`/api/auth/pat`) stay session-only (already enforced via `requireSessionUser` — no change).
+- `/api/search`, `/api/graph`, `/api/docs/[id]/backlinks` are read-only → require `docs:read`.
+- `/api/backup/export|restore` are **self-service** (no admin scope required) but they are NOT scope-free: export requires `docs:read`, restore requires `docs:write`. A `docs:read` PAT cannot restore.
+
+**Test:** `tests/unit/pat-scopes.test.ts` (or a dedicated `tests/unit/pat-scope-enforcement.test.ts`) must include:
+- `docs:read`-scoped PAT → **200** on `GET /api/docs`
+- `docs:read`-scoped PAT → **403** on `POST /api/docs`
+- `docs:read`-scoped PAT → **403** on bulk-trash (`POST /api/docs/bulk`)
+- `docs:read`-scoped PAT → **403** on `POST /api/folders`
+- `docs:read`-scoped PAT → **403** on `POST /api/tags`
+- `docs:read`-scoped PAT → **403** on `POST /api/backup/restore`
+- `docs:read`-scoped PAT → **403** on `PUT /api/settings/profile`
+- `docs:write`-scoped PAT → **allowed** on all of the above (implication via `hasScope`)
+- Cookie session → **allowed** on all routes regardless of scope
+
+(THE bar: "a `docs:read` token can't write — anywhere on the API surface, not just `/api/docs`.")
 
 ### J8-4 — Scope selection in PAT UI — EDIT
-- Files: `src/components/settings/PATManager.tsx` + `settings/developer/page.tsx`. Checkboxes for scopes on create; show granted scopes in the list.
-- Browser probe: create a read-only token; assert the list row shows `read`; (with that token via `fetch` in `preview_eval`) assert a write call returns 403.
+- Files: `src/components/settings/PATManager.tsx` + `settings/developer/page.tsx`. Checkboxes for `docs:read` / `docs:write` scopes on create; show granted scopes in the list using the canonical namespaced strings.
+- Browser probe: create a `docs:read`-only token; assert the list row shows `docs:read`; (with that token via `fetch` in `preview_eval`) assert a write call (e.g. `POST /api/folders`) returns 403.
 
 ### J8-5 — REST API reference doc — NEW DOC
 - File: `docs/api.md` (and link from `settings/developer`). Enumerate stable endpoints, auth header, scopes, request/response shapes, rate-limit notes. (Markdown only; no code.)
@@ -290,7 +323,7 @@
 4. **The four bar-setting assertions explicitly demonstrated by a test:**
    - md→import→md round-trips (J7-2); docx imports with documented fidelity (J7-3).
    - upload path-traversal blocked + size limits enforced (J1-2, J1-4, J1-7).
-   - a read-scoped token CANNOT write (J8-3 test).
+   - a `docs:read`-scoped PAT CANNOT write — tested against `POST /api/folders`, `POST /api/tags`, `POST /api/backup/restore`, `PUT /api/settings/profile`, and `POST /api/docs` (J8-3 tests). No bare `'read'`/`'write'` scope strings anywhere in the implementation (J8-1/J8-2).
    - search ranking is deterministic (J4-3, J6-2).
 5. **Browser DOM probes** (local dev server, `preview_eval`/`preview_inspect` — NOT screenshots) recorded for every UI task: J1-6, J2-3, J3-1/2, J4-1, J5-1/3, J6-3, J7-5, J8-4, J10-3, J11-2/3, J12-2/4.
 6. **No placeholders:** grep the diff for `TODO`/`FIXME`/`throw new Error('not implemented')` — none in shipped code.

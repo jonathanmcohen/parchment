@@ -1,10 +1,10 @@
 # Group I — Ops / Self-hosted
 ## v0.2.0 implementation plan
 
-**Spec items:** I1 health/ready/metrics, I2 quota + usage dashboard, I3 backup-verify (dashboard surface only — schedule is owned by backup-sync), I4 setup wizard, I5 upgrade tooling (reference only — migration owned by Group C), I6 maintenance/read-only mode, I7 structured logging + log levels, I8 CI container scan, I9 GDPR data export.
+**Spec items:** I1 health/ready/metrics (I adds `/readyz`+`/metrics`; `/healthz` is C's), I2 quota + usage dashboard, I3 backup-verify (cross-reference only — job + dashboard both owned by backup-sync per §7l), I4 setup wizard, I5 upgrade tooling (reference only — migration owned by Group C), I6 maintenance/read-only mode, I7 structured logging + log levels, I8 CI container scan, I9 GDPR data export.
 
 **Current state (read from code):**
-- `/api/health` exists (returns `{ ok, pills }` via `probeAll()`). No `/healthz`, `/readyz`, or `/metrics` routes yet.
+- `/api/health` exists (returns `{ ok, pills }` via `probeAll()`). No `/readyz` or `/metrics` routes yet. `/healthz` is C's liveness route (§7k) — I does NOT create it.
 - `src/lib/health/probes.ts` has `probeDatabase`, `probeCollab`, `probeDisk`, `probeSearchIndex`, `probeOllama`, `probeS3`.
 - Scheduler (`src/lib/schedules/`) is pure + singleton; three default jobs (trash-purge, db-heartbeat, s3-backup-if-configured). Started from `instrumentation.ts`.
 - `/setup` route creates the owner account; it has no DB-connectivity test or SMTP/S3 opt-in steps.
@@ -20,9 +20,9 @@
 
 ## Locked decisions
 
-- **I1**: `/healthz` = liveness (always 200 unless the process is dead); `/readyz` = readiness (DB connectivity required, collab optional); `/metrics` = Prometheus text format (counters only — no histograms in v0.2.0). Compose `healthcheck` uses `/healthz`. These alias/extend existing `probeAll()` — no new probe logic.
+- **I1**: `/healthz` is owned by C (liveness `{status:'ok'}`, compose healthcheck). I adds `/readyz` = readiness (DB connectivity required, collab advisory) and `/metrics` = Prometheus text format (counters only — no histograms in v0.2.0). `/metrics` is default-deny: empty `METRICS_TOKEN` = admin-session-only, never open (§7v). I's `/readyz` and `/metrics` alias/extend existing `probeAll()` — no new probe logic.
 - **I2**: Quota is enforced per user. Default = 0 (unlimited). Set via admin UI or env var `PARCHMENT_DEFAULT_QUOTA_MB`. Quota is checked at asset-upload (the only per-user binary write path today). Dashboard shows: per-user doc count + doc-content size (from DB), asset disk usage (from filesystem), DB total size.
-- **I3**: Backup-verify (scheduled restore-test) job is registered and owned by backup-sync (on by default). I adds ONLY the dashboard surface on the existing backup admin page that reads the job's state from `scheduler.getState()`. I does NOT register the job or gate it behind `BACKUP_VERIFY` env var.
+- **I3**: Backup-verify job AND dashboard are both owned by backup-sync. I adds nothing to `/settings/admin/backup` or `/settings/backup` (§7l). I does NOT register the job or build any dashboard block — I is a cross-reference only for this item.
 - **I4**: Extend `/setup` with two optional extra steps after account creation: (a) DB connectivity test (already passes at this point, but shown explicitly) and (b) SMTP status check (via `isSmtpConfigured()` from B — DB-backed, no SMTP env vars) and S3 env-var checklist.
 - **I5**: Upgrade/migration tooling is cross-referenced from Group C (migrate.sh + Drizzle migrations). This group adds only a `/settings/admin/migrations` info page listing which migrations have run.
 - **I6**: Maintenance mode = a global flag stored in `settings` table under `ownerId = SYSTEM_OWNER` key `'maintenance'`. Reads are always allowed. All non-GET API routes (and Server Actions that mutate) return 503 with `{ error: 'maintenance' }` when the flag is true. A banner is injected via the root layout.
@@ -36,10 +36,10 @@
 
 ```
 I7 (logger) → I1/I2/I3/I4/I6 (log calls)
-I1 (healthz/readyz) → compose healthcheck [sequenced after C]
+I1 (readyz/metrics; healthz is C's) → compose healthcheck [sequenced after C]
 I6 (maintenance middleware) → I4 (setup must bypass it)
 I2 (quota schema 0024) → I2 (dashboard) → I2 (asset enforce)
-backup-sync (backup-verify job, on by default) → I3 (dashboard surface reads job state)
+backup-sync (backup-verify job + dashboard, on by default) → I3 is cross-reference only (no I tasks)
 I8 (release.yml scan job) ← I1 (image must be published first)
 I9 (export route) ← existing backup service (reuse)
 ```
@@ -106,12 +106,13 @@ logFormat: process.env.LOG_FORMAT === 'json' ? 'json' : 'text',
 
 ## I1 — Health / ready / metrics endpoints + compose healthchecks
 
-### I1-T1 — Failing tests: `/healthz`, `/readyz`, `/metrics` route contracts
+### I1-T1 — Failing tests: `/readyz`, `/metrics` route contracts
+
+> **Reconciliation note (§7k):** `/api/healthz` is owned by C (liveness `{status:'ok'}` + its test). I does NOT rewrite `/api/healthz` or its test. I adds only `/api/readyz` and `/api/metrics` tests here.
 
 **File:** `src/app/api/__tests__/health-routes.test.ts` (new, Vitest + msw or direct unit)
 
 ```
-- GET /api/healthz always returns 200 { ok: true } (liveness — never hits DB)
 - GET /api/readyz returns 200 when probeDatabase succeeds; 503 when it fails
 - GET /api/readyz body contains { ok, checks: { db: 'up'|'down' } }
 - GET /api/metrics returns 200 with Content-Type 'text/plain; version=0.0.4'
@@ -120,18 +121,7 @@ logFormat: process.env.LOG_FORMAT === 'json' ? 'json' : 'text',
 - GET /api/metrics body contains 'parchment_scheduler_job_count{job="..."}'
 ```
 
-### I1-T2 — `src/app/api/healthz/route.ts` (liveness)
-
-```typescript
-// Liveness: the process is alive. Never checks DB or disk.
-// Docker/Kubernetes healthcheck uses this — a DB blip must not restart the container.
-export const dynamic = 'force-dynamic'
-export async function GET() {
-  return Response.json({ ok: true })
-}
-```
-
-### I1-T3 — `src/app/api/readyz/route.ts` (readiness)
+### I1-T2 — `src/app/api/readyz/route.ts` (readiness)
 
 ```typescript
 // Readiness: the app can serve traffic. Requires DB connectivity.
@@ -167,9 +157,12 @@ Store on `globalThis` for HMR safety (same pattern as the scheduler singleton).
 
 ### I1-T5 — `src/app/api/metrics/route.ts` (Prometheus scrape endpoint)
 
+> **Reconciliation note (§7v):** `/metrics` is default-deny when `METRICS_TOKEN` is empty. An empty token NEVER opens the endpoint publicly — fallback is admin-session-only. `isMetricsAuthorized` must check: (1) Bearer token matches `METRICS_TOKEN` AND `METRICS_TOKEN` is non-empty, OR (2) caller has an active admin session.
+
 ```typescript
-// Auth: requires admin session OR a Bearer token matching METRICS_TOKEN env var.
-// METRICS_TOKEN allows Prometheus to scrape without a user session.
+// Auth: requires a non-empty Bearer token matching METRICS_TOKEN env var,
+//       OR an active admin session. When METRICS_TOKEN is empty or unset,
+//       only admin sessions are accepted — the endpoint is NEVER open.
 // Returns text/plain Prometheus exposition format.
 export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
@@ -178,9 +171,16 @@ export async function GET(req: NextRequest) {
     headers: { 'Content-Type': 'text/plain; version=0.0.4' },
   })
 }
+
+// isMetricsAuthorized logic:
+// const token = env.metricsToken   // process.env.METRICS_TOKEN
+// const bearer = req.headers.get('Authorization')?.replace('Bearer ', '')
+// if (token && bearer === token) return true   // non-empty token + match
+// const session = await getAdminSession(req)   // A's requireAdmin equivalent
+// return !!session
 ```
 
-**File to modify:** `src/lib/env.ts` — add `metricsToken: process.env.METRICS_TOKEN`.
+**File to modify:** `src/lib/env.ts` — add `metricsToken: process.env.METRICS_TOKEN ?? ''`. An empty string means "no token configured" and triggers admin-session-only mode.
 
 ### I1-T6 — Compose healthchecks
 
@@ -261,13 +261,15 @@ export function formatBytes(bytes: number): string
 
 Before writing the file, after `bytes.byteLength > MAX_BYTES` check:
 
+> **Reconciliation note (§7v):** Do NOT shadow the `user` variable already in scope. Use a distinct name for the DB-fetched row.
+
 ```typescript
-const user = await db.select().from(schema.users).where(eq(schema.users.id, user.id)).limit(1)
-if (user.quotaMb > 0) {
+const [userRow] = await db.select().from(schema.users).where(eq(schema.users.id, user.id)).limit(1)
+if (userRow && userRow.quotaMb > 0) {
   const usedBytes = await getUsedAssetBytes(user.id)
-  if (usedBytes + bytes.byteLength > user.quotaMb * 1024 * 1024) {
+  if (usedBytes + bytes.byteLength > userRow.quotaMb * 1024 * 1024) {
     return NextResponse.json(
-      { error: 'quota_exceeded', usedMb: usedBytes / 1024 / 1024, quotaMb: user.quotaMb },
+      { error: 'quota_exceeded', usedMb: usedBytes / 1024 / 1024, quotaMb: userRow.quotaMb },
       { status: 413 },
     )
   }
@@ -280,12 +282,14 @@ if (user.quotaMb > 0) {
 defaultQuotaMb: Number(process.env.PARCHMENT_DEFAULT_QUOTA_MB ?? '0'),
 ```
 
-Apply the default when creating users (in `setup/actions.ts` and any future user-create path):
+Apply the default when creating users (in invited/OIDC user-create paths only):
 
 ```typescript
 quotaMb: env.defaultQuotaMb,
 role: 'editor', // §1i: canonical default role is 'editor'; 'member' is banned
 ```
+
+> **Reconciliation note (§7d):** The bootstrap owner in `setup/actions.ts` stays `role:'owner'`. Only add `quotaMb: env.defaultQuotaMb` there. Do NOT change the role for the owner — the `editor` default applies ONLY to invited users and OIDC JIT-provisioned users.
 
 ### I2-T7 — Failing tests: admin usage dashboard data query
 
@@ -308,9 +312,11 @@ Tests (unit, mock DB):
 - Returns one UsageSummary per user
 - docCount is correct count of non-trashed docs for that user
 - contentSizeBytes is pg_column_size sum of documents.content for that user
-- dbSizeBytes comes from pg_database_size('parchment')
+- dbSizeBytes comes from pg_database_size(current_database()) — NOT hardcoded 'parchment'
 - totalAssetBytes is sum of assetSizeBytes across all users
 ```
+
+> **Reconciliation note (§7v):** Use `pg_database_size(current_database())` so the query works regardless of what the database is named — do NOT hardcode the string `'parchment'`.
 
 ### I2-T8 — `src/app/(app)/settings/admin/usage/page.tsx` (new)
 
@@ -329,20 +335,11 @@ Add a new `<li>` under the Observability section linking to `/settings/admin/usa
 
 ---
 
-## I3 — Backup verification (dashboard surface only)
+## I3 — Backup verification (cross-reference only)
 
-> **Reconciliation note (§1g):** The `backup-verify` scheduler job is registered and owned by **backup-sync** (on by default, no `BACKUP_VERIFY` env gate). I does NOT register the job, does NOT create `src/lib/backup/verify.ts`, and does NOT add `BACKUP_VERIFY` to env vars (it is banned — §4 env registry). I adds ONLY the admin dashboard surface that reads the job's live state from `scheduler.getState()`.
+> **Reconciliation note (§7l):** backup-sync owns BOTH the `backup-verify` scheduler job AND the dashboard on `/settings/backup` (the old `/settings/admin/backup` becomes a redirect that backup-sync owns). I builds NOTHING on `/settings/admin/backup` or `/settings/backup` — that page and its verify block are entirely backup-sync's responsibility. I does not register the job, does not create `src/lib/backup/verify.ts`, and does not add `BACKUP_VERIFY` to env vars (banned — §4). I has no tasks in I3.
 
-### I3-T1 — Surface backup-verify job on existing `/settings/admin/backup` page
-
-The `BackupPage` server component already renders s3-backup job state. Add an analogous read-only block for the `backup-verify` job:
-- Read the job entry from `scheduler.getState()` by name `'backup-verify'`.
-- Show: status (idle / running / error), lastRun timestamp, nextRun timestamp, runCount.
-- If the job is not in state (backup-sync not yet deployed), show a "not configured" placeholder.
-
-No write operations — this page is purely informational for ops monitoring.
-
-**Verification:** With backup-sync's job registered, `scheduler.getState()` includes `'backup-verify'`. The DOM on `/settings/admin/backup` has a `data-testid="backup-verify-status"` element showing the job's last run status.
+This item is a cross-reference only. See the backup-sync plan for the `backup-verify` job registration and the `/settings/backup` dashboard implementation.
 
 ---
 
@@ -369,12 +366,15 @@ No write operations — this page is purely informational for ops monitoring.
 
 Change the final `redirect('/')` to `redirect('/setup/config')` so the wizard continues after account creation.
 
-Also apply the default quota when creating the owner:
+Also apply the default quota when creating the owner — but keep `role:'owner'`:
 
 ```typescript
 quotaMb: env.defaultQuotaMb,
-role: 'editor', // canonical role per reconciliation §1i
+// role stays 'owner' — the bootstrap owner must NOT be downgraded (§7d)
+// role: 'editor' applies ONLY to invited / OIDC-JIT users, never to setup/actions.ts
 ```
+
+> **Reconciliation note (§7d):** I MUST NOT change `role:'owner'` to `role:'editor'` in `setup/actions.ts`. Only `quotaMb: env.defaultQuotaMb` is added. The `editor` default is for invited and OIDC-JIT users only.
 
 ### I4-T3 — `src/app/setup/config/page.tsx` (new)
 
@@ -656,14 +656,14 @@ The setup wizard references S3 env vars only. Ensure they are accessible from a 
 | Item | Automated test | Browser / curl check |
 |------|---------------|----------------------|
 | I7 logger | I7-T1 unit tests (LOG_LEVEL, LOG_FORMAT) | `LOG_FORMAT=json node -e "require('./src/lib/log').makeLogger('x').info('hi')"` emits JSON |
-| I1 /healthz | I1-T1 route unit tests | `curl -f http://localhost:3000/api/healthz` → `{"ok":true}` |
-| I1 /readyz | I1-T1 | `curl http://localhost:3000/api/readyz` → 200 `{"ok":true,"checks":{"db":"up","collab":"up"}}` |
-| I1 /metrics | I1-T1 | `curl -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:3000/api/metrics` → `parchment_up 1` |
+| I1 /healthz | C's test (§7k — not owned by I) | `curl -f http://localhost:3000/api/healthz` → `{"status":"ok"}` (C's route) |
+| I1 /readyz | I1-T1 route unit tests | `curl http://localhost:3000/api/readyz` → 200 `{"ok":true,"checks":{"db":"up","collab":"up"}}` |
+| I1 /metrics | I1-T1 | `curl -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:3000/api/metrics` → `parchment_up 1`; `curl http://localhost:3000/api/metrics` (no token, no session) → 403 |
 | I1 compose | (manual smoke — after C) | `docker inspect --format='{{.State.Health.Status}}' parchment-app` → `healthy` |
 | I2 quota schema | I2-T1 integration (migration 0024) | `psql -c '\d users'` shows `quota_mb` column |
 | I2 quota enforce | I2-T3 unit tests | POST /api/docs/[id]/assets with over-quota user → 413 `quota_exceeded` |
 | I2 usage dashboard | I2-T7 unit tests | DOM: `[data-testid="usage-table"]` shows rows per user |
-| I3 dashboard surface | (manual — requires backup-sync deployed) | DOM: `[data-testid="backup-verify-status"]` visible on backup page; reads job state from scheduler |
+| I3 | (cross-reference — no I tasks; see backup-sync plan) | backup-sync's `/settings/backup` page shows verify job state |
 | I4 wizard config step | I4-T1 tests | Browser: after setup, lands on `/setup/config`, DB pill "connected", SMTP via isSmtpConfigured() |
 | I4 SMTP check | I4-T1 (mock isSmtpConfigured) | SMTP section shows "configured"/"not configured" (no SMTP_* env vars referenced) |
 | I6 maintenance block | I6-T2 tests | POST /api/docs with lock file → 503; GET /api/docs → 200; middleware has no auth logic |
@@ -684,9 +684,8 @@ The setup wizard references S3 env vars only. Ensure they are accessible from a 
 | `src/lib/quota.ts` | Asset storage measurement (I2) |
 | `src/lib/admin/usage.ts` | Workspace usage query (I2) |
 | `src/lib/export/gdpr.ts` | GDPR export builder (I9) |
-| `src/app/api/healthz/route.ts` | Liveness probe (I1) |
-| `src/app/api/readyz/route.ts` | Readiness probe (I1) |
-| `src/app/api/metrics/route.ts` | Prometheus scrape (I1) |
+| `src/app/api/readyz/route.ts` | Readiness probe (I1) — deep DB-ready/memory/build checks |
+| `src/app/api/metrics/route.ts` | Prometheus scrape (I1) — default-deny when `METRICS_TOKEN` empty |
 | `src/app/api/user/export/route.ts` | GDPR data export (I9) |
 | `src/app/setup/config/page.tsx` | Post-setup config wizard (I4) |
 | `src/app/(app)/settings/admin/usage/page.tsx` | Usage dashboard (I2) |
@@ -694,11 +693,13 @@ The setup wizard references S3 env vars only. Ensure they are accessible from a 
 | `src/app/(app)/settings/admin/maintenance/actions.ts` | Toggle server action (I6) |
 | `src/app/(app)/settings/admin/migrations/page.tsx` | Migration info page (I5) |
 | `src/db/migrations/0024_quota.sql` | Add quota_mb column (I2) — migration #0024 per §2 |
-| `src/middleware.ts` | Maintenance + metrics middleware (I1/I6) — no auth gating (§1k) |
+| `src/middleware.ts` | Maintenance + metrics middleware (I1/I6) — no auth gating (§1k); sole owner |
 
 **Not created by I (reconciliation):**
+- `src/app/api/healthz/route.ts` — NOT I's (§7k: owned by C; liveness `{status:'ok'}` + test)
 - `src/lib/telemetry.ts` — DROPPED (§1j: no network ping)
 - `src/lib/backup/verify.ts` — DROPPED (§1g: owned by backup-sync)
+- Any block on `/settings/admin/backup` or `/settings/backup` — DROPPED (§7l: owned by backup-sync)
 
 ## Modified files (extend)
 
@@ -707,16 +708,17 @@ The setup wizard references S3 env vars only. Ensure they are accessible from a 
 | `src/db/schema.ts` | Add `quotaMb` to `users` table (I2) |
 | `src/lib/env.ts` | Add `logLevel`, `logFormat`, `defaultQuotaMb`, `metricsToken` (I7/I1/I2) — no `telemetry` (§1j banned) |
 | `src/lib/schedules/scheduler.ts` | Call `incrementCounter` in execute() (I1) — do NOT register `backup-verify` here (§1g: backup-sync owns it) |
-| `src/app/api/docs/[id]/assets/route.ts` | Quota check before write (I2) |
+| `src/app/api/docs/[id]/assets/route.ts` | Quota check before write (I2) — use `userRow` not `user` to avoid shadowing (§7v) |
 | `src/app/(app)/settings/admin/page.tsx` | Add links: Usage, Maintenance, Migrations (I2/I6/I5) |
-| `src/app/(app)/settings/admin/backup/page.tsx` | Add backup-verify job status block (reads state; I3) |
 | `src/app/(app)/settings/account/page.tsx` | Add "Download your data" export link (I9) |
 | `src/app/(app)/layout.tsx` | Maintenance banner (I6) |
-| `src/app/setup/actions.ts` | Redirect to `/setup/config` post-creation; set role=`editor` (I4, §1i) |
-| `instrumentation.ts` | No `sendBootPing()` — telemetry ping dropped (§1j) |
+| `src/app/setup/actions.ts` | Redirect to `/setup/config` post-creation; add `quotaMb: env.defaultQuotaMb`; keep `role:'owner'` (§7d — owner must NOT be downgraded) |
 | `.github/workflows/release.yml` | Add `scan` job with Trivy (I8) |
 | `docker-compose.yml` | Add healthcheck to `app` service — sequenced AFTER C (I1, §3) |
 | All `console.*` call-sites in `src/lib/` | Replace with structured logger (I7) |
+
+**Not modified by I (reconciliation):**
+- `src/app/(app)/settings/admin/backup/page.tsx` — NOT modified by I (§7l: backup-sync owns both the job and the dashboard; `/settings/admin/backup` becomes backup-sync's redirect)
 
 ---
 
@@ -724,10 +726,10 @@ The setup wizard references S3 env vars only. Ensure they are accessible from a 
 
 1. **Sentinel UUID for maintenance lock file** — the file-based approach (`/data/parchment/maintenance.lock`) is recommended over a DB settings-row approach. Confirm the path is inside the existing `env.filesRoot` mount or a sibling directory that is always writable in the container. If `PARCHMENT_FILES_ROOT` is set to a custom path, the lock file should live at `${env.filesRoot}/../maintenance.lock` or a configurable `PARCHMENT_LOCK_DIR`.
 
-2. **`/metrics` auth in production** — the `METRICS_TOKEN` env var is recommended so Prometheus can scrape without a user session. If the instance is on a private network and the user prefers no token, allow `METRICS_TOKEN=` (empty) to mean "open". Document this choice.
+2. **`/metrics` auth in production** — `METRICS_TOKEN` enables Prometheus scraping without a user session. When `METRICS_TOKEN` is empty or unset, the endpoint is admin-session-only — **never open** (§7v). There is no "open to all" mode. Document this in `.env.example`: set `METRICS_TOKEN` to a strong random string to enable scraping, or leave unset for admin-session-only access.
 
 3. **GDPR export trashed docs** — the plan excludes trashed documents from the export (they are soft-deleted, still in DB). Confirm whether GDPR requires exporting trashed content too. If yes, remove the `WHERE trashedAt IS NULL` filter and add a `documents/trash/` subdirectory.
 
 4. **I5 migration page: build-time vs runtime file listing** — `fs.readdirSync('src/db/migrations')` works in a standalone Next.js build only if the migrations directory is copied into the `.next/standalone` output. Verify the Dockerfile copies `src/db/migrations/` into the runner stage (it does — via `COPY --from=builder /app/.next/standalone ./`). If the path is wrong, serve the list from a static import of the file names at build time instead.
 
-5. **I3 dashboard when backup-sync not yet deployed** — `scheduler.getState()` will not include `'backup-verify'` until backup-sync ships. The dashboard block should gracefully handle the missing key (show "Not yet configured" placeholder) rather than crashing or hiding the section entirely. Confirm this with backup-sync's implementer before I3-T1 is written.
+5. ~~**I3 dashboard when backup-sync not yet deployed**~~ — RESOLVED: I has no dashboard tasks in I3 (§7l). backup-sync owns both the job and the `/settings/backup` dashboard. This question is backup-sync's to answer.

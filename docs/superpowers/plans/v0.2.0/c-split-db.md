@@ -32,17 +32,15 @@ C1 (Dockerfile strip) → C2 (compose) → C3 (migration docs) → C4 (compose s
 compose-quickstart SNIPPET that F's README task (F3) incorporates. F3 is the sole
 `README.md` author for v0.2.0.
 
-**Note (reconciliation §5 "C"):** The compose `app` healthcheck targets `/api/healthz`,
-which only exists after Group I delivers the ops endpoints. To avoid a compose setup
-where the healthcheck is broken from day one, **C ships a minimal `/api/healthz` stub**
-(returns `{"status":"ok"}`) so the compose healthcheck works immediately. I then
-enhances the endpoint with DB-ready/memory/build checks in its own tasks. See Task C5.
+**Note (reconciliation §7k):** C owns `/api/healthz` (liveness, `{"status":"ok"}`) and its unit test `tests/unit/healthz.test.ts`. **C ships this stub so the compose healthcheck works immediately.** Group I adds a SEPARATE `/api/readyz` endpoint (DB ping, build hash, memory) in its own tasks — I does NOT rewrite `/api/healthz` and does NOT add tests for it. Zero test collision. See Task C5.
 
 ---
 
 ## Task C1 — Strip embedded Postgres from the Dockerfile
 
-**Goal:** Remove postgresql-18 + postgresql-18-pgvector apt packages, the s6 `postgres` service, the `PGDATA` env, the `/var/lib/postgresql` volume, and the `postgres` user setup. The image becomes ~250 MB smaller. `DATABASE_URL` must still be configurable (it is — `src/lib/env.ts` reads it with a fallback).
+**Goal:** Remove the Postgres **server** (`postgresql-18 postgresql-18-pgvector` packages), the s6 `postgres` service, the `PGDATA` env, the `/var/lib/postgresql` volume, and the `postgres` user setup. **Keep** `postgresql-client-18` (needed by `migrate.sh` for `pg_isready`/`createdb`/`psql`) — the PGDG apt repo therefore stays. The image becomes ~250 MB smaller. `DATABASE_URL` must still be configurable (it is — `src/lib/env.ts` reads it with a fallback).
+
+> **Reconciliation §7p:** The PGDG apt repo is KEPT (it provides `postgresql-client-18`). What is REMOVED is the Postgres *server* package (`postgresql-18`) and its pgvector extension package (`postgresql-18-pgvector`), plus the s6 `postgres` service. `postgresql-client-18` is the only Postgres package that remains in the image.
 
 ### C1-T1 — Failing test: image-size regression guard
 
@@ -87,8 +85,8 @@ Edit `Dockerfile`.
    ```
    PGDATA=/var/lib/postgresql/data \
    ```
-2. The entire apt-get block that installs `postgresql-18 postgresql-18-pgvector` (and the PGDG key/repo lines). Keep only: `ca-certificates curl gnupg xz-utils` for s6, then remove `gnupg` purge since it's no longer needed for the PGDG repo. The xz-utils + curl lines for s6-overlay remain.
-3. The `ENV PATH="/usr/lib/postgresql/18/bin:${PATH}"` line (psql/pg_isready no longer present).
+2. From the apt-get install block: remove `postgresql-18 postgresql-18-pgvector` (server + server-side extension). **DO NOT remove** the PGDG key/repo lines or `gnupg` — they are still needed to install `postgresql-client-18`. Keep `ca-certificates curl gnupg xz-utils` and the PGDG repo setup unchanged.
+3. The `ENV PATH="/usr/lib/postgresql/18/bin:${PATH}"` line — this can stay or be removed; `postgresql-client-18` installs its binaries to the same path so the line is a no-op either way. **Do not remove** if keeping it avoids a diff conflict; it is harmless.
 4. The s6 `postgres` service files from the chmod list:
    ```
    /etc/s6-overlay/s6-rc.d/postgres/run \
@@ -100,30 +98,64 @@ Edit `Dockerfile`.
 
 **Update `rootfs/etc/s6-overlay/s6-rc.d/migrate/dependencies.d/`:** The `postgres` dependency file currently makes `migrate` wait for the s6 `postgres` service. Since there is no longer an s6 postgres service, **remove** `rootfs/etc/s6-overlay/s6-rc.d/migrate/dependencies.d/postgres`. The `migrate.sh` script already polls `pg_isready` in a loop — that becomes the sole readiness gate against the external DB.
 
-**Update `rootfs/etc/parchment/migrate.sh`:** Change the `pg_isready` call from hardcoded `localhost` to use the host from `DATABASE_URL`. The cleanest approach is to parse the host from the env var:
+**Update `rootfs/etc/parchment/migrate.sh`:** Change EVERY Postgres client invocation to use variables parsed from `DATABASE_URL` — `pg_isready`, `createdb`, the schema-presence `psql` check, and the migration apply loop. **Never hardcode `-U parchment -d parchment`.** (Reconciliation §7o.)
+
+The cleanest approach is to parse all connection parameters up front:
 
 ```sh
 #!/command/with-contenv sh
 set -e
 
-# Parse host and user from DATABASE_URL for pg_isready.
-# Expected format: postgres://user:pass@host:port/db
+# Parse ALL connection params from DATABASE_URL.
+# Expected format: postgres://user:pass@host:port/db  (or postgresql://...)
 DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/]+)[:/].*|\1|')
 DB_USER=$(echo "$DATABASE_URL" | sed -E 's|.*://([^:]+):.*|\1|')
 DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|' | grep -E '^[0-9]+$' || echo "5432")
-# Parse DB name from DATABASE_URL; fall back to $POSTGRES_DB then 'parchment'.
-# NEVER hardcode the DB name — callers may rename it via $POSTGRES_DB.
+# DB_NAME: parsed from URL path; fall back to $POSTGRES_DB (never hardcode 'parchment').
 DB_NAME=$(echo "$DATABASE_URL" | sed -E 's|.*/([^?]+)(\?.*)?$|\1|')
 DB_NAME="${DB_NAME:-${POSTGRES_DB:-parchment}}"
 
-echo "[parchment] waiting for postgres at $DB_HOST:$DB_PORT ..."
+# ── 1. Wait for Postgres ───────────────────────────────────────────────────────
+echo "[parchment] waiting for postgres at $DB_HOST:$DB_PORT as $DB_USER ..."
 until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" >/dev/null 2>&1; do sleep 2; done
+echo "[parchment] postgres ready"
 
-# createdb is a no-op if the DB already exists; the pgvector image pre-creates it
-# via POSTGRES_DB. Keep the || true guard.
-# Use $DB_NAME (parsed from DATABASE_URL / $POSTGRES_DB) — never hardcode 'parchment'.
+# ── 2. Ensure DB exists ────────────────────────────────────────────────────────
+# createdb is a no-op if the DB was already created by the pgvector image
+# (POSTGRES_DB). Keep the || true guard.
 createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME" 2>/dev/null || true
+
+# ── 3. Schema-presence check (psql) ───────────────────────────────────────────
+# Check if the migrations table exists to decide whether to run or skip.
+# Use $DB_USER and $DB_NAME — never hardcode.
+MIGRATED=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc \
+  "SELECT to_regclass('public.migrations');" 2>/dev/null || echo "")
+
+if [ "$MIGRATED" = "public.migrations" ]; then
+  echo "[parchment] migrations table present; checking for pending migrations ..."
+else
+  echo "[parchment] fresh database; running all migrations ..."
+fi
+
+# ── 4. Apply pending migrations ────────────────────────────────────────────────
+# Iterate over /etc/parchment/migrations/*.sql in order.
+# Each psql call uses $DB_USER/$DB_NAME — never hardcoded.
+for SQL_FILE in $(ls /etc/parchment/migrations/*.sql 2>/dev/null | sort); do
+  MIGRATION_NAME=$(basename "$SQL_FILE" .sql)
+  ALREADY_RAN=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc \
+    "SELECT name FROM migrations WHERE name='$MIGRATION_NAME';" 2>/dev/null || echo "")
+  if [ -z "$ALREADY_RAN" ]; then
+    echo "[parchment] applying migration: $MIGRATION_NAME"
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$SQL_FILE"
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c \
+      "INSERT INTO migrations (name, applied_at) VALUES ('$MIGRATION_NAME', now());" 2>/dev/null || true
+  fi
+done
+
+echo "[parchment] migrations complete"
 ```
+
+> **§7o compliance checklist — every `psql`/`pg_isready`/`createdb` invocation in `migrate.sh` must use `-U "$DB_USER"` and (where applicable) `-d "$DB_NAME"`. No call may use `-U parchment` or `-d parchment` as a literal string.**
 
 **Problem:** `pg_isready`, `createdb`, and `psql` are no longer in the app image after stripping postgresql-18. Install only the `postgresql-client-18` package (no server) — this provides the client binaries and is ~30 MB versus ~200 MB for the server. Add it to the apt-get install line:
 
@@ -208,6 +240,7 @@ describe('docker-compose.yml structure', () => {
   // This test reads the RAW text to catch commented-out entries too.
   const REQUIRED_VARS = [
     'PARCHMENT_SECRET_KEY',
+    'PARCHMENT_PUBLIC_URL',
     'DATABASE_URL',
     'PARCHMENT_VERSION',
     'PORT',
@@ -297,6 +330,10 @@ services:
       PARCHMENT_VERSION: ${PARCHMENT_VERSION:-latest}
       PORT: ${PORT:-3000}
       SECURE_COOKIES: ${SECURE_COOKIES:-false}
+
+      # External base URL — REQUIRED. Used for invite-accept links and OIDC redirect_uri.
+      # Phase 0 boot fails if absent. Example: https://parchment.example.com
+      PARCHMENT_PUBLIC_URL: ${PARCHMENT_PUBLIC_URL:?PARCHMENT_PUBLIC_URL is required — set to your external base URL (e.g. https://parchment.example.com)}
 
       # ── Secret key (REQUIRED for all encrypted instance config) ────────────
       # Generate: openssl rand -base64 32
@@ -408,6 +445,10 @@ DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES
 PARCHMENT_VERSION=v0.2.0
 PORT=3000
 SECURE_COOKIES=false           # set to 'true' in production behind TLS
+
+# External base URL — REQUIRED. Boot fails if absent.
+# Used for invite-accept links and OIDC redirect_uri.
+PARCHMENT_PUBLIC_URL=          # REQUIRED — e.g. https://parchment.example.com
 
 # ── Secret key (REQUIRED for all encrypted instance config) ─────────────────────
 # Generate: openssl rand -base64 32
@@ -746,14 +787,13 @@ makes the dependency explicit. F3 must include the full content of
 
 ## Task C5 — Minimal /api/healthz stub
 
-> **Reconciliation §5 "C":** The compose `app` healthcheck targets `/api/healthz`,
-> which only exists after Group I delivers the full ops endpoint. C ships a minimal stub
-> so the compose healthcheck works from day one. I then enhances the endpoint in its own
-> tasks.
+> **Reconciliation §7k:** `/api/healthz` is **C's endpoint**. C owns both the route file and its unit test. Group I does NOT rewrite `/api/healthz` — I adds a **separate** `/api/readyz` endpoint for deep readiness checks (DB ping, build hash, memory). There is no test collision: `tests/unit/healthz.test.ts` tests only `GET /api/healthz`; I's tests cover `GET /api/readyz`.
 
 **Goal:** Add `src/app/api/healthz/route.ts` returning `{"status":"ok"}` with HTTP 200.
 This is intentionally minimal — no DB ping, no build hash, no memory check (those belong
-to I). The route just proves the app is up and able to serve requests.
+to I's `/api/readyz`). The route just proves the app is up and able to serve requests.
+
+> **Ownership boundary:** C writes `src/app/api/healthz/route.ts` and `tests/unit/healthz.test.ts` (liveness only). I writes `src/app/api/readyz/route.ts` and its own test file (readiness: DB check, build hash, memory). No group may edit the other's route file or test file.
 
 ### C5-T1 — Failing test: healthz route
 
@@ -783,12 +823,12 @@ Run `pnpm exec vitest run tests/unit/healthz.test.ts` — fails today (route doe
 import { NextResponse } from 'next/server'
 
 /**
- * GET /api/healthz — minimal liveness probe.
+ * GET /api/healthz — liveness probe (owned by Group C; §7k).
  * Returns 200 {"status":"ok"} as long as the Next.js app is running.
  *
- * NOTE: This is a liveness stub shipped by Group C so docker-compose healthchecks
- * work from day one. Group I will enhance this endpoint with readiness checks
- * (DB ping, build hash, memory) in a later task.
+ * This is intentionally minimal: no DB ping, no build hash, no memory check.
+ * Group I adds those checks in a SEPARATE /api/readyz endpoint.
+ * This file must NOT be modified by Group I.
  */
 export function GET() {
   return NextResponse.json({ status: 'ok' })
@@ -805,7 +845,7 @@ curl -sf http://localhost:3000/api/healthz
 # {"status":"ok"}
 ```
 
-**Commit:** `git commit -m "C5: minimal /api/healthz stub for compose healthcheck (I will enhance)"`
+**Commit:** `git commit -m "C5: minimal /api/healthz liveness stub (C owns; I adds separate /api/readyz)"`
 
 ---
 
@@ -813,7 +853,9 @@ curl -sf http://localhost:3000/api/healthz
 
 ### C6-T1 — Add compose validation to CI
 
-Add a `compose-lint` job to `ci.yml` that validates the compose file using `docker compose config`:
+Add a `compose-lint` job to `ci.yml` that validates the compose file using `docker compose config`.
+
+> **Reconciliation §7p:** `docker compose config` (and `docker compose up`) will fail with a hard error on the `:?` required-var expansion unless `POSTGRES_PASSWORD` (and `PARCHMENT_SECRET_KEY`, which is also `:?`-required) are set. The CI job MUST supply these. `POSTGRES_USER` and `POSTGRES_DB` are optional (they have `:-` defaults) but are included for clarity.
 
 ```yaml
 compose-lint:
@@ -821,9 +863,13 @@ compose-lint:
   steps:
     - uses: actions/checkout@v4
     - name: Validate docker-compose.yml
-      run: |
-        POSTGRES_PASSWORD=ci_test \
-        docker compose config --quiet
+      env:
+        POSTGRES_PASSWORD: ci_test_pw
+        POSTGRES_USER: parchment
+        POSTGRES_DB: parchment
+        PARCHMENT_SECRET_KEY: Y2ktdGVzdC1rZXktMzItYnl0ZXMtZm9yLWNpLW9ubHk=
+        PARCHMENT_PUBLIC_URL: https://ci.example.com
+      run: docker compose config --quiet
     - name: Validate docker-compose.dev.yml
       run: docker compose -f docker-compose.dev.yml config --quiet
 ```
@@ -854,6 +900,7 @@ POSTGRES_DB=parchment
 POSTGRES_USER=parchment
 PARCHMENT_VERSION=c-test
 PARCHMENT_SECRET_KEY=$(openssl rand -base64 32)
+PARCHMENT_PUBLIC_URL=http://localhost:3000
 EOF
 
 # 3. Start compose, overriding the app image to the local build
@@ -868,7 +915,7 @@ sleep 20
 docker compose ps
 # Both db and app must show "running (healthy)" or "running"
 
-# 5. App health endpoint (minimal healthz stub shipped by C, enhanced later by I)
+# 5. App liveness endpoint (C's /api/healthz stub; Group I adds /api/readyz separately — §7k)
 curl -sf http://localhost:3000/api/healthz | python3 -m json.tool
 # {"status":"ok"}
 
@@ -906,20 +953,20 @@ Expected output for each step documented inline. No step may be skipped.
 
 | File | Change |
 |---|---|
-| `Dockerfile` | Remove postgresql-18 server, keep postgresql-client-18; remove PGDATA env, /var/lib/postgresql VOLUME, postgres user setup; keep PGDG repo for client pkg |
+| `Dockerfile` | Remove postgresql-18 **server** + postgresql-18-pgvector; keep postgresql-client-18 + PGDG repo (needed for client tools); remove PGDATA env, /var/lib/postgresql VOLUME, postgres user setup (§7p) |
 | `rootfs/etc/s6-overlay/s6-rc.d/postgres/` | DELETE entire directory (3 files) |
 | `rootfs/etc/s6-overlay/s6-rc.d/user/contents.d/postgres` | DELETE |
 | `rootfs/etc/s6-overlay/s6-rc.d/migrate/dependencies.d/postgres` | DELETE (migrate no longer depends on s6 postgres service) |
-| `rootfs/etc/parchment/migrate.sh` | Parse DB_HOST/PORT/USER/**DB_NAME** from DATABASE_URL; never hardcode DB name; fall back to `$POSTGRES_DB` |
-| `docker-compose.yml` | Rewrite: production 2-service compose (db + app, external pgvector); full §4 env-var registry; `/api/healthz` app healthcheck |
-| `.env.example` | NEW: full §4 env-var registry with all required + optional vars documented |
+| `rootfs/etc/parchment/migrate.sh` | Parse DB_HOST/PORT/USER/DB_NAME from DATABASE_URL for ALL invocations — `pg_isready`, `createdb`, schema-presence `psql` check, and apply loop; never hardcode `-U parchment -d parchment` (§7o) |
+| `docker-compose.yml` | Rewrite: production 2-service compose (db + app, external pgvector); full §4 env-var registry incl. `PARCHMENT_PUBLIC_URL` (`:?`-required); `/api/healthz` app healthcheck |
+| `.env.example` | NEW: full §4 env-var registry with all required + optional vars documented, incl. `PARCHMENT_PUBLIC_URL` (REQUIRED) |
 | `docker-compose.dev.yml` | NEW: extracted dev compose (local pg on 5433) |
 | `scripts/migrate-aio-to-compose.sh` | NEW: pg_dump/restore migration helper; uses `$POSTGRES_DB`/parse-from-URL, never hardcoded |
-| `src/app/api/healthz/route.ts` | NEW: minimal liveness stub `{"status":"ok"}` (Group I enhances later) |
+| `src/app/api/healthz/route.ts` | NEW: minimal liveness stub `{"status":"ok"}` — C owns this file; Group I adds `/api/readyz` separately (§7k) |
 | `docs/readme-snippets/compose-quickstart.md` | NEW: compose quickstart SNIPPET for F3 to incorporate into README (C does NOT edit README) |
-| `.github/workflows/ci.yml` | Add image-size + compose-lint jobs |
+| `.github/workflows/ci.yml` | Add image-size + compose-lint jobs; compose-lint sets `POSTGRES_PASSWORD`/`POSTGRES_USER`/`POSTGRES_DB`/`PARCHMENT_SECRET_KEY` so `:?` expansions don't abort config validation (§7p) |
 | `tests/unit/compose.test.ts` | NEW: compose structure + full §4 env-var registry coverage assertions |
-| `tests/unit/healthz.test.ts` | NEW: /api/healthz returns 200 {"status":"ok"} |
+| `tests/unit/healthz.test.ts` | NEW: C's unit test for `/api/healthz` liveness; Group I writes its own separate test file for `/api/readyz` (§7k, no collision) |
 
 **Files C does NOT touch:**
 | File | Why |

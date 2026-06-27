@@ -921,7 +921,7 @@ git commit -m "feat(authz): canAccessDoc + resolveDocAccess + authorizeDocRoute 
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tests/integration/authz-routes.test.ts` (Testcontainers boilerplate as before; seed an `owner`, a `viewer` user with a `viewer` doc-permission, a `stranger` with none). Build a real `NextRequest` with a Bearer PAT for each actor (use `createPat` from `src/lib/auth/pat.ts` to mint a token, then set `Authorization: Bearer <token>`):
+Create `tests/integration/authz-routes.test.ts` (Testcontainers boilerplate as before; seed an `owner`, a `viewer` user with a `viewer` doc-permission, a `stranger` with none). Build a real `NextRequest` with a Bearer PAT for each actor (use `issuePat` from `src/lib/auth/pat.ts` to mint a token, then set `Authorization: Bearer <token>`):
 
 ```ts
 import { NextRequest } from 'next/server'
@@ -999,30 +999,199 @@ Note: a 401 (no user) now returns `{status:401}` from the gate; a missing/denied
 Run: `pnpm vitest run tests/integration/authz-routes.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Audit the other doc-touching routes (security sweep — no code change unless a hole is found)**
+- [ ] **Step 5: Closed-enumeration authz sweep of all doc-touching routes (§7e + §7f — REQUIRED)**
 
-Run a sweep and confirm each route that reads/writes a doc by id goes through an owner/ACL check. For each, the check is `eq(ownerId, user.id)` (owner-only is acceptable for owner-private operations) OR `authorizeDocRoute`/`resolveDocAccess` (when sharing should apply). Document the decision per route in the commit body.
+This step is a **CLOSED ENUMERATION** — not a prose "decide per feature" audit. For every route in the table below, implement the stated verdict and ensure it is covered by a row in `tests/integration/authz-routes.test.ts`. CI MUST fail if a `/api/docs/*` route is added without a corresponding entry in that test file (add a route-registry constant at the top of the test and assert its length after each new route is wired).
 
-```bash
-grep -rn "params: Promise<{ id\|docId\|\[id\]\|\[docId\]" src/app/api/docs src/app/api/export src/app/api/shares src/app/api/templates 2>/dev/null
+**Sub-resource IDOR (§7e):** Every `/api/docs/[id]/[childId]` route MUST verify `child.docId === params.id` after fetching the child resource. The underlying repo functions (`comments-repo`, `versions-repo`) MUST accept and filter on `docId`:
+  - `deleteComment(commentId, docId)` → `and(eq(comments.id, commentId), eq(comments.docId, docId))`
+  - `setResolved(commentId, docId, resolved)` → same double-filter
+  - `getVersion(versionId, docId)` → `and(eq(versions.id, versionId), eq(versions.docId, docId))`
+  - `restoreVersion(versionId, docId)` → same double-filter
+  The route then asserts the returned row is non-null (null = the childId belongs to a different doc → return 404, no oracle).
+
+**Add these failing tests first (§7e), then implement:**
+
+```ts
+// append to tests/integration/authz-routes.test.ts
+
+it('IDOR: GET /api/docs/[id]/versions/[versionId] returns 404 when versionId belongs to a different doc', async () => {
+  // seed versionId on otherDocId, attempt to fetch via docId
+  const { GET } = await import('@/app/api/docs/[id]/versions/[versionId]/route')
+  const ctx = { params: Promise.resolve({ id: docId, versionId: otherVersionId }) }
+  const res = await GET(bearer(ownerToken), ctx)
+  expect(res.status).toBe(404)
+})
+
+it('IDOR: DELETE /api/docs/[id]/comments/[commentId] returns 404 when commentId belongs to a different doc', async () => {
+  const { DELETE } = await import('@/app/api/docs/[id]/comments/[commentId]/route')
+  const ctx = { params: Promise.resolve({ id: docId, commentId: otherCommentId }) }
+  const res = await DELETE(bearer(ownerToken), ctx)
+  expect(res.status).toBe(404)
+})
 ```
 
-Routes to verify go through a guard (list, do NOT silently skip):
-- `src/app/api/docs/[id]/route.ts` (done above)
-- `src/app/api/docs/bulk/route.ts`, `src/app/api/docs/[id]/*` subroutes (versions, comments, watermark, custom-css) — each must call `resolveDocAccess` with the right action (`edit` for mutations, `view` for reads, `manage` for share/delete). Where a subroute today does `eq(ownerId)`, decide per feature whether sharing should apply; if yes, switch to `resolveDocAccess`. If a subroute is genuinely owner-only (e.g. watermark/custom-css are owner-author features), leave the `ownerId` scope AND add a one-line comment asserting that intent.
-- `src/app/api/export/**` — exporting a doc must require at least `view` access.
-- `src/app/api/share/[token]/route.ts` — unchanged (anonymous capability link; already server-gated by `resolveShare`/`verifySharePassword`).
+**Closed route enumeration with per-route verdicts (§7f):**
 
-Add tests in `tests/integration/authz-routes.test.ts` for any subroute you switch to `resolveDocAccess` (e.g. "stranger cannot read versions → 404", "viewer cannot post a comment when comment is gated"). If a subroute stays owner-only, add a test that a workspace admin still passes (admin oversight) ONLY if you routed it through `resolveDocAccess`; owner-only routes keep their existing tests.
+Add this registry constant at the top of `tests/integration/authz-routes.test.ts` and assert `DOC_ROUTE_REGISTRY.length` equals the count of routes tested, so CI fails when a new route is wired without a test entry:
+
+```ts
+// Every /api/docs/* route MUST have an entry here. CI fails if a route is missing.
+const DOC_ROUTE_REGISTRY = [
+  'GET  /api/docs/[id]',            // view → authorizeDocRoute('view')
+  'PUT  /api/docs/[id]',            // edit → authorizeDocRoute('edit')
+  'DELETE /api/docs/[id]',          // manage → authorizeDocRoute('manage') or owner+ownerId
+  'GET  /api/docs/bulk',            // owner-scoped (ownerId); no ACL share applies to bulk list
+  'POST /api/docs/bulk',            // owner-scoped (ownerId)
+  'GET  /api/docs/[id]/versions',   // view → resolveDocAccess('view')
+  'POST /api/docs/[id]/versions',   // edit → resolveDocAccess('edit')
+  'GET  /api/docs/[id]/versions/[versionId]',     // view + IDOR docId check
+  'POST /api/docs/[id]/versions/[versionId]/restore', // manage + IDOR docId check
+  'GET  /api/docs/[id]/comments',   // view → resolveDocAccess('view')
+  'POST /api/docs/[id]/comments',   // comment → resolveDocAccess('comment')
+  'PATCH /api/docs/[id]/comments/[commentId]',  // comment or manage + IDOR docId check
+  'DELETE /api/docs/[id]/comments/[commentId]', // manage + IDOR docId check
+  'GET  /api/docs/[id]/permissions', // manage → authorizeDocRoute('manage')
+  'POST /api/docs/[id]/permissions', // manage → authorizeDocRoute('manage')
+  'DELETE /api/docs/[id]/permissions', // manage → authorizeDocRoute('manage')
+  'GET  /api/docs/[id]/watermark',  // owner-only (ownerId, not ACL — intentional: author feature)
+  'PUT  /api/docs/[id]/watermark',  // owner-only (ownerId — intentional: author feature)
+  'GET  /api/docs/[id]/custom-css', // owner-only (ownerId — intentional: author feature)
+  'PUT  /api/docs/[id]/custom-css', // owner-only (ownerId — intentional: author feature)
+  'POST /api/export/doc/[id]',      // view → resolveDocAccess('view') before export
+  'POST /api/export/bulk',          // owner-scoped (ownerId); bulk export is personal
+] as const
+
+it('DOC_ROUTE_REGISTRY covers every /api/docs/* route (CI sentinel)', () => {
+  // This count MUST be updated when a new /api/docs/* route is added.
+  expect(DOC_ROUTE_REGISTRY.length).toBe(22)
+})
+```
+
+Per-route authz verdicts and required test cases:
+
+| Route | Verdict | Required test |
+|---|---|---|
+| `GET /api/docs/[id]` | `authorizeDocRoute('view')` | viewer-grant → 200; stranger → 404 (done Step 1) |
+| `PUT /api/docs/[id]` | `authorizeDocRoute('edit')` | viewer-grant → 404; editor-grant → 204 (done Step 1) |
+| `DELETE /api/docs/[id]` | `authorizeDocRoute('manage')` | stranger → 404; owner → 204 |
+| `GET/POST /api/docs/bulk` | `ownerId` scope (owner-private list; sharing does not apply to bulk ops) — add `and(eq(ownerId, user.id))` guard | stranger → 200 but empty list (no other user's docs leak) |
+| `GET /api/docs/[id]/versions` | `resolveDocAccess('view')` | stranger → 404; viewer-grant → 200 |
+| `POST /api/docs/[id]/versions` | `resolveDocAccess('edit')` | viewer-grant → 404; editor-grant → 2xx |
+| `GET /api/docs/[id]/versions/[versionId]` | `resolveDocAccess('view')` + IDOR `versionId.docId === id` | IDOR cross-doc → 404 (added above) |
+| `POST /api/docs/[id]/versions/[versionId]/restore` | `resolveDocAccess('manage')` + IDOR | cross-doc → 404; non-manage → 404 |
+| `GET /api/docs/[id]/comments` | `resolveDocAccess('view')` | stranger → 404; viewer-grant → 200 |
+| `POST /api/docs/[id]/comments` | `resolveDocAccess('comment')` | viewer-grant → 404 (view ≠ comment); commenter-grant → 2xx |
+| `PATCH /api/docs/[id]/comments/[commentId]` | `resolveDocAccess('comment')` + IDOR | cross-doc → 404 |
+| `DELETE /api/docs/[id]/comments/[commentId]` | `resolveDocAccess('manage')` + IDOR | cross-doc → 404 |
+| `GET /api/docs/[id]/permissions` | `authorizeDocRoute('manage')` | editor-grant → 404; owner → 200 (done Task 7) |
+| `POST /api/docs/[id]/permissions` | `authorizeDocRoute('manage')` | done Task 7 |
+| `DELETE /api/docs/[id]/permissions` | `authorizeDocRoute('manage')` | done Task 7 |
+| `GET/PUT /api/docs/[id]/watermark` | `ownerId` scope — intentionally owner-only (author branding feature; shared editors should not override the owner's watermark) — leave `eq(ownerId, user.id)` guard AND add comment: `// owner-only by design: watermark is author branding, not collab content` | owner → 2xx; workspace-admin (non-owner) → 404 (intentional; admin oversight is for content/safety, not branding) |
+| `GET/PUT /api/docs/[id]/custom-css` | Same owner-only rationale as watermark — add comment | owner → 2xx; admin → 404 |
+| `POST /api/export/doc/[id]` | `resolveDocAccess('view')` — any viewer-or-above may export | stranger → 404; viewer-grant → 2xx |
+| `POST /api/export/bulk` | `ownerId` scope (bulk export is the owner's personal archive) | no cross-user data leak |
+
+For each route that currently does a bare `eq(ownerId, user.id)` where sharing should apply, replace it with `resolveDocAccess` and add the corresponding test row. For routes intentionally left owner-only, add a one-line comment stating the intent (see watermark/custom-css above).
+
+- [ ] **Step 5b: Folder-ownership IDOR guard for `moveDocument` and any folderId-accepting write (§7g — REQUIRED)**
+
+> **Context (5th-pass finding 7g — never landed):** `moveDocument(id, folderId)` in `src/lib/docs/repo.ts` and the `POST /api/docs/[id]/move` route accept a caller-supplied `folderId`. Without a check that the target folder is owned by the same user who owns the document, a user can move their own document into another user's folder — an IDOR that reveals the target folder's existence and lets a user inject content into another user's folder tree.
+
+**Files:**
+- Modify: `src/lib/docs/repo.ts` — add the folder-ownership guard inside `moveDocument`
+- Modify: `src/app/api/docs/[id]/move/route.ts` (or wherever the move route lives — locate via `grep -rln "moveDocument\|/move" src/app/api`) — the route already calls `authorizeDocRoute` for the doc; the folder check is added at the repo layer
+- Test: `tests/integration/authz-routes.test.ts` (extend)
+
+**The guard pattern** mirrors the `ownFolderIds` allow-list pattern used elsewhere in A's IDOR guards (see Task 6 Step 5 sub-resource checks): after verifying the doc is accessible, look up the target folder and assert `folder.ownerId === user.id`. A missing or foreign folder returns 404 — the target folder's existence is never leaked.
+
+**Failing test (add to `tests/integration/authz-routes.test.ts`):**
+
+```ts
+it('IDOR §7g: POST /api/docs/[id]/move returns 404 when folderId belongs to a different user (no existence leak)', async () => {
+  // seed: ownerDoc owned by ownerId; otherFolder created by strangerId
+  const { POST } = await import('@/app/api/docs/[id]/move/route')
+  const ctx = { params: Promise.resolve({ id: docId }) }
+  const body = JSON.stringify({ folderId: otherUserFolderId })
+
+  // owner moving their own doc into another user's folder → 404 (not 403, no existence oracle)
+  const res = await POST(bearerJson(ownerToken, body), ctx)
+  expect(res.status).toBe(404)
+
+  // owner moving their own doc into their own folder → 204 (happy path)
+  const ok = await POST(bearerJson(ownerToken, JSON.stringify({ folderId: ownerFolderId })), ctx)
+  expect(ok.status).toBe(204)
+})
+```
+
+**Repo guard — add inside `moveDocument` in `src/lib/docs/repo.ts`:**
+
+```ts
+export async function moveDocument(
+  id: string,
+  folderId: string | null,
+  actingUserId: string, // the session user performing the move — REQUIRED for the ownership check
+): Promise<void> {
+  if (folderId !== null) {
+    // §7g: the target folder MUST be owned by the same user. A missing or
+    // foreign folder is indistinguishable from a denied one (no existence leak).
+    const [folder] = await db
+      .select({ ownerId: schema.folders.ownerId })
+      .from(schema.folders)
+      .where(eq(schema.folders.id, folderId))
+      .limit(1)
+    if (!folder || folder.ownerId !== actingUserId) {
+      throw Object.assign(new Error('folder_not_found'), { status: 404 })
+    }
+  }
+  await db
+    .update(schema.documents)
+    .set({ folderId })
+    .where(eq(schema.documents.id, id))
+}
+```
+
+**Route update — `src/app/api/docs/[id]/move/route.ts`:**
+
+The route already calls `authorizeDocRoute(user, id, 'manage')` (or `'edit'` — use whichever action the existing route uses; moving a doc is a manage-level operation; update to `'manage'` if it was `'edit'`). Pass `user.id` to `moveDocument` as the new `actingUserId` parameter, and map the `status: 404` error to a 404 response:
+
+```ts
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const user = await authenticateRequest(req)
+  const { id } = await ctx.params
+  const gate = await authorizeDocRoute(user, id, 'manage')
+  if (!gate.ok) return NextResponse.json({ error: 'not_found' }, { status: gate.status })
+
+  const body = (await req.json()) as { folderId?: string | null }
+  const folderId = body.folderId ?? null
+  try {
+    await moveDocument(id, folderId, user!.id)
+  } catch (e) {
+    const status = (e as { status?: number }).status ?? 500
+    return NextResponse.json({ error: 'not_found' }, { status: status === 404 ? 404 : 500 })
+  }
+  return new NextResponse(null, { status: 204 })
+}
+```
+
+**Add to `DOC_ROUTE_REGISTRY`** (extend the array and bump the `length` assertion):
+
+```ts
+  'POST /api/docs/[id]/move',  // manage + §7g folder-ownership IDOR guard
+```
+
+Update the assertion to `DOC_ROUTE_REGISTRY.length` to be `23` (was 22).
+
+> **Note — future `folderId`-accepting writes:** The same guard applies to any route or Server Action that accepts a `folderId` parameter on a write: create-in-folder, duplicate-to-folder, from-template-in-folder, and any future bulk-move. For each new write that takes a `folderId`, call the same ownership pre-check (`folder.ownerId === user.id`) before committing. The pattern is: resolve the folder row, assert ownership, throw `{ status: 404 }` on mismatch. Document this in a code comment at the top of the `moveDocument` function so future implementors pick it up.
 
 - [ ] **Step 6: Run + commit**
 
 Run: `pnpm vitest run tests/integration/authz-routes.test.ts`
-Expected: PASS.
+Expected: PASS (all prior tests + the new §7g IDOR test).
 
 ```bash
-git add src/app/api/docs tests/integration/authz-routes.test.ts
-git commit -m "feat(authz): enforce canAccessDoc on doc routes; sweep doc subroutes (A4)"
+git add src/lib/docs/repo.ts src/app/api/docs tests/integration/authz-routes.test.ts
+git commit -m "feat(authz): enforce canAccessDoc on doc routes; sweep doc subroutes; §7g folder-ownership IDOR guard (A4)"
 ```
 
 ---
@@ -1699,26 +1868,37 @@ async function deliver(msg: EmailPayload): Promise<void> {
   }
 }
 
-// Uses B's inviteEmailPayload if available; falls back to an inline payload.
-// When B is merged, replace the inline fallback with:
+// Uses B's inviteEmailPayload with the OBJECT form {to, inviterName, workspaceName, acceptUrl}
+// (§7n: B re-exports it from @/lib/email/send; the arg is an object, NOT positional strings).
+// The acceptUrl is built from env.publicUrl (§7n: invite links use env.publicUrl).
+// Falls back to an inline payload when B is not yet merged.
+// When B is merged, replace the dynamic import block with a static import:
 //   import { inviteEmailPayload } from '@/lib/email/send'
-export async function sendInviteEmail(to: string, acceptUrl: string): Promise<void> {
+//   const payload = inviteEmailPayload({ to, inviterName, workspaceName, acceptUrl })
+export async function sendInviteEmail(input: {
+  to: string
+  inviterName: string
+  workspaceName: string
+  acceptUrl: string
+}): Promise<void> {
+  const { to, inviterName, workspaceName, acceptUrl } = input
   let payload: EmailPayload
   try {
     const mod = (await import('@/lib/email/send').catch(() => null)) as
-      | { inviteEmailPayload?: (to: string, url: string) => EmailPayload }
+      | { inviteEmailPayload?: (opts: { to: string; inviterName: string; workspaceName: string; acceptUrl: string }) => EmailPayload }
       | null
-    payload = mod?.inviteEmailPayload?.(to, acceptUrl) ?? {
+    // Call with the OBJECT form (§7n — not positional):
+    payload = mod?.inviteEmailPayload?.({ to, inviterName, workspaceName, acceptUrl }) ?? {
       to,
-      subject: 'You have been invited to Parchment',
-      text: `You've been invited to a Parchment workspace. Set your password to get started:\n\n${acceptUrl}\n\nThis link expires soon.`,
-      html: `<p>You've been invited to a Parchment workspace.</p><p><a href="${acceptUrl}">Set your password to get started</a></p><p>This link expires soon.</p>`,
+      subject: `${inviterName} invited you to ${workspaceName}`,
+      text: `${inviterName} invited you to join ${workspaceName} on Parchment. Set your password to get started:\n\n${acceptUrl}\n\nThis link expires soon.`,
+      html: `<p>${inviterName} invited you to join <strong>${workspaceName}</strong> on Parchment.</p><p><a href="${acceptUrl}">Set your password to get started</a></p><p>This link expires soon.</p>`,
     }
   } catch {
     payload = {
       to,
-      subject: 'You have been invited to Parchment',
-      text: `You've been invited to a Parchment workspace. Set your password to get started:\n\n${acceptUrl}\n\nThis link expires soon.`,
+      subject: `${inviterName} invited you to ${workspaceName}`,
+      text: `${inviterName} invited you to join ${workspaceName} on Parchment. Set your password to get started:\n\n${acceptUrl}\n\nThis link expires soon.`,
     }
   }
   await deliver(payload)
@@ -2104,8 +2284,9 @@ export async function inviteUserAction(_p: InviteState, fd: FormData): Promise<I
   if (!canAssignRole(actor, role)) return { error: 'You do not have permission to assign that role.' }
 
   const { token } = await createInvite({ email, role, invitedBy: actor.id, ttlHours: 72 })
+  // invite link uses env.publicUrl (§7n); call with OBJECT form (§7n — not positional)
   const acceptUrl = `${env.publicUrl.replace(/\/$/, '')}/accept/${token}`
-  await sendInviteEmail(email, acceptUrl) // never throws / never blocks
+  await sendInviteEmail({ to: email, inviterName: actor.name, workspaceName: 'Parchment', acceptUrl }) // never throws / never blocks
   await logAudit('user.invite', { actorId: actor.id, targetType: 'user', meta: { email, role } })
   revalidatePath('/settings/users')
   return { acceptUrl }
@@ -2296,9 +2477,251 @@ export default async function UsersSettingsPage() {
 }
 ```
 
-`_user-row.tsx` (`'use client'`): renders the user's name/email/role, a role `<select>` wired to `setUserRoleAction` (options limited to roles the actor `canAssignRole`), a disable/enable toggle (`setUserDisabledAction`), and a delete button (`deleteUserAction`). The delete and disable controls are `disabled` when `isLastOwner` or `isSelf` (for delete). Each `<li data-testid="user-row">`. Use `useActionState` + `useTransition` for optimistic feedback (copy patterns from existing settings client forms, e.g. `src/app/(app)/settings/security/mfa-section.tsx`).
+`_user-row.tsx` (`'use client'`): **Write the full component — do NOT stub with "similar to mfa-section" (§7s).** Actual required code:
 
-`_create-invite-forms.tsx` (`'use client'`): two forms — "Invite by email" (email + role select → `inviteUserAction`, then renders the returned `acceptUrl` with a copy button) and "Create directly" (email + name + role → `createUserAction`). Role options limited to those `canAssignRole(actorRole, r)` allows.
+```tsx
+// src/app/(app)/settings/users/_user-row.tsx
+'use client'
+import { useActionState, useTransition } from 'react'
+import { canAssignRole, WORKSPACE_ROLES, type Role } from '@/lib/auth/roles'
+import { deleteUserAction, setUserDisabledAction, setUserRoleAction } from './actions'
+import type { UserListItem } from '@/lib/auth/users-repo'
+
+type Props = {
+  user: UserListItem
+  actorRole: string
+  isSelf: boolean
+  isLastOwner: boolean
+}
+
+export function UserRow({ user, actorRole, isSelf, isLastOwner }: Props) {
+  const [roleState, roleAction, rolePending] = useActionState(setUserRoleAction, null)
+  const [disState, disAction, disPending] = useActionState(setUserDisabledAction, null)
+  const [delState, delAction, delPending] = useActionState(deleteUserAction, null)
+  const [, startTransition] = useTransition()
+  const assignableRoles = WORKSPACE_ROLES.filter(
+    (r) => r !== 'owner' && canAssignRole({ role: actorRole }, r as Role),
+  )
+
+  function handleRoleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const fd = new FormData()
+    fd.set('userId', user.id)
+    fd.set('role', e.target.value)
+    startTransition(() => roleAction(fd))
+  }
+
+  function handleToggleDisabled() {
+    const fd = new FormData()
+    fd.set('userId', user.id)
+    fd.set('disabled', user.disabledAt ? 'false' : 'true')
+    startTransition(() => disAction(fd))
+  }
+
+  function handleDelete() {
+    const fd = new FormData()
+    fd.set('userId', user.id)
+    startTransition(() => delAction(fd))
+  }
+
+  const canDelete = !isSelf && !isLastOwner
+  const canDisable = !isSelf && !isLastOwner
+
+  return (
+    <li
+      data-testid="user-row"
+      className="flex items-center justify-between rounded-md border border-[var(--border)] px-4 py-3 text-sm"
+    >
+      <div className="flex flex-col gap-0.5">
+        <span className="font-medium">{user.name}</span>
+        <span className="text-[var(--muted)]">{user.email}</span>
+        {user.disabledAt && <span className="text-xs text-[var(--warning)]">Disabled</span>}
+      </div>
+      <div className="flex items-center gap-2">
+        {assignableRoles.length > 0 ? (
+          <select
+            aria-label="Role"
+            defaultValue={user.role}
+            onChange={handleRoleChange}
+            disabled={rolePending || isLastOwner}
+            className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs"
+          >
+            {user.role === 'owner' && <option value="owner">owner</option>}
+            {assignableRoles.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="rounded border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)]">
+            {user.role}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={handleToggleDisabled}
+          disabled={!canDisable || disPending}
+          className="rounded px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-40"
+        >
+          {user.disabledAt ? 'Enable' : 'Disable'}
+        </button>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={!canDelete || delPending}
+          className="rounded px-2 py-1 text-xs text-[var(--destructive)] hover:opacity-80 disabled:opacity-40"
+        >
+          Delete
+        </button>
+      </div>
+      {(roleState?.error || disState?.error || delState?.error) && (
+        <p className="mt-1 text-xs text-[var(--destructive)]" role="alert">
+          {roleState?.error ?? disState?.error ?? delState?.error}
+        </p>
+      )}
+    </li>
+  )
+}
+```
+
+`_create-invite-forms.tsx` (`'use client'`): **Write the full component — do NOT stub (§7s).** Actual required code:
+
+```tsx
+// src/app/(app)/settings/users/_create-invite-forms.tsx
+'use client'
+import { useActionState, useTransition } from 'react'
+import { canAssignRole, WORKSPACE_ROLES, type Role } from '@/lib/auth/roles'
+import { createUserAction, inviteUserAction, type InviteState, type ActionState } from './actions'
+import { useState } from 'react'
+
+type Props = { actorRole: string }
+
+export function CreateInviteForms({ actorRole }: Props) {
+  const assignableRoles = WORKSPACE_ROLES.filter(
+    (r) => r !== 'owner' && canAssignRole({ role: actorRole }, r as Role),
+  )
+  const [, startTransition] = useTransition()
+  const [showInvite, setShowInvite] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [inviteState, inviteAction, invitePending] = useActionState<InviteState, FormData>(inviteUserAction, null)
+  const [createState, createAction, createPending] = useActionState<ActionState, FormData>(createUserAction, null)
+
+  return (
+    <div className="mt-6 flex flex-col gap-4">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => { setShowInvite((v) => !v); setShowCreate(false) }}
+          className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-fg)] hover:opacity-90"
+        >
+          Invite by email
+        </button>
+        <button
+          type="button"
+          onClick={() => { setShowCreate((v) => !v); setShowInvite(false) }}
+          className="rounded-md border border-[var(--border)] px-4 py-2 text-sm font-medium hover:bg-[var(--surface-hover)]"
+        >
+          Create directly
+        </button>
+      </div>
+
+      {showInvite && (
+        <form action={inviteAction} className="flex flex-col gap-3 rounded-md border border-[var(--border)] p-4">
+          <h3 className="font-medium text-sm">Invite by email</h3>
+          <label className="flex flex-col gap-1 text-sm">
+            Email
+            <input
+              name="email"
+              type="email"
+              required
+              aria-label="Email"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Role
+            <select
+              name="role"
+              defaultValue="editor"
+              aria-label="Role"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm"
+            >
+              {assignableRoles.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </label>
+          {inviteState && 'error' in inviteState && (
+            <p className="text-sm text-[var(--destructive)]" role="alert">{inviteState.error}</p>
+          )}
+          {inviteState && 'acceptUrl' in inviteState && (
+            <div className="flex items-center gap-2 rounded-md bg-[var(--surface-muted)] px-3 py-2 text-xs">
+              <span className="truncate font-mono">{inviteState.acceptUrl}</span>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(inviteState.acceptUrl)}
+                className="shrink-0 rounded px-2 py-1 text-xs hover:bg-[var(--surface-hover)]"
+              >
+                Copy
+              </button>
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={invitePending}
+            className="self-start rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-fg)] disabled:opacity-50"
+          >
+            {invitePending ? 'Sending…' : 'Send invite'}
+          </button>
+        </form>
+      )}
+
+      {showCreate && (
+        <form action={createAction} className="flex flex-col gap-3 rounded-md border border-[var(--border)] p-4">
+          <h3 className="font-medium text-sm">Create user directly</h3>
+          <label className="flex flex-col gap-1 text-sm">
+            Email
+            <input
+              name="email"
+              type="email"
+              required
+              aria-label="Email"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Name
+            <input
+              name="name"
+              type="text"
+              required
+              aria-label="Name"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Role
+            <select
+              name="role"
+              defaultValue="editor"
+              aria-label="Role"
+              className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm"
+            >
+              {assignableRoles.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </label>
+          {createState?.error && (
+            <p className="text-sm text-[var(--destructive)]" role="alert">{createState.error}</p>
+          )}
+          <button
+            type="submit"
+            disabled={createPending}
+            className="self-start rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-fg)] disabled:opacity-50"
+          >
+            {createPending ? 'Creating…' : 'Create user'}
+          </button>
+        </form>
+      )}
+    </div>
+  )
+}
+```
 
 - [ ] **Step 4: Link the page (admin-only) in settings nav + admin index**
 
@@ -2522,9 +2945,48 @@ Add a final integration test asserting the COMPOSED guarantee: in a workspace wi
 
 ```ts
 it('A6 composed: owner is never lockable-out across the action layer', async () => {
-  // CURRENT=admin: every owner-targeting destructive action errors
-  // CURRENT=owner: transferOwnership(adminId) succeeds; counts stay 1 owner
-  // (assert via users-repo countOwners + getUser roles)
+  const { deleteUserAction, setUserRoleAction, setUserDisabledAction, transferOwnershipAction } =
+    await import('@/app/(app)/settings/users/actions')
+  const usersRepo = await import('@/lib/auth/users-repo')
+
+  // Ensure we start with exactly one owner
+  const allUsers = await usersRepo.listUsers()
+  const ownerUser = allUsers.find((u) => u.role === 'owner')!
+  const adminUser = allUsers.find((u) => u.role === 'admin')!
+  expect(await usersRepo.countOwners()).toBe(1)
+
+  // CURRENT=admin: every owner-targeting destructive action must be rejected
+  CURRENT = { id: adminUser.id, role: 'admin' }
+
+  const delFd = new FormData(); delFd.set('userId', ownerUser.id)
+  const delResult = await deleteUserAction(null, delFd)
+  expect(delResult).toMatchObject({ error: expect.any(String) })
+  expect((await usersRepo.getUser(ownerUser.id))?.role).toBe('owner') // owner still present
+
+  const roleFd = new FormData(); roleFd.set('userId', ownerUser.id); roleFd.set('role', 'admin')
+  const roleResult = await setUserRoleAction(null, roleFd)
+  expect(roleResult).toMatchObject({ error: expect.any(String) })
+  expect((await usersRepo.getUser(ownerUser.id))?.role).toBe('owner') // still owner
+
+  const disFd = new FormData(); disFd.set('userId', ownerUser.id); disFd.set('disabled', 'true')
+  const disResult = await setUserDisabledAction(null, disFd)
+  expect(disResult).toMatchObject({ error: expect.any(String) })
+  expect((await usersRepo.getUser(ownerUser.id))?.disabledAt).toBeNull() // still active
+
+  // CURRENT=owner: transfer to admin succeeds; count remains 1
+  CURRENT = { id: ownerUser.id, role: 'owner' }
+  const xferFd = new FormData(); xferFd.set('toUserId', adminUser.id)
+  const xferResult = await transferOwnershipAction(null, xferFd)
+  expect(xferResult).toBeNull() // null = success
+  expect((await usersRepo.getUser(adminUser.id))?.role).toBe('owner')
+  expect((await usersRepo.getUser(ownerUser.id))?.role).toBe('admin')
+  expect(await usersRepo.countOwners()).toBe(1) // exactly one owner throughout
+
+  // Restore original ownership so later tests are unaffected
+  CURRENT = { id: adminUser.id, role: 'owner' }
+  const restoreFd = new FormData(); restoreFd.set('toUserId', ownerUser.id)
+  await transferOwnershipAction(null, restoreFd)
+  expect(await usersRepo.countOwners()).toBe(1)
 })
 ```
 
@@ -2565,6 +3027,7 @@ git commit -m "test(authz): per-route security sweep + owner-lockout composed re
 - role escalation blocked → Task 2 `canAssignRole` unit + Task 10 action tests (admin cannot mint admin/owner). ✓
 - owner never lockable-out → Task 8 repo invariants + Task 14 composed e2e. ✓
 - UI verified by DOM/computed probes, not screenshots → Tasks 11, 12 (Playwright `getByRole`/`getByTestId`/`toBeDisabled`). ✓
+- folder-ownership IDOR (§7g) blocked → Task 6 Step 5b (`moveDocument` ownership pre-check + `POST /api/docs/[id]/move` test; stranger folder → 404 no existence leak; same guard pattern required on all future `folderId`-accepting writes). ✓
 - explicit per-route security review → Task 14. ✓
 
 **Placeholder scan:** every code step ships real code; no "TBD"/"add validation"/"handle edge cases". The two UI client components (Task 11 `_user-row`/`_create-invite-forms`, Task 12 panel) are described structurally with the exact actions/endpoints they call and the testids they expose — the e2e tests pin their observable contract. ✓
@@ -2576,7 +3039,7 @@ git commit -m "test(authz): per-route security sweep + owner-lockout composed re
 ## Open questions / coordination
 
 1. **Current single-user auth structure (answered by investigation):** sessions are ALREADY per-user (`sessions.userId` FK, opaque sha256-hashed cookie tokens, 30-day TTL, MFA-pending two-phase). `role` already exists (default `'owner'`) and `guard.ts` already recognizes an `admin` role. There is **no `middleware.ts`** — authz is per-route via `requireUser`/`requireAdmin`/`authenticateRequest` + uniform `ownerId`-scoped repo queries. **Safest migration:** additive only — keep every owner-only repo path; layer ACLs via `document_permissions` + `canAccessDoc`; gate disabled users at the two existing resolution chokepoints (`getUserByToken`, `authenticateRequest`); leave `/setup` as first-owner-only and add subsequent users through the new admin UI. The owner is never touched: role stays `owner`, the owner satisfies every `canAccessDoc`, and the last-owner invariant is enforced in the repo transactions. No data migration of existing rows is required (the single owner's docs remain owner-scoped and fully accessible).
-2. **Group B `sendEmail` / `inviteEmailPayload`:** Per reconciliation §1e, B owns `src/lib/email/send.ts` and exports `sendEmail(p: EmailPayload)`, `EmailPayload = {to, subject, text, html?, replyTo?}`, and `inviteEmailPayload(to, acceptUrl)`. A's local `OutboundEmail` type is **deleted**; A uses B's `EmailPayload` (type-only via dynamic import until B merges). A's `email.ts` already dynamically imports `inviteEmailPayload` from B with an inline fallback payload — no seam change needed when B ships, just confirm B exports `inviteEmailPayload`.
+2. **Group B `sendEmail` / `inviteEmailPayload`:** Per reconciliation §1e and §7n, B owns `src/lib/email/send.ts` and exports `sendEmail(p: EmailPayload)`, `EmailPayload = {to, subject, text, html?, replyTo?}`, and `inviteEmailPayload({ to, inviterName, workspaceName, acceptUrl })` (OBJECT arg — not positional strings). A's local `OutboundEmail` type is **deleted**; A uses B's `EmailPayload` (type-only via dynamic import until B merges). A's `email.ts` already dynamically imports `inviteEmailPayload` from B with the object form and an inline fallback payload — no seam change needed when B ships, just confirm B exports `inviteEmailPayload` with the object signature.
 3. **Admin "reset password" surface:** folded into the invite/set-password token to avoid a second token type (an admin reset = issue a fresh accept link for the existing email). If the user wants a visibly separate "Send password reset" button distinct from "Invite", add a thin `resetPasswordAction` reusing `createInvite` — flagged in Task 14 / A6 self-review. **Confirm desired UX.**
 4. **Workspace-wide vs per-owner data model:** today many repos are `ownerId`-scoped (folders, tags, templates, settings, smart-folders are per-user). This plan makes DOCUMENTS shareable across users but leaves folders/tags/templates per-owner (a shared doc appears in the recipient's "Shared with me", not inside the owner's folders). If the user wants shared docs to also carry their folder/tag context to recipients, that is a larger model change — out of Group A scope; **flag for a follow-up decision** (likely H — collaboration).
 5. **`verifyPat` disabled-user coverage:** Task 3 assumes `verifyPat` returns the full user row (so `disabledAt` is present). If it projects a subset, Task 3 Step 3 adds `disabledAt` to its select — verify when implementing.

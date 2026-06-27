@@ -38,7 +38,7 @@ New files (created by this plan):
 
 Modified files:
 
-- `src/lib/env.ts` — add `secretKey` (validated) and `secretKeyConfigured` (boolean) to the `env` object.
+- `src/lib/env.ts` — add `secretKey` (validated), `secretKeyConfigured` (boolean), and `publicUrl` (required base URL, §7a) to the `env` object.
 - `src/lib/audit/index.ts` — expand `AuditAction` union, add `ip` + hash-chain params to `logAudit`, update schema insert.
 - `src/db/schema.ts` — add `appConfig` table and new `auditLog` columns (`ip`, `prevHash`, `entryHash`; `targetId` type change to `text`).
 - `src/db/migrations/meta/_journal.json` — append entries for idx 20 and 21.
@@ -55,6 +55,16 @@ export function redactSecret(v: string): string          // returns SECRET_MASK 
 export function encryptSecret(plain: string): string     // returns 'v1:<b64iv>:<b64ct>:<b64tag>'
 export function decryptSecret(envelope: string): string  // throws DecryptError on wrong key / tamper
 
+// src/lib/env.ts — additions from Phase 0 (§7a, §3c)
+// Throw at boot if PARCHMENT_PUBLIC_URL is absent.
+// Consumers: A (invite-accept links), G (OIDC redirect_uri). Import as `env.publicUrl`.
+export const env: {
+  // ... existing fields ...
+  secretKey: string | null            // base64 32B; null if PARCHMENT_SECRET_KEY absent
+  secretKeyConfigured: boolean
+  publicUrl: string                   // required; trailing slash stripped; throws at boot if absent
+}
+
 // src/lib/config/repo.ts — ENCRYPTED config repo over the app_config table (Task 4b)
 // B, backup-sync, and G ALL import from here. No other module touches app_config directly.
 export async function setAppConfig(key: string, plaintext: string): Promise<void>
@@ -65,8 +75,10 @@ export async function getAppConfigJson<T>(key: string): Promise<T | null>
 
 // src/lib/audit/index.ts
 export type AuditAction =
-  // Pre-existing verbs (A4 / I5)
-  | 'create' | 'delete' | 'share' | 'export' | 'login'
+  // Pre-existing / legacy verbs (A4 / I5 / setup bootstrap — §7b)
+  // 'setup' is emitted by src/app/setup/actions.ts; G converts that call-site to typed
+  // logAudit, so 'setup' MUST remain in the union or typecheck fails.
+  | 'create' | 'delete' | 'share' | 'export' | 'login' | 'setup'
   // A's user lifecycle verbs — ALL DOTTED per §1d canonical list
   | 'user.create' | 'user.invite' | 'user.disable' | 'user.enable' | 'user.delete'
   | 'user.role' | 'ownership.transfer'
@@ -216,7 +228,30 @@ secretKey: (() => {
   return raw   // keep as base64 string; secret-box re-decodes at call time
 })(),
 secretKeyConfigured: !!process.env.PARCHMENT_SECRET_KEY,
+
+// PARCHMENT_PUBLIC_URL (§7a — required base URL, e.g. "https://notes.example.com").
+// No trailing slash. Used by:
+//   • Group A — invite-accept links  (e.g. `${publicUrl}/invite/accept?token=...`)
+//   • Group G — OIDC redirect_uri    (e.g. `${publicUrl}/api/auth/oidc/callback`)
+// The process will throw at boot if this env var is absent, because both A and G
+// produce broken URLs without it (invite emails land on the wrong domain; OIDC
+// callback registration fails at the IdP).
+publicUrl: (() => {
+  const raw = process.env.PARCHMENT_PUBLIC_URL
+  if (!raw) throw new Error('PARCHMENT_PUBLIC_URL is required (e.g. https://notes.example.com)')
+  return raw.replace(/\/$/, '')  // strip trailing slash for safe URL concatenation
+})(),
 ```
+
+- [ ] **3c-extra** Add `PARCHMENT_PUBLIC_URL` to the env-validation integration tests in `tests/integration/secret-box-env.test.ts` (or create a companion `tests/integration/public-url-env.test.ts` if cleaner):
+
+  ```
+  describe('env.ts — PARCHMENT_PUBLIC_URL validation')
+    it('accepts a valid URL and strips trailing slash')
+    it('throws at import-time when PARCHMENT_PUBLIC_URL is absent')
+  ```
+
+  Use the same `vi.resetModules()` / dynamic `import()` pattern as the PARCHMENT_SECRET_KEY tests.
 
 - [ ] **3d** Run `pnpm vitest run tests/integration/secret-box-env.test.ts` — all tests must pass.
 
@@ -470,12 +505,15 @@ import { db, schema } from '@/db'
 //   doc.permission_change, oidc_config, login_locked, session_revoke,
 //   mfa_enable, mfa_disable — NEVER use these underscored / _change / _grant forms.
 export type AuditAction =
-  // Pre-existing verbs (A4 / I5)
+  // Pre-existing / legacy verbs (A4 / I5 / setup bootstrap — §7b)
+  // 'setup' is emitted by src/app/setup/actions.ts; G converts that call-site to typed
+  // logAudit, so 'setup' MUST remain in the union or typecheck fails.
   | 'create'
   | 'delete'
   | 'share'
   | 'export'
   | 'login'
+  | 'setup'
   // A's user lifecycle verbs — ALL DOTTED per §1d canonical list
   | 'user.create'
   | 'user.invite'
@@ -508,7 +546,10 @@ export interface AuditOptions {
  * Write a single audit row with a sha256 hash chain.
  *
  * prev_hash: sha256 of the previous row's entry_hash (or null for the first row).
- * entry_hash: sha256 of `${action}|${actorId}|${targetId}|${prev_hash}|${Date.now()}`.
+ * entry_hash: sha256 of `${action}|${actorId}|${targetId}|${prev_hash}|${dbCreatedAtMs}`
+ *   where dbCreatedAtMs = new Date(insertedRow.created_at).getTime().toString().
+ *   IMPORTANT (§7c): use the DB-returned created_at, NEVER Date.now() — the hash
+ *   must be reproducible by verifyAuditChain which reads created_at from the stored row.
  *
  * This MUST NEVER throw to the caller — auditing is a side-effect of the real
  * action and must not be able to block or fail it.
@@ -534,9 +575,32 @@ export async function logAudit(action: AuditAction, opts: AuditOptions = {}): Pr
 The `logAudit` body must:
 1. Query `SELECT entry_hash FROM audit_log ORDER BY created_at DESC LIMIT 1` via the `db` connection (use `db.execute(sql\`...\`)` from Drizzle, matching the pattern in other repo files). Wrap in a try/catch — if this read fails, use `null` as `prevHash` (do not abort the write).
 2. Compute `prevHash = rows[0]?.entry_hash ?? null`.
-3. Compute `entryHash = createHash('sha256').update([action, opts.actorId ?? '', opts.targetId ?? '', prevHash ?? '', Date.now().toString()].join('|')).digest('hex')`.
-4. Insert with `db.insert(schema.auditLog).values({ action, actorId: opts.actorId ?? null, targetType: opts.targetType ?? null, targetId: opts.targetId ?? null, meta: opts.meta ?? null, ip: opts.ip ?? null, prevHash, entryHash })`.
-5. Entire function body wrapped in `try { ... } catch (err) { console.error('audit write failed', { action, opts, err }) }`. The error log MUST NOT include any value that could be a secret (opts.meta could contain sensitive fields — log only `action` and the top-level keys of opts, not its values, or pass `{ action, optKeys: Object.keys(opts) }`).
+3. Insert the row first (without `entryHash`) and read back the DB-assigned `created_at` from the returned row:
+   ```ts
+   const [inserted] = await db
+     .insert(schema.auditLog)
+     .values({ action, actorId: opts.actorId ?? null, targetType: opts.targetType ?? null,
+               targetId: opts.targetId ?? null, meta: opts.meta ?? null,
+               ip: opts.ip ?? null, prevHash, entryHash: null })
+     .returning({ id: schema.auditLog.id, createdAt: schema.auditLog.createdAt })
+   ```
+4. Compute `entryHash` from the PERSISTED row's DB `created_at` (§7c — NEVER `Date.now()`):
+   ```ts
+   const createdAtMs = new Date(inserted.createdAt).getTime().toString()
+   const entryHash = createHash('sha256')
+     .update([action, opts.actorId ?? '', opts.targetId ?? '', prevHash ?? '', createdAtMs].join('|'))
+     .digest('hex')
+   ```
+   **Why:** `verifyAuditChain` re-derives each hash using the stored DB `created_at`. If `entry_hash` is computed from `Date.now()` (which differs from the DB clock), `verifyAuditChain` will never produce a matching hash and will always return `{ ok: false }`. Using the read-back `created_at` guarantees the hash is reproducible.
+5. Update the row with the computed `entryHash`:
+   ```ts
+   await db.update(schema.auditLog)
+     .set({ entryHash })
+     .where(eq(schema.auditLog.id, inserted.id))
+   ```
+   (The append-only trigger blocks UPDATE on `audit_log`. Disable it for this self-update by setting `SET LOCAL session_replication_role = replica` within a transaction, OR write the migration so the trigger only blocks external sessions. Preferred approach: wrap steps 3–5 in a transaction and execute `SET LOCAL session_replication_role = replica` before the UPDATE — this disables the trigger for the current transaction only without affecting other sessions.)
+   **Alternative (simpler):** structure the trigger to allow UPDATEs originating from a designated internal function, or compute `entryHash` in the DB via a `BEFORE INSERT` trigger that reads `NEW.created_at` directly. Document whichever approach is chosen. If using the transaction approach, the transaction is already the try/catch outer scope.
+6. Entire function body wrapped in `try { ... } catch (err) { console.error('audit write failed', { action, optKeys: Object.keys(opts), err }) }`. The error log MUST NOT include any value that could be a secret (opts.meta could contain sensitive fields — log only `action` and the top-level keys of opts, never the values).
 
 Also export `verifyAuditChain` from the same file:
 
@@ -563,8 +627,20 @@ export async function verifyAuditChain(): Promise<{ ok: boolean; brokenAt?: stri
 
   ```
   describe('Phase 0 — verifyAuditChain')
+    it('returns { ok: true } after a real insert+readback (§7c: DB created_at, not Date.now)')
     it('returns { ok: true } when the chain is intact after 3 rows')
     it('returns { ok: false, brokenAt: <hash> } when a stored entry_hash is tampered')
+  ```
+
+  **The `ok: true` after real insert+readback test (§7c — this is the regression guard for the Date.now mismatch bug):**
+  This test must call `logAudit(...)` to perform a real DB insert, then immediately call `verifyAuditChain()` and assert it returns `{ ok: true }`. The point is that if `logAudit` computes `entry_hash` using `Date.now()` but `verifyAuditChain` recomputes using the stored DB `created_at`, they will NEVER match — this test catches that bug. Name the test clearly so reviewers understand its purpose:
+  ```ts
+  it('returns { ok: true } after a real insert+readback (verifies entry_hash uses DB created_at, not Date.now)', async () => {
+    await logAudit('login', { actorId: 'user-verify-test' })
+    const result = await verifyAuditChain()
+    expect(result.ok).toBe(true)
+    expect(result.brokenAt).toBeUndefined()
+  })
   ```
 
   The tamper test must bypass the append-only trigger to directly update a row's `entry_hash` (use `SET session_replication_role = replica` to suppress triggers, or drop+recreate the trigger temporarily within the test transaction, or use a superuser connection — document which approach is used). Assert that `verifyAuditChain()` returns `{ ok: false, brokenAt: <the tampered row's stored entry_hash> }`.
@@ -633,10 +709,11 @@ export async function verifyAuditChain(): Promise<{ ok: boolean; brokenAt?: stri
 ## Acceptance criteria (phase complete when ALL pass)
 
 - [ ] `pnpm vitest run tests/unit/secret-box.test.ts` — 15 tests green.
-- [ ] `pnpm vitest run tests/integration/secret-box-env.test.ts` — 6 tests green.
+- [ ] `pnpm vitest run tests/integration/secret-box-env.test.ts` — 8 tests green (6 PARCHMENT_SECRET_KEY + 2 PARCHMENT_PUBLIC_URL — §7a).
 - [ ] `pnpm vitest run tests/unit/config-repo.test.ts` — 10 tests green.
-- [ ] `pnpm vitest run tests/integration/audit-phase0.test.ts` — 16 tests green (14 original + 2 verifyAuditChain).
+- [ ] `pnpm vitest run tests/integration/audit-phase0.test.ts` — 17 tests green (14 original + 3 verifyAuditChain: ok-after-insert §7c + chain-intact + tamper-detect).
 - [ ] `pnpm vitest run tests/integration/audit.test.ts` — existing 3 tests still green (no regression).
+- [ ] `env.publicUrl` is populated from `PARCHMENT_PUBLIC_URL` (required, throws at boot if absent); trailing slash stripped. (§7a)
 - [ ] `pnpm tsc --noEmit` — zero errors.
 - [ ] `pnpm build` — succeeds.
 - [ ] `pnpm biome check .` — zero new violations.
@@ -645,7 +722,8 @@ export async function verifyAuditChain(): Promise<{ ok: boolean; brokenAt?: stri
 - [ ] `SECRET_MASK`, `isMasked`, `redactSecret`, `encryptSecret`, `decryptSecret`, `DecryptError` all exported from `src/lib/crypto/secret-box.ts`.
 - [ ] `src/lib/config/repo.ts` exists and exports `setAppConfig`, `getAppConfig`, `deleteAppConfig`, `setAppConfigJson`, `getAppConfigJson`. No other module accesses `app_config` directly.
 - [ ] `logAudit`, `verifyAuditChain`, and `AuditAction` in `src/lib/audit/index.ts` match the frozen interface above exactly.
-- [ ] `AuditAction` union contains ONLY dotted verbs from §1d. No `user.role_change`, `doc.permission_grant`, `doc.permission_revoke`, `doc.permission_change`, `oidc_config`, `login_locked`, `session_revoke`, `mfa_enable`, `mfa_disable` strings appear anywhere in the repo (`grep -r "role_change\|permission_grant\|permission_revoke\|permission_change\|oidc_config\|login_locked" src/` returns nothing).
+- [ ] `AuditAction` union includes `'setup'` in the legacy-verb line (§7b — raw call-site in `src/app/setup/actions.ts`; required for typecheck after G converts it to typed `logAudit`).
+- [ ] `AuditAction` union contains ONLY dotted verbs from §1d plus the legacy flat verbs (`'create'|'delete'|'share'|'export'|'login'|'setup'`). No `user.role_change`, `doc.permission_grant`, `doc.permission_revoke`, `doc.permission_change`, `oidc_config`, `login_locked`, `session_revoke`, `mfa_enable`, `mfa_disable` strings appear anywhere in the repo (`grep -r "role_change\|permission_grant\|permission_revoke\|permission_change\|oidc_config\|login_locked" src/` returns nothing).
 - [ ] Migrations 0020 and 0021 exist as `.sql` files and are registered in `_journal.json` at idx 20 and 21.
 - [ ] `app_config` table is defined in `src/db/schema.ts` as `appConfig`.
 - [ ] `audit_log` schema has `ip`, `prev_hash`, `entry_hash` (all text, nullable) and `target_id` typed as `text`.
@@ -657,6 +735,6 @@ export async function verifyAuditChain(): Promise<{ ok: boolean; brokenAt?: stri
 Once all acceptance criteria pass and the security review is closed, Phase 0 is complete. Downstream groups may proceed:
 
 - **Group B** (SMTP): import from `@/lib/config/repo` (`setAppConfig`/`getAppConfig`/`getAppConfigJson`/`setAppConfigJson`) for all SMTP config; import `SECRET_MASK`/`isMasked`/`redactSecret` from `@/lib/crypto/secret-box` for masking; do NOT create `app_config` again and do NOT create `src/lib/config/app-config-repo.ts`.
-- **Group G** (security): read/write OIDC client secret and other instance secrets via `@/lib/config/repo`; import `logAudit`/`verifyAuditChain` from `@/lib/audit` — extend `AuditAction` ONLY by adding to the union using the §1d canonical dotted verbs; G's migration is **0023** (OIDC/lockouts only — NOT audit_log or app_config).
-- **Group A** (multi-user): extend `AuditAction` with user/doc verbs by adding to the Phase-0 union using ONLY dotted verbs (`user.role`, `doc.share`, `doc.unshare` — NOT `user.role_change`, `doc.permission_grant` etc.); migration is **0022**; do NOT re-create `app_config` or `audit_log` migrations.
+- **Group G** (security): read/write OIDC client secret and other instance secrets via `@/lib/config/repo`; import `logAudit`/`verifyAuditChain` from `@/lib/audit` — extend `AuditAction` ONLY by adding to the union using the §1d canonical dotted verbs; G's migration is **0023** (OIDC/lockouts only — NOT audit_log or app_config); use `env.publicUrl` from `@/lib/env` for the OIDC `redirect_uri` (§7a).
+- **Group A** (multi-user): extend `AuditAction` with user/doc verbs by adding to the Phase-0 union using ONLY dotted verbs (`user.role`, `doc.share`, `doc.unshare` — NOT `user.role_change`, `doc.permission_grant` etc.); migration is **0022**; do NOT re-create `app_config` or `audit_log` migrations; use `env.publicUrl` from `@/lib/env` for invite-accept link URLs (§7a).
 - **backup-sync**: import from `@/lib/config/repo` for all S3/git secret config; env var is `PARCHMENT_SECRET_KEY` (not `APP_SECRET`); do NOT access `app_config` directly.

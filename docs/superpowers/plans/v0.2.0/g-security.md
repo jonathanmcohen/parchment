@@ -158,6 +158,13 @@ Add (all `process.env`-driven, server-only, never client-bundled):
   required iff any encrypted secret is stored (OIDC). Phase 0 validates this at
   boot in `src/lib/env.ts`; G should confirm the validation is present and test
   that absence causes a clear error, not a silent plaintext fallback.
+- `PARCHMENT_PUBLIC_URL` — the canonical base URL of the instance (e.g.
+  `https://parchment.example.com`). **Required** (boot-fail if absent); added to
+  the §4 env-var registry per reconciliation §7a. G's `env.ts` must validate it
+  is set and export it as `env.publicUrl`. Used exclusively for the OIDC
+  `redirect_uri` (§3.2) and A's invite-accept links — never for auth origin checks
+  derived from the live request. G confirms the validation in `src/lib/env.ts`;
+  Phase 0 or A may have added it first; do NOT duplicate the definition.
 - OIDC config is stored in the DB (`app_config` table, key `'oidc'`, encrypted
   via `@/lib/crypto/secret-box`) — NOT env — so admins configure it in the UI
   (§3.1). Env only holds the master key. (Mirrors B1 SMTP / backup-sync S3:
@@ -222,7 +229,9 @@ Library: `openid-client`. All routes node-runtime.
   `getOidcConfigForDisplay()` returns the config with the secret replaced by
   `redactSecret(clientSecretEnc)` (from `@/lib/crypto/secret-box`) and never
   decrypts.
-- Server Action / route to save config: **admin-only** (`requireAdmin`, from A).
+- Server Action / route to save config: **admin-only** (`requireAdmin` —
+  already exported from `src/lib/auth/guard.ts`; import from there, do NOT
+  re-export or re-implement it).
   On save, validate the issuer by running discovery once (`openid-client`
   discovery) and return a clear error if it fails — analogous to B2 "test before
   save". Audit the change (§5) with `action:'oidc.config'`, no secret in `meta`.
@@ -248,17 +257,23 @@ Replace the 501 stub. Flow:
   URL). `redirectTo` defaults to `/` and is validated app-relative (reject
   absolute/`//` → open-redirect guard).
 - Build the IdP authorization URL with `code_challenge`, `state`, `nonce`,
-  `scope` (default `openid email profile`), `redirect_uri` = `env.publicUrl` +
-  `/api/auth/sso/callback` (fixed server config — NEVER derived from request
-  headers; same anti-spoof rule the WebAuthn RP origin already follows).
+  `scope` (default `openid email profile`), `redirect_uri` =
+  `env.publicUrl` + `/api/auth/sso/callback`, where `env.publicUrl` is sourced
+  from `PARCHMENT_PUBLIC_URL` (the new required env var added to the §4 registry
+  by reconciliation §7a, validated at boot in `src/lib/env.ts`). This is a
+  **fixed server config value — NEVER derived from request headers** (`Host`,
+  `Origin`, `X-Forwarded-Host`, etc.); same anti-spoof rule the WebAuthn RP
+  origin already follows. If `PARCHMENT_PUBLIC_URL` is unset, `env.ts` must boot-
+  fail with a clear error rather than falling back to the request origin.
 - 302 to the IdP.
 - **Tests (integration, `tests/integration/oidc-flow.test.ts` with a stub IdP —
   see 3.4):**
   - start with OIDC disabled → no redirect to IdP (404/redirect-to-login).
   - start writes exactly one `oidc_login_flows` row; the authorization URL it
     redirects to contains `state`, `code_challenge`, `code_challenge_method=S256`,
-    `nonce`, and the **fixed** `redirect_uri` (asserts it is `env.publicUrl`-based,
-    not the request host).
+    `nonce`, and the **fixed** `redirect_uri` (asserts it equals
+    `process.env.PARCHMENT_PUBLIC_URL + '/api/auth/sso/callback'`, NOT the
+    request's `Host` header).
 
 ### Task 3.3 — Callback (`GET /api/auth/sso/callback`) — the security core
 Replace the 501 stub. This is the highest-risk surface; TDD every rejection.
@@ -291,6 +306,17 @@ Replace the 501 stub. This is the highest-risk surface; TDD every rejection.
      (SSO-only users have no local password), then the `oidc_identities` row.
      (Comment: swap to Group A's `createUser` helper when it lands; ensure it
      accepts an explicit role so the `editor` default is passed in.)
+
+  **`disabledAt` gate (reconciliation §7j — binding):** In ALL three resolution
+  paths above, after resolving a user row, check `users.disabledAt IS NOT NULL`.
+  If the user is disabled, reject immediately (generic 401 — do NOT create a
+  session, do NOT update `lastLoginAt`, do NOT insert an `oidc_identities` row
+  for a newly-linked account). A disabled user's email must never produce a
+  session via OIDC even if the IdP returns a valid token. This applies equally to
+  the identity-match path, the email-link path, and JIT-provisioning (a just-
+  provisioned row will never have `disabledAt` set, but the check must be uniform
+  across all three branches).
+
 - Issue a **full** session via `createSession(user.id)` (the existing helper —
   same opaque-token, httpOnly-cookie path as password login). OIDC users with no
   local second factor get a full session directly (the IdP performed the auth);
@@ -318,23 +344,78 @@ Replace the 501 stub. This is the highest-risk surface; TDD every rejection.
   - **linking**: existing local user `x` (verified) → callback links and the
     SAME user row is used (no duplicate user).
   - **JIT**: brand-new email → exactly one new user + one identity.
+  - **disabled user — identity match (§7j)**: a user whose `oidc_identities` row
+    already exists but who has `disabledAt IS NOT NULL` → callback rejected with
+    401, no session created, `lastLoginAt` NOT updated (query the row after to
+    confirm it is unchanged).
+  - **disabled user — email link (§7j)**: existing local user with matching
+    verified email and `disabledAt IS NOT NULL` → callback rejected, no
+    `oidc_identities` row inserted for that user.
   - **secrets never logged**: capture `console.error/log` during a failing
     callback; assert neither the client secret nor any token appears.
 - **Threat-model note (route header):** enumerate the defended attacks — CSRF
   (state, server-side single-use), authz-code injection (PKCE), ID-token forgery
   (JWKS sig + iss/aud/exp), replay (nonce + single-use state), open redirect
   (app-relative `redirectTo` validation), account takeover via email (verified-
-  email gate + (issuer,subject) primary key), client-secret exposure (encrypted
+  email gate + (issuer,subject) primary key), disabled-account bypass (§7j
+  `disabledAt` check before session issue), client-secret exposure (encrypted
   at rest via `@/lib/crypto/secret-box`, redacted in UI via `redactSecret`,
-  fixed redirect_uri prevents code exfil to attacker host).
+  fixed `redirect_uri` from `PARCHMENT_PUBLIC_URL` prevents authorization-code
+  exfiltration to an attacker-controlled host).
 
 ### Task 3.4 — Stub IdP test harness
-- `tests/integration/helpers/stub-oidc.ts`: a minimal in-test OIDC provider
-  (discovery doc, JWKS, token endpoint) so 3.2/3.3 run end-to-end without a real
-  IdP. Sign ID tokens with a test RSA key whose JWKS the stub serves; expose hooks
-  to mint a **good** token and **tampered** tokens (wrong nonce/aud/exp/sig) for
-  the rejection tests. Reuse `jose` if `openid-client` pulls it transitively;
-  otherwise sign with `node:crypto`.
+- `tests/integration/helpers/stub-oidc.ts`: a **real local OIDC stub provider**
+  that listens on a random free port (use `net.createServer({port:0})` to pick the
+  port, then close and reuse it, or bind to `0` and read the assigned port from
+  `server.address().port`). It must serve real OIDC discovery + JWKS + token
+  endpoints so that `openid-client` can run a full discovery → authorize →
+  token-exchange round-trip without any mocking of the library itself.
+
+  **Required endpoints:**
+  - `GET /.well-known/openid-configuration` — returns a JSON discovery document
+    with `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
+    `response_types_supported: ['code']`, `subject_types_supported: ['public']`,
+    `id_token_signing_alg_values_supported: ['RS256']`.
+  - `GET /jwks` — returns the stub's RSA public key in JWK set format.
+  - `POST /token` — exchanges a `code` (the stub issued it in-memory during the
+    `start` call) for an ID token signed with the stub's private RS256 key. Accepts
+    `grant_type=authorization_code`, validates `redirect_uri` + `client_id`. Returns
+    `{access_token, token_type:'Bearer', id_token, expires_in}`.
+
+  **Key management:** generate an RSA-2048 keypair once in `beforeAll` using
+  `node:crypto` (`generateKeyPairSync('rsa', {modulusLength:2048})`). Sign ID tokens
+  with `node:crypto.createSign('SHA256')` or via `jose`'s `SignJWT` if it is already
+  a transitive dependency of `openid-client` (check `node_modules/.pnpm` before
+  choosing).
+
+  **Minting helpers exposed to tests:**
+  - `stub.issueCode(claims: Partial<IdTokenClaims>): string` — stores a one-time
+    authorization code mapped to the given claims; the `/token` endpoint consumes it
+    (single-use: delete on exchange to prevent code-replay).
+  - `stub.mintIdToken(claims)` — signs and returns an ID token directly (for
+    tampered-token rejection tests that bypass the code-exchange path and hand-inject
+    into the `openid-client` callback validator).
+  - `stub.tamperToken(idToken, field, value)` — re-serializes a signed token with
+    `field` replaced by `value` in the payload (breaks the signature — tests that the
+    library rejects it).
+
+  **Lifecycle:** `stub.start()` in `beforeAll` returns `{issuer, port}`;
+  `stub.stop()` in `afterAll` closes the HTTP server. Tests configure the OIDC
+  config (`issuerUrl`) to point at the stub's `issuer`.
+
+  **State/nonce race-condition handling (atomic single-use consumption):**
+  The callback handler in `src/app/api/auth/sso/callback/route.ts` MUST consume the
+  `oidc_login_flows` row atomically — use a single `DELETE … WHERE state = $1 AND
+  expiresAt > now() RETURNING *` query (not a `SELECT` followed by a separate
+  `DELETE`). If the `RETURNING` set is empty the flow was already consumed or expired;
+  reject immediately. This makes concurrent callbacks for the same `state` safe: only
+  one will get a row back; the other gets nothing and is rejected. Test this explicitly:
+  - `state.race`: fire two concurrent callback requests for the same valid `state` via
+    `Promise.all`; assert exactly one creates a session and the other is rejected with
+    no second session or user row created.
+  - `state.expired`: insert an `oidc_login_flows` row with `expiresAt` in the past;
+    callback is rejected (the `AND expiresAt > now()` condition excludes it).
+
 - Not a product file — lives under `tests/`.
 
 ### Task 3.5 — Login page "Sign in with SSO" button
@@ -390,19 +471,21 @@ Replace the 501 stub. This is the highest-risk surface; TDD every rejection.
 ## 5. G3 — audit log: verb extension + admin gate + write-sites
 
 > **Phase-0 scope boundary:** the `audit_log` schema hardening (`ip`, `prev_hash`,
-> `entry_hash`, `target_id` uuid→text, `BEFORE UPDATE OR DELETE` trigger) and the
-> `logAudit` helper with its hash-chain logic are all built in **Phase 0** (migration
-> 0021 + `src/lib/audit/index.ts`). G does NOT re-implement or re-migrate any of
-> that. G's sole audit responsibility is: (a) extend the `AuditAction` union with G's
-> verbs, (b) wire all G write-sites to call `logAudit`, and (c) gate the admin UI.
+> `entry_hash`, `target_id` uuid→text, `BEFORE UPDATE OR DELETE` trigger), the
+> `logAudit` helper with its hash-chain logic, and the full `AuditAction` union
+> (including G's canonical verbs) are all built in **Phase 0** (migration 0021 +
+> `src/lib/audit/index.ts`). G does NOT re-implement, re-migrate, or extend any of
+> that. G's sole audit responsibility is: (a) **emit** G's verbs at write-sites via
+> `logAudit` (Phase 0 already added them to the union), (b) wire all G write-sites to
+> call `logAudit`, and (c) gate the admin UI.
 
-### Task 5.1 — Extend the `AuditAction` union with G's verbs
-- `src/lib/audit/index.ts` is owned by Phase 0 and exports `AuditAction`. G
-  **adds** its verbs to the union by editing that file (or, if the union is
-  defined in a separate type file it imports, extending it there).
-  The canonical dotted strings (from reconciliation §1d) are already in the
-  Phase-0 union; G does NOT re-add them — it only EMITS them via `logAudit`:
-  `'session.revoke'`, `'mfa.enable'`, `'mfa.disable'`, `'oidc.config'`, `'login.locked'`.
+### Task 5.1 — Emit G's audit verbs (DO NOT re-add to the union)
+- The canonical dotted strings for G's features —
+  `'session.revoke'`, `'mfa.enable'`, `'mfa.disable'`, `'oidc.config'`, `'login.locked'` —
+  are already present in the Phase-0 `AuditAction` union (reconciliation §1d).
+  G does **NOT** edit `src/lib/audit/index.ts` to add these verbs; Phase 0 shipped
+  them. G's only job here is to **EMIT** them at write-sites via
+  `import { logAudit } from '@/lib/audit'`.
   The underscored forms (`session_revoke`, `mfa_enable`, `mfa_disable`,
   `oidc_config`, `login_locked`) are **BANNED** — never use them anywhere in G.
 - Do NOT replace the existing union, do NOT add new columns, do NOT change the
@@ -458,8 +541,10 @@ Replace the 501 stub. This is the highest-risk surface; TDD every rejection.
 ### Task 5.4 — Gate the admin audit viewer (security fix)
 - The audit page (and the whole `settings/admin/*` subtree) is currently
   **unguarded**. Add `src/app/(app)/settings/admin/layout.tsx` that calls
-  `requireAdmin()` from A's auth module (redirects non-admins). This single
-  layout protects audit, backup, health, schedules, and the new SSO config page.
+  `requireAdmin()` imported from `src/lib/auth/guard.ts` (which already exports
+  it — G does NOT create a new export; it only creates the `layout.tsx` file).
+  This single layout redirects non-admins and protects audit, backup, health,
+  schedules, and the new SSO config page.
 - The audit page already loads server-side via `db` (fine); ensure it shows the
   `ip` column and a "Verify integrity" affordance calling
   `verifyAuditChain()` imported from `@/lib/audit` (Phase-0 canonical export —
@@ -469,8 +554,9 @@ Replace the 501 stub. This is the highest-risk surface; TDD every rejection.
 - **Tests:**
   - **gate (integration/route):** a non-admin user (`viewer` or `editor` role)
     hitting `/settings/admin/audit` is redirected; an `admin`/`owner` is not.
-    (Assert `requireAdmin` from A is invoked — the string `'member'` must not
-    appear in the gate check; use A's role lattice: `owner > admin > editor > viewer`.)
+    (Assert `requireAdmin` from `src/lib/auth/guard.ts` is invoked — the string
+    `'member'` must not appear in the gate check; use A's role lattice:
+    `owner > admin > editor > viewer`.)
   - viewer renders the `ip` column and the integrity banner; mock `verifyAuditChain`
     returning `{ ok: true }` → banner shows OK; `{ ok: false, brokenAt: '...' }` →
     banner shows broken + the `brokenAt` value (render test).
@@ -568,8 +654,9 @@ specs that drive real DOM and assert via probes (NOT screenshots-only):
 - `pnpm typecheck` clean (TS6 strict).
 - No `notImplemented`/501 left in `api/auth/sso` or `api/auth/oauth` (oauth
   deleted).
-- The admin subtree is `requireAdmin`-gated via A's `requireAdmin` (no unguarded
-  audit/backup/etc.).
+- The admin subtree is `requireAdmin`-gated: `layout.tsx` imports `requireAdmin`
+  from `src/lib/auth/guard.ts` (already exists there — G adds only the layout
+  file, not the export). No unguarded audit/backup/etc.
 - The string `'member'` does not appear as a role value in any G-authored code
   path (search: `grep -r "'member'" src/` for G's files before merging).
 - No own crypto module: `src/lib/crypto/secret-box.ts` is owned by Phase 0 and
@@ -580,11 +667,13 @@ specs that drive real DOM and assert via probes (NOT screenshots-only):
 - Adversarial security review (a final reviewer subagent) against the per-feature
   threat-model notes: TOTP window/replay, recovery single-use, OIDC
   state/nonce/PKCE/aud/exp/sig + linking takeover (verified-email gate +
-  issuer/subject primary key), per-IP + per-account lockout, immediate session
-  death, audit append-only (Phase-0 trigger + chain; G extends, not owns) +
-  admin gate (A's `requireAdmin`), secrets encrypted-at-rest via Phase-0
-  `secret-box` + redacted via `redactSecret` + never logged. Ship only on a
-  clean pass.
+  issuer/subject primary key) + disabled-account bypass (`disabledAt` check
+  before any session issue, all three resolution paths) + fixed `redirect_uri`
+  from `PARCHMENT_PUBLIC_URL` (never from request headers), per-IP + per-account
+  lockout, immediate session death, audit append-only (Phase-0 trigger + chain;
+  G extends, not owns) + admin gate (`requireAdmin` from `src/lib/auth/guard.ts`,
+  G adds layout only), secrets encrypted-at-rest via Phase-0 `secret-box` +
+  redacted via `redactSecret` + never logged. Ship only on a clean pass.
 
 ---
 
@@ -605,8 +694,9 @@ gap-fills on already-working code.
   new tables (`oidc_identities`, `oidc_login_flows`, `login_lockouts`).
 - **Group A:** G2 JIT-provisioning should call A's `createUser` once it exists
   (interim: direct insert, `role:'editor'`, commented — never `'member'`). No
-  schema collision. The admin gate (§5.4) uses A's `requireAdmin` and A's role
-  lattice (`owner > admin > editor > viewer`).
+  schema collision. The admin gate (§5.4) imports `requireAdmin` from
+  `src/lib/auth/guard.ts` (already exists; G adds only the `layout.tsx`) and
+  uses A's role lattice (`owner > admin > editor > viewer`).
 - Within G, §4/§5/§6 are independent of §3 and can be built in parallel by
-  separate worktree subagents; §5.1 (verb extension) must land before §5.3
-  write-site wiring and before §3/§4/§6 emit their audit rows.
+  separate worktree subagents; §5.1 (confirm Phase-0 verbs are present) must land
+  before §5.3 write-site wiring and before §3/§4/§6 emit their audit rows.

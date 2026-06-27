@@ -189,13 +189,19 @@ export type SendEmailResult =
 // Returns { ok: false } (never throws) when unconfigured or on transport error.
 // The SMTP password is decrypted inside this function and NEVER logged.
 export async function sendEmail(payload: EmailPayload): Promise<SendEmailResult>
+
+// Re-exported from @/lib/email/templates so A (and any caller) can import
+// sendEmail + inviteEmailPayload from this single canonical path.
+// A calls: inviteEmailPayload({ to, inviterName, workspaceName, acceptUrl })
+export { inviteEmailPayload } from '@/lib/email/templates'
 ```
 
 Implementation:
 1. Calls `isSmtpConfigured()` → if false, return `{ ok: false, error: 'smtp_not_configured' }`.
 2. Reads `getSmtpConfig()` for the non-secret fields; reads the decrypted SMTP password via
-   `getAppConfig('smtp_password')` from `@/lib/config/repo` (repo.ts handles decryption via
-   secret-box internally — no direct `decryptSecret` call in `send.ts`).
+   `getAppConfig('smtp_password')` from `@/lib/config/repo` — `repo.ts` decrypts via
+   `secret-box` internally. `send.ts` MUST NOT call `decryptSecret` directly; it only calls
+   `getAppConfig('smtp_password')` and uses the returned plaintext string.
 3. Dynamic imports `nodemailer` (`await import('nodemailer')`).
 4. Creates a transporter with appropriate `secure`/`requireTLS`/`ignoreTLS` based on `tls` field:
    - `'tls'` → `secure: true, port: config.port`
@@ -302,6 +308,12 @@ Auth: `requireAdmin()`.
 - "Send test email" button: POST `/api/settings/smtp/test` with current form values.
   Shows a success or error toast (inline `aria-live` region, no modal).
 - Validation before save: port is numeric 1-65535; host non-empty; from contains `@`.
+
+**TDD — RED step (required before implementation):**
+Write `tests/unit/smtp-config-form.test.ts` first with all assertions below failing
+(component does not exist yet). Confirm the test runner reports failures, then implement
+`SmtpConfigForm.tsx` + the route until all tests pass (GREEN). This mirrors the RED→GREEN
+pattern required by all other B tasks.
 
 **DOM tests (`tests/unit/smtp-config-form.test.ts`):** using jsdom + `@testing-library/react`
 or direct DOM queries (follow `account-theme-select.test.ts` pattern):

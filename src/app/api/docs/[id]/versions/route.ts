@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
-import { getDocument } from '@/lib/docs/repo'
+import { resolveDocAccess } from '@/lib/authz/doc-access'
 import { createVersion, listVersions } from '@/lib/docs/versions-repo'
 
 export const dynamic = 'force-dynamic'
@@ -11,9 +11,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { id } = await ctx.params
-  const doc = await getDocument(id)
-  if (!doc || doc.ownerId !== user.id)
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  // view access: owner, admin, or any doc-permission grant (viewer+) may read history.
+  const doc = await resolveDocAccess(user, id, 'view')
+  if (!doc) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   const versions = await listVersions(id)
   return NextResponse.json(versions)
@@ -28,9 +28,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const { id } = await ctx.params
-  const doc = await getDocument(id)
-  if (!doc || doc.ownerId !== user.id)
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  // edit access required: snapshotting mutates the version history of the doc.
+  const doc = await resolveDocAccess(user, id, 'edit')
+  if (!doc) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   const body = (await req.json()) as { kind?: string; label?: string }
   const kind = body.kind === 'named' ? 'named' : 'auto'

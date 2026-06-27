@@ -115,20 +115,20 @@ describe('D1 — comments repo', () => {
     expect(thread.every((c) => c.threadId === threadId)).toBe(true)
   })
 
-  it('setResolved(threadId, true) marks the root comment resolved', async () => {
+  it('setResolved(threadId, docId, true) marks the root comment resolved', async () => {
     const { createThread, listComments, setResolved } = await import('@/lib/docs/comments-repo')
     const { id, threadId } = await createThread(docId, ownerId, { body: 'To resolve' })
-    await setResolved(threadId, true)
+    expect(await setResolved(threadId, docId, true)).toBe(1)
 
     const all = await listComments(docId)
     const root = all.find((c) => c.id === id)
     expect(root?.resolved).toBe(true)
   })
 
-  it('deleteComment removes the row', async () => {
+  it('deleteComment removes the row (doc-scoped)', async () => {
     const { createThread, deleteComment, listComments } = await import('@/lib/docs/comments-repo')
     const { id } = await createThread(docId, ownerId, { body: 'To delete' })
-    await deleteComment(id)
+    expect(await deleteComment(id, docId)).toBe(1)
     const all = await listComments(docId)
     expect(all.find((c) => c.id === id)).toBeUndefined()
   })

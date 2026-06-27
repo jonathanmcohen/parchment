@@ -52,8 +52,14 @@ export async function POST(req: NextRequest) {
     if (action === 'move') {
       const folderId =
         body.folderId === null ? null : typeof body.folderId === 'string' ? body.folderId : null
-      await moveDocument(id, folderId)
-      affected++
+      // §7g: moveDocument verifies the target folder is owned by user.id; a foreign
+      // folder throws 404 → skip that id rather than aborting the whole batch.
+      try {
+        await moveDocument(id, folderId, user.id)
+        affected++
+      } catch {
+        // foreign/missing target folder — skip this id
+      }
     } else if (action === 'trash') {
       await trashDocument(user.id, id)
       affected++

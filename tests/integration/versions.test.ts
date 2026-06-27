@@ -97,7 +97,7 @@ describe('D3 — versions repo', () => {
       content: { type: 'doc', content: [{ type: 'paragraph' }] },
       markdown: 'paragraph\n',
     })
-    const v = await getVersion(id)
+    const v = await getVersion(id, docId)
     expect(v).not.toBeNull()
     expect(v?.label).toBeNull()
     expect(v?.kind).toBe('auto')
@@ -142,7 +142,7 @@ describe('D3 — versions repo', () => {
       markdown: 'snapshot\n',
       authorId: ownerId,
     })
-    const v = await getVersion(id)
+    const v = await getVersion(id, docId)
     expect(v).not.toBeNull()
     expect(v?.content).toEqual(content)
     expect(v?.markdown).toBe('snapshot\n')
@@ -151,7 +151,7 @@ describe('D3 — versions repo', () => {
 
   it('getVersion returns null for unknown id', async () => {
     const { getVersion } = await import('@/lib/docs/versions-repo')
-    const v = await getVersion('00000000-0000-0000-0000-000000000000')
+    const v = await getVersion('00000000-0000-0000-0000-000000000000', docId)
     expect(v).toBeNull()
   })
 
@@ -207,7 +207,7 @@ describe('D3 — versions repo', () => {
       markdown: 'restored content\n',
     })
 
-    const version = await getVersion(versionId)
+    const version = await getVersion(versionId, docId)
     expect(version).not.toBeNull()
 
     // Simulate restore: write version content back to document

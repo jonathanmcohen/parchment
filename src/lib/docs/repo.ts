@@ -351,8 +351,35 @@ export async function emptyTrash(ownerId: string): Promise<number> {
   return result.rowCount ?? 0
 }
 
-/** Move a doc to a folder (null = root). Owner-scoped by id. */
-export async function moveDocument(id: string, folderId: string | null): Promise<void> {
+/**
+ * Move a doc to a folder (null = root). Owner-scoped by id.
+ *
+ * §7g IDOR: `actingUserId` is REQUIRED. When a non-null `folderId` is given, the
+ * target folder MUST be owned by that user — otherwise a user could move a doc
+ * into ANOTHER user's folder tree (revealing the folder's existence and injecting
+ * content). A missing or foreign folder is indistinguishable from a denied one:
+ * we throw `{ status: 404 }` (no existence leak), which the route maps to a 404.
+ *
+ * The SAME guard applies to any future write that accepts a `folderId`
+ * (create-in-folder, duplicate-to-folder, from-template-in-folder, bulk-move):
+ * resolve the folder row, assert `folder.ownerId === actingUserId`, throw 404 on
+ * mismatch — before committing.
+ */
+export async function moveDocument(
+  id: string,
+  folderId: string | null,
+  actingUserId: string,
+): Promise<void> {
+  if (folderId !== null) {
+    const [folder] = await db
+      .select({ ownerId: schema.folders.ownerId })
+      .from(schema.folders)
+      .where(eq(schema.folders.id, folderId))
+      .limit(1)
+    if (!folder || folder.ownerId !== actingUserId) {
+      throw Object.assign(new Error('folder_not_found'), { status: 404 })
+    }
+  }
   await db
     .update(schema.documents)
     .set({ folderId, updatedAt: new Date() })

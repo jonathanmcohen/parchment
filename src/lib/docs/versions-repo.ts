@@ -60,12 +60,16 @@ export async function listVersions(docId: string): Promise<VersionSummary[]> {
 
 // ─── getVersion ───────────────────────────────────────────────────────────────
 // Returns full version including content + markdown.
+//
+// §7e IDOR: `docId` is REQUIRED and the lookup double-filters on (id, docId) so a
+// versionId belonging to a DIFFERENT document can never be fetched via this doc's
+// route. A cross-doc id returns null → the route 404s with no existence leak.
 
-export async function getVersion(id: string): Promise<Version | null> {
+export async function getVersion(id: string, docId: string): Promise<Version | null> {
   const [row] = await db
     .select()
     .from(schema.docVersions)
-    .where(eq(schema.docVersions.id, id))
+    .where(and(eq(schema.docVersions.id, id), eq(schema.docVersions.docId, docId)))
     .limit(1)
 
   if (!row) return null

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
-import { getDocument } from '@/lib/docs/repo'
+import { resolveDocAccess } from '@/lib/authz/doc-access'
 import { exportDoc, exportFilename, parseExportFormat } from '@/lib/export'
 
 export const dynamic = 'force-dynamic'
@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic'
 /** GET /api/docs/[id]/export?format=md|txt|html
  *
  * H3/H4/H7: Download the document in the requested format.
- * Owner-scoped — only the document owner may export (404 for non-owned docs).
+ * A4: any user with 'view' access (owner, admin, or a viewer+ doc-permission grant)
+ * may export; a non-shared stranger gets 404 (no existence leak).
  * Returns Content-Disposition: attachment with a filesystem-safe filename.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -19,8 +20,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const format = parseExportFormat(req.nextUrl.searchParams.get('format'))
   if (!format) return NextResponse.json({ error: 'bad format' }, { status: 400 })
 
-  const doc = await getDocument(id)
-  if (!doc || doc.ownerId !== user.id) {
+  const doc = await resolveDocAccess(user, id, 'view')
+  if (!doc) {
     return NextResponse.json({ error: 'not found' }, { status: 404 })
   }
 

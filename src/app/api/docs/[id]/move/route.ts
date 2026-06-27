@@ -1,23 +1,28 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
-import { getDocument, moveDocument } from '@/lib/docs/repo'
+import { authorizeDocRoute } from '@/lib/authz/doc-access'
+import { moveDocument } from '@/lib/docs/repo'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-
   const { id } = await params
-  const doc = await getDocument(id)
-  if (!doc || doc.ownerId !== user.id) {
-    return NextResponse.json({ error: 'not found' }, { status: 404 })
-  }
+  // moving a doc is a manage-level operation on the doc.
+  const gate = await authorizeDocRoute(user, id, 'manage')
+  if (!gate.ok) return NextResponse.json({ error: 'not_found' }, { status: gate.status })
 
   const body = (await req.json()) as { folderId?: unknown }
   const folderId =
     body.folderId === null ? null : typeof body.folderId === 'string' ? body.folderId : null
 
-  await moveDocument(id, folderId)
-  return NextResponse.json({ ok: true })
+  try {
+    // §7g: moveDocument verifies the target folder is owned by user.id; a foreign
+    // or missing folder throws { status: 404 } → 404 (no existence leak).
+    await moveDocument(id, folderId, user!.id)
+  } catch (e) {
+    const status = (e as { status?: number }).status ?? 500
+    return NextResponse.json({ error: 'not_found' }, { status: status === 404 ? 404 : 500 })
+  }
+  return new NextResponse(null, { status: 204 })
 }

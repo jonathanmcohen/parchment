@@ -128,7 +128,7 @@ describe('F1 — disk mirror write side', () => {
     const oldPath = join(filesDir, 'FolderA', 'MovingDoc.md')
     expect(await fileExists(oldPath)).toBe(true)
 
-    await moveDocument(id, f2Id)
+    await moveDocument(id, f2Id, ownerId)
 
     expect(await fileExists(oldPath)).toBe(false)
     const newPath = join(filesDir, 'FolderB', 'MovingDoc.md')

@@ -4,6 +4,8 @@ import { isS3Active } from '@/lib/backup/s3-config'
 import { createWorkspaceBackup } from '@/lib/backup/service'
 import { purgeExpiredTrash } from '@/lib/docs/repo'
 import { getTrashRetentionDays } from '@/lib/docs/settings-repo'
+import { resolveGitSyncConfig } from '@/lib/git/sync-config'
+import { gitSyncJob } from '@/lib/git/sync-job'
 import { type JobState, Scheduler } from '@/lib/schedules/jobs'
 
 // I10 — the in-process scheduler SINGLETON. This is the server-only composition
@@ -22,6 +24,9 @@ import { type JobState, Scheduler } from '@/lib/schedules/jobs'
 const TICK_INTERVAL_MS = 60_000 // 60s
 
 const DAY_MS = 24 * 60 * 60 * 1000
+
+// Default git-sync cadence (hours) when none is supplied to reconfigureGitSyncJob.
+const HOUR_MS_DEFAULT_HOURS = 24
 
 // HMR-safe singleton: cache on globalThis so Next's dev module re-imports reuse
 // the same Scheduler + interval instead of leaking new ones each reload.
@@ -62,6 +67,14 @@ class SchedulerSingleton {
       // ignore — the job can still be live-registered later via the settings UI
     }
 
+    // E — register the git-sync job if a DB-backed git config is enabled.
+    try {
+      const git = await resolveGitSyncConfig()
+      if (git) this.reconfigureGitSyncJob(true, git.scheduleHours)
+    } catch {
+      // ignore — live-registered later via the settings UI
+    }
+
     // Kick a tick on the next macrotask so a due-on-boot job runs shortly after
     // start without blocking the server boot path.
     setTimeout(() => void this.tick(), 0)
@@ -87,6 +100,24 @@ class SchedulerSingleton {
       }
     } else if (this.core.has('s3-backup')) {
       this.core.unregister('s3-backup')
+    }
+  }
+
+  /**
+   * Live add/remove the periodic 'git-sync' job. Registered only when enabled AND
+   * scheduleHours > 0; scheduleHours === 0 is push-on-change mode (the disk
+   * watcher pushes), so the periodic job is removed. Re-registering replaces the
+   * interval. Idempotent.
+   */
+  reconfigureGitSyncJob(enabled: boolean, scheduleHours = HOUR_MS_DEFAULT_HOURS): void {
+    this.registerDefaults()
+    const periodic = enabled && scheduleHours > 0
+    if (periodic) {
+      const intervalMs = scheduleHours * 3_600_000
+      // Always (re-)register so a changed cadence takes effect.
+      this.core.register({ name: 'git-sync', intervalMs, run: gitSyncJob })
+    } else if (this.core.has('git-sync')) {
+      this.core.unregister('git-sync')
     }
   }
 

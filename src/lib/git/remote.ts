@@ -1,8 +1,10 @@
 import fs from 'node:fs'
 import git from 'isomorphic-git'
 import http from 'isomorphic-git/http/node'
+import { setAppConfigJson } from '@/lib/config/repo'
 import { gitDir } from '@/lib/git/repo' // already exists — DO NOT recreate
 import type { GitSyncConfig } from './sync-config'
+import { resolveGitSyncConfig } from './sync-config'
 
 // E — isomorphic-git HTTPS push wrapper. Token auth via onAuth. Disk is the
 // source of truth; this only PUSHES (never pull/merge/rebase). A non-fast-forward
@@ -90,4 +92,32 @@ export function classifyPushError(err: unknown, token: string): PushResult {
 /** Remove the token from a message before it leaves this module. */
 function sanitize(msg: string, token: string): string {
   return token && msg.includes(token) ? msg.split(token).join('***') : msg
+}
+
+/**
+ * Push-on-change hook for the disk watcher. ONLY pushes in push-on-change mode
+ * (scheduleHours === 0); otherwise a no-op (the periodic git-sync job handles it).
+ * Best-effort: errors are swallowed but recorded to git.lastError for the status
+ * display. Fire-and-forget from the watcher — NEVER throws.
+ */
+export async function maybePushOnChange(): Promise<void> {
+  try {
+    const config = await resolveGitSyncConfig()
+    if (!config || config.scheduleHours !== 0) return
+    const result = await pushToRemote(config)
+    if (!result.ok) {
+      await setAppConfigJson('git.lastError', {
+        kind: result.error,
+        at: new Date().toISOString(),
+        message: result.message,
+      })
+    } else {
+      await setAppConfigJson('git.lastPush', {
+        oid: result.oid,
+        at: new Date().toISOString(),
+      })
+    }
+  } catch {
+    // Best-effort: a push-on-change failure must never disturb the watcher.
+  }
 }

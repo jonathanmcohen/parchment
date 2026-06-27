@@ -14,6 +14,7 @@
 // fires them and-forgets.
 
 import { watch } from 'chokidar'
+import { maybePushOnChange } from '@/lib/git/remote'
 import { commitPath, ensureRepo, removeAndCommit } from '@/lib/git/repo'
 // relPathIfManaged is the single source of truth for "is this a committable
 // managed .md path" — reused here (it's pure path math, pulls in no graph) so the
@@ -58,7 +59,12 @@ export async function startDiskWatcher(): Promise<void> {
     // queue serializes concurrent commits so the index can't race.
     const onAddOrChange = (absPath: string): void => {
       const rel = relPathIfManaged(absPath)
-      if (rel !== null) void commitPath(rel, `edit: ${rel}`)
+      if (rel !== null) {
+        void commitPath(rel, `edit: ${rel}`)
+        // E — push-on-change mode (git scheduleHours === 0). Fire-and-forget,
+        // best-effort; a no-op unless push-on-change is configured.
+        void maybePushOnChange()
+      }
       void handleExternalChange(absPath)
     }
     watcher.on('add', onAddOrChange)
@@ -67,7 +73,10 @@ export async function startDiskWatcher(): Promise<void> {
     // DO record the deletion in git history (remove + commit, best-effort).
     watcher.on('unlink', (absPath) => {
       const rel = relPathIfManaged(absPath)
-      if (rel !== null) void removeAndCommit(rel, `delete: ${rel}`)
+      if (rel !== null) {
+        void removeAndCommit(rel, `delete: ${rel}`)
+        void maybePushOnChange()
+      }
       console.warn(`[parchment-disk] file removed (not deleting doc): ${absPath}`)
     })
     // A watcher 'error' must not crash the process.

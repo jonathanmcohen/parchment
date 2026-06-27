@@ -2,6 +2,14 @@
 // at runtime but stored encrypted in app_config (git.token); the rest is JSON in
 // app_config (git.config). parseGitSyncConfig validates + fills defaults.
 
+import {
+  deleteAppConfig,
+  getAppConfig,
+  getAppConfigJson,
+  setAppConfig,
+  setAppConfigJson,
+} from '@/lib/config/repo'
+
 export interface GitSyncConfig {
   remoteUrl: string // HTTPS URL
   branch: string // default 'main'
@@ -71,5 +79,56 @@ export function parseGitSyncConfig(raw: unknown): GitSyncConfig | null {
         : GIT_SYNC_DEFAULTS.authorEmail,
     scheduleHours: clampSchedule(o.scheduleHours),
     enabled: Boolean(o.enabled),
+  }
+}
+
+/** Shape of the non-secret git config persisted as JSON under `git.config`. */
+interface StoredGitConfig {
+  remoteUrl?: string
+  branch?: string
+  authorName?: string
+  authorEmail?: string
+  scheduleHours?: number
+  enabled?: boolean
+}
+
+/**
+ * Resolve the active git-sync config from app_config: `git.config` (JSON, non-
+ * secret) merged with `git.token` (encrypted). Returns null when remoteUrl is
+ * absent OR enabled is false OR the merged config fails validation.
+ */
+export async function resolveGitSyncConfig(): Promise<GitSyncConfig | null> {
+  const stored = (await getAppConfigJson<StoredGitConfig>('git.config')) ?? {}
+  if (!stored.enabled) return null
+  const token = (await getAppConfig('git.token')) ?? ''
+  return parseGitSyncConfig({ ...stored, token })
+}
+
+/**
+ * Persist git-sync config. The token is stored encrypted under `git.token`
+ * (an empty-string token DELETES it — a revoke); the rest is stored as JSON
+ * under `git.config`. Only the provided non-secret fields are merged.
+ */
+export async function saveGitSyncConfig(
+  cfg: Partial<GitSyncConfig> & { token?: string },
+): Promise<void> {
+  const existing = (await getAppConfigJson<StoredGitConfig>('git.config')) ?? {}
+  const merged: StoredGitConfig = {
+    ...existing,
+    ...(cfg.remoteUrl !== undefined ? { remoteUrl: cfg.remoteUrl } : {}),
+    ...(cfg.branch !== undefined ? { branch: cfg.branch } : {}),
+    ...(cfg.authorName !== undefined ? { authorName: cfg.authorName } : {}),
+    ...(cfg.authorEmail !== undefined ? { authorEmail: cfg.authorEmail } : {}),
+    ...(cfg.scheduleHours !== undefined ? { scheduleHours: cfg.scheduleHours } : {}),
+    ...(cfg.enabled !== undefined ? { enabled: cfg.enabled } : {}),
+  }
+  await setAppConfigJson('git.config', merged)
+
+  if (cfg.token !== undefined) {
+    if (cfg.token === '') {
+      await deleteAppConfig('git.token') // revoke
+    } else {
+      await setAppConfig('git.token', cfg.token)
+    }
   }
 }

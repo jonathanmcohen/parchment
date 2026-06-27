@@ -10,6 +10,7 @@ import {
   getSpellcheckEnabled,
 } from '@/lib/docs/settings-repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
+import { parseWritingGoal } from '@/lib/editor/goals'
 import { parseWatermark } from '@/lib/editor/watermark'
 import { isLanguageToolEnabled } from '@/lib/integrations/languagetool'
 
@@ -33,6 +34,10 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
   // G17: parse the stored custom CSS from documents.meta.customCss (empty string
   // when absent — never throws). Raw CSS; sanitize+scope happen at render time.
   const initialCustomCss = parseCustomCss(docMeta?.customCss)
+
+  // J10: per-doc writing-goal target (words) from documents.meta.writingGoal.
+  // 0 = no goal. Validated; never throws.
+  const initialWritingGoal = parseWritingGoal(docMeta?.writingGoal)
 
   // G13: AI is off by default — only enabled when AI_BASE_URL is configured.
   // Computed server-side so the client never reads process.env directly.
@@ -63,6 +68,7 @@ export default async function DocPage({ params }: { params: Promise<{ id: string
       hasCollabState={collabStateExists}
       initialWatermark={initialWatermark}
       initialCustomCss={initialCustomCss}
+      initialWritingGoal={initialWritingGoal}
       aiEnabled={aiEnabled}
       autosaveIntervalMs={autosaveIntervalMs}
       spellcheckEnabled={spellcheckEnabled}

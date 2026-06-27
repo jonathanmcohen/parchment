@@ -48,6 +48,7 @@ import { useSaveStatus } from '@/components/editor/useSaveStatus'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { WatermarkDialog } from '@/components/editor/WatermarkDialog'
 import { WordCountDialog } from '@/components/editor/WordCountDialog'
+import { WritingGoalDialog } from '@/components/editor/WritingGoalDialog'
 import { UserCluster } from '@/components/shell/UserCluster'
 import {
   registerShortcutAction,
@@ -112,6 +113,8 @@ type Props = {
   initialWatermark?: WatermarkConfig
   /** G17: raw custom CSS from documents.meta.customCss; sanitize+scope at render. */
   initialCustomCss?: string
+  /** J10: per-doc writing-goal target in words (0 = no goal) from documents.meta.writingGoal. */
+  initialWritingGoal?: number
   /** G13: true when AI_BASE_URL is configured server-side. Never derived client-side. */
   aiEnabled?: boolean
   /** I3: autosave version-snapshot interval in ms (clamped to 5s–5min, default 30s). */
@@ -140,6 +143,7 @@ export function Editor({
   hasCollabState,
   initialWatermark,
   initialCustomCss,
+  initialWritingGoal = 0,
   aiEnabled = false,
   autosaveIntervalMs = 30_000,
   spellcheckEnabled = true,
@@ -624,6 +628,50 @@ export function Editor({
 
   // S3-2/S3-6: Tools → Word count modal (sourced from the existing counts).
   const [wordCountOpen, setWordCountOpen] = useState(false)
+
+  // J10: focus / zen mode — hides the chrome stack + side rails and centers the
+  // column for distraction-free writing. ESC exits (handler below). Drives a
+  // `data-zen="true"` attribute on the editor shell that globals.css keys off.
+  const [zenMode, setZenMode] = useState(false)
+
+  // J10: per-doc writing goal (target words). 0 = no goal. Seeded from
+  // documents.meta.writingGoal; edited via the goal dialog and PUT to the goal route.
+  const [writingGoal, setWritingGoal] = useState(initialWritingGoal)
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false)
+
+  // J10: persist a new word target (0 clears it). Best-effort — a failed PUT leaves
+  // the local state; the next save reconciles. Owner-scoped server-side.
+  const saveWritingGoal = useCallback(
+    async (target: number) => {
+      const clean = Number.isFinite(target) ? Math.max(0, Math.round(target)) : 0
+      setWritingGoal(clean)
+      setGoalDialogOpen(false)
+      try {
+        await fetch(`/api/docs/${docId}/goal`, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ targetWords: clean }),
+        })
+      } catch {
+        // best-effort — local state already updated
+      }
+    },
+    [docId],
+  )
+
+  // J10: ESC exits zen mode (only bound while zen is on, so it never competes with
+  // other Escape consumers — popovers/dialogs — in normal editing).
+  useEffect(() => {
+    if (!zenMode) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setZenMode(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zenMode])
 
   // D5: reading presence readers list + canvas wrapper ref
   const [readers, setReaders] = useState<Reader[]>([])
@@ -1510,7 +1558,7 @@ export function Editor({
     // S1-2: full-bleed gray gutter the white page floats on (editor route only).
     // The inner max-w-5xl keeps the centered column; the shell paints the gutter
     // edge-to-edge inside the shared <main> (negative margin cancels its padding).
-    <div className="parchment-editor-shell">
+    <div className="parchment-editor-shell" data-zen={zenMode ? 'true' : undefined}>
       {/* L1+L2+L7: full-width sticky chrome stack. The three bars are lifted OUT
           of the centered body column so their backgrounds + bottom borders bleed
           edge-to-edge of the main content area; each bar's own inner wrapper
@@ -1714,6 +1762,10 @@ export function Editor({
           connection={connection}
           mode={editorMode}
           onOpenWordCount={() => setWordCountOpen(true)}
+          writingGoal={writingGoal}
+          onEditGoal={() => setGoalDialogOpen(true)}
+          zenMode={zenMode}
+          onToggleZen={() => setZenMode((v) => !v)}
         />
 
         {/* B5: Image insert dialog */}
@@ -1874,6 +1926,16 @@ export function Editor({
             selection={selection}
             pageCount={pageCount}
             onClose={() => setWordCountOpen(false)}
+          />
+        )}
+
+        {/* J10: set/clear the per-doc writing goal (target words). */}
+        {goalDialogOpen && (
+          <WritingGoalDialog
+            currentTarget={writingGoal}
+            currentWords={full.words}
+            onSave={saveWritingGoal}
+            onClose={() => setGoalDialogOpen(false)}
           />
         )}
 

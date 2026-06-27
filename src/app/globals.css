@@ -1325,6 +1325,54 @@ body {
   color: var(--foreground);
 }
 
+/* J10: writing-goal chip + zen toggle in the status bar's right slot. Same
+   text-button affordance as the word-count button. */
+.parchment-status-goal,
+.parchment-status-zen {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 0 6px;
+  height: 20px;
+  border-radius: 4px;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+.parchment-status-goal:hover,
+.parchment-status-zen:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+/* Goal met → tint the chip with the in-document accent so completion is visible. */
+.parchment-status-goal[data-goal-done="true"] {
+  color: var(--success);
+}
+.parchment-status-zen[aria-pressed="true"] {
+  color: var(--primary);
+}
+
+/* J10: FOCUS / ZEN MODE — when the editor shell carries data-zen="true", hide the
+   chrome stack (title/menu/toolbar bars), the side rails (outline / comments /
+   backlinks / version-history panels), and dim the gutter so only the page +
+   status bar remain. The status bar stays (it hosts the Exit-focus button + the
+   live goal). ESC also exits (handled in Editor.tsx). */
+.parchment-editor-shell[data-zen="true"] .parchment-chrome-stack {
+  display: none;
+}
+/* Collapse the outline rail so the writing column is centered + unobstructed.
+   (The comments / backlinks / version panels are toggled from the now-hidden
+   chrome, so a fresh focus session starts without them.) */
+.parchment-editor-shell[data-zen="true"] .parchment-outline {
+  display: none;
+}
+/* Quiet the gutter band so the page floats on a calm field in focus mode. */
+.parchment-editor-shell[data-zen="true"] {
+  --editor-gutter: var(--background);
+}
+
 .parchment-status-readers {
   display: inline-flex;
   align-items: center;

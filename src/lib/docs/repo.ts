@@ -518,3 +518,54 @@ export async function setDocumentCustomCss(
 
   return true
 }
+
+/**
+ * J10/J12: shallow-merge `patch` into documents.meta (owner-scoped), preserving all
+ * other keys (watermark/customCss/etc.). Returns false when the doc is not found or
+ * not owned by this user. A patch value of `undefined` is written as-is (callers
+ * delete a key by spreading a meta without it; we keep this simple shallow merge to
+ * match the existing watermark/customCss writers). NEVER reached for a foreign doc.
+ */
+export async function mergeDocMeta(
+  ownerId: string,
+  docId: string,
+  patch: Record<string, unknown>,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ meta: schema.documents.meta })
+    .from(schema.documents)
+    .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
+    .limit(1)
+  if (!row) return false
+
+  const existingMeta =
+    row.meta !== null &&
+    row.meta !== undefined &&
+    typeof row.meta === 'object' &&
+    !Array.isArray(row.meta)
+      ? (row.meta as Record<string, unknown>)
+      : {}
+
+  const updatedMeta: Record<string, unknown> = { ...existingMeta, ...patch }
+
+  await db
+    .update(schema.documents)
+    .set({ meta: updatedMeta, updatedAt: new Date() })
+    .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
+
+  return true
+}
+
+/**
+ * J10-2: persist the per-doc writing goal into documents.meta.writingGoal
+ * (owner-scoped). `targetWords <= 0` clears the goal. Returns false if not owned.
+ */
+export async function setDocumentWritingGoal(
+  ownerId: string,
+  docId: string,
+  targetWords: number,
+): Promise<boolean> {
+  const target = Number.isFinite(targetWords) ? Math.max(0, Math.round(targetWords)) : 0
+  const writingGoal = target > 0 ? { targetWords: target } : null
+  return mergeDocMeta(ownerId, docId, { writingGoal })
+}

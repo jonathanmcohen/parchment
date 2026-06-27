@@ -80,6 +80,28 @@ export default async function AccountSettingsPage() {
           <LocaleSwitcher />
         </div>
       </section>
+
+      {/* I9: GDPR data portability export */}
+      <section
+        aria-labelledby="export-data"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
+        <h2 id="export-data" className="font-medium text-lg">
+          Your data
+        </h2>
+        <p className="mt-1 text-[var(--muted)] text-sm">
+          Download a copy of all your documents and profile information as a ZIP file.
+        </p>
+        <div className="mt-4">
+          <a
+            href="/api/user/export"
+            download
+            className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-2 font-medium text-sm hover:bg-[var(--background)]"
+          >
+            Download data export
+          </a>
+        </div>
+      </section>
     </section>
   )
 }

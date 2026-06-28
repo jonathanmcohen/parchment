@@ -3,24 +3,70 @@ import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { countMatchingRecoveryHash, formatRecoveryCode } from '@/lib/auth/mfa'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
+import { DecryptError, decryptSecret, encryptSecret } from '@/lib/crypto/secret-box'
 
 export type MfaRow = typeof schema.userMfa.$inferSelect
 export type PasskeyRow = typeof schema.passkeys.$inferSelect
 
-// Recovery codes are stored as a jsonb string[] of argon2 hashes. Drizzle types
-// jsonb columns as `unknown`; narrow defensively at the boundary.
+// §2 (encrypt-at-rest): the TOTP base32 secret and the argon2 recovery-code hashes
+// are encrypted via the Phase-0 secret-box BEFORE they touch the DB, and decrypted
+// transparently on read, so a DB-only dump exposes neither. The recovery codes are
+// already argon2-hashed (one-way); encrypting the hashes too means a stolen dump
+// can't even be offline-attacked against the recovery code space. Encryption is a
+// repo-boundary concern: every consumer of getMfa() still sees the plaintext base32
+// secret + the argon2 hash array exactly as before — only the at-rest bytes change.
+// Fail-closed: a value that does not decrypt (corrupt/foreign/legacy-plaintext
+// envelope, or missing key) is treated as absent rather than surfaced raw.
+function decryptOrNull(envelope: string | null): string | null {
+  if (envelope === null) return null
+  try {
+    return decryptSecret(envelope)
+  } catch (err) {
+    if (err instanceof DecryptError) return null
+    throw err
+  }
+}
+
+// Recovery codes are stored as a jsonb string[] of ENCRYPTED argon2 hashes. Decrypt
+// each back to the argon2 hash on read; an entry that fails to decrypt is dropped
+// (fail-closed). Drizzle types jsonb columns as `unknown`; narrow defensively.
+function decryptRecoveryCodes(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const out: string[] = []
+  for (const v of value) {
+    if (typeof v !== 'string') continue
+    const plain = decryptOrNull(v)
+    if (plain !== null) out.push(plain)
+  }
+  return out
+}
+
+// Encrypt an array of argon2 hashes for storage (one envelope per hash).
+function encryptRecoveryCodes(hashes: string[]): string[] {
+  return hashes.map((h) => encryptSecret(h))
+}
+
+// Recovery codes on a DECRYPTED row are the plaintext argon2 hashes.
 function recoveryHashesOf(row: MfaRow): string[] {
   const value = row.recoveryCodes
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
 }
 
+// Returns the row with totpSecret + recoveryCodes DECRYPTED in place, so callers
+// never deal with envelopes. A row whose totpSecret can't be decrypted comes back
+// with totpSecret = null (fail-closed).
 export async function getMfa(userId: string): Promise<MfaRow | null> {
   const [row] = await db
     .select()
     .from(schema.userMfa)
     .where(eq(schema.userMfa.userId, userId))
     .limit(1)
-  return row ?? null
+  if (!row) return null
+  return {
+    ...row,
+    totpSecret: decryptOrNull(row.totpSecret),
+    recoveryCodes: decryptRecoveryCodes(row.recoveryCodes),
+  }
 }
 
 // Stores a provisional TOTP secret + the argon2-hashed recovery codes, WITHOUT
@@ -31,13 +77,16 @@ export async function setTotp(
   secret: string,
   recoveryHashes: string[],
 ): Promise<void> {
+  // §2: encrypt the base32 secret + each recovery-code hash at rest.
+  const encSecret = encryptSecret(secret)
+  const encCodes = encryptRecoveryCodes(recoveryHashes)
   await db
     .insert(schema.userMfa)
     .values({
       userId,
-      totpSecret: secret,
+      totpSecret: encSecret,
       totpEnabledAt: null,
-      recoveryCodes: recoveryHashes,
+      recoveryCodes: encCodes,
       lastTotpStep: null,
     })
     .onConflictDoUpdate({
@@ -45,9 +94,9 @@ export async function setTotp(
       // Reset the replay watermark: a fresh provisional secret starts a new
       // step lineage, so a stale high step must not block the first new code.
       set: {
-        totpSecret: secret,
+        totpSecret: encSecret,
         totpEnabledAt: null,
-        recoveryCodes: recoveryHashes,
+        recoveryCodes: encCodes,
         lastTotpStep: null,
       },
     })
@@ -106,10 +155,12 @@ export async function consumeRecoveryCode(userId: string, code: string): Promise
   const matchIdx = await countMatchingRecoveryHash(hashes, normalized, verifyPassword)
   if (matchIdx < 0) return false
 
+  // `hashes` here are the DECRYPTED argon2 hashes (getMfa decrypted them). Re-encrypt
+  // the remaining ones before writing back so the column stays encrypted at rest.
   const remaining = hashes.filter((_, i) => i !== matchIdx)
   await db
     .update(schema.userMfa)
-    .set({ recoveryCodes: remaining })
+    .set({ recoveryCodes: encryptRecoveryCodes(remaining) })
     .where(eq(schema.userMfa.userId, userId))
   return true
 }

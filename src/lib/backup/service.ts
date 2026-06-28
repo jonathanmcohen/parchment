@@ -10,15 +10,74 @@ import 'server-only'
 import {
   type BackupDocInput,
   buildWorkspaceBackup,
+  type ParsedBackupEntry,
   parseWorkspaceBackup,
 } from '@/lib/backup/archive'
+import { folderPath } from '@/lib/docs/folder-tree'
 import { listFolders } from '@/lib/docs/folders-repo'
 import { createDocument, getDocument, listDocuments } from '@/lib/docs/repo'
+
+// Re-export the pure archive parser (reconciliation §7q) so consumers that mock
+// `@/lib/backup/service` get one cohesive surface. The implementation lives in
+// `./archive` — this is NOT a re-definition.
+export { parseWorkspaceBackup } from '@/lib/backup/archive'
 
 export interface RestoreResult {
   created: number
   skipped: number
   warnings: string[]
+}
+
+/**
+ * D2 — selective-restore filter. Both lists default to "include all" when empty.
+ * When BOTH are non-empty, a doc matching EITHER is included (UNION, not AND).
+ */
+export interface SelectiveRestoreFilter {
+  /** Include only docs whose folder-name path matches one of these prefixes
+   *  (e.g. 'work/', 'notes/'). Empty / absent = no folder constraint. */
+  folderPrefixes?: string[]
+  /** Include only these exact doc titles (case-sensitive). Empty / absent = all. */
+  docTitles?: string[]
+}
+
+export interface SelectiveRestoreResult extends RestoreResult {
+  /** Entries present in the backup but excluded by the filter (before restore). */
+  filtered: number
+}
+
+/**
+ * The folder-name path for an entry, e.g. 'work/' or 'work/sub/' (trailing slash),
+ * or '' when the doc is at the workspace root. `folders` is the owner's folder
+ * list; a folderId not in that list resolves to '' (folder dropped, like restore).
+ */
+export function entryFolderPath(
+  entry: ParsedBackupEntry,
+  folders: { id: string; name: string; parentId: string | null }[],
+): string {
+  const folderId = entry.meta.folderId
+  if (!folderId) return ''
+  const chain = folderPath(folders, folderId)
+  if (chain.length === 0) return ''
+  return `${chain.map((f) => f.name).join('/')}/`
+}
+
+/**
+ * True iff `entry` passes the selective filter. Empty filter = include all.
+ * When both folderPrefixes and docTitles are non-empty, a match on EITHER passes
+ * (union semantics).
+ */
+export function matchesSelectiveFilter(
+  entry: ParsedBackupEntry,
+  filter: SelectiveRestoreFilter,
+  folders: { id: string; name: string; parentId: string | null }[],
+): boolean {
+  const prefixes = filter.folderPrefixes ?? []
+  const titles = filter.docTitles ?? []
+  if (prefixes.length === 0 && titles.length === 0) return true
+  const path = prefixes.length > 0 ? entryFolderPath(entry, folders) : ''
+  const prefixMatch = prefixes.some((p) => path.startsWith(p))
+  const titleMatch = titles.includes(entry.meta.title)
+  return prefixMatch || titleMatch
 }
 
 /**
@@ -94,4 +153,62 @@ export async function restoreWorkspaceBackup(
   }
 
   return { created, skipped, warnings }
+}
+
+/**
+ * Selective restore: like restoreWorkspaceBackup, but only the entries passing
+ * `filter` are restored. Excluded entries increment `filtered` (counted BEFORE
+ * any restore attempt). An entry whose original doc id already exists is skipped
+ * (counted in `skipped`, not `filtered`). Per-doc failures never abort the run.
+ */
+export async function restoreWorkspaceBackupSelective(
+  ownerId: string,
+  bytes: Uint8Array,
+  filter: SelectiveRestoreFilter,
+): Promise<SelectiveRestoreResult> {
+  const { entries, warnings } = await parseWorkspaceBackup(bytes)
+
+  const folders = await listFolders(ownerId)
+  const ownFolderIds = new Set(folders.map((f) => f.id))
+
+  const result: SelectiveRestoreResult = {
+    created: 0,
+    skipped: 0,
+    warnings: [...warnings],
+    filtered: 0,
+  }
+
+  for (const entry of entries) {
+    if (!matchesSelectiveFilter(entry, filter, folders)) {
+      result.filtered++
+      continue
+    }
+    try {
+      // Skip when the original doc id already exists (idempotent re-restore).
+      const existing = await getDocument(entry.meta.id)
+      if (existing) {
+        result.skipped++
+        continue
+      }
+      const folderId =
+        entry.meta.folderId !== null && ownFolderIds.has(entry.meta.folderId)
+          ? entry.meta.folderId
+          : undefined
+      await createDocument(ownerId, {
+        title: entry.meta.title,
+        ...(folderId ? { folderId } : {}),
+        content: entry.content,
+      })
+      result.created++
+    } catch (err) {
+      result.skipped++
+      result.warnings.push(
+        `Failed to restore doc "${entry.meta.title}" (${entry.meta.id}): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      )
+    }
+  }
+
+  return result
 }

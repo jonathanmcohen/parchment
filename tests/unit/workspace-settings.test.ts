@@ -40,9 +40,17 @@ const authenticateRequest = vi.fn()
 const getWorkspaceName = vi.fn()
 const setWorkspaceName = vi.fn()
 
-vi.mock('@/lib/auth/guard', () => ({
-  authenticateRequest: (req: NextRequest) => authenticateRequest(req),
-}))
+vi.mock('@/lib/auth/guard', async () => {
+  const { NextResponse } = await import('next/server')
+  return {
+    authenticateRequest: (req: NextRequest) => authenticateRequest(req),
+    apiAuthFailure: (status: 401 | 403) =>
+      NextResponse.json(
+        { error: status === 403 ? 'insufficient_scope' : 'unauthorized' },
+        { status },
+      ),
+  }
+})
 vi.mock('@/lib/docs/settings-repo', () => ({
   getWorkspaceName: (id: string) => getWorkspaceName(id),
   setWorkspaceName: (id: string, name: unknown) => setWorkspaceName(id, name),
@@ -66,7 +74,7 @@ describe('F7 — GET/PUT /api/settings/workspace', () => {
   })
 
   it('GET returns 401 when unauthenticated', async () => {
-    authenticateRequest.mockResolvedValue(null)
+    authenticateRequest.mockResolvedValue({ ok: false, status: 401 })
     const { GET } = await import('@/app/api/settings/workspace/route')
     const res = await GET(makeReq())
     expect(res.status).toBe(401)
@@ -74,7 +82,7 @@ describe('F7 — GET/PUT /api/settings/workspace', () => {
   })
 
   it('GET returns the stored name for the authenticated owner', async () => {
-    authenticateRequest.mockResolvedValue({ id: 'owner-1' })
+    authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'owner-1' } })
     getWorkspaceName.mockResolvedValue('Acme Docs')
     const { GET } = await import('@/app/api/settings/workspace/route')
     const res = await GET(makeReq())
@@ -84,7 +92,7 @@ describe('F7 — GET/PUT /api/settings/workspace', () => {
   })
 
   it('PUT returns 401 when unauthenticated', async () => {
-    authenticateRequest.mockResolvedValue(null)
+    authenticateRequest.mockResolvedValue({ ok: false, status: 401 })
     const { PUT } = await import('@/app/api/settings/workspace/route')
     const res = await PUT(makeReq({ name: 'x' }))
     expect(res.status).toBe(401)
@@ -92,7 +100,7 @@ describe('F7 — GET/PUT /api/settings/workspace', () => {
   })
 
   it('PUT rejects a non-string name with 400', async () => {
-    authenticateRequest.mockResolvedValue({ id: 'owner-1' })
+    authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'owner-1' } })
     const { PUT } = await import('@/app/api/settings/workspace/route')
     const res = await PUT(makeReq({ name: 123 }))
     expect(res.status).toBe(400)
@@ -100,7 +108,7 @@ describe('F7 — GET/PUT /api/settings/workspace', () => {
   })
 
   it('PUT rejects a missing/invalid JSON body with 400', async () => {
-    authenticateRequest.mockResolvedValue({ id: 'owner-1' })
+    authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'owner-1' } })
     const { PUT } = await import('@/app/api/settings/workspace/route')
     const res = await PUT(makeReq())
     expect(res.status).toBe(400)
@@ -108,7 +116,7 @@ describe('F7 — GET/PUT /api/settings/workspace', () => {
   })
 
   it('PUT persists the name and echoes the normalized stored value', async () => {
-    authenticateRequest.mockResolvedValue({ id: 'owner-1' })
+    authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'owner-1' } })
     setWorkspaceName.mockResolvedValue('My Team')
     const { PUT } = await import('@/app/api/settings/workspace/route')
     const res = await PUT(makeReq({ name: '  My   Team  ' }))

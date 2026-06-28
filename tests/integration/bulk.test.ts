@@ -70,7 +70,7 @@ describe('E6 — bulk operations repo', () => {
     for (const id of ids) {
       const doc = await getDocument(id)
       if (!doc || doc.ownerId !== ownerId) continue
-      await moveDocument(id, folderId)
+      await moveDocument(id, folderId, ownerId)
       affected++
     }
 
@@ -94,8 +94,8 @@ describe('E6 — bulk operations repo', () => {
     const { id: docB } = await createDocument(ownerId, { folderId })
 
     // Move both to root
-    await moveDocument(docA, null)
-    await moveDocument(docB, null)
+    await moveDocument(docA, null, ownerId)
+    await moveDocument(docB, null, ownerId)
 
     const atRoot = await listDocumentsInFolder(ownerId, null)
     expect(atRoot.map((d) => d.id)).toContain(docA)

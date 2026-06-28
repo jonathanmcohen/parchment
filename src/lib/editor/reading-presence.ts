@@ -79,6 +79,77 @@ export function collectReaders(
   return readers
 }
 
+// ── Presence cluster (Task 14) ─────────────────────────────────────────────
+
+/** One participant in the avatar cluster. */
+export interface Participant {
+  name: string
+  color: string
+  /** true = actively editing (has a recent caret/selection); false = viewing. */
+  editing: boolean
+}
+
+/**
+ * Reduce an awareness state map to the de-duplicated list of live participants for
+ * the title-bar avatar cluster.
+ *   • excludes `selfClientId`
+ *   • requires a `user.name` (drops nameless/user-less states)
+ *   • `editing` = the state carries a CollaborationCaret `cursor`/`selection` field
+ *     (a fresh one, when it has an `updatedAt`); otherwise the participant is
+ *     `viewing` (reading-only or merely present)
+ *   • de-duplicated by name (the same user open in two tabs shows once), preferring
+ *     an editing entry over a viewing one
+ *   • sorted by name for stable rendering
+ */
+export function presenceCluster(
+  states: Map<number, Record<string, unknown>>,
+  selfClientId: number,
+  now: number,
+  staleMs = 30_000,
+): Participant[] {
+  const byName = new Map<string, Participant>()
+
+  for (const [clientId, state] of states) {
+    if (clientId === selfClientId) continue
+
+    const user = state.user
+    if (
+      !user ||
+      typeof user !== 'object' ||
+      typeof (user as Record<string, unknown>).name !== 'string' ||
+      ((user as Record<string, unknown>).name as string).length === 0
+    ) {
+      continue
+    }
+
+    const name = (user as Record<string, unknown>).name as string
+    const rawColor = (user as Record<string, unknown>).color
+    const color = typeof rawColor === 'string' ? rawColor : '#888888'
+
+    // editing = a CollaborationCaret cursor/selection field is present (and fresh
+    // when it carries an updatedAt). The caret extension publishes `cursor`; we also
+    // accept `selection` defensively.
+    const caret =
+      (state.cursor as Record<string, unknown> | undefined) ??
+      (state.selection as Record<string, unknown> | undefined)
+    let editing = false
+    if (caret && typeof caret === 'object') {
+      const updatedAt = caret.updatedAt
+      editing = typeof updatedAt === 'number' ? now - updatedAt <= staleMs : true
+    }
+
+    const existing = byName.get(name)
+    if (!existing) {
+      byName.set(name, { name, color, editing })
+    } else if (editing && !existing.editing) {
+      // Prefer the editing entry when the same user appears twice (two tabs).
+      byName.set(name, { name, color, editing: true })
+    }
+  }
+
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
 /** Trailing+leading throttle. Returns a function with a `.cancel()` method. */
 export function throttle<A extends unknown[]>(
   fn: (...args: A) => void,

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { searchDocuments } from '@/lib/docs/repo'
 
 export const dynamic = 'force-dynamic'
@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic'
  * Empty or absent q → most recently updated docs.
  */
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const q = req.nextUrl.searchParams.get('q') ?? ''
   const docs = await searchDocuments(user.id, q)

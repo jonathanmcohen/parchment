@@ -138,12 +138,12 @@ describe('E1 — folders repo', () => {
     const { id: docId } = await createDocument(ownerId, { folderId: f1Id })
 
     // Move to f2
-    await moveDocument(docId, f2Id)
+    await moveDocument(docId, f2Id, ownerId)
     let inF2 = await listDocumentsInFolder(ownerId, f2Id)
     expect(inF2.map((d) => d.id)).toContain(docId)
 
     // Move to root
-    await moveDocument(docId, null)
+    await moveDocument(docId, null, ownerId)
     const atRoot = await listDocumentsInFolder(ownerId, null)
     expect(atRoot.map((d) => d.id)).toContain(docId)
 

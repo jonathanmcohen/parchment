@@ -1,69 +1,77 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
-import { getDocument, moveDocument, trashDocument } from '@/lib/docs/repo'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
+import { parseBulkRequest } from '@/lib/docs/bulk-action'
+import {
+  deleteDocumentPermanently,
+  getDocument,
+  moveDocument,
+  restoreDocument,
+  trashDocument,
+} from '@/lib/docs/repo'
 import { addTagToDoc } from '@/lib/docs/tags-repo'
 
 export const dynamic = 'force-dynamic'
 
-type BulkAction = 'move' | 'trash' | 'tag'
-
-interface BulkBody {
-  ids: unknown
-  action: unknown
-  folderId?: unknown
-  tagId?: unknown
-}
-
 export async function POST(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
-  const body = (await req.json()) as BulkBody
-
-  // Validate ids is a non-empty array of strings
-  if (
-    !Array.isArray(body.ids) ||
-    body.ids.length === 0 ||
-    !body.ids.every((id) => typeof id === 'string')
-  ) {
-    return NextResponse.json({ error: 'ids must be a non-empty string array' }, { status: 400 })
-  }
-
-  const ids = body.ids as string[]
-  const action = body.action as BulkAction
-
-  if (action !== 'move' && action !== 'trash' && action !== 'tag') {
-    return NextResponse.json({ error: 'action must be move, trash, or tag' }, { status: 400 })
-  }
-
-  if (action === 'tag') {
-    if (typeof body.tagId !== 'string' || !body.tagId) {
-      return NextResponse.json({ error: 'tagId is required for tag action' }, { status: 400 })
-    }
+  const parsed = parseBulkRequest((await req.json()) as Record<string, unknown>)
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
   }
 
   let affected = 0
 
-  for (const id of ids) {
-    // Confirm ownership — skip ids that don't belong to this user
+  for (const id of parsed.ids) {
+    // Confirm ownership — skip ids that don't belong to this user (no existence leak).
     const doc = await getDocument(id)
     if (!doc || doc.ownerId !== user.id) continue
 
-    if (action === 'move') {
-      const folderId =
-        body.folderId === null ? null : typeof body.folderId === 'string' ? body.folderId : null
-      await moveDocument(id, folderId)
-      affected++
-    } else if (action === 'trash') {
-      await trashDocument(user.id, id)
-      affected++
-    } else {
-      // tag — addTagToDoc handles tag ownership verification internally
-      try {
-        await addTagToDoc(user.id, id, body.tagId as string)
+    switch (parsed.action) {
+      case 'move': {
+        // §7g: moveDocument verifies the target folder is owned by user.id; a foreign
+        // folder throws 404 → skip that id rather than aborting the whole batch.
+        try {
+          await moveDocument(id, parsed.folderId, user.id)
+          affected++
+        } catch {
+          // foreign/missing target folder — skip this id
+        }
+        break
+      }
+      case 'trash': {
+        await trashDocument(user.id, id)
         affected++
-      } catch {
-        // tag or doc ownership check failed — skip
+        break
+      }
+      case 'restore': {
+        // J11-1: only meaningful for a trashed doc; restoreDocument is a no-op on a
+        // live doc, so we count it as affected only when it was actually trashed.
+        if (doc.trashedAt !== null) {
+          await restoreDocument(user.id, id)
+          affected++
+        }
+        break
+      }
+      case 'delete': {
+        // J11-1: PERMANENT delete — only from trash. deleteDocumentPermanently gates
+        // on owned-AND-trashed and returns false otherwise; it also removes the disk
+        // mirror + asset directory.
+        const removed = await deleteDocumentPermanently(user.id, id)
+        if (removed) affected++
+        break
+      }
+      case 'tag': {
+        // addTagToDoc handles tag ownership verification internally.
+        try {
+          await addTagToDoc(user.id, id, parsed.tagId)
+          affected++
+        } catch {
+          // tag or doc ownership check failed — skip
+        }
+        break
       }
     }
   }

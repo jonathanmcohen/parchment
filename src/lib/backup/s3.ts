@@ -69,3 +69,41 @@ export async function uploadToS3(
     }),
   )
 }
+
+/**
+ * Fetch the object at `key` from the configured S3-compatible bucket. Returns the
+ * body as a Uint8Array, or null when the object does not exist (NoSuchKey / 404) or
+ * S3 is unconfigured. Other transport errors propagate (the caller decides). Used by
+ * the J1 asset adapter to read attachments stored under the `assets/` key prefix.
+ *
+ * Dynamic-imports @aws-sdk/client-s3 so the SDK stays out of the default bundle.
+ */
+export async function getObjectFromS3(key: string): Promise<Uint8Array | null> {
+  const endpoint = process.env.BACKUP_S3_ENDPOINT
+  const bucket = process.env.BACKUP_S3_BUCKET
+  const accessKeyId = process.env.BACKUP_S3_ACCESS_KEY_ID
+  const secretAccessKey = process.env.BACKUP_S3_SECRET_ACCESS_KEY
+  if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) return null
+  const region = process.env.BACKUP_S3_REGION || 'us-east-1'
+
+  const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3')
+  const client = new S3Client({
+    region,
+    endpoint,
+    forcePathStyle: true,
+    credentials: { accessKeyId, secretAccessKey },
+  })
+
+  try {
+    const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+    const body = res.Body as { transformToByteArray?: () => Promise<Uint8Array> } | undefined
+    if (!body?.transformToByteArray) return null
+    return await body.transformToByteArray()
+  } catch (err) {
+    // A missing object is a normal "not found", not an error to surface.
+    const name = (err as { name?: string })?.name ?? ''
+    const status = (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode
+    if (name === 'NoSuchKey' || name === 'NotFound' || status === 404) return null
+    throw err
+  }
+}

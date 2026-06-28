@@ -10,6 +10,7 @@ import type { WatermarkConfig } from '@/lib/editor/watermark'
 import { dispatchWebhooks } from '@/lib/integrations/webhook-dispatch'
 import { serializeMarkdown } from '@/lib/markdown/serialize'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
+import { removeAssetsForDoc } from '@/lib/uploads/store'
 
 // B0 document lifecycle. No 'server-only' guard so the repo stays unit-testable;
 // it touches `db` (pg) and is only imported by server routes/components in app code.
@@ -123,6 +124,25 @@ export async function saveDocument(
 export async function getDocument(id: string): Promise<Doc | null> {
   const [row] = await db.select().from(schema.documents).where(eq(schema.documents.id, id)).limit(1)
   return row ?? null
+}
+
+/** A4: docs shared WITH this user via document_permissions (not owned by them),
+ *  newest-first, excludes trashed. Backs the "Shared with me" view. */
+export async function listSharedWithMe(userId: string): Promise<DocSummary[]> {
+  return db
+    .select({
+      id: schema.documents.id,
+      title: schema.documents.title,
+      updatedAt: schema.documents.updatedAt,
+      folderId: schema.documents.folderId,
+    })
+    .from(schema.documents)
+    .innerJoin(
+      schema.documentPermissions,
+      eq(schema.documentPermissions.docId, schema.documents.id),
+    )
+    .where(and(eq(schema.documentPermissions.userId, userId), isNull(schema.documents.trashedAt)))
+    .orderBy(desc(schema.documents.updatedAt))
 }
 
 /**
@@ -262,8 +282,11 @@ export async function listStarred(ownerId: string): Promise<DocRow[]> {
     .orderBy(desc(schema.documents.updatedAt))
 }
 
+/** A trashed doc row also carries trashedAt so the UI can show days-until-purge. */
+export type TrashedDocRow = DocRow & { trashedAt: Date | null }
+
 /** Trashed docs (trashedAt not null), most-recently-trashed first. */
-export async function listTrashed(ownerId: string): Promise<DocRow[]> {
+export async function listTrashed(ownerId: string): Promise<TrashedDocRow[]> {
   return db
     .select({
       id: schema.documents.id,
@@ -274,6 +297,8 @@ export async function listTrashed(ownerId: string): Promise<DocRow[]> {
       createdAt: schema.documents.createdAt,
       size: sql<number>`length(${schema.documents.markdown})`.as('size'),
       preview: sql<string>`left(${schema.documents.markdown}, 140)`.as('preview'),
+      // J11-3: surface when the doc was trashed so the list can show the countdown.
+      trashedAt: schema.documents.trashedAt,
     })
     .from(schema.documents)
     .where(and(eq(schema.documents.ownerId, ownerId), isNotNull(schema.documents.trashedAt)))
@@ -320,6 +345,42 @@ export async function restoreDocument(ownerId: string, id: string): Promise<void
 }
 
 /**
+ * J11-1: PERMANENTLY delete a single TRASHED doc (owner-scoped). Only deletes when
+ * the doc is owned by `ownerId` AND already in the trash (trashedAt IS NOT NULL) —
+ * a live doc is never hard-deleted by this path. Removes the disk mirror (BEFORE the
+ * row, since removeDocFromDisk reads diskPath) and the asset directory (AFTER). FK
+ * cascades clear shares / permissions / links / comments. Returns true if a row was
+ * deleted. NEVER throws on the best-effort fs cleanup.
+ */
+export async function deleteDocumentPermanently(ownerId: string, id: string): Promise<boolean> {
+  // Gate: must be owned AND trashed.
+  const [doc] = await db
+    .select({ id: schema.documents.id })
+    .from(schema.documents)
+    .where(
+      and(
+        eq(schema.documents.id, id),
+        eq(schema.documents.ownerId, ownerId),
+        isNotNull(schema.documents.trashedAt),
+      ),
+    )
+    .limit(1)
+  if (!doc) return false
+
+  // Remove the mirrored file first (reads diskPath off the still-present row).
+  await removeDocFromDisk(id)
+
+  const result = await db
+    .delete(schema.documents)
+    .where(and(eq(schema.documents.id, id), eq(schema.documents.ownerId, ownerId)))
+
+  // Clean the asset directory after the row is gone (best-effort, never throws).
+  await removeAssetsForDoc({ id })
+
+  return (result.rowCount ?? 0) > 0
+}
+
+/**
  * E11: Permanently delete trashed docs older than `retentionDays` for this owner.
  * No-op if retentionDays <= 0. Only touches docs where trashedAt is not null.
  * Returns the count purged.
@@ -351,8 +412,35 @@ export async function emptyTrash(ownerId: string): Promise<number> {
   return result.rowCount ?? 0
 }
 
-/** Move a doc to a folder (null = root). Owner-scoped by id. */
-export async function moveDocument(id: string, folderId: string | null): Promise<void> {
+/**
+ * Move a doc to a folder (null = root). Owner-scoped by id.
+ *
+ * §7g IDOR: `actingUserId` is REQUIRED. When a non-null `folderId` is given, the
+ * target folder MUST be owned by that user — otherwise a user could move a doc
+ * into ANOTHER user's folder tree (revealing the folder's existence and injecting
+ * content). A missing or foreign folder is indistinguishable from a denied one:
+ * we throw `{ status: 404 }` (no existence leak), which the route maps to a 404.
+ *
+ * The SAME guard applies to any future write that accepts a `folderId`
+ * (create-in-folder, duplicate-to-folder, from-template-in-folder, bulk-move):
+ * resolve the folder row, assert `folder.ownerId === actingUserId`, throw 404 on
+ * mismatch — before committing.
+ */
+export async function moveDocument(
+  id: string,
+  folderId: string | null,
+  actingUserId: string,
+): Promise<void> {
+  if (folderId !== null) {
+    const [folder] = await db
+      .select({ ownerId: schema.folders.ownerId })
+      .from(schema.folders)
+      .where(eq(schema.folders.id, folderId))
+      .limit(1)
+    if (!folder || folder.ownerId !== actingUserId) {
+      throw Object.assign(new Error('folder_not_found'), { status: 404 })
+    }
+  }
   await db
     .update(schema.documents)
     .set({ folderId, updatedAt: new Date() })
@@ -471,4 +559,70 @@ export async function setDocumentCustomCss(
     .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
 
   return true
+}
+
+/**
+ * J10/J12: shallow-merge `patch` into documents.meta (owner-scoped), preserving all
+ * other keys (watermark/customCss/etc.). Returns false when the doc is not found or
+ * not owned by this user. A patch value of `undefined` is written as-is (callers
+ * delete a key by spreading a meta without it; we keep this simple shallow merge to
+ * match the existing watermark/customCss writers). NEVER reached for a foreign doc.
+ */
+export async function mergeDocMeta(
+  ownerId: string,
+  docId: string,
+  patch: Record<string, unknown>,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ meta: schema.documents.meta })
+    .from(schema.documents)
+    .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
+    .limit(1)
+  if (!row) return false
+
+  const existingMeta =
+    row.meta !== null &&
+    row.meta !== undefined &&
+    typeof row.meta === 'object' &&
+    !Array.isArray(row.meta)
+      ? (row.meta as Record<string, unknown>)
+      : {}
+
+  const updatedMeta: Record<string, unknown> = { ...existingMeta, ...patch }
+
+  await db
+    .update(schema.documents)
+    .set({ meta: updatedMeta, updatedAt: new Date() })
+    .where(and(eq(schema.documents.id, docId), eq(schema.documents.ownerId, ownerId)))
+
+  return true
+}
+
+/**
+ * J10-2: persist the per-doc writing goal into documents.meta.writingGoal
+ * (owner-scoped). `targetWords <= 0` clears the goal. Returns false if not owned.
+ */
+export async function setDocumentWritingGoal(
+  ownerId: string,
+  docId: string,
+  targetWords: number,
+): Promise<boolean> {
+  const target = Number.isFinite(targetWords) ? Math.max(0, Math.round(targetWords)) : 0
+  const writingGoal = target > 0 ? { targetWords: target } : null
+  return mergeDocMeta(ownerId, docId, { writingGoal })
+}
+
+/**
+ * J12-2: persist the per-doc theme override into documents.meta.theme (owner-scoped).
+ * `theme` is the ALREADY-VALIDATED DocTheme (parseDocTheme'd by the route) — an empty
+ * object clears the override. Returns false if not owned. Token-only by construction
+ * (no raw CSS ever stored here).
+ */
+export async function setDocumentTheme(
+  ownerId: string,
+  docId: string,
+  theme: Record<string, unknown>,
+): Promise<boolean> {
+  const value = Object.keys(theme).length > 0 ? theme : null
+  return mergeDocMeta(ownerId, docId, { theme: value })
 }

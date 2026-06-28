@@ -1,9 +1,15 @@
 import { db, schema } from '@/db'
 import { isS3Configured, uploadToS3 } from '@/lib/backup/s3'
+import { isS3Active } from '@/lib/backup/s3-config'
 import { createWorkspaceBackup } from '@/lib/backup/service'
+import { backupVerifyJob } from '@/lib/backup/verify-job'
 import { purgeExpiredTrash } from '@/lib/docs/repo'
 import { getTrashRetentionDays } from '@/lib/docs/settings-repo'
+import { resolveGitSyncConfig } from '@/lib/git/sync-config'
+import { gitSyncJob } from '@/lib/git/sync-job'
 import { type JobState, Scheduler } from '@/lib/schedules/jobs'
+import { runEmbeddingBackfill } from '@/lib/search/backfill'
+import { isSemanticEnabled } from '@/lib/search/embeddings'
 
 // I10 — the in-process scheduler SINGLETON. This is the server-only composition
 // layer over the pure, timer-free core in `./jobs.ts`: it registers the real,
@@ -21,6 +27,9 @@ import { type JobState, Scheduler } from '@/lib/schedules/jobs'
 const TICK_INTERVAL_MS = 60_000 // 60s
 
 const DAY_MS = 24 * 60 * 60 * 1000
+
+// Default git-sync cadence (hours) when none is supplied to reconfigureGitSyncJob.
+const HOUR_MS_DEFAULT_HOURS = 24
 
 // HMR-safe singleton: cache on globalThis so Next's dev module re-imports reuse
 // the same Scheduler + interval instead of leaking new ones each reload.
@@ -45,11 +54,29 @@ class SchedulerSingleton {
    * IDEMPOTENT: a second call while already started is a no-op — it never
    * creates a duplicate timer. Safe to call from `register()` across HMR.
    */
-  start(): void {
+  async start(): Promise<void> {
     if (this.started) return
     this.started = true
 
     this.registerDefaults()
+
+    // DB-config awareness: registerDefaults() only sees the env-based S3 toggle
+    // (sync). At boot, additionally consult the DB-backed config (env OR DB) so a
+    // UI-configured S3 backup is registered without a restart. Best-effort — a
+    // config-read failure must never block boot.
+    try {
+      if (await isS3Active()) this.reconfigureS3Job(true)
+    } catch {
+      // ignore — the job can still be live-registered later via the settings UI
+    }
+
+    // E — register the git-sync job if a DB-backed git config is enabled.
+    try {
+      const git = await resolveGitSyncConfig()
+      if (git) this.reconfigureGitSyncJob(true, git.scheduleHours)
+    } catch {
+      // ignore — live-registered later via the settings UI
+    }
 
     // Kick a tick on the next macrotask so a due-on-boot job runs shortly after
     // start without blocking the server boot path.
@@ -60,6 +87,41 @@ class SchedulerSingleton {
     }, TICK_INTERVAL_MS)
     // Don't keep the process alive solely for the scheduler (clean test/CLI exit).
     this.timer.unref?.()
+  }
+
+  /**
+   * Live add/remove the 's3-backup' job without a restart (called after the
+   * settings UI saves the S3 config). Idempotent: registering when already
+   * present is a no-op; disabling when absent is a no-op. The job runs on the
+   * same 24h cadence as the env-configured path.
+   */
+  reconfigureS3Job(enabled: boolean): void {
+    this.registerDefaults()
+    if (enabled) {
+      if (!this.core.has('s3-backup')) {
+        this.core.register({ name: 's3-backup', intervalMs: DAY_MS, run: s3BackupJob })
+      }
+    } else if (this.core.has('s3-backup')) {
+      this.core.unregister('s3-backup')
+    }
+  }
+
+  /**
+   * Live add/remove the periodic 'git-sync' job. Registered only when enabled AND
+   * scheduleHours > 0; scheduleHours === 0 is push-on-change mode (the disk
+   * watcher pushes), so the periodic job is removed. Re-registering replaces the
+   * interval. Idempotent.
+   */
+  reconfigureGitSyncJob(enabled: boolean, scheduleHours = HOUR_MS_DEFAULT_HOURS): void {
+    this.registerDefaults()
+    const periodic = enabled && scheduleHours > 0
+    if (periodic) {
+      const intervalMs = scheduleHours * 3_600_000
+      // Always (re-)register so a changed cadence takes effect.
+      this.core.register({ name: 'git-sync', intervalMs, run: gitSyncJob })
+    } else if (this.core.has('git-sync')) {
+      this.core.unregister('git-sync')
+    }
   }
 
   /**
@@ -122,6 +184,15 @@ class SchedulerSingleton {
       run: heartbeatJob,
     })
 
+    // I3 (backup-sync OWNS this — §7l/§1g): backup-verify is ON BY DEFAULT with
+    // NO env gate. Weekly, it builds a real backup for the first user and parses
+    // it back; any warning/corruption sets lastStatus:'error'. Zero-config.
+    this.core.register({
+      name: 'backup-verify',
+      intervalMs: 7 * DAY_MS,
+      run: backupVerifyJob,
+    })
+
     // OFF-UNLESS-CONFIGURED (E9 / Cairn CFG-2): the scheduled S3 backup job is
     // registered ONLY when S3 is configured via env. An unconfigured install has
     // no 's3-backup' job at all — its getState() shows only trash-purge and
@@ -132,6 +203,17 @@ class SchedulerSingleton {
         name: 's3-backup',
         intervalMs: DAY_MS, // 24h
         run: s3BackupJob,
+      })
+    }
+
+    // J4-2 OFF-UNLESS-CONFIGURED: the embedding backfill is registered ONLY when
+    // EMBEDDINGS_URL is set. It fills vectors for docs created before semantic
+    // search was configured (embedding IS NULL); best-effort and bounded per run.
+    if (isSemanticEnabled()) {
+      this.core.register({
+        name: 'embed-backfill',
+        intervalMs: 6 * 60 * 60 * 1000, // 6h
+        run: embedBackfillJob,
       })
     }
   }
@@ -154,6 +236,15 @@ async function trashPurgeJob(): Promise<void> {
 /** Cheap liveness check: confirm the DB answers a trivial query. */
 async function heartbeatJob(): Promise<void> {
   await db.select({ id: schema.users.id }).from(schema.users).limit(1)
+}
+
+/**
+ * J4-2: fill embeddings for docs that have none yet (embedding IS NULL). Bounded
+ * per run; best-effort (runEmbeddingBackfill never throws). Only registered when
+ * EMBEDDINGS_URL is set, so this never runs on an install without semantic search.
+ */
+async function embedBackfillJob(): Promise<void> {
+  await runEmbeddingBackfill()
 }
 
 /**

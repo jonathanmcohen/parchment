@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { getDocument } from '@/lib/docs/repo'
 import { readAtCommit } from '@/lib/git/repo'
 
@@ -9,12 +9,10 @@ export const dynamic = 'force-dynamic'
 // at a specific commit (read-only preview of a historical version). Auth +
 // ownership; 400 if oid missing, 404 if the doc has no disk_path or the blob
 // isn't found at that commit. Best-effort: readAtCommit never throws.
-export async function GET(
-  req: NextRequest,
-  ctx: { params: Promise<{ id: string }> },
-): Promise<NextResponse<{ content: string } | { error: string }>> {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const { id } = await ctx.params
   const doc = await getDocument(id)

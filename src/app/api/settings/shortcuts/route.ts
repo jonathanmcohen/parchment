@@ -1,13 +1,14 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { getShortcutOverrides, setShortcutOverrides } from '@/lib/help/keymap-repo'
 
 export const dynamic = 'force-dynamic'
 
 /** GET /api/settings/shortcuts → { overrides: Record<action, combo> } */
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const overrides = await getShortcutOverrides(user.id)
   return NextResponse.json({ overrides })
@@ -15,8 +16,9 @@ export async function GET(req: NextRequest) {
 
 /** PUT /api/settings/shortcuts { overrides: Record<action, combo> } → { overrides } */
 export async function PUT(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const body = (await req.json().catch(() => null)) as { overrides?: unknown } | null
   if (body === null || typeof body !== 'object') {

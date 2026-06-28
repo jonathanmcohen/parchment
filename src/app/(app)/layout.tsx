@@ -16,6 +16,7 @@ import { SignOutButton } from '@/lib/auth/sign-out-button'
 import { getWorkspaceTheme } from '@/lib/docs/settings-repo'
 import { themeCssVars } from '@/lib/editor/theme'
 import { getShortcutOverrides } from '@/lib/help/keymap-repo'
+import { isMaintenanceMode } from '@/lib/maintenance'
 
 // S2-2 polish (v0.1.9): the sidebar footer is a cohesive cluster of nav-row-
 // height controls separated by a hairline from the nav above. Controls share:
@@ -35,6 +36,7 @@ const nav = [
   { href: '/files', key: 'files', icon: 'folder' },
   { href: '/files?view=recents', key: 'recents', icon: 'schedule' },
   { href: '/templates', key: 'templates', icon: 'grid_view' },
+  { href: '/graph', key: 'graph', icon: 'hub' },
   { href: '/inbox', key: 'inbox', icon: 'inbox' },
   { href: '/files?view=shared', key: 'shared', icon: 'group' },
   { href: '/files?view=starred', key: 'starred', icon: 'star' },
@@ -64,6 +66,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // I2: the owner's persisted shortcut overrides, merged with DEFAULT_BINDINGS by
   // the GlobalShortcuts dispatcher (key routing) and the HelpMenu (cheat sheet).
   const shortcutOverrides = await getShortcutOverrides(user.id)
+
+  const maintenanceActive = await isMaintenanceMode()
 
   const sidebar = (
     <>
@@ -129,6 +133,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <a href="#main-content" className="parchment-skip-link">
         {t('shell.skipToContent')}
       </a>
+      {/* I6: maintenance-mode banner — injected server-side when the lock file exists. */}
+      {maintenanceActive && (
+        <div
+          role="alert"
+          data-testid="maintenance-banner"
+          style={{
+            background: 'var(--warning, #b45309)',
+            color: '#fff',
+            padding: '8px 16px',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            textAlign: 'center',
+            position: 'sticky',
+            top: 0,
+            zIndex: 9999,
+          }}
+        >
+          Maintenance mode is active. The workspace is read-only until an admin disables it.
+        </div>
+      )}
       <AppShell
         sidebar={sidebar}
         topbarRight={

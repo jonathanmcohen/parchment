@@ -3,10 +3,12 @@
 import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { db, schema } from '@/db'
+import { logAudit } from '@/lib/audit'
 import { ownerExists } from '@/lib/auth/bootstrap'
 import { hashPassword } from '@/lib/auth/password'
 import { createSession } from '@/lib/auth/session'
 import { seedGuideWorkspace } from '@/lib/docs/seed-guide'
+import { env } from '@/lib/env'
 
 export type SetupState = { error: string } | null
 
@@ -32,7 +34,13 @@ export async function createOwner(_prev: SetupState, formData: FormData): Promis
 
   const [user] = await db
     .insert(schema.users)
-    .values({ name, email, passwordHash, role: 'owner' })
+    .values({
+      name,
+      email,
+      passwordHash,
+      role: 'owner', // §7d: owner role MUST NOT be downgraded; only quotaMb is added here
+      quotaMb: env.defaultQuotaMb,
+    })
     .onConflictDoNothing({ target: schema.users.email })
     .returning({ id: schema.users.id })
 
@@ -47,12 +55,11 @@ export async function createOwner(_prev: SetupState, formData: FormData): Promis
     return { error: 'Could not create the owner account.' }
   }
 
-  await db.insert(schema.auditLog).values({
-    actorId: user.id,
-    action: 'setup',
-    targetType: 'user',
-    targetId: user.id,
-  })
+  // §7b: emit via the hash-chained logAudit (NOT a raw db.insert with a NULL
+  // entry_hash) so this first-boot row joins the chain and verifyAuditChain stays
+  // ok. First-boot has no request scope, so ip is omitted (null). logAudit never
+  // throws — owner creation must not be blocked by an audit write.
+  await logAudit('setup', { actorId: user.id, targetType: 'user', targetId: user.id })
 
   await createSession(user.id)
 
@@ -66,5 +73,7 @@ export async function createOwner(_prev: SetupState, formData: FormData): Promis
     // ignore — the guide is a nicety; owner creation already succeeded.
   }
 
-  redirect('/')
+  // I4: after account creation, redirect to the setup config wizard step.
+  // The wizard shows DB status, SMTP config, and S3 checklist — informational only.
+  redirect('/setup/config')
 }

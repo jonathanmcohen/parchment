@@ -39,6 +39,8 @@ type Props = {
   suggestionsOpen: boolean
   onToggleBacklinks: () => void
   backlinksOpen: boolean
+  /** J3-1: capture the current document as a reusable template. */
+  onSaveAsTemplate: () => void
   /** K7: grammar-check panel toggle — only rendered when grammar is enabled. */
   onToggleGrammar?: () => void
   grammarOpen?: boolean
@@ -169,6 +171,7 @@ export function Toolbar({
   suggestionsOpen,
   onToggleBacklinks,
   backlinksOpen,
+  onSaveAsTemplate,
   onToggleGrammar,
   grammarOpen = false,
   grammarEnabled = false,
@@ -462,6 +465,7 @@ export function Toolbar({
     { label: 'Toggle comments', icon: 'comment', onSelect: onToggleComments },
     { label: 'Version history', icon: 'history', onSelect: onToggleVersionHistory },
     { label: 'Backlinks', icon: 'call_received', onSelect: onToggleBacklinks },
+    { label: 'Save as template', icon: 'bookmark_add', onSelect: onSaveAsTemplate },
     {
       label: 'Suggesting mode',
       icon: 'edit_note',

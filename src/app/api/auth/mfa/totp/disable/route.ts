@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { logAuditRequest } from '@/lib/audit'
 import { authenticateRequest } from '@/lib/auth/guard'
 import { verifyTotp } from '@/lib/auth/mfa'
 import { disableTotp, getMfa } from '@/lib/auth/mfa-repo'
@@ -50,5 +51,11 @@ export async function POST(req: NextRequest) {
   }
 
   await disableTotp(user.id)
+  // §5.3: audit the second-factor removal (canonical dotted verb 'mfa.disable').
+  await logAuditRequest('mfa.disable', req, {
+    actorId: user.id,
+    targetType: 'user',
+    targetId: user.id,
+  })
   return NextResponse.json({ disabled: true })
 }

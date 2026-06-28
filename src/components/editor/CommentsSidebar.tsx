@@ -2,7 +2,8 @@
 
 import type { Editor } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { parseMentions } from '@/lib/docs/comments-shared'
+import { resolveAnchor, serializeAnchor } from '@/lib/docs/comment-anchor'
+import { type AnchorJson, parseMentions } from '@/lib/docs/comments-shared'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,8 @@ type CommentRow = {
   mentions: unknown
   anchorFrom: number | null
   anchorTo: number | null
+  anchorStart: AnchorJson | null
+  anchorEnd: AnchorJson | null
   resolved: boolean
   createdAt: string
 }
@@ -88,6 +91,9 @@ export function CommentsSidebar({
   // configured server-side (the GET route returns { address: null } then).
   const [inboundAddress, setInboundAddress] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // H1: thread ids whose durable anchor no longer resolves (the anchored text was
+  // deleted) — rendered in an "Orphaned" group instead of vanishing.
+  const [orphanedThreadIds, setOrphanedThreadIds] = useState<Set<string>>(new Set())
 
   const focusRefs = useRef<Record<string, HTMLElement | null>>({})
 
@@ -107,6 +113,73 @@ export function CommentsSidebar({
   useEffect(() => {
     void load()
   }, [load])
+
+  // ── H1: re-anchor durable comments onto the live doc ──────────────────────
+  // For each ROOT comment, resolve its stored anchor (Yjs RelativePosition JSON
+  // first, integer fallback when JSON is null/legacy) → an absolute range, re-apply
+  // the TRANSIENT CommentMark over it (never serialized to markdown), and flag the
+  // thread orphaned when its durable anchor no longer resolves (anchored text
+  // deleted). Re-runs on comment load AND on every editor update (debounced) so the
+  // highlight tracks concurrent edits. The CommentMark itself is not persisted.
+  const reanchor = useCallback(() => {
+    const nextOrphans = new Set<string>()
+    const cmType = editor.schema.marks.comment
+    if (!cmType) return
+
+    // Clear all existing comment marks, then re-apply from current anchors. One
+    // transaction; addToHistory:false so re-anchoring is invisible to undo and
+    // never persists (the doc content is unchanged structurally).
+    const tr = editor.state.tr
+    tr.removeMark(0, editor.state.doc.content.size, cmType)
+
+    for (const c of comments) {
+      // Only root comments carry an anchor (threadId === id).
+      if (c.threadId !== c.id) continue
+      let range: { from: number; to: number } | null = null
+      if (c.anchorStart && c.anchorEnd) {
+        range = resolveAnchor(editor, { start: c.anchorStart, end: c.anchorEnd })
+        if (range === null) {
+          // durable anchor present but unresolvable → the text was deleted.
+          nextOrphans.add(c.threadId)
+          continue
+        }
+      } else if (c.anchorFrom !== null && c.anchorTo !== null) {
+        // Legacy / non-collab fallback: clamp to the current doc size.
+        const max = editor.state.doc.content.size
+        const from = Math.min(c.anchorFrom, max)
+        const to = Math.min(c.anchorTo, max)
+        if (from < to) range = { from, to }
+      }
+      if (!range) continue
+      if (range.from >= range.to) continue
+      tr.addMark(range.from, range.to, cmType.create({ threadId: c.threadId }))
+    }
+
+    tr.setMeta('addToHistory', false)
+    // Only dispatch when the transaction actually changed something (avoids a
+    // render loop: dispatching fires editor 'update' which re-runs this effect).
+    if (tr.docChanged || tr.steps.length > 0) editor.view.dispatch(tr)
+    setOrphanedThreadIds((prev) => {
+      if (prev.size === nextOrphans.size && [...prev].every((id) => nextOrphans.has(id))) {
+        return prev
+      }
+      return nextOrphans
+    })
+  }, [editor, comments])
+
+  useEffect(() => {
+    reanchor()
+    let raf = 0
+    const onUpdate = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(reanchor)
+    }
+    editor.on('update', onUpdate)
+    return () => {
+      cancelAnimationFrame(raf)
+      editor.off('update', onUpdate)
+    }
+  }, [editor, reanchor])
 
   // ── Load the per-doc inbound email address (J5) ───────────────────────────
 
@@ -196,6 +269,10 @@ export function CommentsSidebar({
     if (!body) return
     const { from, to } = editor.state.selection
     const hasSelection = from !== to
+    // H1: durable anchor — serialize the selection to a Yjs RelativePosition pair
+    // (survives concurrent edits). Falls back to integer positions when the editor
+    // is not collab-bound (serializeAnchor returns null).
+    const durable = hasSelection ? serializeAnchor(editor, from, to) : null
 
     setLoading(true)
     try {
@@ -205,6 +282,7 @@ export function CommentsSidebar({
         body: JSON.stringify({
           body,
           ...(hasSelection ? { anchorFrom: from, anchorTo: to } : {}),
+          ...(durable ? { anchorStart: durable.start, anchorEnd: durable.end } : {}),
           mentions: parseMentions(body),
         }),
       })
@@ -460,6 +538,9 @@ export function CommentsSidebar({
           filteredRoots.map((root) => {
             const replies = (threadMap.get(root.threadId) ?? []).filter((c) => c.id !== c.threadId)
             const isFocused = focusedThreadId === root.threadId
+            // H1: the anchored text was deleted — the highlight is gone, so flag the
+            // thread as orphaned instead of letting it look anchored to nothing.
+            const isOrphaned = orphanedThreadIds.has(root.threadId)
 
             return (
               <article
@@ -468,6 +549,7 @@ export function CommentsSidebar({
                   focusRefs.current[root.threadId] = el
                 }}
                 aria-label="Comment thread"
+                data-orphaned={isOrphaned ? 'true' : undefined}
                 onClick={() => setFocusedThreadId(root.threadId)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') setFocusedThreadId(root.threadId)
@@ -481,6 +563,19 @@ export function CommentsSidebar({
                   outlineOffset: -2,
                 }}
               >
+                {isOrphaned && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--muted)',
+                      marginBottom: 4,
+                      fontStyle: 'italic',
+                    }}
+                    title="The text this comment was anchored to was deleted."
+                  >
+                    Orphaned — anchored text deleted
+                  </div>
+                )}
                 {/* Root comment */}
                 <CommentCard comment={root} />
 

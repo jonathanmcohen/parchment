@@ -4,7 +4,7 @@
 // No network / db / docx live-conversion — those stay in integration tests.
 
 import { describe, expect, it } from 'vitest'
-import { detectImportType, htmlToMarkdown, importToPmJson } from '@/lib/import'
+import { detectImportType, htmlToMarkdown, importToPmJson, isUserImportType } from '@/lib/import'
 
 // PK magic bytes for a valid zip header
 const PK_BYTES = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00])
@@ -43,6 +43,30 @@ describe('detectImportType', () => {
 
   it('returns unknown for .zip without PK magic', () => {
     expect(detectImportType('bad.zip', EMPTY)).toBe('unknown')
+  })
+})
+
+// ─── isUserImportType (J7-1: md+docx ONLY in the user-facing flow) ────────────
+
+describe('isUserImportType', () => {
+  it('allows md', () => {
+    expect(isUserImportType('md')).toBe(true)
+  })
+
+  it('allows docx', () => {
+    expect(isUserImportType('docx')).toBe(true)
+  })
+
+  it('rejects html in the user flow (lib still supports it)', () => {
+    expect(isUserImportType('html')).toBe(false)
+  })
+
+  it('rejects notion-zip in the user flow', () => {
+    expect(isUserImportType('notion-zip')).toBe(false)
+  })
+
+  it('rejects unknown', () => {
+    expect(isUserImportType('unknown')).toBe(false)
   })
 })
 
@@ -131,5 +155,59 @@ describe('importToPmJson', () => {
     const result = await importToPmJson('unknown', EMPTY, 'image.png')
     expect(result.json.type).toBe('doc')
     expect(result.warnings.length).toBeGreaterThan(0)
+  })
+})
+
+// ─── rewriteDataUriImages (J7-4: docx embedded-image extraction) ──────────────
+// Pure helper: given markdown with data-URI image refs and a persist callback,
+// it persists each image and rewrites the src to the returned URL. On a persist
+// failure it keeps the data URI and records a warning. No db / fs in this test —
+// the persist callback is a stub.
+
+describe('rewriteDataUriImages', () => {
+  it('rewrites a data-URI image src to the persisted URL', async () => {
+    const { rewriteDataUriImages } = await import('@/lib/import')
+    const md = '![alt](data:image/png;base64,iVBORw0KGgo=)\n\ntext'
+    const warnings: string[] = []
+    const out = await rewriteDataUriImages(md, warnings, async (bytes, mime) => {
+      expect(bytes).toBeInstanceOf(Uint8Array)
+      expect(mime).toBe('image/png')
+      return '/api/docs/abc/assets/img-1.png'
+    })
+    expect(out).toContain('/api/docs/abc/assets/img-1.png')
+    expect(out).not.toContain('data:image/png')
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('keeps the data URI + records a warning when persistence fails', async () => {
+    const { rewriteDataUriImages } = await import('@/lib/import')
+    const md = '![x](data:image/png;base64,iVBORw0KGgo=)'
+    const warnings: string[] = []
+    const out = await rewriteDataUriImages(md, warnings, async () => null)
+    expect(out).toContain('data:image/png;base64,iVBORw0KGgo=')
+    expect(warnings.length).toBeGreaterThan(0)
+  })
+
+  it('passes through markdown with no data-URI images unchanged', async () => {
+    const { rewriteDataUriImages } = await import('@/lib/import')
+    const md = '# Title\n\n![remote](https://example.com/x.png)'
+    const warnings: string[] = []
+    const out = await rewriteDataUriImages(md, warnings, async () => '/should/not/be/used')
+    expect(out).toBe(md)
+    expect(warnings).toHaveLength(0)
+  })
+
+  it('decodes base64 payload to the correct bytes', async () => {
+    const { rewriteDataUriImages } = await import('@/lib/import')
+    // "PNG" in base64 is "UE5H"
+    const md = '![a](data:image/png;base64,UE5H)'
+    let captured: Uint8Array | null = null
+    await rewriteDataUriImages(md, [], async (bytes) => {
+      captured = bytes
+      return '/api/docs/abc/assets/x.png'
+    })
+    expect(captured).not.toBeNull()
+    const bytes = captured as unknown as Uint8Array
+    expect(Array.from(bytes)).toEqual([0x50, 0x4e, 0x47]) // P N G
   })
 })

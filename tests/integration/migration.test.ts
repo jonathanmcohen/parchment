@@ -42,22 +42,29 @@ afterAll(async () => {
 })
 
 describe('A1 — migration + schema', () => {
-  it('creates exactly the v0.1 tables', async () => {
+  it('creates exactly the expected tables (v0.1 + Phase 0 app_config)', async () => {
     const c = await client()
     const { rows } = await c.query<{ tablename: string }>(
       "select tablename from pg_tables where schemaname = 'public' order by 1",
     )
     await c.end()
     expect(rows.map((r) => r.tablename)).toEqual([
+      // Phase 0 §1b — instance encrypted config (migration 0020).
+      'app_config',
       'audit_log',
       'cairn_links',
       'collab_state',
       'comments',
       'doc_links',
       'doc_versions',
+      'document_permissions',
       'document_tags',
       'documents',
       'folders',
+      'invites',
+      'login_lockouts',
+      'oidc_identities',
+      'oidc_login_flows',
       'passkeys',
       'pats',
       'sessions',
@@ -90,5 +97,29 @@ describe('A1 — migration + schema', () => {
     const { rows } = await c.query<{ ok: number }>('select 1 as ok')
     await c.end()
     expect(rows[0]?.ok).toBe(1)
+  })
+
+  it('0022 adds disabled_at, document_permissions, invites', async () => {
+    const c = await client()
+    const cols = await c.query(
+      `select column_name from information_schema.columns where table_name='users'`,
+    )
+    expect(cols.rows.map((r) => r.column_name)).toContain('disabled_at')
+
+    const tables = await c.query(
+      `select table_name from information_schema.tables where table_schema='public'`,
+    )
+    const names = tables.rows.map((r) => r.table_name)
+    expect(names).toContain('document_permissions')
+    expect(names).toContain('invites')
+
+    // document_permissions PK is (doc_id, user_id)
+    const pk = await c.query(
+      `select a.attname from pg_index i
+         join pg_attribute a on a.attrelid=i.indrelid and a.attnum = any(i.indkey)
+        where i.indrelid='document_permissions'::regclass and i.indisprimary`,
+    )
+    await c.end()
+    expect(pk.rows.map((r) => r.attname).sort()).toEqual(['doc_id', 'user_id'])
   })
 })

@@ -69,3 +69,28 @@ jobs:
           sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # I8: container security scan. Runs AFTER publish so the pushed image is
+  # available to pull. Fails the workflow on HIGH or CRITICAL CVE findings.
+  # Results are uploaded to the GitHub Security tab as SARIF even on failure.
+  scan:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # required to upload SARIF to GitHub Security tab
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/jonathanmcohen/parchment:${{ github.ref_name }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: '1'          # fail the job on HIGH/CRITICAL findings
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: always()              # upload even if the scan step above failed
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif

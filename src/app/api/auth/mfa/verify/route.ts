@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { db, schema } from '@/db'
+import { logAuditRequest } from '@/lib/audit'
 import { verifyTotpStep } from '@/lib/auth/mfa'
 import { consumeRecoveryCode, getMfa, recordTotpStep } from '@/lib/auth/mfa-repo'
 import { clientIp, rateLimit } from '@/lib/auth/rate-limit'
@@ -75,9 +75,10 @@ export async function POST(req: NextRequest) {
   const promoted = await promotePendingSession()
   if (!promoted) return NextResponse.json({ error: 'no_pending_session' }, { status: 401 })
 
-  await db.insert(schema.auditLog).values({
+  // §5.3: route the audit write through logAuditRequest (hash chain + ip from the
+  // request headers) instead of a raw db.insert that bypassed the chain.
+  await logAuditRequest('login', req, {
     actorId: userId,
-    action: 'login',
     targetType: 'user',
     targetId: userId,
     meta: { factor: token.length > 0 ? 'totp' : 'recovery_code' },

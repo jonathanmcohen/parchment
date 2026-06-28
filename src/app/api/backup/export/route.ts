@@ -5,7 +5,7 @@
 // (jszip + the backup service touch @/db / Node APIs).
 
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { createWorkspaceBackup } from '@/lib/backup/service'
 
 export const runtime = 'nodejs'
@@ -17,8 +17,10 @@ function dateStamp(iso: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  // J8 §7i: self-service export is read-only → requires docs:read.
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const createdAt = new Date().toISOString()
   const zipBytes = await createWorkspaceBackup(user.id, createdAt)

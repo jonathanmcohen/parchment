@@ -111,3 +111,59 @@ describe('A4 — audit log writer', () => {
     expect(Number(post[0]?.n ?? 0)).toBe(startCount + 2)
   })
 })
+
+// §5.1 — logAuditRequest convenience wrapper: extracts the client IP from a
+// request's headers (XFF first hop, then x-real-ip) and passes it to logAudit. It
+// must NEVER throw, and the chain must stay valid after each write.
+describe('§5.1 — logAuditRequest', () => {
+  function reqWith(headers: Record<string, string>): { headers: Headers } {
+    return { headers: new Headers(headers) }
+  }
+
+  it('writes the X-Forwarded-For first hop into audit_log.ip', async () => {
+    const { logAuditRequest, verifyAuditChain } = await import('@/lib/audit')
+    await logAuditRequest('login', reqWith({ 'x-forwarded-for': '198.51.100.9, 10.0.0.1' }), {})
+    const c = await client()
+    const { rows } = await c.query<{ ip: string | null }>(
+      'select ip from audit_log order by created_at desc limit 1',
+    )
+    await c.end()
+    expect(rows[0]?.ip).toBe('198.51.100.9')
+    expect((await verifyAuditChain()).ok).toBe(true)
+  })
+
+  it('falls back to x-real-ip when no XFF', async () => {
+    const { logAuditRequest } = await import('@/lib/audit')
+    await logAuditRequest('login', reqWith({ 'x-real-ip': '203.0.113.5' }), {})
+    const c = await client()
+    const { rows } = await c.query<{ ip: string | null }>(
+      'select ip from audit_log order by created_at desc limit 1',
+    )
+    await c.end()
+    expect(rows[0]?.ip).toBe('203.0.113.5')
+  })
+
+  it('writes NULL ip (not the string "unknown") when no IP header is present', async () => {
+    const { logAuditRequest } = await import('@/lib/audit')
+    await logAuditRequest('login', reqWith({}), {})
+    const c = await client()
+    const { rows } = await c.query<{ ip: string | null }>(
+      'select ip from audit_log order by created_at desc limit 1',
+    )
+    await c.end()
+    expect(rows[0]?.ip).toBeNull()
+  })
+
+  it('never throws even if the underlying write fails', async () => {
+    const { logAuditRequest } = await import('@/lib/audit')
+    // A request whose headers getter throws must not blow up the caller.
+    const bad = {
+      headers: {
+        get() {
+          throw new Error('boom')
+        },
+      },
+    } as unknown as { headers: Headers }
+    await expect(logAuditRequest('login', bad, {})).resolves.toBeUndefined()
+  })
+})

@@ -24,11 +24,14 @@ CREATE TABLE IF NOT EXISTS "comments" (
   "mentions" jsonb NOT NULL DEFAULT '[]',
   "anchor_from" integer,
   "anchor_to" integer,
+  "anchor_start" jsonb,
+  "anchor_end" jsonb,
   "resolved" boolean NOT NULL DEFAULT false,
   "created_at" timestamp with time zone NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS "comments_doc_idx" ON "comments" ("doc_id");
 CREATE INDEX IF NOT EXISTS "comments_thread_idx" ON "comments" ("thread_id");
+CREATE INDEX IF NOT EXISTS "comments_doc_resolved_idx" ON "comments" ("doc_id", "resolved");
 `
 
 beforeAll(async () => {
@@ -115,21 +118,43 @@ describe('D1 — comments repo', () => {
     expect(thread.every((c) => c.threadId === threadId)).toBe(true)
   })
 
-  it('setResolved(threadId, true) marks the root comment resolved', async () => {
+  it('setResolved(threadId, docId, true) marks the root comment resolved', async () => {
     const { createThread, listComments, setResolved } = await import('@/lib/docs/comments-repo')
     const { id, threadId } = await createThread(docId, ownerId, { body: 'To resolve' })
-    await setResolved(threadId, true)
+    expect(await setResolved(threadId, docId, true)).toBe(1)
 
     const all = await listComments(docId)
     const root = all.find((c) => c.id === id)
     expect(root?.resolved).toBe(true)
   })
 
-  it('deleteComment removes the row', async () => {
+  it('deleteComment removes the row (doc-scoped)', async () => {
     const { createThread, deleteComment, listComments } = await import('@/lib/docs/comments-repo')
     const { id } = await createThread(docId, ownerId, { body: 'To delete' })
-    await deleteComment(id)
+    expect(await deleteComment(id, docId)).toBe(1)
     const all = await listComments(docId)
     expect(all.find((c) => c.id === id)).toBeUndefined()
+  })
+
+  // ── H1 Task 10 — durable anchor JSON persists + returns ───────────────────
+  it('createThread persists anchorStart/anchorEnd JSON; listComments returns them', async () => {
+    const { createThread, listComments } = await import('@/lib/docs/comments-repo')
+    const start = { tname: 'default', item: { client: 1, clock: 2 }, assoc: 0 }
+    const end = { tname: 'default', item: { client: 1, clock: 5 }, assoc: 0 }
+    const { id } = await createThread(docId, ownerId, {
+      body: 'durable',
+      anchorFrom: 3,
+      anchorTo: 6,
+      anchorStart: start,
+      anchorEnd: end,
+    })
+    const all = await listComments(docId)
+    const row = all.find((c) => c.id === id)
+    expect(row).toBeDefined()
+    expect(row?.anchorStart).toEqual(start)
+    expect(row?.anchorEnd).toEqual(end)
+    // integer fallback still stored alongside.
+    expect(row?.anchorFrom).toBe(3)
+    expect(row?.anchorTo).toBe(6)
   })
 })

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { Editor } from '@tiptap/core'
+import { Slice } from '@tiptap/pm/model'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { baseExtensions } from '@/lib/editor/tiptap-extensions'
 
@@ -194,5 +195,200 @@ describe('D2 Suggesting extension', () => {
 
     const marks = collectMarks(editor.getJSON() as DocJson)
     expect(marks.some((m) => m.type === 'insertion')).toBe(false)
+  })
+})
+
+// ── Task 4 — close the documented data-integrity gaps ───────────────────────
+// These need a real EditorView (mounted) so handlePaste / handleDOMEvents.cut
+// run, and to build a paste Slice from the schema.
+
+function mountedEditor(content: string): { editor: Editor; el: HTMLElement } {
+  const el = document.createElement('div')
+  document.body.appendChild(el)
+  const ed = new Editor({ element: el, extensions: baseExtensions, content })
+  return { editor: ed, el }
+}
+
+/** Build a one-text-node Slice carrying `text` (openStart/openEnd 0). */
+function textSlice(editor: Editor, text: string): Slice {
+  const node = editor.schema.text(text)
+  const paragraph = editor.schema.nodes.paragraph
+  if (!paragraph) throw new Error('no paragraph node in schema')
+  const frag = paragraph.create(null, node).content
+  // The pasted slice's content is the inline fragment (the text node), depth 0.
+  return new Slice(frag, 0, 0)
+}
+
+describe('D2 Suggesting — Task 4 tracked-change integrity gaps', () => {
+  let editor: Editor
+  let el: HTMLElement
+
+  afterEach(() => {
+    editor?.destroy()
+    el?.remove()
+  })
+
+  it('paste OVER a selection: replaced text is deletion-marked, pasted text is insertion-marked', () => {
+    ;({ editor, el } = mountedEditor('<p>hello world</p>'))
+    editor.commands.setSuggesting(true)
+    // Select "hello" (positions 1..6).
+    editor.commands.setTextSelection({ from: 1, to: 6 })
+    const slice = textSlice(editor, 'HI')
+
+    // Invoke the registered handlePaste prop directly (jsdom has no ClipboardEvent).
+    const handled = editor.view.someProp('handlePaste', (fn) =>
+      fn(editor.view, new Event('paste') as ClipboardEvent, slice),
+    )
+    expect(handled).toBe(true)
+
+    const json = editor.getJSON() as DocJson
+    const marks = collectMarks(json)
+    const text = collectText(json)
+    // The old "hello" survives as deletion-marked (tracked), not vanished.
+    expect(marks.some((m) => m.type === 'deletion')).toBe(true)
+    expect(text).toContain('hello')
+    // The pasted "HI" is present and insertion-marked.
+    expect(text).toContain('HI')
+    expect(marks.some((m) => m.type === 'insertion')).toBe(true)
+  })
+
+  it('node-level delete of a whole block while suggesting does NOT silently remove it', () => {
+    // A doc with an image block (leaf) followed by a paragraph; select the image
+    // and press Backspace. The image must NOT just disappear without a tracked change.
+    ;({ editor, el } = mountedEditor(
+      '<p>before</p><img src="https://example.com/y.png" /><p>after</p>',
+    ))
+    editor.commands.setSuggesting(true)
+
+    // Find the image node position.
+    let imgPos = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'image') imgPos = pos
+      return true
+    })
+    expect(imgPos).toBeGreaterThanOrEqual(0)
+
+    const sizeBefore = editor.state.doc.nodeSize
+    // Select the image node (NodeSelection) and Backspace.
+    editor.commands.setNodeSelection(imgPos)
+    const ev = new KeyboardEvent('keydown', { key: 'Backspace' })
+    editor.view.someProp('handleKeyDown', (fn) => fn(editor.view, ev))
+
+    // The image must still be in the doc (not hard-removed) — either block-flagged
+    // deleted or left intact; it must NOT have silently vanished.
+    let stillThere = false
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'image') stillThere = true
+      return true
+    })
+    expect(stillThere).toBe(true)
+    expect(editor.state.doc.nodeSize).toBe(sizeBefore)
+  })
+
+  it('Cut (Cmd-X) over a selection while suggesting behaves like a tracked deletion', () => {
+    ;({ editor, el } = mountedEditor('<p>hello world</p>'))
+    editor.commands.setSuggesting(true)
+    editor.commands.setTextSelection({ from: 1, to: 6 }) // "hello"
+
+    const handled = editor.view.someProp('handleDOMEvents', (handlers) => {
+      const cut = (handlers as Record<string, (v: unknown, e: Event) => boolean>).cut
+      if (!cut) return false
+      return cut(editor.view, new Event('cut'))
+    })
+    expect(handled).toBe(true)
+
+    const json = editor.getJSON() as DocJson
+    const text = collectText(json)
+    const marks = collectMarks(json)
+    // Cut must NOT hard-delete: "hello" stays as deletion-marked text.
+    expect(text).toContain('hello')
+    expect(marks.some((m) => m.type === 'deletion')).toBe(true)
+  })
+})
+
+// ── Task 5 — accept/reject application under interleaved authors ────────────
+describe('D2 Suggesting — accept/reject under interleaved authors (Task 5)', () => {
+  let editor: Editor
+
+  afterEach(() => {
+    editor?.destroy()
+  })
+
+  /** Apply a mark of `type` over [from,to) by `author`. */
+  function mark(
+    ed: Editor,
+    from: number,
+    to: number,
+    type: 'insertion' | 'deletion',
+    author: string,
+  ) {
+    ed.commands.command(({ tr, dispatch, state }) => {
+      const mt = state.schema.marks[type]
+      if (dispatch && mt) {
+        tr.addMark(from, to, mt.create({ author, color: '#1a73e8' }))
+        dispatch(tr)
+      }
+      return true
+    })
+  }
+
+  it('acceptAllChanges on A-ins / B-del / A-ins keeps insertions, removes deletion, no corruption', () => {
+    // Doc text: "AAAxxxBBB" → positions 1..4 "AAA"(ins A), 4..7 "xxx"(del B), 7..10 "BBB"(ins A)
+    editor = new Editor({ extensions: baseExtensions, content: '<p>AAAxxxBBB</p>' })
+    mark(editor, 1, 4, 'insertion', 'alice')
+    mark(editor, 4, 7, 'deletion', 'bob')
+    mark(editor, 7, 10, 'insertion', 'alice')
+
+    editor.commands.acceptAllChanges()
+
+    const json = editor.getJSON() as DocJson
+    const text = collectText(json)
+    const marks = collectMarks(json)
+    // Both insertions survive as text, no marks; the deletion's "xxx" removed.
+    expect(text).toBe('AAABBB')
+    expect(marks.some((m) => m.type === 'insertion')).toBe(false)
+    expect(marks.some((m) => m.type === 'deletion')).toBe(false)
+  })
+
+  it('rejectAllChanges on the same interleaved doc removes insertions, restores deletion text', () => {
+    editor = new Editor({ extensions: baseExtensions, content: '<p>AAAxxxBBB</p>' })
+    mark(editor, 1, 4, 'insertion', 'alice')
+    mark(editor, 4, 7, 'deletion', 'bob')
+    mark(editor, 7, 10, 'insertion', 'alice')
+
+    editor.commands.rejectAllChanges()
+
+    const json = editor.getJSON() as DocJson
+    const text = collectText(json)
+    const marks = collectMarks(json)
+    // Insertions gone, the deletion-marked "xxx" restored (kept, mark dropped).
+    expect(text).toBe('xxx')
+    expect(marks.some((m) => m.type === 'insertion')).toBe(false)
+    expect(marks.some((m) => m.type === 'deletion')).toBe(false)
+  })
+
+  it('single accept of a NON-edge change leaves later changes intact + correctly located', () => {
+    // "keepAAAtail" : 1..5 "keep" plain, 5..8 "AAA"(ins alice), 8..12 "tail" → but
+    // we want a change after the accepted one. Use: "preINSmidDELend"
+    // text: "preMIDend" with INS over "pre"(1..4 alice) and DEL over "end"(7..10 bob).
+    editor = new Editor({ extensions: baseExtensions, content: '<p>preMIDend</p>' })
+    mark(editor, 1, 4, 'insertion', 'alice') // "pre"
+    mark(editor, 7, 10, 'deletion', 'bob') // "end"
+
+    // Accept the FIRST change (the insertion "pre", not at the doc end). The later
+    // deletion must remain a tracked change over "end".
+    editor.commands.acceptChange(1, 4, 'insertion')
+
+    const json = editor.getJSON() as DocJson
+    const marks = collectMarks(json)
+    const text = collectText(json)
+    // "pre" kept as plain text (insertion accepted); "end" still deletion-marked.
+    expect(text).toContain('pre')
+    expect(text).toContain('end')
+    expect(marks.some((m) => m.type === 'insertion')).toBe(false)
+    expect(marks.some((m) => m.type === 'deletion')).toBe(true)
+    // The deletion run is still over "end" — re-collect and check.
+    const dels = marks.filter((m) => m.type === 'deletion')
+    expect(dels).toHaveLength(1)
   })
 })

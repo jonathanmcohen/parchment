@@ -10,6 +10,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
   vector,
 } from 'drizzle-orm/pg-core'
@@ -37,6 +38,12 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   passwordHash: text('password_hash'), // null until owner sets a password
   role: text('role').notNull().default('owner'),
+  // A6: a disabled user keeps all rows but can never authenticate. null = active.
+  // Enforced server-side in getUserByToken/authenticateRequest (defense in depth).
+  disabledAt: timestamp('disabled_at', { withTimezone: true }),
+  // I2 (migration 0024): per-user storage quota in MiB. 0 = unlimited (default).
+  // Checked at asset-upload time. Set via admin usage dashboard or env default.
+  quotaMb: integer('quota_mb').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -93,16 +100,74 @@ export const documents = pgTable(
   ],
 )
 
-// ─── Audit log (A4 / I5) — append-only ───
+// ─── Document permissions (A4) — per-user ACL layered over public/password links ─
+// A row grants `user` a `role` on `doc`. The doc OWNER is implicit (no row needed)
+// and always has full control. `role` is a doc-scoped capability, distinct from the
+// workspace `users.role`: viewer (read) < commenter (read+comment) < editor (write).
+// Composite PK (doc_id, user_id) — one role per (doc, user). Both FKs cascade so a
+// deleted doc or user leaves no dangling grant. Enforced server-side by
+// canAccessDoc/resolveDocAccess — NEVER a UI-only gate.
+export const documentPermissions = pgTable(
+  'document_permissions',
+  {
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('viewer'), // viewer | commenter | editor
+    grantedBy: uuid('granted_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.docId, t.userId] }),
+    index('document_permissions_user_idx').on(t.userId),
+  ],
+)
+
+// ─── Invites (A5) — pending user invitations; accepted → a real user + password ─
+// An invite is created by an admin/owner with a target email + workspace role. The
+// `tokenHash` is the sha256 of the single-use accept token carried in the email
+// link (the plaintext token is shown/sent once and never persisted). Accepting
+// within `expiresAt` creates the user (or sets the password on a pre-created
+// disabled placeholder) and deletes the invite. `acceptedAt` marks consumed.
+export const invites = pgTable(
+  'invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    email: text('email').notNull(),
+    role: text('role').notNull().default('editor'), // workspace role to grant on accept; canonical default is 'editor' (never 'member')
+    tokenHash: text('token_hash').notNull().unique(), // sha256 of the accept token
+    invitedBy: uuid('invited_by').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }), // null until consumed
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('invites_email_idx').on(t.email)],
+)
+
+// ─── Audit log (A4 / I5 / Phase 0 §1d) — append-only, hash-chained ───
+// `action` is the merged AuditAction union (see src/lib/audit/index.ts): the legacy
+// flat verbs (create|delete|share|export|login|setup) plus A's + G's dotted verbs.
+// `targetId` is text (migration 0021, was uuid) so any identifier — user/doc id, OIDC
+// subject, session hash, config key — stores without a cast. `ip` is the caller's
+// best-effort client IP. `prevHash`/`entryHash` form the sha256 integrity chain
+// (entry_hash is computed from the PERSISTED created_at and back-filled by logAudit;
+// the append-only trigger permits ONLY that NULL->hash transition). verifyAuditChain
+// re-derives and compares the chain.
 export const auditLog = pgTable(
   'audit_log',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
-    action: text('action').notNull(), // create | delete | share | export | login
+    action: text('action').notNull(),
     targetType: text('target_type'),
-    targetId: uuid('target_id'),
+    targetId: text('target_id'),
     meta: jsonb('meta'),
+    ip: text('ip'),
+    prevHash: text('prev_hash'),
+    entryHash: text('entry_hash'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('audit_log_created_idx').on(t.createdAt)],
@@ -189,6 +254,8 @@ export const pats = pgTable(
     ownerId: uuid('owner_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    // J8: canonical scope strings ('docs:read' | 'docs:write'); default '{}' = none.
+    scopes: text('scopes').array().notNull().default([]),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -246,10 +313,19 @@ export const comments = pgTable(
     mentions: jsonb('mentions').notNull().default([]),
     anchorFrom: integer('anchor_from'),
     anchorTo: integer('anchor_to'),
+    // H1: durable Yjs RelativePosition anchors (relativePositionToJSON shape). Null
+    // on replies and on legacy rows; integer anchorFrom/anchorTo stay as fallback.
+    anchorStart: jsonb('anchor_start'),
+    anchorEnd: jsonb('anchor_end'),
     resolved: boolean('resolved').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('comments_doc_idx').on(t.docId), index('comments_thread_idx').on(t.threadId)],
+  (t) => [
+    index('comments_doc_idx').on(t.docId),
+    index('comments_thread_idx').on(t.threadId),
+    // H1: the sidebar open/resolved filter + published-doc comment count hit this.
+    index('comments_doc_resolved_idx').on(t.docId, t.resolved),
+  ],
 )
 
 // ─── Document version history (D3) ──────────────────────────────────────────
@@ -422,6 +498,72 @@ export const templates = pgTable(
   },
   (t) => [index('templates_owner_idx').on(t.ownerId)],
 )
+
+// ─── OIDC identities (G2) — link a workspace user to an external IdP identity ──
+// One row per (issuer, subject) — the SECURITY-CORRECT link anchor: `subject` is
+// the IdP's stable per-user id and `issuer` namespaces it. We key on (issuer,
+// subject), NOT email, because email is mutable at the IdP and an attacker who
+// controls an email at a second IdP must not be able to hijack a Parchment
+// account. `email` is stored for display/audit only and is never the match key.
+// Cascades on user delete. Created in migration 0023.
+export const oidcIdentities = pgTable(
+  'oidc_identities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    issuer: text('issuer').notNull(), // the IdP `iss`
+    subject: text('subject').notNull(), // the IdP `sub` (stable per-user id)
+    email: text('email'), // email at link time — audit/debug ONLY, never the match key
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  },
+  (t) => [
+    unique('oidc_identities_issuer_subject_uq').on(t.issuer, t.subject), // one identity per IdP user
+    index('oidc_identities_user_idx').on(t.userId),
+  ],
+)
+
+// ─── OIDC login flows (G2) — short-lived server-side PKCE/state/nonce store ────
+// The PKCE `codeVerifier`, `state`, and `nonce` are NEVER trusted from the client:
+// they live here (a DB row, not a cookie) so they are unforgeable and single-use.
+// `state` is the CSPRNG lookup key. The row is DELETED atomically on callback
+// consumption (DELETE … WHERE state=$1 AND expiresAt>now() RETURNING *), so a
+// replayed callback finds nothing. Expired rows (`expiresAt`, ~10 min) are
+// rejected by that same predicate and swept. Created in migration 0023.
+export const oidcLoginFlows = pgTable('oidc_login_flows', {
+  state: text('state').primaryKey(), // CSPRNG; also the lookup key
+  codeVerifier: text('code_verifier').notNull(), // PKCE; never leaves the server
+  nonce: text('nonce').notNull(), // bound into the ID-token check
+  redirectTo: text('redirect_to'), // post-login landing (validated app-relative only)
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(), // ~10 min
+})
+
+// ─── Login lockouts (G4) — per-account brute-force lockout ─────────────────────
+// Keyed on `emailHash` (sha256 of the normalised email) — NEVER the raw email —
+// so the lockout table can't be mined for the set of registered addresses. After
+// N consecutive password failures the account is locked until `lockedUntil`
+// regardless of source IP (per-IP throttling alone is bypassable behind a botnet /
+// spoofed XFF). A successful login resets the row. Created in migration 0023.
+export const loginLockouts = pgTable('login_lockouts', {
+  emailHash: text('email_hash').primaryKey(), // sha256 of the normalised email; never raw
+  failedCount: integer('failed_count').notNull().default(0),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ─── app_config (Phase 0, §1b) — instance-level ENCRYPTED config ─────────────
+// All instance secrets (SMTP, S3, git-sync, OIDC client secret, etc.) live here
+// encrypted via src/lib/crypto/secret-box.ts and accessed ONLY through
+// src/lib/config/repo.ts. Created in migration 0020 (hand-written, NOT drizzle-kit
+// managed). No other module reads/writes this table directly.
+export const appConfig = pgTable('app_config', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
 
 // Hint for the migration generator: ensure extensions exist.
 export const _extensions = sql`create extension if not exists vector;`

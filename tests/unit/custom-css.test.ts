@@ -211,3 +211,38 @@ describe('parseCustomCss', () => {
     expect(parseCustomCss(big).length).toBe(20_000)
   })
 })
+
+// ── J12-3: workspace/share break-out regression (the values that reach anonymous
+// viewers MUST be neutralized) ────────────────────────────────────────────────
+
+describe('sanitizeCustomCss — J12-3 break-out regression', () => {
+  it('strips a vbscript: scheme', () => {
+    const out = sanitizeCustomCss("div { background: url(vbscript:msgbox('x')) }")
+    expect(out).not.toMatch(/vbscript:/i)
+  })
+
+  it('strips @scope with NO prelude (relative form)', () => {
+    const out = sanitizeCustomCss('@scope { :scope { color: red } }')
+    expect(out).not.toContain('@scope')
+  })
+
+  it('neutralizes a </style> break-out hidden inside a comment', () => {
+    const out = sanitizeCustomCss('/* </style><script>x</script> */ h1 { color: red }')
+    expect(out).not.toContain('<')
+  })
+
+  it('strips a protocol-relative url that the structured pass might miss', () => {
+    const out = sanitizeCustomCss("div { background: url('//evil.example/x.png') }")
+    expect(out).not.toContain('//evil.example')
+  })
+
+  it('pipeline output for a hostile sheet never contains < or an external scheme', () => {
+    const hostile =
+      '@import "//evil/x.css"; @scope(:root){body{background:url(https://evil/t)}} a::after{content:"</style>"}'
+    const out = prepareCustomCss(hostile, SCOPE)
+    expect(out).not.toContain('<')
+    expect(out).not.toContain('@import')
+    expect(out).not.toContain('@scope')
+    expect(out).not.toMatch(/https?:\/\//)
+  })
+})

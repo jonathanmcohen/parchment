@@ -5,7 +5,7 @@ import { type LoginState, login } from './actions'
 
 const initialState: LoginState = null
 
-export function LoginForm() {
+export function LoginForm({ ssoEnabled = false }: { ssoEnabled?: boolean }) {
   const [state, action, pending] = useActionState(login, initialState)
 
   // Once the password step returns mfaRequired, swap to the second-factor step.
@@ -14,49 +14,68 @@ export function LoginForm() {
   }
 
   return (
-    <form action={action} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="font-medium text-sm">
-          Email
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="font-medium text-sm">
-          Password
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-        />
-      </div>
-
-      {state && 'error' in state ? (
-        <p role="alert" className="text-[var(--error)] text-sm">
-          {state.error}
-        </p>
+    <div className="flex flex-col gap-4">
+      {ssoEnabled ? (
+        <>
+          {/* G2: SSO entry point — a plain link (GET) to the OIDC start route. Shown
+              only when OIDC is enabled (ssoEnabled prop, resolved server-side). */}
+          <a
+            href="/api/auth/sso/start"
+            className="rounded-lg border border-[var(--border)] px-4 py-2 text-center font-medium text-sm hover:bg-[var(--background)]"
+          >
+            Sign in with SSO
+          </a>
+          <div className="flex items-center gap-3 text-[var(--muted)] text-xs">
+            <span className="h-px flex-1 bg-[var(--border)]" />
+            or
+            <span className="h-px flex-1 bg-[var(--border)]" />
+          </div>
+        </>
       ) : null}
+      <form action={action} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="email" className="font-medium text-sm">
+            Email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+          />
+        </div>
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-lg bg-[var(--primary)] px-4 py-2 font-medium text-[var(--on-primary)] disabled:opacity-60"
-      >
-        {pending ? 'Signing in…' : 'Sign in'}
-      </button>
-    </form>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="password" className="font-medium text-sm">
+            Password
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+          />
+        </div>
+
+        {state && 'error' in state ? (
+          <p role="alert" className="text-[var(--error)] text-sm">
+            {state.error}
+          </p>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-lg bg-[var(--primary)] px-4 py-2 font-medium text-[var(--on-primary)] disabled:opacity-60"
+        >
+          {pending ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
+    </div>
   )
 }
 

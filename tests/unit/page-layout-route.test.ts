@@ -13,9 +13,17 @@ const authenticateRequest = vi.fn()
 const getPageLayoutMode = vi.fn()
 const setPageLayoutMode = vi.fn()
 
-vi.mock('@/lib/auth/guard', () => ({
-  authenticateRequest: (req: NextRequest) => authenticateRequest(req),
-}))
+vi.mock('@/lib/auth/guard', async () => {
+  const { NextResponse } = await import('next/server')
+  return {
+    authenticateRequest: (req: NextRequest) => authenticateRequest(req),
+    apiAuthFailure: (status: 401 | 403) =>
+      NextResponse.json(
+        { error: status === 403 ? 'insufficient_scope' : 'unauthorized' },
+        { status },
+      ),
+  }
+})
 vi.mock('@/lib/docs/settings-repo', () => ({
   getPageLayoutMode: (id: string) => getPageLayoutMode(id),
   setPageLayoutMode: (id: string, mode: unknown) => setPageLayoutMode(id, mode),
@@ -39,7 +47,7 @@ describe('v0.1.5 — GET/PUT /api/settings/page-layout', () => {
   })
 
   it('GET returns 401 when unauthenticated', async () => {
-    authenticateRequest.mockResolvedValue(null)
+    authenticateRequest.mockResolvedValue({ ok: false, status: 401 })
     const { GET } = await import('@/app/api/settings/page-layout/route')
     const res = await GET(makeReq())
     expect(res.status).toBe(401)
@@ -47,7 +55,7 @@ describe('v0.1.5 — GET/PUT /api/settings/page-layout', () => {
   })
 
   it('GET returns the stored mode for the authenticated owner', async () => {
-    authenticateRequest.mockResolvedValue({ id: 'owner-1' })
+    authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'owner-1' } })
     getPageLayoutMode.mockResolvedValue('paged')
     const { GET } = await import('@/app/api/settings/page-layout/route')
     const res = await GET(makeReq())
@@ -57,7 +65,7 @@ describe('v0.1.5 — GET/PUT /api/settings/page-layout', () => {
   })
 
   it('PUT returns 401 when unauthenticated', async () => {
-    authenticateRequest.mockResolvedValue(null)
+    authenticateRequest.mockResolvedValue({ ok: false, status: 401 })
     const { PUT } = await import('@/app/api/settings/page-layout/route')
     const res = await PUT(makeReq({ mode: 'paged' }))
     expect(res.status).toBe(401)
@@ -65,7 +73,7 @@ describe('v0.1.5 — GET/PUT /api/settings/page-layout', () => {
   })
 
   it('PUT rejects an invalid mode with 400', async () => {
-    authenticateRequest.mockResolvedValue({ id: 'owner-1' })
+    authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'owner-1' } })
     const { PUT } = await import('@/app/api/settings/page-layout/route')
     expect((await PUT(makeReq({ mode: 'bogus' }))).status).toBe(400)
     expect((await PUT(makeReq({ mode: 123 }))).status).toBe(400)
@@ -74,7 +82,7 @@ describe('v0.1.5 — GET/PUT /api/settings/page-layout', () => {
   })
 
   it('PUT rejects a missing/invalid JSON body with 400', async () => {
-    authenticateRequest.mockResolvedValue({ id: 'owner-1' })
+    authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'owner-1' } })
     const { PUT } = await import('@/app/api/settings/page-layout/route')
     const res = await PUT(makeReq())
     expect(res.status).toBe(400)
@@ -82,7 +90,7 @@ describe('v0.1.5 — GET/PUT /api/settings/page-layout', () => {
   })
 
   it('PUT persists "paged" and echoes the normalized stored value', async () => {
-    authenticateRequest.mockResolvedValue({ id: 'owner-1' })
+    authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'owner-1' } })
     setPageLayoutMode.mockResolvedValue('paged')
     const { PUT } = await import('@/app/api/settings/page-layout/route')
     const res = await PUT(makeReq({ mode: 'paged' }))
@@ -92,7 +100,7 @@ describe('v0.1.5 — GET/PUT /api/settings/page-layout', () => {
   })
 
   it('PUT persists "continuous"', async () => {
-    authenticateRequest.mockResolvedValue({ id: 'owner-1' })
+    authenticateRequest.mockResolvedValue({ ok: true, user: { id: 'owner-1' } })
     setPageLayoutMode.mockResolvedValue('continuous')
     const { PUT } = await import('@/app/api/settings/page-layout/route')
     const res = await PUT(makeReq({ mode: 'continuous' }))

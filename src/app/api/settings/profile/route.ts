@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { type NextRequest, NextResponse } from 'next/server'
 import { db, schema } from '@/db'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,8 +16,9 @@ const MAX_NAME_LENGTH = 100
 // name. Session OR PAT may call it (it is a personal-profile write, not a
 // credential rotation), so plain authenticateRequest is fine.
 export async function PUT(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   let body: unknown
   try {

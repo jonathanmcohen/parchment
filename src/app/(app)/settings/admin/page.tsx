@@ -8,7 +8,68 @@ export default function AdminSettingsPage() {
         Operational controls for owners and administrators.
       </p>
 
-      <section aria-labelledby="admin-observability" className="mt-10">
+      <section aria-labelledby="admin-email" className="mt-10">
+        <h2 id="admin-email" className="font-medium text-lg">
+          Email
+        </h2>
+        <p className="mt-1 text-[var(--muted)] text-sm">
+          Outbound email for invites and notifications.
+        </p>
+        <ul className="mt-4 flex flex-col gap-2">
+          <li>
+            <Link
+              href="/settings/admin/smtp"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Email (SMTP)</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Configure outbound email for invites and notifications.
+              </span>
+            </Link>
+          </li>
+        </ul>
+      </section>
+
+      <section
+        aria-labelledby="admin-people"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
+        <h2 id="admin-people" className="font-medium text-lg">
+          People
+        </h2>
+        <p className="mt-1 text-[var(--muted)] text-sm">
+          Invite people, manage roles, and control account access.
+        </p>
+        <ul className="mt-4 flex flex-col gap-2">
+          <li>
+            <Link
+              href="/settings/users"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Users</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Create, invite, disable, and assign roles to workspace members (Plan A1).
+              </span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/settings/admin/sso"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Single sign-on (OIDC)</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Connect an OpenID Connect identity provider for SSO login (Plan G2).
+              </span>
+            </Link>
+          </li>
+        </ul>
+      </section>
+
+      <section
+        aria-labelledby="admin-observability"
+        className="mt-12 border-t border-[var(--border)] pt-8"
+      >
         <h2 id="admin-observability" className="font-medium text-lg">
           Observability
         </h2>
@@ -38,6 +99,28 @@ export default function AdminSettingsPage() {
               </span>
             </Link>
           </li>
+          <li>
+            <Link
+              href="/settings/admin/usage"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Usage</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Per-user document count, content size, asset storage, and quota overview (I2).
+              </span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/settings/admin/migrations"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Migrations</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                View applied database migrations (I5). Migrations run automatically on startup.
+              </span>
+            </Link>
+          </li>
         </ul>
       </section>
 
@@ -63,12 +146,23 @@ export default function AdminSettingsPage() {
           </li>
           <li>
             <Link
-              href="/settings/admin/backup"
+              href="/settings/backup"
               className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
             >
               <span className="font-medium text-sm">Backup</span>
               <span className="mt-0.5 block text-[var(--muted)] text-sm">
                 Download, restore, and configure scheduled off-site backups (Plan I4).
+              </span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/settings/admin/maintenance"
+              className="block rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 hover:bg-[var(--background)]"
+            >
+              <span className="font-medium text-sm">Maintenance mode</span>
+              <span className="mt-0.5 block text-[var(--muted)] text-sm">
+                Block all write operations while keeping reads available (I6).
               </span>
             </Link>
           </li>

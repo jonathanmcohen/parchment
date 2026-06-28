@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { backlinks } from '@/lib/docs/doc-links-repo'
 import { getDocument } from '@/lib/docs/repo'
 
@@ -14,8 +14,9 @@ type RouteCtx = { params: Promise<{ id: string }> }
  * not found or not owned by the caller.
  */
 export async function GET(req: NextRequest, ctx: RouteCtx) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
   const { id } = await ctx.params
   const doc = await getDocument(id)
   if (!doc || doc.ownerId !== user.id)

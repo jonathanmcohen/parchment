@@ -54,13 +54,15 @@ describe('I4 — scheduler s3-backup registration (off-unless-configured)', () =
     ;(globalThis as Record<string, unknown>).__scheduler = savedGlobal
   })
 
-  it('does NOT register s3-backup when S3 is unconfigured — only trash-purge + db-heartbeat', async () => {
+  it('does NOT register s3-backup when S3 is unconfigured — trash-purge + db-heartbeat + backup-verify only', async () => {
     const { scheduler } = await import('@/lib/schedules/scheduler')
     const names = scheduler.getState().map((j) => j.name)
     expect(names).toContain('trash-purge')
     expect(names).toContain('db-heartbeat')
+    // backup-sync registers backup-verify ON BY DEFAULT (§1g/§7l).
+    expect(names).toContain('backup-verify')
     expect(names).not.toContain('s3-backup')
-    expect(names).toHaveLength(2)
+    expect(names).toHaveLength(3)
   })
 
   it('registers s3-backup (24h) when all four BACKUP_S3_* vars are set', async () => {

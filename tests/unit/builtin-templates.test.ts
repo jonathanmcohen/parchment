@@ -46,4 +46,17 @@ describe('G2 — builtin templates', () => {
     expect(meeting?.name).toBeTruthy()
     expect(getBuiltinTemplate('does-not-exist')).toBeUndefined()
   })
+
+  // J3-2 — categories
+  it('every template declares a known category', () => {
+    const known = new Set(['Work', 'Writing', 'Personal'])
+    for (const t of BUILTIN_TEMPLATES) {
+      expect(known.has(t.category)).toBe(true)
+    }
+  })
+
+  it('ships templates across more than one category', () => {
+    const cats = new Set(BUILTIN_TEMPLATES.map((t) => t.category))
+    expect(cats.size).toBeGreaterThanOrEqual(2)
+  })
 })

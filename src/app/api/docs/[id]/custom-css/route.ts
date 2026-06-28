@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { setDocumentCustomCss } from '@/lib/docs/repo'
 import { parseCustomCss } from '@/lib/editor/custom-css'
 
@@ -12,8 +12,9 @@ export const dynamic = 'force-dynamic'
  * Stores the raw-but-parsed CSS; sanitize+scope happen at render time.
  */
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const { id } = await params
   const body = (await req.json()) as { css?: unknown }

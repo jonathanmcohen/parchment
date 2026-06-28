@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/auth/guard'
 import { issuePat, listPats } from '@/lib/auth/pat'
+import { normalizeScopes } from '@/lib/auth/scopes'
 
 // PAT management is owner-only and guarded by a live session — a PAT cannot mint
 // or list other PATs (use the cookie session in Developer settings).
@@ -39,9 +40,25 @@ export async function POST(req: NextRequest) {
 
   if (!name) return NextResponse.json({ error: 'name_required' }, { status: 400 })
 
-  const issued = await issuePat(user.id, name)
+  // J8: scopes from the request, coerced to the canonical set (bare 'read'/'write'
+  // and unknowns are dropped). Default to docs:read when none/invalid are supplied so
+  // a token is never accidentally minted with zero capability.
+  const rawScopes =
+    typeof body === 'object' && body !== null && 'scopes' in body
+      ? (body as { scopes: unknown }).scopes
+      : []
+  let scopes = normalizeScopes(rawScopes)
+  if (scopes.length === 0) scopes = ['docs:read']
+
+  const issued = await issuePat(user.id, name, scopes)
   return NextResponse.json(
-    { id: issued.id, name: issued.name, tokenPrefix: issued.tokenPrefix, token: issued.token },
+    {
+      id: issued.id,
+      name: issued.name,
+      tokenPrefix: issued.tokenPrefix,
+      scopes: issued.scopes,
+      token: issued.token,
+    },
     { status: 201 },
   )
 }

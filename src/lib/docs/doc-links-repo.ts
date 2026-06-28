@@ -7,6 +7,10 @@ import { db, schema } from '@/db'
 
 export type Backlink = { id: string; title: string }
 
+export type GraphNode = { id: string; title: string }
+export type GraphEdge = { from: string; to: string }
+export type LinkGraph = { nodes: GraphNode[]; edges: GraphEdge[] }
+
 /**
  * Replace the outgoing wiki links for `sourceId` with exactly `targetIds`.
  *
@@ -68,4 +72,35 @@ export async function backlinks(targetDocId: string, ownerId: string): Promise<B
       ),
     )
     .orderBy(schema.documents.title)
+}
+
+/**
+ * J5-2: the wiki-link graph for an owner — every owned, non-trashed doc as a
+ * node, and every doc_links edge whose BOTH endpoints are owned + non-trashed.
+ * An edge to a deleted target never appears (the FK cascade removes the row;
+ * we also filter defensively). Self-links are excluded. Used by the graph view.
+ */
+export async function graphEdges(ownerId: string): Promise<LinkGraph> {
+  const nodes = await db
+    .select({ id: schema.documents.id, title: schema.documents.title })
+    .from(schema.documents)
+    .where(and(eq(schema.documents.ownerId, ownerId), isNull(schema.documents.trashedAt)))
+    .orderBy(schema.documents.title)
+
+  const ownedIds = new Set(nodes.map((n) => n.id))
+
+  // Pull all link rows whose SOURCE is owned + non-trashed; then keep only those
+  // whose TARGET is also an owned, non-trashed node (the node set above).
+  const rows = await db
+    .select({
+      from: schema.docLinks.sourceDocId,
+      to: schema.docLinks.targetDocId,
+    })
+    .from(schema.docLinks)
+    .innerJoin(schema.documents, eq(schema.documents.id, schema.docLinks.sourceDocId))
+    .where(and(eq(schema.documents.ownerId, ownerId), isNull(schema.documents.trashedAt)))
+
+  const edges = rows.filter((e) => e.from !== e.to && ownedIds.has(e.to))
+
+  return { nodes, edges }
 }

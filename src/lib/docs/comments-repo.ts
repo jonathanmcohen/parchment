@@ -1,5 +1,6 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { db, schema } from '@/db'
+import type { AnchorJson } from '@/lib/docs/comments-shared'
 import { dispatchWebhooks } from '@/lib/integrations/webhook-dispatch'
 
 // D1 comments data layer. No 'server-only' guard so the repo stays unit-testable.
@@ -39,7 +40,15 @@ function fireCommentCreated(docId: string, body: string): void {
 export async function createThread(
   docId: string,
   authorId: string | null,
-  opts: { body: string; anchorFrom?: number; anchorTo?: number; mentions?: string[] },
+  opts: {
+    body: string
+    anchorFrom?: number
+    anchorTo?: number
+    // H1: durable Yjs RelativePosition anchors (relativePositionToJSON shape).
+    anchorStart?: AnchorJson | null
+    anchorEnd?: AnchorJson | null
+    mentions?: string[]
+  },
 ): Promise<{ id: string; threadId: string }> {
   const [row] = await db
     .insert(schema.comments)
@@ -51,6 +60,8 @@ export async function createThread(
       mentions: opts.mentions ?? [],
       anchorFrom: opts.anchorFrom ?? null,
       anchorTo: opts.anchorTo ?? null,
+      anchorStart: opts.anchorStart ?? null,
+      anchorEnd: opts.anchorEnd ?? null,
       resolved: false,
     })
     .returning({ id: schema.comments.id })
@@ -105,15 +116,32 @@ export async function listComments(docId: string): Promise<Comment[]> {
 }
 
 // ─── setResolved ──────────────────────────────────────────────────────────────
+// §7e IDOR: `docId` is REQUIRED and the update double-filters on (id, docId) so a
+// commentId belonging to a DIFFERENT doc can never be toggled via this doc's route.
+// Returns the number of rows affected (0 = cross-doc / missing → route 404s).
 
-export async function setResolved(threadId: string, resolved: boolean): Promise<void> {
+export async function setResolved(
+  threadId: string,
+  docId: string,
+  resolved: boolean,
+): Promise<number> {
   // `resolved` is semantically on the root comment; update it there.
   // The root comment has id == threadId.
-  await db.update(schema.comments).set({ resolved }).where(eq(schema.comments.id, threadId))
+  const res = await db
+    .update(schema.comments)
+    .set({ resolved })
+    .where(and(eq(schema.comments.id, threadId), eq(schema.comments.docId, docId)))
+  return res.rowCount ?? 0
 }
 
 // ─── deleteComment ────────────────────────────────────────────────────────────
+// §7e IDOR: `docId` is REQUIRED and the delete double-filters on (id, docId) so a
+// commentId belonging to a DIFFERENT doc can never be deleted via this doc's route.
+// Returns the number of rows affected (0 = cross-doc / missing → route 404s).
 
-export async function deleteComment(id: string): Promise<void> {
-  await db.delete(schema.comments).where(eq(schema.comments.id, id))
+export async function deleteComment(id: string, docId: string): Promise<number> {
+  const res = await db
+    .delete(schema.comments)
+    .where(and(eq(schema.comments.id, id), eq(schema.comments.docId, docId)))
+  return res.rowCount ?? 0
 }

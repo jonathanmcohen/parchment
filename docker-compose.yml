@@ -1,38 +1,113 @@
-# DEV ONLY. Production is the single all-in-one image (see Dockerfile).
+# docker-compose.yml — Production deployment (v0.2.0+).
+# Two services: external pgvector DB + the Parchment app.
+# For local development (source mount, live reload) see docker-compose.dev.yml.
 #
-#  - `db`  : Postgres 18 + pgvector for local `pnpm dev` (host port 5433).
-#  - `app` : builds + runs the full single-container image (its own bundled
-#            Postgres; ignores `db`). Use to smoke-test the production image.
+# OPEN QUESTION: confirm ghcr.io/jonathanmcohen/pgvector image tag + env interface
+# before finalizing. Assumed: standard postgres conventions (POSTGRES_USER/PASSWORD/DB),
+# port 5432. If the image pre-creates the vector extension, Parchment migration 0000
+# IF NOT EXISTS guard is still safe.
 
 services:
   db:
-    image: pgvector/pgvector:pg18
+    image: ghcr.io/jonathanmcohen/pgvector:latest   # TODO: pin a digest/tag once confirmed
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: parchment
-      POSTGRES_PASSWORD: parchment
-      POSTGRES_DB: parchment
-    ports:
-      - '5433:5432'
+      POSTGRES_USER: ${POSTGRES_USER:-parchment}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-parchment}
     volumes:
-      - parchment_dev_pg:/var/lib/postgresql/data
+      - parchment_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U parchment']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-parchment}']
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
+      start_period: 10s
+    networks:
+      - parchment_net
 
   app:
-    build: .
-    image: ghcr.io/jonathanmcohen/parchment:dev
+    image: ghcr.io/jonathanmcohen/parchment:${PARCHMENT_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # I1: healthcheck targets /api/healthz (C's liveness route — always returns 200
+    # as long as the Next.js process is up). For deeper readiness checks use /api/readyz.
+    # Sequenced after C (C owns /api/healthz; I adds the healthcheck stanza here).
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    environment:
+      # ── Core (required) ────────────────────────────────────────────────────
+      DATABASE_URL: postgres://${POSTGRES_USER:-parchment}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:-parchment}
+      PARCHMENT_VERSION: ${PARCHMENT_VERSION:-latest}
+      PORT: ${PORT:-3000}
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
+
+      # External base URL — REQUIRED. Used for invite-accept links and OIDC redirect_uri.
+      # Phase 0 boot fails if absent. Example: https://parchment.example.com
+      PARCHMENT_PUBLIC_URL: ${PARCHMENT_PUBLIC_URL:?PARCHMENT_PUBLIC_URL is required — set to your external base URL (e.g. https://parchment.example.com)}
+
+      # ── Secret key (REQUIRED for all encrypted instance config) ────────────
+      # Generate: openssl rand -base64 32
+      PARCHMENT_SECRET_KEY: ${PARCHMENT_SECRET_KEY:?PARCHMENT_SECRET_KEY is required — see .env.example}
+
+      # ── Collaboration (Hocuspocus) ─────────────────────────────────────────
+      COLLAB_URL: ${COLLAB_URL:-ws://localhost:1234}
+      COLLAB_PORT: ${COLLAB_PORT:-1234}
+
+      # ── File storage ───────────────────────────────────────────────────────
+      PARCHMENT_FILES_ROOT: /data/files
+
+      # ── Logging (optional; defaults: LOG_LEVEL=info, LOG_FORMAT=json) ──────
+      # LOG_LEVEL: ${LOG_LEVEL:-info}          # trace|debug|info|warn|error
+      # LOG_FORMAT: ${LOG_FORMAT:-json}        # json|pretty
+
+      # ── Metrics (optional; omit to disable /metrics endpoint) ─────────────
+      # METRICS_TOKEN: ${METRICS_TOKEN}
+
+      # ── Quota (optional; default 512 MB per user) ──────────────────────────
+      # PARCHMENT_DEFAULT_QUOTA_MB: ${PARCHMENT_DEFAULT_QUOTA_MB:-512}
+
+      # ── File locking (optional; default /tmp/parchment-locks) ─────────────
+      # PARCHMENT_LOCK_DIR: ${PARCHMENT_LOCK_DIR:-/tmp/parchment-locks}
+
+      # ── S3 backup (optional; omit to disable cloud backup) ────────────────
+      # BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT}
+      # BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET}
+      # BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID}
+      # BACKUP_S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY}
+
+      # ── Semantic search / embeddings (optional) ────────────────────────────
+      # EMBEDDINGS_URL: ${EMBEDDINGS_URL}
+      # EMBEDDINGS_API_KEY: ${EMBEDDINGS_API_KEY}
+      # EMBEDDINGS_MODEL: ${EMBEDDINGS_MODEL}
+
+      # ── Passkeys / WebAuthn (required only in production behind TLS) ────────
+      # PARCHMENT_RP_ID: your-domain.com
+      # PARCHMENT_RP_ORIGIN: https://your-domain.com
+
+      # ── BANNED (must NOT appear) ───────────────────────────────────────────
+      # APP_SECRET        — replaced by PARCHMENT_SECRET_KEY
+      # SMTP_*            — SMTP configured via admin UI, not env
+      # PARCHMENT_TELEMETRY (network ping) — dropped for v0.2.0
+      # BACKUP_VERIFY     — job is on-by-default in backup-sync; no env gate
     ports:
-      - '3000:3000'
-      - '1234:1234'
+      - '${PORT:-3000}:3000'
+      - '${COLLAB_PORT:-1234}:1234'
     volumes:
-      - parchment_pg:/var/lib/postgresql
       - parchment_data:/data
-    profiles: ['full']
+    networks:
+      - parchment_net
 
 volumes:
-  parchment_dev_pg:
   parchment_pg:
   parchment_data:
+
+networks:
+  parchment_net:
+    driver: bridge

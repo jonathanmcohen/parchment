@@ -46,6 +46,17 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.0',
+    notes: [
+      'Collaboration: threaded comments anchored to a selection that survive concurrent edits (durable Yjs anchors), resolve, and @mention notifications; orphaned comments are kept in their own group when the anchored text is deleted.',
+      'Suggestion mode hardening: paste-over, cut, and whole-block deletions are now tracked changes (no silent loss), and accept/reject converges correctly when two people edit at once.',
+      'Publish to web: a read-only public page (reusing the share renderer) that can show comments read-only.',
+      'Share links now carry a permission level (view / comment / edit) and an optional expiry, enforced on the server every request — a view link cannot comment or edit, and an expired link is dead everywhere including live collaboration.',
+      'Real-time presence: avatars of who is editing or viewing a document, with live cursors.',
+      'Security: the real-time collaboration server now authenticates every connection and is bound to localhost only — unauthorized, view-only, expired, and wrong-document connections are refused.',
+    ],
+  },
+  {
     version: '0.1.11',
     notes: [
       'Fixed the slash, wiki-link, and citation menus rendering behind code blocks and the table of contents — they now always appear on top.',
@@ -160,6 +171,10 @@ export const TOUR_STEPS: TourStep[] = [
   {
     title: 'The editor',
     body: 'Write in a rich editor with real-time collaboration, diagrams (Mermaid, draw.io), math (LaTeX), citations, and more. Use ⌘K to open the command palette or / to insert blocks.',
+  },
+  {
+    title: 'Collaboration',
+    body: 'Work together in real time: see who is editing or viewing, leave threaded comments anchored to the text (they follow it as the document changes), and @mention someone to notify them. Turn on Suggesting mode to propose tracked changes a reviewer can accept or reject. Share a document with a view, comment, or edit link — with an optional expiry — or publish a read-only page to the web.',
   },
   {
     title: 'The file manager',

@@ -49,6 +49,38 @@ describe('parseCriteria', () => {
     const result = parseCriteria({ folderId: 42 })
     expect('folderId' in result).toBe(false)
   })
+
+  // J2-1 — broadened criteria coverage
+  it('parses a string tagId through', () => {
+    expect(parseCriteria({ tagId: 'tag-123' })).toEqual({ tagId: 'tag-123' })
+  })
+
+  it('omits tagId when not a non-empty string', () => {
+    expect('tagId' in parseCriteria({ tagId: 42 })).toBe(false)
+    expect('tagId' in parseCriteria({ tagId: '' })).toBe(false)
+    expect('tagId' in parseCriteria({ tagId: '   ' })).toBe(false)
+  })
+
+  it('parses a positive integer updatedWithinDays', () => {
+    expect(parseCriteria({ updatedWithinDays: 7 })).toEqual({ updatedWithinDays: 7 })
+  })
+
+  it('coerces a numeric-string updatedWithinDays', () => {
+    expect(parseCriteria({ updatedWithinDays: '30' })).toEqual({ updatedWithinDays: 30 })
+  })
+
+  it('omits a non-positive / non-numeric / fractional updatedWithinDays', () => {
+    expect('updatedWithinDays' in parseCriteria({ updatedWithinDays: 0 })).toBe(false)
+    expect('updatedWithinDays' in parseCriteria({ updatedWithinDays: -5 })).toBe(false)
+    expect('updatedWithinDays' in parseCriteria({ updatedWithinDays: 'soon' })).toBe(false)
+    expect('updatedWithinDays' in parseCriteria({ updatedWithinDays: 1.5 })).toBe(false)
+  })
+
+  it('parses all new criteria together with the existing ones', () => {
+    expect(
+      parseCriteria({ titleContains: 'q', starred: true, tagId: 't1', updatedWithinDays: 14 }),
+    ).toEqual({ titleContains: 'q', starred: true, tagId: 't1', updatedWithinDays: 14 })
+  })
 })
 
 describe('describeCriteria', () => {
@@ -76,5 +108,21 @@ describe('describeCriteria', () => {
 
   it('describes folderId string', () => {
     expect(describeCriteria({ folderId: 'abc-123' })).toBe('in folder abc-123')
+  })
+
+  // J2-1 — descriptions for the new criteria
+  it('describes tagId', () => {
+    expect(describeCriteria({ tagId: 'tag-9' })).toBe('tagged tag-9')
+  })
+
+  it('describes updatedWithinDays (singular + plural)', () => {
+    expect(describeCriteria({ updatedWithinDays: 1 })).toBe('updated in the last day')
+    expect(describeCriteria({ updatedWithinDays: 7 })).toBe('updated in the last 7 days')
+  })
+
+  it('joins new criteria into the combined description', () => {
+    expect(describeCriteria({ starred: true, updatedWithinDays: 30 })).toBe(
+      'starred · updated in the last 30 days',
+    )
   })
 })

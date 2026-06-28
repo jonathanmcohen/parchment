@@ -2,16 +2,30 @@
 
 import { useEffect, useState } from 'react'
 
-// Client island for the Security page "Sessions" section. Read-only: fetches the
-// caller's active sessions from GET /api/auth/sessions and lists them, marking
-// the one in use. Revoking other sessions is a named follow-up; this view never
-// sees a token hash (the server drops it).
+// Client island for the Security page "Sessions" section. Lists the caller's active
+// sessions (GET /api/auth/sessions), marks the one in use, and lets the user REVOKE
+// any of them (DELETE /api/auth/sessions/[id]). This view never sees a token hash
+// (the server drops it). Revoking the current session signs the user out, so that
+// row asks for confirmation first.
 
 type SessionView = {
   id: string
   createdAt: string
   expiresAt: string
   current: boolean
+}
+
+type FetchDep = { fetch?: typeof fetch }
+
+export type RevokeResult = { ok: true } | { ok: false; status: number }
+
+// Injectable handler (testable without JSX): DELETE one session by id. Uses the
+// GLOBAL fetch by default; a hoisted local avoids the `this`-binding pitfall (a
+// member call `deps.fetch(...)` would bind `this` to deps → "Illegal invocation").
+export async function revokeSessionRequest(id: string, deps: FetchDep = {}): Promise<RevokeResult> {
+  const doFetch = deps.fetch ?? fetch
+  const res = await doFetch(`/api/auth/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  return res.ok ? { ok: true } : { ok: false, status: res.status }
 }
 
 function formatDate(iso: string): string {
@@ -22,6 +36,21 @@ function formatDate(iso: string): string {
 export function SessionsList() {
   const [sessions, setSessions] = useState<SessionView[] | null>(null)
   const [failed, setFailed] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  async function load(): Promise<void> {
+    try {
+      const res = await fetch('/api/auth/sessions')
+      if (!res.ok) {
+        setFailed(true)
+        return
+      }
+      const data = (await res.json()) as { sessions: SessionView[] }
+      setSessions(data.sessions)
+    } catch {
+      setFailed(true)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -42,6 +71,31 @@ export function SessionsList() {
       active = false
     }
   }, [])
+
+  async function handleRevoke(s: SessionView): Promise<void> {
+    if (s.current) {
+      const confirmed = window.confirm(
+        'Sign out of this device? You will be returned to the login page.',
+      )
+      if (!confirmed) return
+    }
+    setBusyId(s.id)
+    const result = await revokeSessionRequest(s.id)
+    if (result.ok) {
+      if (s.current) {
+        // Revoking the current session logged us out — the next request is dead.
+        window.location.assign('/login')
+        return
+      }
+      // Optimistic remove.
+      setSessions((prev) => (prev ? prev.filter((x) => x.id !== s.id) : prev))
+      setBusyId(null)
+    } else {
+      // Refetch on error so the list reflects reality.
+      setBusyId(null)
+      await load()
+    }
+  }
 
   if (failed) {
     return <p className="mt-4 text-[var(--muted)] text-sm">Could not load your active sessions.</p>
@@ -80,6 +134,15 @@ export function SessionsList() {
                 Started {formatDate(s.createdAt)} · expires {formatDate(s.expiresAt)}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => void handleRevoke(s)}
+              disabled={busyId === s.id}
+              aria-label={s.current ? 'Sign out of this device' : 'Revoke this session'}
+              className="shrink-0 rounded-md border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--background)] disabled:opacity-60"
+            >
+              {busyId === s.id ? '…' : s.current ? 'Sign out' : 'Revoke'}
+            </button>
           </div>
         </li>
       ))}

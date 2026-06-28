@@ -1,9 +1,15 @@
 import 'server-only'
 import { redirect } from 'next/navigation'
-import type { NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { verifyPat } from '@/lib/auth/pat'
+import { hasRoleAtLeast, isAdmin, type Role } from '@/lib/auth/roles'
+import { hasScope, type Scope } from '@/lib/auth/scopes'
 import type { SessionUser } from '@/lib/auth/session'
 import { getCurrentUser, getUserByToken, SESSION_COOKIE } from '@/lib/auth/session'
+
+// A2: the single definition of isAdmin/the role lattice lives in roles.ts; re-home
+// the export here so existing importers (`@/lib/auth/guard`) keep working.
+export { isAdmin }
 
 // For Server Components and Server Actions. Redirects to /login when there is no
 // authenticated user; otherwise returns the live user row.
@@ -13,42 +19,78 @@ export async function requireUser(): Promise<SessionUser> {
   return user
 }
 
-// Admin roles. The owner of a workspace is always an admin; `admin` is the
-// explicit elevated role for v0.2 multi-user. Everything else (e.g. a plain
-// `member`) is NOT an admin. The `role` column defaults to 'owner'.
-const ADMIN_ROLES = new Set(['owner', 'admin'])
-
-// True if the user holds an admin-level role. Used to gate destructive,
-// all-owners operations (e.g. firing the cross-tenant trash-purge job).
-export function isAdmin(user: SessionUser): boolean {
-  return ADMIN_ROLES.has(user.role)
+// For Server Components / Server Actions requiring a minimum role. Redirects
+// unauthenticated → /login and under-privileged → '/'. Returns the live user row.
+export async function requireRole(min: Role): Promise<SessionUser> {
+  const user = await requireUser()
+  if (!hasRoleAtLeast(user, min)) redirect('/')
+  return user
 }
 
 // For Server Components / Server Actions that require admin. Redirects
 // unauthenticated visitors to /login, and authenticated-but-non-admin users to
 // the app root. Returns the live admin user row.
 export async function requireAdmin(): Promise<SessionUser> {
-  const user = await requireUser()
-  if (!isAdmin(user)) redirect('/')
-  return user
+  return requireRole('admin')
 }
 
+// J8: result of a scoped API auth — distinguishes 401 (no/invalid principal) from
+// 403 (a KNOWN Bearer principal that lacks the required scope; distinct from a 404
+// IDOR oracle which is authz of a resource, not of the principal).
+export type ApiAuthResult = { ok: true; user: SessionUser } | { ok: false; status: 401 | 403 }
+
 // For Route Handlers / API routes. Accepts either the session cookie or an
-// 'Authorization: Bearer pat_...' header. Returns the user or null (the caller
-// decides the response shape / status code).
-export async function authenticateRequest(req: NextRequest): Promise<SessionUser | null> {
+// 'Authorization: Bearer pat_...' header.
+//
+// Two call shapes (overloaded):
+//   authenticateRequest(req)               → SessionUser | null   (legacy; caller maps null→401)
+//   authenticateRequest(req, { require })  → ApiAuthResult        (scoped; 401 vs 403)
+//
+// Cookie sessions are FULL-ACCESS and bypass the scope check entirely (an interactive
+// user is never scope-limited). A Bearer PAT must carry a scope that satisfies
+// `require` (docs:write implies docs:read) — otherwise the principal is known but
+// unauthorized → 403.
+export async function authenticateRequest(req: NextRequest): Promise<SessionUser | null>
+export async function authenticateRequest(
+  req: NextRequest,
+  opts: { require: Scope },
+): Promise<ApiAuthResult>
+export async function authenticateRequest(
+  req: NextRequest,
+  opts?: { require: Scope },
+): Promise<SessionUser | null | ApiAuthResult> {
+  const required = opts?.require
   const auth = req.headers.get('authorization')
+
   if (auth?.startsWith('Bearer ')) {
     const token = auth.slice('Bearer '.length).trim()
-    const user = await verifyPat(token)
-    if (user) return user
+    // A6: a disabled user cannot authenticate via PAT either. verifyPat returns the
+    // full user row + the token's scopes (migration 0027).
+    const verified = await verifyPat(token)
+    if (verified && verified.user.disabledAt === null) {
+      if (required && !hasScope(verified.scopes, required)) {
+        // Known principal, insufficient scope → 403 (only meaningful in scoped mode).
+        return required ? { ok: false, status: 403 } : null
+      }
+      return required ? { ok: true, user: verified.user } : verified.user
+    }
   }
 
   const cookie = req.cookies.get(SESSION_COOKIE)?.value
   if (cookie) {
     const user = await getUserByToken(cookie)
-    if (user) return user
+    // Cookie session = full access; scope checks do not apply to interactive users.
+    if (user) return required ? { ok: true, user } : user
   }
 
-  return null
+  return required ? { ok: false, status: 401 } : null
+}
+
+// J8: standard failure response for a scoped API auth — 401 (no principal) or 403
+// (known principal, insufficient scope). Keeps the body shape uniform across routes.
+export function apiAuthFailure(status: 401 | 403): NextResponse {
+  return NextResponse.json(
+    { error: status === 403 ? 'insufficient_scope' : 'unauthorized' },
+    { status },
+  )
 }

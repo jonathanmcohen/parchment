@@ -1,8 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
+import { findFolderByName } from '@/lib/docs/folders-repo'
 import type { DocRow } from '@/lib/docs/repo'
+import type { SearchFilters } from '@/lib/docs/search-repo'
 import { searchFullText, searchSemantic } from '@/lib/docs/search-repo'
+import { findTagByName } from '@/lib/docs/tags-repo'
 import { embed, isSemanticEnabled } from '@/lib/search/embeddings'
+import { parseQuery } from '@/lib/search/operators'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,18 +24,49 @@ function serializeRow(row: DocRow) {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const params = req.nextUrl.searchParams
-  const q = params.get('q') ?? ''
+  const rawQ = params.get('q') ?? ''
   const mode = params.get('mode') ?? 'keyword'
   const folderParam = params.get('folder')
   const tagParam = params.get('tag')
   const starredParam = params.get('starred')
 
-  const filters: import('@/lib/docs/search-repo').SearchFilters = {}
+  // J6: parse structured operators (tag:/folder:/is:starred/title:/before:/after:)
+  // out of the free-text query. The remaining text feeds FTS/semantic.
+  const parsed = parseQuery(rawQ)
+  const q = parsed.text
 
+  const filters: SearchFilters = {}
+
+  // Operators resolved name→id (owner-scoped). A name that matches nothing means
+  // "no doc qualifies", so we short-circuit to an empty result set rather than
+  // pass a bogus id into the query (which Postgres would reject as a bad uuid).
+  let unresolvedFilter = false
+  if (parsed.filters.tagName !== undefined) {
+    const tagId = await findTagByName(user.id, parsed.filters.tagName)
+    if (tagId === null) unresolvedFilter = true
+    else filters.tagId = tagId
+  }
+  if (parsed.filters.folderName !== undefined) {
+    const folderId = await findFolderByName(user.id, parsed.filters.folderName)
+    if (folderId === null) unresolvedFilter = true
+    else filters.folderId = folderId
+  }
+  if (parsed.filters.starred === true) {
+    filters.starred = true
+  }
+  if (parsed.filters.titleContains !== undefined) {
+    filters.titleContains = parsed.filters.titleContains
+  }
+  if (parsed.filters.before !== undefined) filters.before = parsed.filters.before
+  if (parsed.filters.after !== undefined) filters.after = parsed.filters.after
+
+  // Explicit query params (the FileManager's existing tag/folder/starred views)
+  // take precedence over operators parsed from the text box.
   if (folderParam !== null) {
     filters.folderId = folderParam === 'root' ? null : folderParam
   }
@@ -45,7 +80,10 @@ export async function GET(req: NextRequest) {
   const semanticEnabled = isSemanticEnabled()
   let rows: DocRow[]
 
-  if (mode === 'semantic') {
+  if (unresolvedFilter) {
+    // A tag:/folder: name that resolved to nothing → no document can match.
+    rows = []
+  } else if (mode === 'semantic') {
     if (semanticEnabled) {
       const v = await embed(q)
       if (v) {

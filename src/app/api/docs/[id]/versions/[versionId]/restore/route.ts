@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
-import { getDocument, saveDocument } from '@/lib/docs/repo'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
+import { resolveDocAccess } from '@/lib/authz/doc-access'
+import { saveDocument } from '@/lib/docs/repo'
 import { createVersion, getVersion } from '@/lib/docs/versions-repo'
 
 export const dynamic = 'force-dynamic'
@@ -13,15 +14,17 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; versionId: string }> },
 ) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const { id, versionId } = await ctx.params
-  const doc = await getDocument(id)
-  if (!doc || doc.ownerId !== user.id)
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  // manage access: restoring overwrites the live doc — owner/admin only.
+  const doc = await resolveDocAccess(user, id, 'manage')
+  if (!doc) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
-  const version = await getVersion(versionId)
+  // §7e IDOR: getVersion double-filters on (versionId, docId) — a cross-doc id 404s.
+  const version = await getVersion(versionId, id)
   if (!version) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   // Step 1: snapshot the pre-restore state so the user can undo the restore

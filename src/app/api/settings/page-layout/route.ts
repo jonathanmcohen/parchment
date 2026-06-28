@@ -1,13 +1,14 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/guard'
+import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { getPageLayoutMode, setPageLayoutMode } from '@/lib/docs/settings-repo'
 
 export const dynamic = 'force-dynamic'
 
 /** GET /api/settings/page-layout → { mode: 'continuous' | 'paged' } */
 export async function GET(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:read' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   const mode = await getPageLayoutMode(user.id)
   return NextResponse.json({ mode })
@@ -15,8 +16,9 @@ export async function GET(req: NextRequest) {
 
 /** PUT /api/settings/page-layout { mode: 'continuous' | 'paged' } → { ok: true, mode } */
 export async function PUT(req: NextRequest) {
-  const user = await authenticateRequest(req)
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const auth = await authenticateRequest(req, { require: 'docs:write' })
+  if (!auth.ok) return apiAuthFailure(auth.status)
+  const user = auth.user
 
   let body: { mode?: unknown }
   try {

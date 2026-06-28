@@ -1,8 +1,28 @@
-export default function NotificationsSettingsPage() {
+import Link from 'next/link'
+import { isSmtpConfigured } from '@/lib/config/smtp-config-repo'
+
+export const dynamic = 'force-dynamic'
+
+export default async function NotificationsSettingsPage() {
+  const smtpReady = await isSmtpConfigured()
+
   return (
     <section className="max-w-2xl">
       <h1 className="font-semibold text-2xl tracking-tight">Notifications</h1>
       <p className="mt-2 text-[var(--muted)]">Choose what you are notified about and where.</p>
+
+      {!smtpReady && (
+        <div
+          role="alert"
+          className="mt-6 rounded-md border border-[var(--border)] bg-[var(--paper)] px-4 py-3 text-sm"
+        >
+          Email delivery is not configured.{' '}
+          <Link href="/settings/admin/smtp" className="font-medium underline">
+            Set up SMTP
+          </Link>{' '}
+          to enable notifications.
+        </div>
+      )}
 
       <section aria-labelledby="notifications-inbox" className="mt-8">
         <h2 id="notifications-inbox" className="font-medium text-lg">

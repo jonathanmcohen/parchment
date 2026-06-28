@@ -33,6 +33,7 @@ import { OutlinePane } from '@/components/editor/OutlinePane'
 import { PageCanvas } from '@/components/editor/PageCanvas'
 import { PageSetupDialog } from '@/components/editor/PageSetupDialog'
 import { PlantumlPopover } from '@/components/editor/PlantumlPopover'
+import { PresenceCluster } from '@/components/editor/PresenceCluster'
 import { PresenterView } from '@/components/editor/PresenterView'
 import { PrintView } from '@/components/editor/PrintView'
 import { ReadingPresence } from '@/components/editor/ReadingPresence'
@@ -47,6 +48,7 @@ import { useSaveStatus } from '@/components/editor/useSaveStatus'
 import { VersionHistory } from '@/components/editor/VersionHistory'
 import { WatermarkDialog } from '@/components/editor/WatermarkDialog'
 import { WordCountDialog } from '@/components/editor/WordCountDialog'
+import { WritingGoalDialog } from '@/components/editor/WritingGoalDialog'
 import { UserCluster } from '@/components/shell/UserCluster'
 import {
   registerShortcutAction,
@@ -57,6 +59,7 @@ import { clampAutosaveMs } from '@/lib/docs/autosave-config'
 import { getCollabUrl } from '@/lib/editor/collab-url'
 import { type Counts, countText } from '@/lib/editor/counts'
 import { CUSTOM_CSS_SCOPE } from '@/lib/editor/custom-css'
+import { type DocTheme, resolveDocThemeVars } from '@/lib/editor/doc-theme'
 import { resolveProvider } from '@/lib/editor/embed-providers'
 import { CairnSuggestionExtension } from '@/lib/editor/extensions/cairn-suggestion'
 import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
@@ -111,6 +114,10 @@ type Props = {
   initialWatermark?: WatermarkConfig
   /** G17: raw custom CSS from documents.meta.customCss; sanitize+scope at render. */
   initialCustomCss?: string
+  /** J10: per-doc writing-goal target in words (0 = no goal) from documents.meta.writingGoal. */
+  initialWritingGoal?: number
+  /** J12: per-doc theme override (validated DocTheme) from documents.meta.theme. */
+  initialDocTheme?: DocTheme
   /** G13: true when AI_BASE_URL is configured server-side. Never derived client-side. */
   aiEnabled?: boolean
   /** I3: autosave version-snapshot interval in ms (clamped to 5s–5min, default 30s). */
@@ -139,6 +146,8 @@ export function Editor({
   hasCollabState,
   initialWatermark,
   initialCustomCss,
+  initialWritingGoal = 0,
+  initialDocTheme,
   aiEnabled = false,
   autosaveIntervalMs = 30_000,
   spellcheckEnabled = true,
@@ -381,6 +390,25 @@ export function Editor({
         url: getCollabUrl(),
         name: docId,
         document: ydoc,
+        // H Task 15 (§7h): authenticate the WS handshake. The collab server's
+        // onAuthenticate requires a token granting EDIT on this doc; we mint a
+        // short-lived one from the session-authenticated /api/collab-token. A
+        // function token is re-invoked on reconnect, so the token never goes stale.
+        // On failure return '' (the server rejects it → offline fallback fires).
+        token: async () => {
+          try {
+            const res = await fetch('/api/collab-token', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ docId }),
+            })
+            if (!res.ok) return ''
+            const data = (await res.json()) as { token?: string }
+            return data.token ?? ''
+          } catch {
+            return ''
+          }
+        },
         onSynced: () => {
           if (settled) return
           settled = true
@@ -411,6 +439,19 @@ export function Editor({
       return null
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // H Task 18 (DEV-ONLY): expose the collab provider on window for the e2e DOM/
+  // awareness probes (bar #7). Guarded behind NODE_ENV !== 'production' so it never
+  // ships to a real deploy. The Playwright collaboration spec reads
+  // `window.__parchmentProvider.awareness.getStates().size` and the editor doc.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return
+    const w = window as unknown as { __parchmentProvider?: HocuspocusProvider | null }
+    w.__parchmentProvider = provider
+    return () => {
+      w.__parchmentProvider = null
+    }
+  }, [provider])
 
   // Destroy the provider on unmount; also clear the offline-fallback timer so it
   // can't fire goOffline() after the component is gone.
@@ -457,6 +498,12 @@ export function Editor({
   // G17: custom CSS state — seeded from server-rendered initialCustomCss
   const [customCss, setCustomCss] = useState(initialCustomCss ?? '')
   const [customCssOpen, setCustomCssOpen] = useState(false)
+
+  // J12: per-doc theme override state — seeded from server-rendered initialDocTheme.
+  // Resolved to inline token vars applied on the doc canvas wrapper (token-only, so
+  // it is export/share safe). The Custom-CSS dialog edits it alongside the CSS.
+  const [docTheme, setDocTheme] = useState<DocTheme>(initialDocTheme ?? {})
+  const docThemeVars = resolveDocThemeVars(docTheme)
 
   // B5: image dialog state — null = closed; string = prefill src for paste/drop flow
   const [imageDialogOpen, setImageDialogOpen] = useState(false)
@@ -591,6 +638,50 @@ export function Editor({
 
   // S3-2/S3-6: Tools → Word count modal (sourced from the existing counts).
   const [wordCountOpen, setWordCountOpen] = useState(false)
+
+  // J10: focus / zen mode — hides the chrome stack + side rails and centers the
+  // column for distraction-free writing. ESC exits (handler below). Drives a
+  // `data-zen="true"` attribute on the editor shell that globals.css keys off.
+  const [zenMode, setZenMode] = useState(false)
+
+  // J10: per-doc writing goal (target words). 0 = no goal. Seeded from
+  // documents.meta.writingGoal; edited via the goal dialog and PUT to the goal route.
+  const [writingGoal, setWritingGoal] = useState(initialWritingGoal)
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false)
+
+  // J10: persist a new word target (0 clears it). Best-effort — a failed PUT leaves
+  // the local state; the next save reconciles. Owner-scoped server-side.
+  const saveWritingGoal = useCallback(
+    async (target: number) => {
+      const clean = Number.isFinite(target) ? Math.max(0, Math.round(target)) : 0
+      setWritingGoal(clean)
+      setGoalDialogOpen(false)
+      try {
+        await fetch(`/api/docs/${docId}/goal`, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ targetWords: clean }),
+        })
+      } catch {
+        // best-effort — local state already updated
+      }
+    },
+    [docId],
+  )
+
+  // J10: ESC exits zen mode (only bound while zen is on, so it never competes with
+  // other Escape consumers — popovers/dialogs — in normal editing).
+  useEffect(() => {
+    if (!zenMode) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setZenMode(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zenMode])
 
   // D5: reading presence readers list + canvas wrapper ref
   const [readers, setReaders] = useState<Reader[]>([])
@@ -1046,6 +1137,25 @@ export function Editor({
     setOpenComposerSignal((n) => n + 1)
   }, [editor])
 
+  // J3-1: capture the current document's content as a reusable user template.
+  // Prompts for a name, then POSTs the live ProseMirror JSON to /api/templates.
+  const handleSaveAsTemplate = useCallback(() => {
+    if (!editor) return
+    const name = window.prompt('Template name')
+    if (name === null || name.trim() === '') return
+    const content = editor.getJSON()
+    void fetch('/api/templates', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), content }),
+    })
+      .then((res) => {
+        if (res.ok) window.alert(`Saved “${name.trim()}” to your templates.`)
+        else window.alert('Could not save the template.')
+      })
+      .catch(() => window.alert('Could not save the template.'))
+  }, [editor])
+
   // F3: once the sidebar has consumed the open-composer intent, clear it so a
   // later rail toggle (which re-mounts CommentsSidebar) does not re-open the
   // composer for a stale signal value. Stable so it doesn't re-fire the child's
@@ -1458,7 +1568,7 @@ export function Editor({
     // S1-2: full-bleed gray gutter the white page floats on (editor route only).
     // The inner max-w-5xl keeps the centered column; the shell paints the gutter
     // edge-to-edge inside the shared <main> (negative margin cancels its padding).
-    <div className="parchment-editor-shell">
+    <div className="parchment-editor-shell" data-zen={zenMode ? 'true' : undefined}>
       {/* L1+L2+L7: full-width sticky chrome stack. The three bars are lifted OUT
           of the centered body column so their backgrounds + bottom borders bleed
           edge-to-edge of the main content area; each bar's own inner wrapper
@@ -1478,6 +1588,7 @@ export function Editor({
           onToggleComments={() => setCommentsSidebarOpen((v) => !v)}
           onToggleVersionHistory={() => setVersionHistoryOpen((v) => !v)}
           onOpenShare={() => setShareDialogOpen(true)}
+          presence={<PresenceCluster provider={provider} />}
           avatar={<UserCluster name={currentUserName} />}
         />
 
@@ -1521,6 +1632,7 @@ export function Editor({
             suggestionsOpen={suggestionsOpen}
             onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
             backlinksOpen={backlinksOpen}
+            onSaveAsTemplate={handleSaveAsTemplate}
             onToggleGrammar={() => setGrammarPanelOpen((v) => !v)}
             grammarOpen={grammarPanelOpen}
             grammarEnabled={grammarEnabled}
@@ -1595,7 +1707,16 @@ export function Editor({
               on un-transformed dimensions and are never corrupted by the scale. */}
             {/* G17: scope class wraps doc content ONLY (not toolbar/chrome).
               CustomCssStyle injects the sanitized+scoped <style> here. */}
-            <div ref={scaledHostRef} className={`parchment-canvas-scaled-host ${CUSTOM_CSS_SCOPE}`}>
+            <div
+              ref={scaledHostRef}
+              className={`parchment-canvas-scaled-host ${CUSTOM_CSS_SCOPE}`}
+              // J12: per-doc theme token vars (page bg / ink / accent). Token-only —
+              // values are validated hex/keywords, never raw CSS.
+              style={docThemeVars as React.CSSProperties}
+              data-doc-theme={
+                docTheme.preset ?? (docTheme.pageBg || docTheme.accent ? 'custom' : undefined)
+              }
+            >
               <CustomCssStyle css={customCss} />
               <PageCanvas
                 pageSetup={pageSetup}
@@ -1660,6 +1781,10 @@ export function Editor({
           connection={connection}
           mode={editorMode}
           onOpenWordCount={() => setWordCountOpen(true)}
+          writingGoal={writingGoal}
+          onEditGoal={() => setGoalDialogOpen(true)}
+          zenMode={zenMode}
+          onToggleZen={() => setZenMode((v) => !v)}
         />
 
         {/* B5: Image insert dialog */}
@@ -1799,12 +1924,14 @@ export function Editor({
           />
         )}
 
-        {/* G17: Custom CSS dialog */}
+        {/* G17 + J12: Custom CSS + per-doc theme dialog */}
         {customCssOpen && (
           <CustomCssDialog
             initial={customCss}
             docId={docId}
+            initialTheme={docTheme}
             onApply={setCustomCss}
+            onApplyTheme={setDocTheme}
             onClose={() => setCustomCssOpen(false)}
           />
         )}
@@ -1820,6 +1947,16 @@ export function Editor({
             selection={selection}
             pageCount={pageCount}
             onClose={() => setWordCountOpen(false)}
+          />
+        )}
+
+        {/* J10: set/clear the per-doc writing goal (target words). */}
+        {goalDialogOpen && (
+          <WritingGoalDialog
+            currentTarget={writingGoal}
+            currentWords={full.words}
+            onSave={saveWritingGoal}
+            onClose={() => setGoalDialogOpen(false)}
           />
         )}
 

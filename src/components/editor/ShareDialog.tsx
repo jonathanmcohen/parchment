@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { DocPermissionsPanel } from '@/components/share/DocPermissionsPanel'
 import { pickActiveShare, type ShareLinkRow } from '@/lib/docs/share-link'
 
 // G1/F9 share-management dialog (owner side, in the editor). The link model: a
@@ -51,7 +52,6 @@ export function ShareDialog({ docId, onClose }: Props) {
   const permId = useId()
   const passwordId = useId()
   const expiryId = useId()
-  const emailId = useId()
 
   const [shares, setShares] = useState<ShareLinkRow[]>([])
   const [permission, setPermission] = useState('view')
@@ -337,7 +337,9 @@ export function ShareDialog({ docId, onClose }: Props) {
           </div>
           <p className="parchment-share-toggle-hint">
             {isPublic
-              ? 'Anyone with the link can access this document.'
+              ? permission === 'view'
+                ? 'Published to the web — anyone with the link sees a read-only page (comments shown read-only).'
+                : 'Anyone with the link can access this document.'
               : 'Only people you share with directly can access this document.'}
           </p>
         </fieldset>
@@ -420,21 +422,10 @@ export function ShareDialog({ docId, onClose }: Props) {
           />
         </div>
 
-        {/* Per-email sharing — disabled v0.2 placeholder (needs a new grants
-            table + route; out of scope for F9). No dead Add button. */}
-        <div className="parchment-dialog-field">
-          <label htmlFor={emailId} className="parchment-dialog-label">
-            Add people, groups, calendar events (v0.2)
-          </label>
-          <input
-            id={emailId}
-            type="email"
-            placeholder="Invite by email — coming in v0.2"
-            disabled
-            aria-disabled="true"
-            className="parchment-dialog-input"
-          />
-        </div>
+        {/* A4: per-user document ACL — the real people-based sharing (replaces the
+            former disabled v0.2 placeholder). All operations are MANAGE-gated on
+            the server (owner/admin); a non-manager simply sees an error. */}
+        <DocPermissionsPanel docId={docId} />
 
         {error && (
           <p className="parchment-share-error" role="alert">

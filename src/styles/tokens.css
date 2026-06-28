@@ -390,3 +390,37 @@
     color-scheme: dark;
   }
 }
+
+/* ─── J12-4: bundled per-DOCUMENT theme presets ────────────────────────────────
+ * These are PAGE themes (page background + in-page ink + accent), applied to a
+ * single document's content wrapper, NOT the app chrome. The editor + share viewer
+ * set data-doc-theme="<key>" on the doc wrapper and ALSO emit the same vars inline
+ * (resolveDocThemeVars) so the share view themes without this stylesheet; these
+ * blocks are the static CSS source of truth + a no-JS fallback. Keys mirror
+ * DOC_THEME_PRESETS in src/lib/editor/doc-theme.ts. All AA-checked vs their page bg.
+ *
+ *   sepia      — warm paper, dark-brown ink, terracotta accent.
+ *   solarized  — Solarized-light (base3 page, base00 ink, blue accent).
+ *   night      — dark sheet, light ink (reuses the workspace dark-page palette). */
+[data-doc-theme="sepia"] {
+  --page-bg: #f4ecd8;
+  --page-ink: #433422;
+  --page-ink-muted: #6f5f48;
+  --accent: #a8642a;
+  --accent-contrast: #a8642a;
+}
+[data-doc-theme="solarized"] {
+  --page-bg: #fdf6e3;
+  --page-ink: #586e75;
+  --page-ink-muted: #93a1a1;
+  --accent: #268bd2;
+  --accent-contrast: #268bd2;
+}
+[data-doc-theme="night"] {
+  --page-bg: #1e1f22;
+  --page-ink: #e8eaed;
+  --page-ink-muted: #9aa0a6;
+  --page-surface-muted: #2a2c30;
+  --page-border: #3c4043;
+  --code-bg: #1b1c1f;
+}

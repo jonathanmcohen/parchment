@@ -1,28 +1,69 @@
 'use client'
 
-// G17: Custom CSS dialog — a textarea + Apply/Cancel + hint.
-// On Apply: updates local state via onApply then PUTs to the API to persist.
+// G17 + J12: Custom CSS + per-doc THEME dialog — a theme picker (token-only) above
+// a raw-CSS textarea, with Apply/Cancel + hint.
+// On Apply: persists the per-doc theme (PUT …/theme — token-only, validated) AND the
+// custom CSS (PUT …/custom-css), then lifts both into editor state.
 
 import { useId, useState } from 'react'
+import { DOC_THEME_PRESETS, type DocTheme } from '@/lib/editor/doc-theme'
+import { ACCENT_SWATCHES, PAGE_BG_PRESETS } from '@/lib/editor/theme'
 
 type Props = {
   /** Current custom CSS — seeds the textarea. */
   initial?: string
   /** docId is needed to persist via the API. */
   docId: string
+  /** J12: current per-doc theme override — seeds the picker. */
+  initialTheme?: DocTheme
   onApply: (css: string) => void
+  /** J12: lift the applied theme into editor state so the canvas re-themes live. */
+  onApplyTheme?: (theme: DocTheme) => void
   onClose: () => void
 }
 
-export function CustomCssDialog({ initial = '', docId, onApply, onClose }: Props) {
+export function CustomCssDialog({
+  initial = '',
+  docId,
+  initialTheme = {},
+  onApply,
+  onApplyTheme,
+  onClose,
+}: Props) {
   const titleId = useId()
   const textareaId = useId()
+  const presetId = useId()
+  const pageBgId = useId()
   const [value, setValue] = useState(initial)
   const [saving, setSaving] = useState(false)
 
+  // J12: theme draft (preset / pageBg / accent). '' = inherit workspace.
+  const [preset, setPreset] = useState(initialTheme.preset ?? '')
+  const [pageBg, setPageBg] = useState(initialTheme.pageBg ?? '')
+  const [accent, setAccent] = useState(initialTheme.accent ?? '')
+
+  const buildTheme = (): DocTheme => {
+    const t: DocTheme = {}
+    if (preset) t.preset = preset
+    if (pageBg) t.pageBg = pageBg
+    if (accent) t.accent = accent
+    return t
+  }
+
   const handleApply = async () => {
     setSaving(true)
+    const theme = buildTheme()
     try {
+      // Persist the per-doc theme first (token-only, validated server-side).
+      const themeRes = await fetch(`/api/docs/${docId}/theme`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ theme }),
+      })
+      if (!themeRes.ok) {
+        setSaving(false)
+        return
+      }
       const res = await fetch(`/api/docs/${docId}/custom-css`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
@@ -37,6 +78,7 @@ export function CustomCssDialog({ initial = '', docId, onApply, onClose }: Props
       return
     }
     setSaving(false)
+    onApplyTheme?.(theme)
     onApply(value)
     onClose()
   }
@@ -63,7 +105,7 @@ export function CustomCssDialog({ initial = '', docId, onApply, onClose }: Props
       >
         <div className="parchment-dialog-header">
           <h2 id={titleId} className="parchment-dialog-title">
-            Custom CSS
+            Appearance
           </h2>
           <button
             type="button"
@@ -76,8 +118,78 @@ export function CustomCssDialog({ initial = '', docId, onApply, onClose }: Props
         </div>
 
         <p className="parchment-dialog-hint">
-          Scoped to this document — cannot affect the app chrome or other documents.
+          Theme + custom CSS for this document only — never affects the app chrome or other
+          documents.
         </p>
+
+        {/* J12: per-doc THEME picker (token-only — safe on the share view). */}
+        <div className="parchment-dialog-field" data-testid="doc-theme-picker">
+          <span className="parchment-dialog-label">Theme</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor={presetId} className="text-sm text-[var(--muted)]">
+              Preset
+            </label>
+            <select
+              id={presetId}
+              value={preset}
+              data-testid="doc-theme-preset"
+              onChange={(e) => setPreset(e.target.value)}
+              className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-2 py-1 text-sm"
+            >
+              <option value="">Inherit workspace</option>
+              {DOC_THEME_PRESETS.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor={pageBgId} className="text-sm text-[var(--muted)]">
+              Page
+            </label>
+            <select
+              id={pageBgId}
+              value={pageBg}
+              onChange={(e) => setPageBg(e.target.value)}
+              className="rounded-md border border-[var(--border)] bg-[var(--paper)] px-2 py-1 text-sm"
+            >
+              <option value="">Default</option>
+              {PAGE_BG_PRESETS.map((p) => (
+                <option key={p.key} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-[var(--muted)]">Accent</span>
+            <button
+              type="button"
+              aria-label="Inherit accent"
+              aria-pressed={accent === ''}
+              onClick={() => setAccent('')}
+              className="rounded border border-[var(--border)] px-2 py-0.5 text-xs"
+            >
+              Inherit
+            </button>
+            {ACCENT_SWATCHES.map((hex) => (
+              <button
+                key={hex}
+                type="button"
+                aria-label={`Accent ${hex}`}
+                aria-pressed={accent === hex}
+                onClick={() => setAccent(hex)}
+                className="h-5 w-5 rounded-full border border-[var(--border)]"
+                style={{
+                  background: hex,
+                  outline: accent === hex ? '2px solid var(--primary)' : 'none',
+                  outlineOffset: '1px',
+                }}
+              />
+            ))}
+          </div>
+        </div>
 
         <div className="parchment-dialog-field">
           <label htmlFor={textareaId} className="parchment-dialog-label">

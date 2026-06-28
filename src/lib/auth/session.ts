@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { and, eq, gt, ne, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, ne, sql } from 'drizzle-orm'
 import { cookies } from 'next/headers'
 import { db, schema } from '@/db'
 import { env } from '@/lib/env'
@@ -102,10 +102,12 @@ export async function getUserByToken(token: string): Promise<SessionUser | null>
 
   if (!session) return null
 
+  // A6 (defense in depth): a disabled user can never be resolved from a session,
+  // even with a live cookie token. This is the single cookie chokepoint.
   const [user] = await db
     .select()
     .from(schema.users)
-    .where(eq(schema.users.id, session.userId))
+    .where(and(eq(schema.users.id, session.userId), isNull(schema.users.disabledAt)))
     .limit(1)
 
   return user ?? null

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { collectReaders, throttle } from '@/lib/editor/reading-presence'
+import { collectReaders, presenceCluster, throttle } from '@/lib/editor/reading-presence'
 
 describe('collectReaders', () => {
   const NOW = 1_000_000
@@ -105,6 +105,82 @@ describe('collectReaders', () => {
     ])
     const result = collectReaders(states, 1, NOW)
     expect(result[0]?.user.color).toBe('#888888')
+  })
+
+  // Task 14 — a remote with reading.pos but NO user.name is excluded.
+  it('drops an entry with reading.pos but no user.name', () => {
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { reading: { pos: 10 } }], // no user at all
+      [3, { user: { color: '#111' }, reading: { pos: 20 } }], // user without name
+    ])
+    const result = collectReaders(states, 1, NOW)
+    expect(result).toHaveLength(0)
+  })
+
+  it('over a 3-state map (self + 2 remotes, one stale) returns exactly the 1 fresh remote', () => {
+    const STALE = 30_000
+    const states = new Map([
+      makeState(1, { name: 'Self', pos: 5, updatedAt: NOW }), // self
+      makeState(2, { name: 'Fresh', pos: 8, updatedAt: NOW - 1000 }),
+      makeState(3, { name: 'Stale', pos: 12, updatedAt: NOW - STALE - 1 }),
+    ])
+    const result = collectReaders(states, 1, NOW, STALE)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.user.name).toBe('Fresh')
+  })
+})
+
+describe('presenceCluster (Task 14)', () => {
+  const NOW = 1_000_000
+
+  it('de-duplicates participants and excludes self', () => {
+    const states = new Map<number, Record<string, unknown>>([
+      [1, { user: { name: 'Self', color: '#000' } }], // self
+      [2, { user: { name: 'Alice', color: '#1a73e8' }, cursor: { anchor: 1, head: 2 } }],
+      [3, { user: { name: 'Bob', color: '#15803d' }, reading: { pos: 4, updatedAt: NOW } }],
+    ])
+    const cluster = presenceCluster(states, 1, NOW)
+    expect(cluster.map((c) => c.name).sort()).toEqual(['Alice', 'Bob'])
+    expect(cluster.find((c) => c.name === 'Self')).toBeUndefined()
+  })
+
+  it('marks a participant with a recent caret/selection as editing, reading-only as viewing', () => {
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { user: { name: 'Editor', color: '#1a73e8' }, cursor: { anchor: 1, head: 3 } }],
+      [3, { user: { name: 'Viewer', color: '#15803d' }, reading: { pos: 4, updatedAt: NOW } }],
+    ])
+    const cluster = presenceCluster(states, 1, NOW)
+    expect(cluster.find((c) => c.name === 'Editor')?.editing).toBe(true)
+    expect(cluster.find((c) => c.name === 'Viewer')?.editing).toBe(false)
+  })
+
+  it('includes a participant that has a user but neither cursor nor reading (present, viewing)', () => {
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { user: { name: 'Lurker', color: '#1a73e8' } }],
+    ])
+    const cluster = presenceCluster(states, 1, NOW)
+    expect(cluster).toHaveLength(1)
+    expect(cluster[0]?.editing).toBe(false)
+  })
+
+  it('excludes a participant with no user name', () => {
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { cursor: { anchor: 1, head: 2 } }], // no user
+      [3, { user: { color: '#111' }, cursor: { anchor: 1, head: 2 } }], // no name
+    ])
+    expect(presenceCluster(states, 1, NOW)).toHaveLength(0)
+  })
+
+  it('two distinct user ids map to two distinct palette colours via authorColor', () => {
+    // colour-distinctness is a property of authorColor; pin that two different ids
+    // generally differ (the 12-colour palette + djb2 hash). Use ids known to differ.
+    const states = new Map<number, Record<string, unknown>>([
+      [2, { user: { name: 'A', color: '#1a73e8' } }],
+      [3, { user: { name: 'B', color: '#15803d' } }],
+    ])
+    const cluster = presenceCluster(states, 1, NOW)
+    const colors = new Set(cluster.map((c) => c.color))
+    expect(colors.size).toBe(2)
   })
 })
 

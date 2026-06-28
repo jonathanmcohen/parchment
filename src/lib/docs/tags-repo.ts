@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, isNull, sql } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import type { DocRow } from '@/lib/docs/repo'
 import { DEFAULT_TAG_COLOR, isValidTagColor } from '@/lib/docs/tag-colors'
@@ -26,6 +26,21 @@ export async function listTags(ownerId: string): Promise<Tag[]> {
     .from(schema.tags)
     .where(eq(schema.tags.ownerId, ownerId))
     .orderBy(desc(schema.tags.createdAt))
+}
+
+/**
+ * J6: resolve a tag NAME → its id for the owner (case-insensitive exact match),
+ * or null when no such tag exists. Backs the `tag:foo` search operator.
+ */
+export async function findTagByName(ownerId: string, name: string): Promise<string | null> {
+  const trimmed = name.trim()
+  if (trimmed.length === 0) return null
+  const [row] = await db
+    .select({ id: schema.tags.id })
+    .from(schema.tags)
+    .where(and(eq(schema.tags.ownerId, ownerId), ilike(schema.tags.name, trimmed)))
+    .limit(1)
+  return row?.id ?? null
 }
 
 export async function renameTag(ownerId: string, id: string, name: string): Promise<void> {

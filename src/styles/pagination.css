@@ -219,6 +219,7 @@
 
 .parchment-live-chrome {
   pointer-events: none;
+  z-index: 0;
 }
 .parchment-live-chrome .parchment-running-header,
 .parchment-live-chrome .parchment-running-footer {

@@ -151,6 +151,7 @@ export function PageCanvas({
 
   // ── ResizeObserver: compute automatic breaks from content height ────────
   useEffect(() => {
+    if (pageLayoutMode === 'paged') return
     const el = contentRef.current
     if (!el) return
 
@@ -166,7 +167,7 @@ export function PageCanvas({
     const ro = new ResizeObserver(update)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [heightPx, onPageCountChange])
+  }, [heightPx, onPageCountChange, pageLayoutMode])
 
   // ── DOM query: resolve manual page-break px offsets ────────────────────
   // We read the offsetTop of each [data-page-break] DOM node within the content
@@ -261,14 +262,25 @@ export function PageCanvas({
         return
       }
 
-      // Top of each block relative to the editor content box.
-      const editorRect = view.dom.getBoundingClientRect()
+      // Measure with offsetTop/offsetHeight (layout px), NOT getBoundingClientRect:
+      // the editor renders inside a transform: scale(var(--page-scale)) host, and
+      // rect coords are scaled — which would shrink all heights and defeat
+      // pagination. Top-level blocks are direct children of view.dom, so they
+      // share one offsetParent and their offsetTops are directly comparable.
       const tops: number[] = []
+      let lastNode: HTMLElement | null = null
       for (const pos of offsets) {
-        const node = view.nodeDOM(pos) as HTMLElement | null
-        tops.push(node ? node.getBoundingClientRect().top - editorRect.top : 0)
+        const node = view.nodeDOM(pos)
+        if (node instanceof HTMLElement) {
+          tops.push(node.offsetTop)
+          lastNode = node
+        } else {
+          tops.push(0)
+        }
       }
-      const contentBottom = view.dom.getBoundingClientRect().height
+      const contentBottom = lastNode
+        ? lastNode.offsetTop + lastNode.offsetHeight
+        : view.dom.scrollHeight
 
       // Raw (spacer-free) height of each block: slot delta minus any spacer we
       // currently have inserted before the NEXT block.

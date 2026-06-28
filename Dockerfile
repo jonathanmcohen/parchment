@@ -23,6 +23,14 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     GIT_SHA=$GIT_SHA
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Phase 0's src/lib/env.ts validates these at module load, which `next build`
+# triggers while collecting route data (a missing PARCHMENT_PUBLIC_URL otherwise
+# fails the build with "Failed to collect page data"). BUILD-TIME PLACEHOLDERS
+# ONLY — the real values are supplied at runtime (compose env / runner stage);
+# nothing here is embedded in the output bundle. The secret is a valid base64-32
+# dummy so env.ts's key-format check passes.
+ENV PARCHMENT_PUBLIC_URL=http://localhost:3000 \
+    PARCHMENT_SECRET_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 RUN pnpm build
 
 # ─── runner (compose-ready: external Postgres) ───

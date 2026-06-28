@@ -2,6 +2,7 @@ import { RestoreForm, S3BackupNowButton } from '@/components/backup/BackupContro
 import { requireAdmin } from '@/lib/auth/guard'
 import { resolveS3Config } from '@/lib/backup/s3-config'
 import { getAppConfig, getAppConfigJson } from '@/lib/config/repo'
+import { SECRET_MASK } from '@/lib/crypto/mask'
 import { resolveGitSyncConfig } from '@/lib/git/sync-config'
 import type { JobState } from '@/lib/schedules/jobs'
 import { scheduler } from '@/lib/schedules/scheduler'
@@ -61,7 +62,7 @@ export default async function BackupPage() {
     prefix: s3?.prefix ?? '',
     scheduleHours: s3?.scheduleHours ?? 24,
     enabled: s3?.enabled ?? false,
-    secretAccessKey: s3?.secretAccessKey ? '***' : '',
+    secretAccessKey: s3?.secretAccessKey ? SECRET_MASK : '',
   }
 
   const state = scheduler.getState()

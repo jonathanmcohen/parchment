@@ -1,9 +1,10 @@
 'use client'
 
 import { type FormEvent, useState } from 'react'
+import { SECRET_MASK } from '@/lib/crypto/mask'
 
 // F1 — S3 config form (client island). Controlled form for the S3 fields; the
-// secret shows '***' if already set (typing replaces the mask). Save → PUT;
+// secret shows the mask if already set (typing replaces it). Save → PUT;
 // Test connection → POST the current unsaved values.
 
 export interface S3FormInitial {
@@ -14,11 +15,13 @@ export interface S3FormInitial {
   prefix: string
   scheduleHours: number
   enabled: boolean
-  /** '***' when a secret is stored, '' otherwise. */
+  /** SECRET_MASK when a secret is stored, '' otherwise. */
   secretAccessKey: string
 }
 
-const MASK = '***'
+// Must equal the server's SECRET_MASK: the PUT route drops a submitted secret
+// that equals this, so the stored secret survives a save that didn't retype it.
+const MASK = SECRET_MASK
 
 export function S3ConfigForm({ initial }: { initial: S3FormInitial }) {
   const [endpoint, setEndpoint] = useState(initial.endpoint)

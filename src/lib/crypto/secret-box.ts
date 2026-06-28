@@ -9,9 +9,13 @@
 // load time) so the module can be imported even when the key is absent (secret WRITES
 // return 503 at the route level; reads of unencrypted config still work).
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
+import { SECRET_MASK } from './mask'
 
-/** The exact 8 bullet characters (U+2022) used to mask a secret in any UI/API surface. */
-export const SECRET_MASK = '••••••••'
+// SECRET_MASK is imported from the client-safe ./mask module (above) so client
+// islands can use it without this module's node:crypto dependency. Re-exported
+// here so existing server-side `import { SECRET_MASK } from '@/lib/crypto/secret-box'`
+// call-sites keep working unchanged.
+export { SECRET_MASK }
 
 /** Thrown by decryptSecret on a malformed envelope, wrong key, or tampered ciphertext/tag. */
 export class DecryptError extends Error {

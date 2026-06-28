@@ -210,3 +210,18 @@
 .parchment-page-spacer {
   display: block;
 }
+
+/* ── Live paged editor: per-sheet chrome (watermark + header/footer/page-number) ──
+ *
+ * .parchment-live-chrome sits at the same z-index as the sheet backgrounds
+ * (z-index:0), behind the editable content (z-index:1). The header/footer are
+ * positioned inside the sheet's margin area so they never overlap body text. */
+
+.parchment-live-chrome {
+  pointer-events: none;
+}
+.parchment-live-chrome .parchment-running-header,
+.parchment-live-chrome .parchment-running-footer {
+  padding-left: 96px; /* align with default page margins; visual only */
+  padding-right: 96px;
+}

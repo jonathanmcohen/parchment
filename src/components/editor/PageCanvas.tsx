@@ -384,6 +384,53 @@ export function PageCanvas({
           />
         ))}
 
+      {/* Paged mode: per-sheet chrome — watermark, running header, footer + page number.
+          Sits above the sheet backgrounds (z-index:0) but below the content (z-index:1).
+          aria-hidden because this is purely decorative/informational chrome. */}
+      {paged &&
+        pageBoxes.map((box, i) => {
+          const section = resolveSection(sectionPxEntries, box.top)
+          const effectiveWatermark = section.watermark ?? watermark
+          const pageNumStr = formatPageNumber(i + 1, section.pageNumberFormat)
+          return (
+            <div
+              key={`chrome-${box.top}`}
+              aria-hidden="true"
+              className="parchment-live-chrome"
+              style={{ position: 'absolute', left: 0, right: 0, top: box.top, height: box.height }}
+            >
+              <div
+                className="parchment-paged-watermark"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  overflow: 'hidden',
+                  pointerEvents: 'none',
+                }}
+              >
+                <WatermarkLayer config={effectiveWatermark} />
+              </div>
+              {section.headerText && (
+                <div
+                  className="parchment-running-header"
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0 }}
+                >
+                  <span className="parchment-running-header-text">{section.headerText}</span>
+                </div>
+              )}
+              <div
+                className={`parchment-running-footer parchment-pn-${section.pageNumberPosition}`}
+                style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}
+              >
+                {section.footerText && (
+                  <span className="parchment-running-footer-text">{section.footerText}</span>
+                )}
+                {pageNumStr && <span className="parchment-page-number">{pageNumStr}</span>}
+              </div>
+            </div>
+          )
+        })}
+
       {/* Page-boundary overlays — decorative, aria-hidden (continuous mode only) */}
       {!paged &&
         allBreaks.map((offset, i) => {

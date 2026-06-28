@@ -181,6 +181,12 @@ export function PageCanvas({
   const sectionEntriesRef = useRef(sectionEntries)
   sectionEntriesRef.current = sectionEntries
 
+  // Keep a stable ref to onPageCountChange so the paged effect doesn't
+  // re-attach its ResizeObserver/listeners when the parent passes a new
+  // callback identity on every render.
+  const onPageCountChangeRef = useRef(onPageCountChange)
+  onPageCountChangeRef.current = onPageCountChange
+
   useEffect(() => {
     // domMeasureKey drives re-runs when pageBreak/sectionBreak positions change.
     // It is intentionally referenced here (not just in the dep array) so Biome
@@ -230,6 +236,9 @@ export function PageCanvas({
   // The spacer heights we last pushed, keyed by beforeBlockIndex, so the next
   // measurement can subtract them and recover spacer-free raw block heights.
   const spacerByIndexRef = useRef<Map<number, number>>(new Map())
+  // Signature of the last pageBoxes we pushed, so we skip redundant setState
+  // calls when the layout hasn't changed between debounced measurement cycles.
+  const pageBoxesSigRef = useRef<string>('')
 
   useEffect(() => {
     if (!paged || !editor) {
@@ -259,6 +268,8 @@ export function PageCanvas({
         setPageBoxes([{ top: 0, height: heightPx, oversized: false }])
         editor.commands.setPaginationSpacers([])
         spacerByIndexRef.current = new Map()
+        // Reset the signature sentinel so a subsequent real layout always applies.
+        pageBoxesSigRef.current = ''
         return
       }
 
@@ -310,8 +321,14 @@ export function PageCanvas({
         spacerByIndexRef.current = nextMap
         editor.commands.setPaginationSpacers(layout.spacers)
       }
-      setPageBoxes(layout.pageBoxes)
-      onPageCountChange?.(layout.pageBoxes.length)
+
+      // Guard: only update state when the page layout actually changed.
+      const sig = layout.pageBoxes.map((b) => `${b.top}:${b.height}:${b.oversized}`).join('|')
+      if (sig !== pageBoxesSigRef.current) {
+        pageBoxesSigRef.current = sig
+        setPageBoxes(layout.pageBoxes)
+        onPageCountChangeRef.current?.(layout.pageBoxes.length)
+      }
     }
 
     const schedule = () => {
@@ -338,7 +355,7 @@ export function PageCanvas({
       editor.off('update', schedule)
       ro.disconnect()
     }
-  }, [paged, editor, heightPx, margins.top, margins.bottom, onPageCountChange])
+  }, [paged, editor, heightPx, margins.top, margins.bottom])
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (

@@ -19,7 +19,16 @@ import {
   type PageSetup,
   resolvePageDims,
 } from '@/lib/editor/paginate'
+import {
+  computePageLayout,
+  type PageBox,
+  type PageGeometry,
+  topLevelBlockOffsets,
+} from '@/lib/editor/pagination'
 import { DEFAULT_WATERMARK, parseWatermark, type WatermarkConfig } from '@/lib/editor/watermark'
+
+/** Inter-sheet gutter (matches .parchment-paged-root gap in pagination.css). */
+const GUTTER_PX = 24
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -214,6 +223,111 @@ export function PageCanvas({
   // ── Merge auto + manual breaks into final boundary list ─────────────────
   const allBreaks = mergeBreaks(autoBreaks, manualBreakOffsets)
 
+  // ── Paged mode: measure block heights, run layout engine, push spacers ──
+  const paged = pageLayoutMode === 'paged'
+  const [pageBoxes, setPageBoxes] = useState<PageBox[]>([])
+  // The spacer heights we last pushed, keyed by beforeBlockIndex, so the next
+  // measurement can subtract them and recover spacer-free raw block heights.
+  const spacerByIndexRef = useRef<Map<number, number>>(new Map())
+
+  useEffect(() => {
+    if (!paged || !editor) {
+      // Leaving paged mode: clear any spacers so continuous mode is pristine.
+      if (editor) editor.commands.setPaginationSpacers([])
+      setPageBoxes([])
+      spacerByIndexRef.current = new Map()
+      return
+    }
+
+    const geo: PageGeometry = {
+      usableHeight: Math.max(0, heightPx - margins.top - margins.bottom),
+      topMargin: margins.top,
+      bottomMargin: margins.bottom,
+      gutter: GUTTER_PX,
+      pageHeight: heightPx,
+    }
+
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let raf = 0
+
+    const measureAndPaginate = () => {
+      const view = editor.view
+      const doc = view.state.doc
+      const offsets = topLevelBlockOffsets(doc)
+      if (offsets.length === 0) {
+        setPageBoxes([{ top: 0, height: heightPx, oversized: false }])
+        editor.commands.setPaginationSpacers([])
+        spacerByIndexRef.current = new Map()
+        return
+      }
+
+      // Top of each block relative to the editor content box.
+      const editorRect = view.dom.getBoundingClientRect()
+      const tops: number[] = []
+      for (const pos of offsets) {
+        const node = view.nodeDOM(pos) as HTMLElement | null
+        tops.push(node ? node.getBoundingClientRect().top - editorRect.top : 0)
+      }
+      const contentBottom = view.dom.getBoundingClientRect().height
+
+      // Raw (spacer-free) height of each block: slot delta minus any spacer we
+      // currently have inserted before the NEXT block.
+      const prevSpacers = spacerByIndexRef.current
+      const rawHeights: number[] = []
+      for (let i = 0; i < offsets.length; i++) {
+        const top = tops[i] ?? 0
+        const nextTop = i + 1 < offsets.length ? (tops[i + 1] ?? top) : contentBottom
+        const spacerBeforeNext = i + 1 < offsets.length ? (prevSpacers.get(i + 1) ?? 0) : 0
+        rawHeights.push(Math.max(0, nextTop - top - spacerBeforeNext))
+      }
+
+      // Manual page breaks → forced break before the following block.
+      const forced = new Set<number>()
+      doc.forEach((node, _offset, index) => {
+        if (node.type.name === 'pageBreak' && index + 1 < offsets.length) forced.add(index + 1)
+      })
+
+      const layout = computePageLayout(rawHeights, forced, geo)
+
+      // Idempotency guard: only push spacers if they changed.
+      const nextMap = new Map<number, number>()
+      for (const s of layout.spacers) nextMap.set(s.beforeBlockIndex, s.height)
+      const changed =
+        nextMap.size !== prevSpacers.size || [...nextMap].some(([k, v]) => prevSpacers.get(k) !== v)
+      if (changed) {
+        spacerByIndexRef.current = nextMap
+        editor.commands.setPaginationSpacers(layout.spacers)
+      }
+      setPageBoxes(layout.pageBoxes)
+      onPageCountChange?.(layout.pageBoxes.length)
+    }
+
+    const schedule = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        raf = requestAnimationFrame(() => {
+          raf = requestAnimationFrame(measureAndPaginate)
+        })
+      }, 200)
+    }
+
+    schedule()
+    editor.on('update', schedule)
+    const ro = new ResizeObserver(schedule)
+    if (contentRef.current) ro.observe(contentRef.current)
+    // Re-measure when images finish loading (their height is 0 until then).
+    const imgs = Array.from(editor.view.dom.querySelectorAll('img'))
+    for (const img of imgs)
+      if (!img.complete) img.addEventListener('load', schedule, { once: true })
+
+    return () => {
+      if (timer) clearTimeout(timer)
+      if (raf) cancelAnimationFrame(raf)
+      editor.off('update', schedule)
+      ro.disconnect()
+    }
+  }, [paged, editor, heightPx, margins.top, margins.bottom, onPageCountChange])
+
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div
@@ -223,57 +337,72 @@ export function PageCanvas({
         paddingRight: margins.right,
         paddingBottom: margins.bottom,
         paddingLeft: margins.left,
+        position: 'relative',
+        ...(paged ? { background: 'var(--editor-gutter)' } : {}),
       }}
       className="parchment-page mx-auto"
       data-page-layout={pageLayoutMode}
+      data-paged={paged ? '' : undefined}
     >
-      {/* Page-boundary overlays — decorative, aria-hidden */}
-      {allBreaks.map((offset, i) => {
-        // This boundary separates page i+1 (above) from page i+2 (below)
-        const pageAbove = i + 1 // 1-based page number above this break
-        const pageBelow = i + 2 // 1-based page number below this break
-
-        // The page above starts after the previous break (or at 0)
-        const pageAboveStartPx = i === 0 ? 0 : (allBreaks[i - 1] ?? 0)
-        // The page below starts at this break
-        const pageBelowStartPx = offset
-
-        const sectionAbove = resolveSection(sectionPxEntries, pageAboveStartPx)
-        const sectionBelow = resolveSection(sectionPxEntries, pageBelowStartPx)
-
-        const pageNumStr = formatPageNumber(pageAbove, sectionAbove.pageNumberFormat)
-
-        return (
+      {/* Paged mode: discrete sheet backgrounds painted behind the content. */}
+      {paged &&
+        pageBoxes.map((box) => (
           <div
-            key={offset}
+            key={`sheet-${box.top}`}
             aria-hidden="true"
-            style={{ top: offset }}
-            className="parchment-page-boundary"
-          >
-            {/* Footer of the page above: running footer + page number */}
+            className="parchment-page parchment-live-sheet"
+            style={{ position: 'absolute', left: 0, right: 0, top: box.top, height: box.height }}
+          />
+        ))}
+
+      {/* Page-boundary overlays — decorative, aria-hidden (continuous mode only) */}
+      {!paged &&
+        allBreaks.map((offset, i) => {
+          // This boundary separates page i+1 (above) from page i+2 (below)
+          const pageAbove = i + 1 // 1-based page number above this break
+          const pageBelow = i + 2 // 1-based page number below this break
+
+          // The page above starts after the previous break (or at 0)
+          const pageAboveStartPx = i === 0 ? 0 : (allBreaks[i - 1] ?? 0)
+          // The page below starts at this break
+          const pageBelowStartPx = offset
+
+          const sectionAbove = resolveSection(sectionPxEntries, pageAboveStartPx)
+          const sectionBelow = resolveSection(sectionPxEntries, pageBelowStartPx)
+
+          const pageNumStr = formatPageNumber(pageAbove, sectionAbove.pageNumberFormat)
+
+          return (
             <div
-              className={`parchment-running-footer parchment-pn-${sectionAbove.pageNumberPosition}`}
+              key={offset}
+              aria-hidden="true"
+              style={{ top: offset }}
+              className="parchment-page-boundary"
             >
-              {sectionAbove.footerText && (
-                <span className="parchment-running-footer-text">{sectionAbove.footerText}</span>
-              )}
-              {pageNumStr && <span className="parchment-page-number">{pageNumStr}</span>}
-            </div>
-
-            {/* Divider line */}
-            <div className="parchment-page-divider">
-              <span className="parchment-page-divider-label">Page {pageBelow}</span>
-            </div>
-
-            {/* Header of the page below: running header */}
-            {sectionBelow.headerText && (
-              <div className="parchment-running-header">
-                <span className="parchment-running-header-text">{sectionBelow.headerText}</span>
+              {/* Footer of the page above: running footer + page number */}
+              <div
+                className={`parchment-running-footer parchment-pn-${sectionAbove.pageNumberPosition}`}
+              >
+                {sectionAbove.footerText && (
+                  <span className="parchment-running-footer-text">{sectionAbove.footerText}</span>
+                )}
+                {pageNumStr && <span className="parchment-page-number">{pageNumStr}</span>}
               </div>
-            )}
-          </div>
-        )
-      })}
+
+              {/* Divider line */}
+              <div className="parchment-page-divider">
+                <span className="parchment-page-divider-label">Page {pageBelow}</span>
+              </div>
+
+              {/* Header of the page below: running header */}
+              {sectionBelow.headerText && (
+                <div className="parchment-running-header">
+                  <span className="parchment-running-header-text">{sectionBelow.headerText}</span>
+                </div>
+              )}
+            </div>
+          )
+        })}
 
       {/* G9: Per-page watermark overlays — one absolutely-positioned div per page region.
           Rendering one overlay per page (rather than one spanning the full canvas) ensures
@@ -285,32 +414,33 @@ export function PageCanvas({
           The first page always starts at y=0. Each subsequent page starts at the previous
           break offset. The active section's watermark override (if set) takes precedence
           over the doc-level default for that page. */}
-      {(() => {
-        // Build page-start offsets: page 1 starts at 0, each subsequent page starts at its break.
-        const pageStarts: number[] = [0, ...allBreaks]
-        return pageStarts.map((startPx) => {
-          const section = resolveSection(sectionPxEntries, startPx)
-          const effectiveWatermark = section.watermark ?? watermark
-          return (
-            <div
-              key={startPx}
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                top: startPx,
-                left: 0,
-                right: 0,
-                height: heightPx,
-                pointerEvents: 'none',
-                overflow: 'hidden',
-                zIndex: 0,
-              }}
-            >
-              <WatermarkLayer config={effectiveWatermark} />
-            </div>
-          )
-        })
-      })()}
+      {!paged &&
+        (() => {
+          // Build page-start offsets: page 1 starts at 0, each subsequent page starts at its break.
+          const pageStarts: number[] = [0, ...allBreaks]
+          return pageStarts.map((startPx) => {
+            const section = resolveSection(sectionPxEntries, startPx)
+            const effectiveWatermark = section.watermark ?? watermark
+            return (
+              <div
+                key={startPx}
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: startPx,
+                  left: 0,
+                  right: 0,
+                  height: heightPx,
+                  pointerEvents: 'none',
+                  overflow: 'hidden',
+                  zIndex: 0,
+                }}
+              >
+                <WatermarkLayer config={effectiveWatermark} />
+              </div>
+            )
+          })
+        })()}
 
       {/* Content wrapper — measured by ResizeObserver */}
       <div ref={contentRef} className="parchment-page-content">

@@ -83,9 +83,9 @@ this. It is the only thing this spec changes.
 
 Three cooperating VIEW-layer pieces. None mutate the document.
 
-### 1. Pure layout helper (extends the existing engine)
+### 1. Pure layout helpers
 
-Add one pure, unit-tested function alongside the existing engine:
+Add two pure, unit-tested functions alongside the existing engine:
 
 ```
 computePageLayout(
@@ -93,15 +93,22 @@ computePageLayout(
   forcedBreakBefore: Set<number>,  // block indices preceded by a manual pageBreak
   geo: { usableHeight, topMargin, bottomMargin, gutter, pageHeight },
 ) => {
-  breakBeforeBlock: number[]       // block indices that start a new page
-  spacerHeights: Map<number, number> // blockIndex -> spacer height to insert before it
-  pageBoxes: { top: number, height: number, oversized: boolean }[] // for the bg layer
+  breakBeforeBlock: number[]                          // block indices that start a new page
+  spacers: { beforeBlockIndex: number; height: number }[] // spacers to insert (one per break)
+  pageBoxes: { top: number; height: number; oversized: boolean }[] // for the bg layer
 }
+
+topLevelBlockOffsets(doc: PMNode) => number[]   // PM position before each top-level block
 ```
 
-- Break decision delegates to the existing greedy first-fit logic, extended to
-  also break wherever `forcedBreakBefore` requires it (manual page breaks) and to
-  reset the running height after a forced break.
+- `computePageLayout` runs its OWN greedy first-fit walk (it needs each page's
+  running `used` height to compute the spacer-fill term, which the existing
+  `computeBreakIndicesVariable` does not expose). It also breaks wherever
+  `forcedBreakBefore` requires and resets `used` after a forced break. The
+  existing `computeBreakIndicesVariable` is left untouched for the read-only path.
+- `topLevelBlockOffsets` is shared by the plugin (to place decorations) and the
+  React measurer (to locate each block's DOM node via `view.nodeDOM`). It takes a
+  ProseMirror node and returns the position before each direct child.
 - **Spacer height** for a break before block `i` that ends page N:
   `spacer = (usableHeight - usedOnPageN) + bottomMargin + gutter + topMargin`.
   - `(usableHeight - usedOnPageN)` fills the remainder of page N's text area, so
@@ -132,53 +139,68 @@ bottomMargin`. Blocks fill to `used <= usable`; the last block ends at `y = used
 
 This is why the approach is correct by construction, not by tuning.
 
+Ownership split (refined): **React measures and decides; the plugin only
+renders spacer decorations.** This is the key risk reducer — see idempotency.
+
 ### 2. ProseMirror pagination plugin (`src/lib/editor/extensions/pagination-live.ts`)
 
-A Tiptap extension wrapping a ProseMirror plugin. Active only in paged mode
-(reads paged-ness from extension storage/options; no-op otherwise).
+A Tiptap extension wrapping a thin ProseMirror plugin. It does NO measurement and
+owns NO timers. Its entire job: hold a list of spacers and render them as
+decorations.
 
-**Measurement.** Read the raw outer height of each top-level block. The direct
-children of `editorView.dom` map 1:1 to the top-level document nodes, so heights
-come from consecutive `offsetTop` deltas (final block via `scrollHeight`), the
-same technique already proven in `PaginatedDocument.measureSlotHeights`.
-Measurement EXCLUDES our own spacer widgets — see idempotency.
+- **State:** `{ spacers: Array<{ beforeBlockIndex: number; height: number }> }`.
+- **Update:** React pushes a new spacer list via a meta-only transaction
+  (`tr.setMeta(paginationKey, spacers)`, zero doc steps → no Yjs update, no
+  history entry). `apply` replaces the stored list.
+- **Decorations:** `props.decorations` maps each `beforeBlockIndex` to the
+  ProseMirror position before that top-level block (via the pure
+  `topLevelBlockOffsets(doc)` helper) and emits one
+  `Decoration.widget(pos, makeSpacerDOM(height), { side: -1, key })` per spacer.
+  Widgets are non-document atoms: the cursor steps over them, they never enter
+  the doc, and they are invisible to Yjs and the markdown mirror. The spacer DOM
+  is an empty `contentEditable=false`, `aria-hidden`, `data-pagination-spacer`
+  block of the given height.
+- **Collab safety:** decorations are recomputed from the (mapped) current doc on
+  every render, so remote edits that shift positions are handled for free; our
+  decoration set and the y-prosemirror cursor decoration set are independent and
+  coexist.
+- **Active only in paged mode:** when the editor is in continuous mode React
+  pushes an empty spacer list, so the plugin emits nothing.
 
-**Forced + oversized.** Collect `pageBreak` node positions → map to the block
-index they precede (`forcedBreakBefore`). Oversized blocks are handled by the
-engine.
+### 3. Background sheet layer + measurement + transparent foreground (paged branch of `PageCanvas.tsx`)
 
-**Decorations.** For each break, insert ONE `Decoration.widget(pos, dom, {
-side })` of the computed spacer height at the boundary before the breaking block.
-Widgets are non-document atoms: the cursor steps over them, they never enter the
-doc, they are invisible to Yjs and the markdown mirror. The spacer DOM is an
-empty `contentEditable=false`, `aria-hidden` block of the given height.
+React (the paged branch of `PageCanvas`) owns measurement, the recompute timer,
+and the background sheets. Continuous mode stays byte-for-byte as today, minus
+the dead overlay band.
 
-**Plugin state.** Holds `{ pageBoxes, pageCount, decorations }`. The React layer
-subscribes via `useEditorState` reading this plugin key (the same pattern
-`PageCanvas` already uses for `docBreakInfo`).
+**Measurement (idempotent + accurate).** For each top-level block, get its DOM
+node via `editor.view.nodeDOM(pos)` (pos from `topLevelBlockOffsets`) and read its
+`offsetTop` relative to the content box. The slot height between consecutive
+blocks is `top[i+1] - top[i]`; the **raw** (spacer-free) height is that slot minus
+the height of any spacer we currently have inserted before block `i+1`:
 
-**Recompute loop.**
-- Trigger on `docChanged` transactions (debounced ~200ms) and on a
-  `ResizeObserver` over the editor DOM (width/font changes). Re-measure when
-  fonts/images settle (listen for image `load`, like `PaginatedDocument`).
-- Apply via a **meta-only transaction** (`tr.setMeta(key, newState)`, zero doc
-  steps) so it produces NO Yjs update and does not touch document history.
-- **Idempotency (no reflow loop):** break decisions derive only from RAW block
-  heights, which are independent of the spacers we inserted (spacers are widgets
-  between blocks, not inside them, and are skipped during measurement). So a
-  second measurement after spacers are placed yields identical raw heights →
-  identical decorations. Guard: deep-equal the new decoration/geometry set
-  against current plugin state and skip the dispatch when unchanged.
-- **Collab safety:** the plugin maps its `DecorationSet` across every
-  transaction (including remote ones) via `DecorationSet.map(tr.mapping,
-  tr.doc)`, then schedules a debounced recompute. Our decorations and the
-  y-prosemirror cursor decorations are independent decoration sets and coexist.
+```
+rawHeight[i] = (top[i+1] - top[i]) - (spacerHeightBefore[i+1] ?? 0)
+last block:  rawHeight[last] = contentBottom - top[last]
+```
 
-### 3. Background sheet layer + transparent foreground (paged branch of `PageCanvas.tsx`)
+Subtracting our own known spacer heights recovers the exact spacer-free layout
+(including collapsed inter-block margins, which `offsetTop` captures). Because raw
+heights are therefore independent of what we inserted, the next measurement yields
+identical raw heights → identical spacers. **No reflow loop, by construction** —
+and we still guard with a deep-equal on the spacer list before dispatching.
 
-In paged mode only (continuous mode stays byte-for-byte as today, minus the dead
-overlay band):
+**Recompute.** Debounced ~200ms after `editor` transactions (`editor.on('update')`)
+and on a `ResizeObserver` over the content box (width/font changes); re-measure on
+image `load` (heights are 0 until images load), reusing the two-rAF settle from
+`PaginatedDocument`. Each cycle: measure raw heights → collect `forcedBreakBefore`
+from `pageBreak` nodes → `computePageLayout()` → (a) `setState(pageBoxes)` and
+(b) push `spacers` to the plugin via the meta transaction.
 
+**Forced + oversized.** `forcedBreakBefore` = block indices preceded by a
+`pageBreak` node. Oversized blocks are handled inside `computePageLayout`.
+
+**Background sheets + foreground.**
 - The outer `.parchment-page` container's own paper background is dropped in
   paged mode; the container background becomes the workspace gutter
   (`var(--editor-gutter)`).
@@ -227,14 +249,15 @@ overlay band):
 ## Files
 
 - **New:** `src/lib/editor/extensions/pagination-live.ts` — Tiptap extension +
-  ProseMirror plugin (measurement, decorations, recompute, plugin state).
-- **New (pure):** `computePageLayout()` added to `src/lib/editor/pagination/`
-  (e.g. `page-layout.ts`) + unit tests.
-- **Extend:** `computeBreakIndicesVariable()` (or a thin wrapper) to honor
-  `forcedBreakBefore` for manual page breaks + unit tests.
+  thin ProseMirror plugin (holds the spacer list, renders widget decorations; no
+  measurement, no timers).
+- **New (pure):** `computePageLayout()` + `topLevelBlockOffsets()` added to
+  `src/lib/editor/pagination/` (e.g. `page-layout.ts`) + unit tests. The existing
+  `computeBreakIndicesVariable()` is NOT modified.
 - **Rewrite (paged branch only):** `src/components/editor/PageCanvas.tsx` —
-  background sheet layer driven by plugin geometry; port headers/footers/
-  watermarks; continuous mode unchanged.
+  owns measurement (live-DOM tops minus known spacers), the recompute timer, the
+  background sheet layer, and pushing the spacer list to the plugin; port
+  headers/footers/watermarks; continuous mode unchanged.
 - **Wire:** `src/components/editor/Editor.tsx` — register the extension and pass
   paged-ness; it already threads `pageLayoutMode`.
 - **CSS:** add live paged sheet/gutter rules (in `src/styles/pagination.css`,
@@ -250,8 +273,9 @@ overlay band):
 - `computePageLayout()` pure unit tests: spacer-height math, bottom-margin
   guarantee, cumulative page boxes, oversized-block page growth, forced breaks,
   empty doc, single oversized block.
-- `forcedBreakBefore` engine extension unit tests.
-- Keep DOM/measurement code thin (it delegates to the tested pure helper).
+- `topLevelBlockOffsets()` pure unit tests against a small ProseMirror doc.
+- Keep DOM/measurement code thin (it delegates to the tested pure helpers); the
+  DOM glue is covered by the live browser verification below.
 
 ### Live browser verification (REQUIRED — user acceptance gate)
 
@@ -281,8 +305,9 @@ The unproven part is driving them from a live contenteditable. Highest-risk
 unknowns, to validate earliest during implementation:
 
 1. **Reflow idempotency** — confirm raw-height measurement is stable after
-   spacers are inserted (no thrash). Mitigation: measure excluding spacers +
-   deep-equal guard.
+   spacers are inserted (no thrash). Mitigation: measure live-DOM block tops and
+   SUBTRACT the known inserted spacer heights, so raw heights are spacer-
+   independent; plus a deep-equal guard on the spacer list before dispatch.
 2. **Caret/selection over large atom-widget spacers** — confirm the cursor steps
    cleanly across the gutter and selection drag works.
 3. **Collab decoration mapping** — confirm our decorations survive remote edits

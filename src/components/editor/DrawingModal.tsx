@@ -6,7 +6,9 @@ import type {
 } from '@excalidraw/excalidraw/types'
 import type { Editor } from '@tiptap/core'
 import dynamic from 'next/dynamic'
-import { useId, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
+import { DrawingErrorBoundary } from '@/components/editor/DrawingErrorBoundary'
+import { sanitizeDrawingScene } from '@/lib/editor/excalidraw-scene'
 
 // Import the Excalidraw CSS (client-only). The dynamic import below ensures
 // the Excalidraw component itself is never evaluated server-side.
@@ -40,16 +42,27 @@ type Props = {
  * editor.commands.updateDrawing() to write them back to the node. Cancel
  * discards without writing.
  *
- * Persisted appState keys: only the Excalidraw-meaningful display keys are
- * kept (viewBackgroundColor, currentItemFontFamily, etc.). Volatile/large
- * runtime keys like collaborators, selectedElementIds (empty on export), and
- * editingElement are NOT filtered because exportToSvg already handles them;
- * we pass the full appState for fidelity and let Excalidraw manage it.
+ * Persisted appState: sanitizeDrawingScene() strips the runtime-only fields
+ * before we write the scene back to the node. Critically `appState.collaborators`
+ * is a Map at runtime — JSON.stringify degrades it to `{}` and Excalidraw then
+ * calls collaborators.forEach() on reload and crashes the editor (#8). The live
+ * appState is still passed to exportToSvg for the SVG snapshot (export tolerates
+ * it); only the PERSISTED scene is sanitized. On load we also sanitize
+ * initialScene to repair drawings saved before this fix, and the Excalidraw
+ * render is wrapped in an error boundary as a last-resort safety net.
  */
 export function DrawingModal({ editor, pos, initialScene, onClose }: Props) {
   const titleId = useId()
   const apiRef = useRef<ExcalidrawAPI | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // #8: sanitize the incoming scene so an already-saved drawing with a degraded
+  // appState.collaborators (a `{}`/`[]` where Excalidraw expects a Map) is repaired
+  // before it ever reaches Excalidraw's initialData path. Memoized on the raw scene.
+  const safeInitialScene = useMemo(
+    () => (initialScene !== null ? sanitizeDrawingScene(initialScene) : null),
+    [initialScene],
+  )
 
   const handleDone = async () => {
     const api = apiRef.current
@@ -72,7 +85,10 @@ export function DrawingModal({ editor, pos, initialScene, onClose }: Props) {
       })
       const svg = svgEl.outerHTML
 
-      const scene = { elements, appState, files }
+      // #8: strip runtime-only appState (collaborators Map, selection/editing
+      // state) BEFORE persisting so a reload never re-feeds Excalidraw a degraded
+      // collaborators value. The live appState above was used for the SVG export.
+      const scene = sanitizeDrawingScene({ elements, appState, files })
       editor.commands.updateDrawing(pos, scene, svg)
       onClose()
     } catch (err) {
@@ -123,14 +139,18 @@ export function DrawingModal({ editor, pos, initialScene, onClose }: Props) {
 
         {/* Excalidraw needs an explicit-height container or it renders blank */}
         <div style={{ flex: 1, minHeight: 0, height: 'calc(70vh - 4rem)', position: 'relative' }}>
-          <Excalidraw
-            {...(initialScene !== null
-              ? { initialData: initialScene as ExcalidrawInitialDataState }
-              : {})}
-            excalidrawAPI={(api) => {
-              apiRef.current = api
-            }}
-          />
+          {/* #8: a render throw from Excalidraw (e.g. a future bad-scene bug) must
+              not unmount the whole editor — the boundary keeps the modal usable. */}
+          <DrawingErrorBoundary>
+            <Excalidraw
+              {...(safeInitialScene !== null
+                ? { initialData: safeInitialScene as ExcalidrawInitialDataState }
+                : {})}
+              excalidrawAPI={(api) => {
+                apiRef.current = api
+              }}
+            />
+          </DrawingErrorBoundary>
         </div>
 
         <div className="parchment-dialog-actions">

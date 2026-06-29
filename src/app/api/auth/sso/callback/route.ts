@@ -5,6 +5,7 @@ import { discoverOidc, exchangeCallback } from '@/lib/auth/oidc-client'
 import { getOidcConfig, isOidcEnabled } from '@/lib/auth/oidc-config'
 import { consumeOidcFlow } from '@/lib/auth/oidc-flow-repo'
 import { createSession } from '@/lib/auth/session'
+import { env } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,8 +25,11 @@ export const dynamic = 'force-dynamic'
 //     host.
 // Any failure → a generic 401 redirect to /login; a session is NEVER created on error.
 
-function fail(req: NextRequest, code: string): NextResponse {
-  return NextResponse.redirect(new URL(`/login?sso=${code}`, req.nextUrl.origin))
+function fail(_req: NextRequest, code: string): NextResponse {
+  // #1: redirect to the PUBLIC host, not the internal request origin (0.0.0.0:3000
+  // behind a TLS-terminating proxy). The request arg is retained for the signature
+  // (callers pass it) but the origin is no longer derived from it.
+  return NextResponse.redirect(new URL(`/login?sso=${code}`, env.publicUrl))
 }
 
 // App-relative only (defense in depth; /start already validated).
@@ -85,5 +89,6 @@ export async function GET(req: NextRequest) {
     meta: { method: 'oidc', issuer: claims.iss, outcome: resolved.outcome },
   })
 
-  return NextResponse.redirect(new URL(safeRedirectTo(flow.redirectTo), req.nextUrl.origin))
+  // #1: landing redirect on the PUBLIC host (not the internal request origin).
+  return NextResponse.redirect(new URL(safeRedirectTo(flow.redirectTo), env.publicUrl))
 }

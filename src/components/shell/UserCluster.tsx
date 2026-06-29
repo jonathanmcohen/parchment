@@ -134,7 +134,21 @@ export function UserCluster({
   function signOut() {
     setOpen(false)
     startTransition(async () => {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      // #9: the logout route may return an IdP end-session URL (RP-initiated
+      // single-logout). When present, do a full-page navigation there so the IdP
+      // session is also terminated; it redirects back to /login afterwards.
+      let redirectTo: string | undefined
+      try {
+        const res = await fetch('/api/auth/logout', { method: 'POST' })
+        const data = (await res.json()) as { redirectTo?: string }
+        redirectTo = data.redirectTo
+      } catch {
+        // network/parse failure → fall through to the local /login redirect
+      }
+      if (redirectTo) {
+        window.location.assign(redirectTo)
+        return
+      }
       router.replace('/login')
       router.refresh()
     })

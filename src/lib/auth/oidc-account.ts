@@ -145,3 +145,17 @@ export async function resolveOidcUser(claims: OidcClaims): Promise<ResolveResult
   })
   return { ok: true, userId, outcome: 'jit' }
 }
+
+// #9: does this user have a linked OIDC identity? Used by logout to decide whether
+// RP-initiated single-logout applies. (Without a per-session auth-method column we
+// treat "has an OIDC identity" as the trigger; a dual-auth user who logged in with a
+// password still gets a harmless end-session bounce — they end up logged out + on
+// /login either way, and the IdP simply returns immediately if it has no session.)
+export async function userHasOidcIdentity(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ userId: schema.oidcIdentities.userId })
+    .from(schema.oidcIdentities)
+    .where(eq(schema.oidcIdentities.userId, userId))
+    .limit(1)
+  return row !== undefined
+}

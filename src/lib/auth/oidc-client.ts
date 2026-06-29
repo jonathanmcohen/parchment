@@ -78,6 +78,28 @@ export async function buildStart(
   return { state, nonce, codeVerifier, authorizationUrl: url.href }
 }
 
+// #9: RP-initiated single-logout. Given a discovered configuration, returns the
+// IdP end_session URL to redirect the browser to on logout — with
+// post_logout_redirect_uri = <publicUrl>/login (and id_token_hint when available) —
+// but ONLY when the IdP advertises an end_session_endpoint. When it does not, returns
+// null so the caller keeps the existing local-only logout (this is the opt-in/safe
+// gate the brief requires). buildEndSessionUrl throws without the endpoint, hence the
+// explicit metadata check first.
+export function buildEndSessionRedirect(
+  configuration: client.Configuration,
+  idToken?: string,
+): string | null {
+  const meta = configuration.serverMetadata()
+  if (!meta.end_session_endpoint) return null
+
+  const params: Record<string, string> = {
+    post_logout_redirect_uri: oidcPostLogoutRedirectUri(),
+  }
+  if (idToken) params.id_token_hint = idToken
+
+  return client.buildEndSessionUrl(configuration, params).href
+}
+
 export type OidcClaims = {
   iss: string
   sub: string

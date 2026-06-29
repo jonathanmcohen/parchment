@@ -46,6 +46,13 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.1',
+    notes: [
+      'Paged layout now paginates the live editor as you type: content fills each page and breaks at a block boundary onto a new sheet, with a real page gutter, sheet shadows, and preserved top/bottom margins — instead of one continuous canvas. Themes correctly in both light and dark page modes (completing the Paged-mode note from v0.1.10, which was preview/print-only).',
+      'An image, table, or code block taller than a page gets its own page rather than being cut; manual page breaks start a new sheet. The document itself is never split — pagination is purely visual, so collaboration and the Markdown mirror are unaffected.',
+    ],
+  },
+  {
     version: '0.2.0',
     notes: [
       'Collaboration: threaded comments anchored to a selection that survive concurrent edits (durable Yjs anchors), resolve, and @mention notifications; orphaned comments are kept in their own group when the anchored text is deleted.',

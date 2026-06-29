@@ -45,8 +45,8 @@ export class DrawingErrorBoundary extends Component<Props, State> {
               color: 'var(--muted)',
             }}
           >
-            This drawing could not be opened for editing. Close this dialog and try
-            again; your document is unaffected.
+            This drawing could not be opened for editing. Close this dialog and try again; your
+            document is unaffected.
           </div>
         )
       )

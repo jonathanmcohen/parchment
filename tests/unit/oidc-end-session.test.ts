@@ -37,7 +37,9 @@ describe('buildEndSessionRedirect', () => {
 
   it('builds the end-session URL with post_logout_redirect_uri = <publicUrl>/login', () => {
     buildEndSessionUrl.mockReturnValue(
-      new URL('https://idp.example.com/logout?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Flogin'),
+      new URL(
+        'https://idp.example.com/logout?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Flogin',
+      ),
     )
     const out = buildEndSessionRedirect(configWith('https://idp.example.com/logout') as never)
     expect(out).toBe(

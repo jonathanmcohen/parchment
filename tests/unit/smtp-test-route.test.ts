@@ -39,7 +39,9 @@ const VALID_BODY = {
   port: 587,
   user: 'user@example.com',
   password: 'mypassword',
-  from: 'noreply@example.com',
+  // The form/save use `fromAddress`; the test endpoint must read the same key
+  // (it previously read `from`, so every test send falsely failed validation).
+  fromAddress: 'noreply@example.com',
   tls: 'starttls',
   to: 'test@example.com',
 }
@@ -81,10 +83,22 @@ describe('POST /api/settings/smtp/test — validation', () => {
     expect(res.status).toBe(400)
   })
 
-  it('returns 400 on missing from', async () => {
-    const { from: _, ...rest } = VALID_BODY
+  it('returns 400 on missing fromAddress', async () => {
+    const { fromAddress: _, ...rest } = VALID_BODY
     const res = await POST(makeReq(rest))
     expect(res.status).toBe(400)
+  })
+
+  it('accepts a body that uses fromAddress (the key the form actually sends)', async () => {
+    authenticateRequest.mockResolvedValue(ADMIN_USER)
+    sendMailMock.mockResolvedValue({ messageId: 'fa-1' })
+    const res = await POST(makeReq(VALID_BODY))
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+    // The address the form supplied must be the envelope From.
+    expect(sendMailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ from: 'noreply@example.com' }),
+    )
   })
 
   it('returns 400 on missing tls', async () => {

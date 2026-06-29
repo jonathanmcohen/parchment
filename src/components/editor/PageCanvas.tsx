@@ -270,6 +270,7 @@ export function PageCanvas({
         spacerByIndexRef.current = new Map()
         // Reset the signature sentinel so a subsequent real layout always applies.
         pageBoxesSigRef.current = ''
+        onPageCountChangeRef.current?.(1)
         return
       }
 
@@ -375,9 +376,10 @@ export function PageCanvas({
     >
       {/* Paged mode: discrete sheet backgrounds painted behind the content. */}
       {paged &&
-        pageBoxes.map((box) => (
+        pageBoxes.map((box, i) => (
           <div
-            key={`sheet-${box.top}`}
+            // biome-ignore lint/suspicious/noArrayIndexKey: page indices are stable within a layout pass; top changes on reflow (the bug we're fixing)
+            key={`sheet-${i}`}
             aria-hidden="true"
             className="parchment-page parchment-live-sheet"
             style={{ position: 'absolute', left: 0, right: 0, top: box.top, height: box.height }}
@@ -394,7 +396,8 @@ export function PageCanvas({
           const pageNumStr = formatPageNumber(i + 1, section.pageNumberFormat)
           return (
             <div
-              key={`chrome-${box.top}`}
+              // biome-ignore lint/suspicious/noArrayIndexKey: page indices are stable within a layout pass; top changes on reflow (the bug we're fixing)
+              key={`chrome-${i}`}
               aria-hidden="true"
               className="parchment-live-chrome"
               style={{ position: 'absolute', left: 0, right: 0, top: box.top, height: box.height }}

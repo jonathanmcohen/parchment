@@ -4242,7 +4242,7 @@ body {
      anchors the scale at the top-left corner so the shrunken page stays
      flush with the left edge of the reading area (top center would push
      the page off-screen to the right on narrow viewports). */
-  .parchment-canvas-scaled-host .parchment-page {
+  .parchment-canvas-scaled-host .parchment-page:not(.parchment-live-sheet) {
     transform: scale(var(--page-scale, 1));
     transform-origin: top left;
   }

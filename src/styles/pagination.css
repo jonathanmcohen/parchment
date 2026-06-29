@@ -199,6 +199,13 @@
   /* width comes from left:0/right:0 inline; paper look inherited via .parchment-page */
 }
 
+/* Fix 1: Override the 1056px min-height from .parchment-page (globals.css ~line 979)
+   so landscape geometries (Letter=816px, A4=794px) are not floored too tall.
+   Specificity 0,2,0 beats .parchment-page (0,1,0) regardless of import order. */
+.parchment-page.parchment-live-sheet {
+  min-height: 0;
+}
+
 /* The editable content rides above the sheets. */
 .parchment-page[data-paged] .parchment-page-content {
   position: relative;

@@ -13,6 +13,14 @@ export {
   pagesFromBreaks,
 } from '@/lib/editor/pagination/break-index'
 export {
+  computePageLayout,
+  type PageBox,
+  type PageGeometry,
+  type PageLayout,
+  type Spacer,
+  topLevelBlockOffsets,
+} from '@/lib/editor/pagination/page-layout'
+export {
   type ContentBox,
   contentBoxFor,
   orientationForPage,

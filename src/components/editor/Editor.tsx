@@ -65,6 +65,7 @@ import { CairnSuggestionExtension } from '@/lib/editor/extensions/cairn-suggesti
 import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion'
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { GrammarCheckExtension } from '@/lib/editor/extensions/grammar-check'
+import { PaginationLive } from '@/lib/editor/extensions/pagination-live'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import { WikiSuggestionExtension } from '@/lib/editor/extensions/wiki-suggestion'
 import { classifySwipe, isMobileWidth, pageFitScale } from '@/lib/editor/page-fit'
@@ -998,6 +999,10 @@ export function Editor({
       // cairnSuggestion/findReplace (F6 lesson). Only registered when LanguageTool
       // is enabled server-side; with no extension the doc carries no grammar state.
       ...(grammarEnabled ? [GrammarCheckExtension] : []),
+      // Task 2: live-pagination spacer decorations — holds a spacer list pushed
+      // from PageCanvas and renders widget decorations between blocks so content
+      // is pushed onto discrete sheets. Meta-only transactions; no history / Yjs.
+      PaginationLive,
     ],
     editorProps: {
       // K6: drive the ProseMirror contenteditable's `spellcheck` attr from the

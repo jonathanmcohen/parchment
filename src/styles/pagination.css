@@ -175,3 +175,61 @@
     -webkit-print-color-adjust: exact;
   }
 }
+
+/* ── Live paged editor: discrete sheets behind a transparent contenteditable ──
+ *
+ * In paged mode the editor's .parchment-page container is flattened to the gutter
+ * field; the real sheets are .parchment-live-sheet rectangles painted BEHIND the
+ * (transparent) content by PageCanvas, at offsets from the pure layout engine.
+ * Spacer widget decorations (.parchment-page-spacer) in the content flow push
+ * each block onto its sheet, so no text ever sits in a gutter. */
+
+.parchment-page[data-paged] {
+  /* The container is just the gutter field + positioning context; its own paper
+     look is dropped because the .parchment-live-sheet elements carry it. */
+  background: var(--editor-gutter) !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* Each real sheet reuses the .parchment-page paper styling (page-bg, border,
+   shadow, radius from globals.css). It sits behind the content. */
+.parchment-live-sheet {
+  z-index: 0;
+  /* width comes from left:0/right:0 inline; paper look inherited via .parchment-page */
+}
+
+/* Fix 1: Override the 1056px min-height from .parchment-page (globals.css ~line 979)
+   so landscape geometries (Letter=816px, A4=794px) are not floored too tall.
+   Specificity 0,2,0 beats .parchment-page (0,1,0) regardless of import order. */
+.parchment-page.parchment-live-sheet {
+  min-height: 0;
+}
+
+/* The editable content rides above the sheets. */
+.parchment-page[data-paged] .parchment-page-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Spacers occupy space but are visually nothing (the gutter shows through from
+   the container behind them). */
+.parchment-page-spacer {
+  display: block;
+}
+
+/* ── Live paged editor: per-sheet chrome (watermark + header/footer/page-number) ──
+ *
+ * .parchment-live-chrome sits at the same z-index as the sheet backgrounds
+ * (z-index:0), behind the editable content (z-index:1). The header/footer are
+ * positioned inside the sheet's margin area so they never overlap body text. */
+
+.parchment-live-chrome {
+  pointer-events: none;
+  z-index: 0;
+}
+.parchment-live-chrome .parchment-running-header,
+.parchment-live-chrome .parchment-running-footer {
+  padding-left: 96px; /* align with default page margins; visual only */
+  padding-right: 96px;
+}

@@ -1050,80 +1050,6 @@ body {
   user-select: none;
 }
 
-/* ── v0.1.5: Paged-mode boundary visual ──────────────────────────────────
- *
- * The editor renders ONE continuous .parchment-page sheet; the boundary markers
- * are absolutely-positioned overlays at measured break offsets. In Paged mode we
- * want each break to READ as the gap between two separate physical sheets — the
- * bottom edge of page N and the top edge of page N+1, with the gutter colour
- * showing through the seam.
- *
- * CRITICAL CONSTRAINT: the content beneath these overlays is CONTINUOUS (it is
- * NOT split into pages), so the boundary visual MUST stay transparent over the
- * text. We use SEMI-TRANSPARENT shadows + a thin gutter-coloured divider only —
- * never an opaque band that would hide a line of text straddling the seam.
- *
- * Continuous mode is unchanged (no shadows; the default dashed divider stays).
- *
- * REVIEWER: these shadow offsets/blur/alpha are a FIRST PASS — tune the exact
- * sheet-edge look in-browser. The hard rule to preserve: keep the over-content
- * fills transparent (shadows/gradients only), so no text is ever covered. */
-
-/* The boundary container carries the two sheet edges via box-shadow:
- *   • downward shadow  → bottom edge of the departing page (page N)
- *   • upward shadow    → top edge of the arriving page (page N+1)
- * Both are soft + semi-transparent so continuous text underneath stays legible.
- * These cast outward from the seam line onto the (continuous) sheet above/below,
- * giving each region the lifted "floating sheet" edge without any opaque fill. */
-.parchment-page[data-page-layout="paged"] .parchment-page-boundary {
-  box-shadow:
-    0 18px 18px -12px color-mix(in srgb, var(--foreground) 38%, transparent),
-    0 -18px 18px -12px color-mix(in srgb, var(--foreground) 30%, transparent);
-}
-
-/* Paged seam = a visible band of the GUTTER colour straddling the break, so the
- * gap reads as the trough between two physical sheets.
- *
- * Geometry note: the divider keeps height:0 so the flex column (footer / divider
- * / header) lays out byte-for-byte as in continuous mode — the gutter band is
- * painted by a ::before that is absolutely positioned and vertically centred on
- * the seam line. It therefore adds NO layout height and never shifts the running
- * header/footer. (It also has nothing to do with break measurement: the canvas
- * measures [data-page-break] / [data-section-break] nodes inside the CONTENT
- * wrapper, not these decorative overlays.)
- *
- * Non-occlusion guarantee: the whole .parchment-page-boundary is pointer-events:
- * none and the band fill is a SEMI-TRANSPARENT gutter colour (color-mix … 62%).
- * Because the continuous content beneath is never split, a glyph from a line that
- * happens to straddle the seam still shows through the translucent band rather
- * than being hidden — exactly the constraint this block must honour. The "two
- * separate sheets" read comes from the two CRISP 1px sheet edges (top edge of the
- * lower sheet + bottom edge of the upper sheet) plus the container shadows above,
- * not from any opaque coverage. The dashed continuous-mode hairline is dropped. */
-.parchment-page[data-page-layout="paged"] .parchment-page-divider {
-  border-top: 0;
-  /* keep height:0 from the base rule — band is drawn by ::before below */
-}
-
-.parchment-page[data-page-layout="paged"] .parchment-page-divider::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  /* 36px gutter band centred on the seam line (top:0 of the zero-height divider) */
-  top: -18px;
-  height: 36px;
-  pointer-events: none;
-  /* Translucent gutter fill — reads as the gutter trough, yet straddling text
-     bleeds through because the content underneath is continuous/unsplit. */
-  background: color-mix(in srgb, var(--editor-gutter) 62%, transparent);
-  /* Crisp sheet edges: a bright top line (top edge of the arriving sheet) and a
-     soft inner shadow at the bottom of the departing sheet, so each side of the
-     band terminates in a clean page edge rather than a fuzzy fade. */
-  border-top: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent);
-}
-
 /* Running header — rendered at the top of the new page region */
 .parchment-running-header {
   order: 1; /* after footer, before divider */
@@ -4316,7 +4242,7 @@ body {
      anchors the scale at the top-left corner so the shrunken page stays
      flush with the left edge of the reading area (top center would push
      the page off-screen to the right on narrow viewports). */
-  .parchment-canvas-scaled-host .parchment-page {
+  .parchment-canvas-scaled-host .parchment-page:not(.parchment-live-sheet) {
     transform: scale(var(--page-scale, 1));
     transform-origin: top left;
   }

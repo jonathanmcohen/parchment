@@ -245,6 +245,9 @@ describe('themeCssVars', () => {
     expect(vars['--page-border']).toBe('#3c4043')
     // Code blocks follow the dark page onto a dark surface.
     expect(vars['--code-bg']).toBe('#1b1c1f')
+    // v0.2.2: a dark page must darken its own paged-editor gutter trough so a
+    // dark sheet never floats on the light chrome gutter (UI scheme = light).
+    expect(vars['--page-gutter']).toBe('#161719')
   })
 
   it("does NOT override page-scoped vars for 'paper'/sepia/white/custom (stays light)", () => {
@@ -257,6 +260,9 @@ describe('themeCssVars', () => {
       expect(vars['--page-surface-muted']).toBeUndefined()
       expect(vars['--page-border']).toBeUndefined()
       expect(vars['--code-bg']).toBeUndefined()
+      // No page-scoped gutter override → the paged container falls back to the
+      // chrome --editor-gutter (light/sepia/custom pages keep prior behavior).
+      expect(vars['--page-gutter']).toBeUndefined()
     }
   })
 
@@ -344,5 +350,11 @@ describe('resolvePageBg / isDarkPage', () => {
   it('DARK_PAGE_VARS carries the legible light-on-dark page palette + dark code-bg', () => {
     expect(DARK_PAGE_VARS['--page-ink']).toBe('#e8eaed')
     expect(DARK_PAGE_VARS['--code-bg']).toBe('#1b1c1f')
+  })
+
+  it('DARK_PAGE_VARS darkens the page-scoped gutter trough (v0.2.2)', () => {
+    // Darker than the #1e1f22 sheet so sheets float above the trough, mirroring
+    // the white-sheet-on-#f1f3f4 relationship in light mode.
+    expect(DARK_PAGE_VARS['--page-gutter']).toBe('#161719')
   })
 })

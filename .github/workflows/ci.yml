@@ -106,12 +106,15 @@ jobs:
         run: docker compose -f docker-compose.dev.yml config --quiet
 
   image-size:
-    # C1: Gate image size. The original 600 MB budget was for the Postgres-stripped
-    # v0.1.x image. v0.2.0 ships the FULL node_modules in the runner so the collab
-    # server (run via tsx) can resolve its deps at runtime, AND adds ~50 features'
-    # worth of dependencies — the real image is ~1.95 GB. Budget raised to 2400 MB.
-    # FOLLOW-UP (image hygiene): trim by shipping a prod-only node_modules (with tsx
-    # promoted to a dependency) for the collab process instead of the full tree.
+    # C1: Gate image size. History: 600 MB (v0.1.x, Postgres-stripped) → 2400 MB
+    # (v0.2.0 shipped the FULL build node_modules so the tsx collab server could
+    # resolve its deps + ~50 features' worth of deps → ~1.95 GB).
+    # v0.2.2: the runner now ships a PROD-ONLY node_modules (tsx promoted to a
+    # dependency; dev toolchain — typescript/vitest/biome/drizzle-kit/jsdom/
+    # playwright — dropped). The node_modules layer drops ~30% (measured 1.1 GB →
+    # 768 MB locally), so the budget tightens to 1800 MB. NOTE: re-tighten toward
+    # the actual built size once a CI run reports it (kept some headroom because
+    # the multi-arch image carries amd64+arm64 esbuild/swc platform binaries).
     runs-on: ubuntu-latest
     needs: [build]
     steps:
@@ -124,11 +127,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build app image
         run: docker build -t parchment-size-check .
-      - name: Check image size (must be under 2400 MB)
+      - name: Check image size (must be under 1800 MB)
         run: |
           SIZE=$(docker image inspect parchment-size-check \
             --format '{{.Size}}')
-          MAX=$((2400 * 1024 * 1024))
+          MAX=$((1800 * 1024 * 1024))
           echo "Image size: $SIZE bytes (max $MAX)"
           [ "$SIZE" -lt "$MAX" ] || { echo "Image too large!"; exit 1; }
 

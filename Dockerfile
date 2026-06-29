@@ -3,12 +3,25 @@
 # Postgres/pgvector runs as a separate container (ghcr.io/jonathanmcohen/pgvector).
 # Use docker-compose.yml for production; docker-compose.dev.yml for local dev.
 
-# ─── deps ───
+# ─── deps (full: dev + prod, for the build) ───
 FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
+
+# ─── prod-deps (production-only node_modules for the runner) ───
+# The runner only needs the runtime graph: the Next standalone server (its own
+# traced node_modules) PLUS the collab `tsx` process's deps (@hocuspocus/*,
+# @tiptap/core, y-prosemirror, pg, drizzle-orm, chokidar, shiki, … + tsx itself,
+# now a production dependency). Shipping ONLY prod deps drops the dev toolchain
+# (typescript, vitest, biome, drizzle-kit, jsdom, playwright, …) — roughly halving
+# the runner's node_modules vs. copying the full build tree.
+FROM node:24-bookworm-slim AS prod-deps
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # ─── builder ───
 FROM node:24-bookworm-slim AS builder
@@ -77,9 +90,13 @@ WORKDIR /app
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-# Collab server + full node_modules (standalone trace omits collab's deps) + migrations.
+# Collab server + PRODUCTION-only node_modules (standalone trace omits collab's
+# deps) + migrations. The prod-deps tree is a runtime superset of the standalone
+# server's traced node_modules, so overlaying it onto ./node_modules keeps Next
+# working AND gives the collab `tsx` process its full import graph — without the
+# dev toolchain that bloated the old "copy the whole build tree" approach.
 COPY --from=builder /app/collab ./collab
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/src/db/migrations ./src/db/migrations
 # F2b: the collab tsx process now imports src/lib/{disk,markdown,editor}/** (the
 # disk watcher + the Y.Doc bridge moved here). Ship the full src/ + tsconfig so

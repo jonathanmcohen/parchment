@@ -83,6 +83,14 @@ describe('resolveDocThemeVars', () => {
     expect(vars['--page-ink']).toBeDefined()
   })
 
+  it('a dark page override darkens the paged gutter trough (v0.2.2)', () => {
+    // Per-doc dark page must darken its own paged-editor gutter so a dark sheet
+    // never floats on the light chrome gutter when the UI scheme is light.
+    expect(resolveDocThemeVars({ pageBg: 'dark' })['--page-gutter']).toBe('#161719')
+    // A light per-doc page emits no gutter override (falls back to chrome gutter).
+    expect(resolveDocThemeVars({ pageBg: 'white' })['--page-gutter']).toBeUndefined()
+  })
+
   it('never emits a value containing a CSS break-out character', () => {
     // Even a hostile-looking (but allow-list-rejected) input yields safe output.
     const vars = resolveDocThemeVars(parseDocTheme({ accent: '#fff;}body{display:none' }))

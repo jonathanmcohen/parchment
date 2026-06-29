@@ -46,6 +46,14 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.2',
+    notes: [
+      'The “page not found” screen now follows your system light/dark preference instead of always showing a light page.',
+      'Smaller, leaner container image: the runner now ships only production dependencies, and the vulnerability scan ignores base-OS issues with no available fix so it flags only actionable ones.',
+      'Security: updated lodash-es to a patched release (CVE-2026-4800).',
+    ],
+  },
+  {
     version: '0.2.1',
     notes: [
       'Paged layout now paginates the live editor as you type: content fills each page and breaks at a block boundary onto a new sheet, with a real page gutter, sheet shadows, and preserved top/bottom margins — instead of one continuous canvas. Themes correctly in both light and dark page modes (completing the Paged-mode note from v0.1.10, which was preview/print-only).',

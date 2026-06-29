@@ -4,6 +4,7 @@
 // and never travels back to the client. Exports an injectable saveOidcConfigRequest
 // handler so it is testable without JSX.
 import { useState } from 'react'
+import { CopyableUrlField } from '@/components/settings/CopyableUrlField'
 
 const SECRET_MASK = '••••••••'
 
@@ -50,7 +51,18 @@ type Feedback =
   | { type: 'saved' }
   | { type: 'error'; message: string }
 
-export function OidcConfigForm({ initial }: { initial: OidcFormValues }) {
+export function OidcConfigForm({
+  initial,
+  callbackUrl,
+  postLogoutUrl,
+}: {
+  initial: OidcFormValues
+  // #3: the redirect_uri to register at the IdP (server-computed from
+  // PARCHMENT_PUBLIC_URL). #9: the post-logout redirect URI for RP-initiated
+  // single-logout. Both optional so the form still renders if a caller omits them.
+  callbackUrl?: string
+  postLogoutUrl?: string
+}) {
   const [enabled, setEnabled] = useState(initial.enabled)
   const [issuerUrl, setIssuerUrl] = useState(initial.issuerUrl)
   const [clientId, setClientId] = useState(initial.clientId)
@@ -88,6 +100,26 @@ export function OidcConfigForm({ initial }: { initial: OidcFormValues }) {
         void handleSave()
       }}
     >
+      {(callbackUrl || postLogoutUrl) && (
+        <div className="flex flex-col gap-4 rounded-md border border-[var(--border)] bg-[var(--paper)] p-4">
+          <p className="font-medium text-sm">Register these at your identity provider</p>
+          {callbackUrl ? (
+            <CopyableUrlField
+              label="Redirect URI (callback)"
+              value={callbackUrl}
+              hint="Add this as an allowed redirect / callback URL in your OIDC app."
+            />
+          ) : null}
+          {postLogoutUrl ? (
+            <CopyableUrlField
+              label="Post-logout redirect URI"
+              value={postLogoutUrl}
+              hint="Register this so single sign-out can return users to the login page."
+            />
+          ) : null}
+        </div>
+      )}
+
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
         Enable single sign-on (OIDC)

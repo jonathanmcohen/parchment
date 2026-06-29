@@ -334,6 +334,34 @@ function _initHighlighter(view: EditorView | null): Promise<void> {
   })
 }
 
+/**
+ * #7: per-mount decoration rebuild trigger.
+ *
+ * The decoration set rebuilds only on `tr.docChanged` or a `shikiReady` meta. The
+ * ONLY thing that dispatched `shikiReady` was `_initHighlighter`, which is gated on
+ * the module-global `_initStarted`. So once the highlighter is warm (initialised by
+ * a prior mount in the same session — common after a client-side nav, or simply the
+ * second editor open), a freshly-mounted view never receives `shikiReady` and its
+ * code blocks stay plaintext until the user edits. Calling this from every `view()`
+ * mount — UNCONDITIONALLY awaiting the (possibly already-resolved) highlighter and
+ * then dispatching `shikiReady` — guarantees each new view rebuilds its code-block
+ * decorations on load, warm highlighter or not. Guarded against dispatching into a
+ * view torn down during the await. `getHl` is injected so this is unit-testable.
+ */
+export function dispatchShikiReadyOnMount(
+  view: EditorView,
+  getHl: typeof getHighlighter = getHighlighter,
+): Promise<void> {
+  return getHl().then((hl) => {
+    // Keep the module cache warm too, so the synchronous buildDecorations pass that
+    // the dispatched transaction triggers finds a resolved highlighter immediately.
+    _resolvedHighlighter = hl
+    if (!view.isDestroyed) {
+      view.dispatch(view.state.tr.setMeta('shikiReady', true))
+    }
+  })
+}
+
 // ── Auto-detect driver (P4) ──────────────────────────────────────────────────
 
 /**
@@ -506,6 +534,9 @@ function makeShikiPlugin(): Plugin<DecorationSet> {
     view(editorView) {
       _currentView = editorView
       void _initHighlighter(editorView)
+      // #7: every mount rebuilds its code-block decorations, even with a warm
+      // highlighter (when _initHighlighter early-returns and never dispatches).
+      void dispatchShikiReadyOnMount(editorView)
       _autoDetectDriver = createAutoDetectDriver(editorView)
 
       // Re-decorate all code blocks when the surrounding page-background changes

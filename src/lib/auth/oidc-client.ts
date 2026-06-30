@@ -136,7 +136,18 @@ export async function exchangeCallback(args: {
   // exactOptionalPropertyTypes.
   const out: OidcClaims = { iss: String(claims.iss), sub: claims.sub }
   if (typeof claims.email === 'string') out.email = claims.email
-  if (typeof claims.email_verified === 'boolean') out.email_verified = claims.email_verified
+  // v0.2.4 #3a: normalize email_verified at the extraction boundary. Several IdPs
+  // send it as the STRING "true"/"false" rather than a JSON boolean; if we only
+  // copied the boolean shape here, a string claim would be silently DROPPED and the
+  // (boolean-typed) field would arrive undefined at resolveOidcUser — blocking the
+  // account-link path. Coerce a boolean OR a "true"/"false" string to the boolean;
+  // leave anything else omitted so a missing/garbage claim stays unverified (the
+  // anti-takeover gate in resolveOidcUser depends on that).
+  if (typeof claims.email_verified === 'boolean') {
+    out.email_verified = claims.email_verified
+  } else if (claims.email_verified === 'true' || claims.email_verified === 'false') {
+    out.email_verified = claims.email_verified === 'true'
+  }
   if (typeof claims.name === 'string') out.name = claims.name
   if (typeof claims.preferred_username === 'string')
     out.preferred_username = claims.preferred_username

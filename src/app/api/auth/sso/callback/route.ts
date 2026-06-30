@@ -25,11 +25,17 @@ export const dynamic = 'force-dynamic'
 //     host.
 // Any failure → a generic 401 redirect to /login; a session is NEVER created on error.
 
-function fail(_req: NextRequest, code: string): NextResponse {
+function fail(_req: NextRequest, code: string, reason?: string): NextResponse {
   // #1: redirect to the PUBLIC host, not the internal request origin (0.0.0.0:3000
   // behind a TLS-terminating proxy). The request arg is retained for the signature
   // (callers pass it) but the origin is no longer derived from it.
-  return NextResponse.redirect(new URL(`/login?sso=${code}`, env.publicUrl))
+  // v0.2.4 #3b: an optional `reason` is appended (e.g. ?sso=denied&reason=disabled)
+  // so the login page can explain WHY an SSO sign-in was refused. The reason codes
+  // are a fixed, non-sensitive enum from resolveOidcUser — no token/claim/email is
+  // ever leaked here.
+  const url = new URL(`/login?sso=${code}`, env.publicUrl)
+  if (reason) url.searchParams.set('reason', reason)
+  return NextResponse.redirect(url)
 }
 
 // App-relative only (defense in depth; /start already validated).
@@ -74,8 +80,10 @@ export async function GET(req: NextRequest) {
   // Resolve / link / JIT-provision, with the §7j disabledAt gate applied in every path.
   const resolved = await resolveOidcUser(claims)
   if (!resolved.ok) {
-    // Disabled account or unverified-email link attempt → generic reject, no session.
-    return fail(req, 'denied')
+    // Disabled account or unverified-email link attempt → reject, no session. Thread
+    // the specific reason ('disabled' | 'no_verified_email_for_link') so the login
+    // page can show an actionable message instead of an opaque "denied".
+    return fail(req, 'denied', resolved.reason)
   }
 
   // Full session — the IdP performed the auth, so OIDC users get a full session

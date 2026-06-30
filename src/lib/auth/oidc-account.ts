@@ -27,6 +27,17 @@ function isDisabled(user: UserRow): boolean {
   return user.disabledAt !== null
 }
 
+// v0.2.4 #3a: tolerate the shapes IdPs actually send for email_verified. The OIDC
+// spec types it as a boolean, but many providers emit the STRING "true" (and some
+// omit it). Treat boolean `true` OR the string `"true"` as verified; ANYTHING ELSE
+// (false, "false", undefined, null, other) is UNverified — the anti-takeover gate
+// must stay closed for a genuinely-unverified or absent claim, so we never coerce
+// missing → verified. Exported so the claims-extraction boundary (oidc-client.ts)
+// can apply the same rule when it copies the raw claim into OidcClaims.
+export function isEmailVerified(value: unknown): boolean {
+  return value === true || value === 'true'
+}
+
 export async function resolveOidcUser(claims: OidcClaims): Promise<ResolveResult> {
   // 1. Identity match on (issuer, subject).
   const [identity] = await db
@@ -63,7 +74,7 @@ export async function resolveOidcUser(claims: OidcClaims): Promise<ResolveResult
   // 2. Email link — ONLY when the IdP asserts a VERIFIED email and a local user with
   //    that email exists. Gated to prevent takeover via an unverified email.
   const email = claims.email?.trim().toLowerCase()
-  if (email && claims.email_verified === true) {
+  if (email && isEmailVerified(claims.email_verified)) {
     const [existing] = await db
       .select()
       .from(schema.users)
@@ -86,7 +97,7 @@ export async function resolveOidcUser(claims: OidcClaims): Promise<ResolveResult
   // If there IS a local user with this email but it is NOT verified, we must NOT link
   // (takeover defense). We also do not silently provision a duplicate over a real
   // account — reject so the local account is never shadowed by an unverified claim.
-  if (email && claims.email_verified !== true) {
+  if (email && !isEmailVerified(claims.email_verified)) {
     const [collision] = await db
       .select({ id: schema.users.id })
       .from(schema.users)

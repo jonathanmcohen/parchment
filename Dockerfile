@@ -83,6 +83,16 @@ RUN set -eux; \
     apt-get purge -y --auto-remove gnupg; \
     rm -rf /tmp/*.tar.xz /var/lib/apt/lists/*
 
+# Drop the base image's bundled standalone npm/npx CLI. It is NEVER invoked at
+# runtime — the app runs `node server.js` (Next standalone), the collab service
+# runs `node --import tsx collab/server.ts`, and migrate.sh uses the postgresql
+# client tools (psql/pg_isready/createdb); none of the s6 run scripts or
+# /etc/parchment/*.sh call npm or npx. The global npm vendors its own copy of
+# undici (e.g. CVE-2026-12151) that a pnpm override cannot reach, which kept the
+# Trivy image scan red on an unfixable-from-the-app finding. corepack (pnpm) and
+# node itself are untouched, so the build stages and runtime are unaffected.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 ENV PATH="/usr/lib/postgresql/18/bin:${PATH}"
 WORKDIR /app
 

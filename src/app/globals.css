@@ -1132,17 +1132,49 @@ body {
   white-space: nowrap;
 }
 
-/* ── v0.2.2 #5: continuous mode is a clean, pageless flow ────────────────────
-   The A1 pagination only added discrete sheets to PAGED mode. In CONTINUOUS
-   mode the editor still emitted the auto page-boundary overlays (the dashed
-   "Page N" divider + running header/footer) and the legacy page-break line, so
-   a multi-page doc showed page indicators with text flowing straight through
-   them. Suppress every auto page marker when the canvas is in continuous mode;
-   paged mode keeps its real sheet gaps. The manual, user-inserted
+/* ── v0.2.2 #5 / v0.2.4 #2: continuous mode page indicator ───────────────────
+   v0.2.2 hid ALL auto page markers in continuous mode because the running
+   header/footer chrome introduced a disruptive grey gap and the dashed divider
+   cut straight through text. v0.2.4 restores a SUBTLE indicator so you can still
+   tell which page you're on, without that disruption:
+     • the running header/footer chrome (the gap-causing part) stays HIDDEN;
+     • a single faint hairline marks each page boundary — it is a zero-height
+       rule positioned exactly at the break offset, BETWEEN blocks, so it never
+       occludes text (the overlay is pointer-events:none and paints a 1px line);
+     • a small "Page N" label is parked in the right margin GUTTER (pushed past
+       the content edge), so it sits beside the text, never over it.
+   The legacy single .parchment-page-break line stays suppressed (the boundary
+   overlay is the canonical indicator). Paged mode keeps its real sheet gaps and
+   full per-sheet chrome — none of this applies there. The manual, user-inserted
    .parchment-page-break-node is intentional and is NOT gated here. */
-[data-page-layout="continuous"] .parchment-page-boundary,
 [data-page-layout="continuous"] .parchment-page-break {
   display: none;
+}
+
+/* Keep the boundary container, but strip it to just the divider + label: hide the
+   running header/footer (the disruptive grey-gap chrome) in continuous mode. */
+[data-page-layout="continuous"] .parchment-page-boundary .parchment-running-header,
+[data-page-layout="continuous"] .parchment-page-boundary .parchment-running-footer {
+  display: none;
+}
+
+/* Faint hairline at the boundary — subtler than the paged/default dashed rule. */
+[data-page-layout="continuous"] .parchment-page-divider {
+  border-top-style: solid;
+  border-top-color: color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+/* "Page N" label out in the right margin gutter, beside the text, never over it.
+   left:100% places it just past the content's right edge (the boundary is inset by
+   the page's right margin), so it floats in the otherwise-empty margin band. */
+[data-page-layout="continuous"] .parchment-page-divider-label {
+  right: auto;
+  left: 100%;
+  top: -0.55rem;
+  margin-left: 10px;
+  font-size: 0.65rem;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--muted) 85%, transparent);
 }
 
 /* Section-break node — inline in the doc */

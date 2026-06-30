@@ -46,6 +46,12 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.6',
+    notes: [
+      'Build/CI: the container image security scan now passes reliably. The scan’s report step builds an all-severity SBOM/CVE report for the Security tab, while the pass/fail gate runs separately and fails only on fixed High/Critical findings — previously a mere Medium-severity finding could fail the release even with zero High/Critical. No application change.',
+    ],
+  },
+  {
     version: '0.2.5',
     notes: [
       'Build/CI: the container image security scan now reliably passes. The v0.2.4 image is already clean, but the scan step tripped over the image’s build attestations (SBOM/provenance) when reading the multi-architecture tag; it now scans a specific platform image directly. No application change.',

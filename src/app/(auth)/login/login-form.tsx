@@ -5,7 +5,15 @@ import { type LoginState, login } from './actions'
 
 const initialState: LoginState = null
 
-export function LoginForm({ ssoEnabled = false }: { ssoEnabled?: boolean }) {
+export function LoginForm({
+  ssoEnabled = false,
+  ssoError = null,
+}: {
+  ssoEnabled?: boolean
+  // v0.2.4 #3b: a human-readable explanation when an SSO sign-in was refused
+  // (?sso=denied&reason=…), resolved server-side and passed in. Null on a clean load.
+  ssoError?: string | null
+}) {
   const [state, action, pending] = useActionState(login, initialState)
 
   // Once the password step returns mfaRequired, swap to the second-factor step.
@@ -15,6 +23,14 @@ export function LoginForm({ ssoEnabled = false }: { ssoEnabled?: boolean }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {ssoError ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-[var(--error)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] px-3 py-2 text-[var(--error)] text-sm"
+        >
+          {ssoError}
+        </p>
+      ) : null}
       {ssoEnabled ? (
         <>
           {/* G2: SSO entry point — a plain link (GET) to the OIDC start route. Shown

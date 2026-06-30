@@ -46,6 +46,15 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.4',
+    notes: [
+      'Continuous layout now shows a subtle page indicator: a faint hairline at each page boundary with a small “Page N” label in the margin, so you can tell what page you’re on without the disruptive grey gaps. Paged mode keeps its real sheet gaps.',
+      'Single sign-on (OIDC) now accepts identity providers that send a string “true” for email_verified (not only the strict boolean), so account linking works with more providers.',
+      'When an SSO sign-in is refused, the login page now explains why (for example, a disabled account, or an unverified email that cannot be linked) instead of a generic “denied”.',
+      'Security: the container image no longer bundles the standalone npm CLI (unused at runtime), removing its vendored undici and clearing the last actionable image-scan finding.',
+    ],
+  },
+  {
     version: '0.2.3',
     notes: [
       'Security: updated undici to a patched release (CVE-2026-12151), clearing the last actionable container-image vulnerability.',

@@ -954,18 +954,37 @@ body {
   padding-bottom: 24px;
 }
 
-/* #12/#14 — horizontal reach for wide pages only. The 816px page sits beside the
- * 220px outline rail + 256px sidebar inside the 2rem-padded shell, fitting around
- * ~1360px of viewport. Below that — including when high browser zoom shrinks the
- * CSS viewport width — the page can exceed the gutter, so re-enable horizontal
- * scrolling on the gutter alone to keep the right edge reachable. This is the only
- * regime where the gutter becomes a scroll container; at the wide desktop widths
- * where the double-scrollbar / detached-chrome bugs are reported, the rule above
- * keeps it `overflow: visible`. The mobile path (≤768px) is handled by --page-scale,
- * so this gate stops at 769px. */
+/* #12/#14 + v0.2.7 #1 — horizontal reach for wide pages only.
+ *
+ * The 816px page sits beside the 220px outline rail + 256px sidebar inside the
+ * 2rem-padded shell, fitting around ~1360px of viewport. Below that — including
+ * when high browser zoom shrinks the CSS viewport width — the page can exceed the
+ * available width, so horizontal scrolling is needed to keep the right edge
+ * reachable.
+ *
+ * v0.2.7 #1 BUG + FIX: previously this `overflow-x:auto` lived on
+ * `.parchment-canvas-gutter` itself. The gutter is the WINDOW-scroll/layout-
+ * viewport-defining column AND the nearest scroll ancestor of the sticky chrome +
+ * sticky sidebar. Putting overflow-x on it (a) coerced overflow-y visible→auto
+ * (the documented hazard above), and (b) the resulting HORIZONTAL scrollbar
+ * consumed bottom gutter space → shortened the layout viewport → the
+ * `height:100vh` sticky sidebar re-measured and visibly SHIFTED UP as you scrolled
+ * a long paged doc to the bottom.
+ *
+ * Fix: isolate the horizontal scroll to the INNER content host
+ * (`.parchment-canvas-scaled-host`) and keep the gutter `overflow:visible` at every
+ * width. The inner host is `height:auto` (it grows to the page's height), so even
+ * though overflow-x:auto coerces its overflow-y to auto, scrollHeight===clientHeight
+ * and NO nested vertical scrollbar appears (avoiding the #12/#14 double-scroll). A
+ * horizontal scrollbar there consumes the inner host's own box height, NOT the
+ * layout viewport — so the `100vh` sidebar never re-measures and stays put.
+ * `scrollbar-gutter:stable` reserves the scrollbar track so toggling it can't nudge
+ * geometry. The mobile path (≤768px) shrinks the page via --page-scale and never
+ * needs horizontal scroll, so this gate stops at 769px. */
 @media (min-width: 769px) and (max-width: 1360px) {
-  .parchment-canvas-gutter {
+  .parchment-canvas-scaled-host {
     overflow-x: auto;
+    scrollbar-gutter: stable;
   }
 }
 

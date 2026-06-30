@@ -45,14 +45,15 @@ const db = vi.hoisted(() => ({
       state.inserts.push(row)
       // The link/JIT identity insert is awaited directly (no .returning()); the
       // JIT user insert chains .onConflictDoNothing().returning(). Support both by
-      // returning a thenable that ALSO exposes the chain methods.
-      const result = {
+      // returning a REAL resolved Promise (so `await db.insert().values()` works)
+      // that also carries the .onConflictDoNothing() chain. Object.assign onto a
+      // genuine Promise — not an object literal with a `then` key, which biome
+      // (noThenProperty) rightly forbids.
+      return Object.assign(Promise.resolve(undefined), {
         onConflictDoNothing: () => ({
           returning: () => Promise.resolve(state.insertReturning),
         }),
-        then: (resolve: (v: unknown) => void) => resolve(undefined),
-      }
-      return result
+      })
     },
   }),
   update: () => ({

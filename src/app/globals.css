@@ -4283,6 +4283,16 @@ body {
     overflow: visible;
   }
 
+  /* v0.2.7 #6: the editor right-rail panels (Version history / Comments) are
+     position:sticky on desktop (EditorSidePanel inline style) so they are
+     reachable from any scroll position. On a narrow viewport a pinned 280–300px
+     panel would cover the document, so de-sticky them here: back to in-flow with
+     no viewport-height cap. */
+  .parchment-side-panel {
+    position: static;
+    max-height: none;
+  }
+
   /* Apply the visual scale to the page element; transform-origin top left
      anchors the scale at the top-left corner so the shrunken page stays
      flush with the left edge of the reading area (top center would push

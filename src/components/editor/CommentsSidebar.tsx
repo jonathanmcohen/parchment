@@ -2,6 +2,7 @@
 
 import type { Editor } from '@tiptap/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { EditorSidePanel } from '@/components/editor/EditorSidePanel'
 import { resolveAnchor, serializeAnchor } from '@/lib/docs/comment-anchor'
 import { type AnchorJson, parseMentions } from '@/lib/docs/comments-shared'
 
@@ -367,19 +368,9 @@ export function CommentsSidebar({
   // ── Render ────────────────────────────────────────────────────────────
 
   return (
-    <aside
-      aria-label="Comments"
-      style={{
-        width: 280,
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        borderLeft: '1px solid var(--border, #e5e7eb)',
-        background: 'var(--surface, #fff)',
-        overflowY: 'auto',
-        padding: '8px 0',
-      }}
-    >
+    // v0.2.7 #6: sticky right-rail panel (EditorSidePanel) — same fix as Version
+    // history so Comments is reachable from any scroll position on a long doc.
+    <EditorSidePanel ariaLabel="Comments" width={280}>
       {/* Header */}
       <div
         style={{
@@ -635,7 +626,7 @@ export function CommentsSidebar({
           })
         )}
       </div>
-    </aside>
+    </EditorSidePanel>
   )
 }
 

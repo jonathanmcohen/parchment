@@ -162,6 +162,27 @@ export async function hasCollabState(docId: string): Promise<boolean> {
   return row !== undefined
 }
 
+/**
+ * v0.2.7 #2: drop the persisted Yjs snapshot for a doc so the NEXT editor open
+ * re-seeds from `documents.content` (the D4 seeding gate keys on hasCollabState).
+ *
+ * Used by the release-notes refresh: rewriting `documents.content` is INVISIBLE in
+ * the editor once a collab snapshot exists (the snapshot shadows documents.content
+ * — that's why the guide only refreshed on a brand-new instance). Clearing the row
+ * hands seeding back to the client, so the freshly-written content surfaces.
+ *
+ * SAFETY: destructive — only call when the doc has NO unsaved user edits to lose
+ * (the refresh gates this strictly to the unedited-managed branch). It is safe with
+ * respect to the collab server because the release-notes doc is not open at owner
+ * page-load (when the refresh runs): hocuspocus only holds a doc in memory while a
+ * client is connected, so there is no in-memory snapshot to re-persist over this
+ * delete. Returns the number of rows removed (0 if there was no snapshot yet).
+ */
+export async function deleteCollabState(docId: string): Promise<number> {
+  const result = await db.delete(schema.collabState).where(eq(schema.collabState.name, docId))
+  return result.rowCount ?? 0
+}
+
 export async function listDocuments(ownerId: string): Promise<DocSummary[]> {
   return db
     .select({

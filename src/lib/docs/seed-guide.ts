@@ -1,6 +1,7 @@
 import { createFolder, findFolderByName } from '@/lib/docs/folders-repo'
 import {
   createDocument,
+  deleteCollabState,
   getDocument,
   listDocuments,
   listDocumentsInFolder,
@@ -124,6 +125,21 @@ export async function refreshReleaseNotesDoc(ownerId: string): Promise<void> {
         markdown,
         title: releaseNotesTitle(APP_VERSION),
       })
+      // v0.2.7 #2: rewriting documents.content is INVISIBLE in the editor once a
+      // Yjs collab snapshot exists (the snapshot shadows documents.content via the
+      // D4 first-open seeding gate) — which is why, before this fix, the guide only
+      // refreshed on a brand-new instance. Drop the snapshot so the NEXT open
+      // re-seeds from the freshly-written content. SAFE here: we are strictly on the
+      // unedited-managed branch (no user edits to lose), and the guide doc is not
+      // open at owner page-load (when this runs), so the collab server holds no
+      // in-memory snapshot to re-persist over the delete. Best-effort: a failure to
+      // clear the snapshot must not break the refresh (the DB/disk write already
+      // landed), so it is wrapped — never throws out of refreshReleaseNotesDoc.
+      try {
+        await deleteCollabState(summary.id)
+      } catch {
+        // ignore — snapshot reset is best-effort; the version is still bumped below.
+      }
     }
     // Whether we refreshed or deferred to a user edit, record the current version so
     // the expensive scan/compare runs at most once per app version.

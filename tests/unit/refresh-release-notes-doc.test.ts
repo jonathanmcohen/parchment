@@ -13,6 +13,7 @@ const {
   listDocumentsInFolder,
   getDocument,
   saveDocument,
+  deleteCollabState,
 } = vi.hoisted(() => ({
   getSetting: vi.fn<() => Promise<unknown>>(),
   setSetting: vi.fn<() => Promise<void>>(),
@@ -20,6 +21,7 @@ const {
   listDocumentsInFolder: vi.fn<() => Promise<Array<{ id: string; title: string }>>>(),
   getDocument: vi.fn<() => Promise<unknown>>(),
   saveDocument: vi.fn<(id: string, data: { title?: string }) => Promise<void>>(),
+  deleteCollabState: vi.fn<(id: string) => Promise<number>>(),
 }))
 
 vi.mock('@/lib/docs/settings-repo', () => ({ getSetting, setSetting }))
@@ -28,6 +30,7 @@ vi.mock('@/lib/docs/repo', () => ({
   listDocumentsInFolder,
   getDocument,
   saveDocument,
+  deleteCollabState,
   createDocument: vi.fn(),
   listDocuments: vi.fn(),
 }))
@@ -62,6 +65,11 @@ describe('refreshReleaseNotesDoc', () => {
     const call = saveDocument.mock.calls[0]
     expect(call?.[0]).toBe('doc1')
     expect(call?.[1]?.title).toBe(`Release notes — v${APP_VERSION}`)
+    // v0.2.7 #2: the Yjs collab snapshot must be cleared so the next open re-seeds
+    // the freshly-written content (the snapshot otherwise shadows documents.content,
+    // which is why the guide only refreshed on a brand-new instance).
+    expect(deleteCollabState).toHaveBeenCalledTimes(1)
+    expect(deleteCollabState).toHaveBeenCalledWith('doc1')
     // Stored version bumped to current.
     expect(setSetting).toHaveBeenCalledWith('owner1', 'releaseNotesGuideVersion', APP_VERSION)
   })
@@ -80,6 +88,9 @@ describe('refreshReleaseNotesDoc', () => {
     await refreshReleaseNotesDoc('owner1')
 
     expect(saveDocument).not.toHaveBeenCalled()
+    // v0.2.7 #2: a user-edited doc keeps its collab snapshot — NEVER cleared (that
+    // would destroy the user's live edits). Only the unedited-managed branch resets it.
+    expect(deleteCollabState).not.toHaveBeenCalled()
     expect(setSetting).toHaveBeenCalledWith('owner1', 'releaseNotesGuideVersion', APP_VERSION)
   })
 

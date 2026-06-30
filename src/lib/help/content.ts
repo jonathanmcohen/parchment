@@ -46,6 +46,12 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.5',
+    notes: [
+      'Build/CI: the container image security scan now reliably passes. The v0.2.4 image is already clean, but the scan step tripped over the image’s build attestations (SBOM/provenance) when reading the multi-architecture tag; it now scans a specific platform image directly. No application change.',
+    ],
+  },
+  {
     version: '0.2.4',
     notes: [
       'Continuous layout now shows a subtle page indicator: a faint hairline at each page boundary with a small “Page N” label in the margin, so you can tell what page you’re on without the disruptive grey gaps. Paged mode keeps its real sheet gaps.',

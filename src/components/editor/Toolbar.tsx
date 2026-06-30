@@ -3,6 +3,8 @@
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
+import { FontPicker } from '@/components/editor/FontPicker'
+import { GoogleFontsStyle } from '@/components/editor/GoogleFontsStyle'
 import { Menu, type MenuItemConfig } from '@/components/editor/menus/Menu'
 import { StylesMenu } from '@/components/editor/StylesMenu'
 import { TableControls } from '@/components/editor/TableControls'
@@ -10,6 +12,7 @@ import { VoiceButton } from '@/components/editor/VoiceButton'
 import { TOP_LANGUAGES } from '@/lib/editor/shiki/languages'
 import { partitionControls } from '@/lib/editor/toolbar-overflow'
 import { stepFontSize } from '@/lib/editor/toolbar-size'
+import { googleFontStack } from '@/lib/fonts/google-fonts'
 
 // S3-3: px reserved for the `⋯` trigger (a 32px icon button + 2px flex gap)
 // when the secondary group overflows. Fed to `partitionControls`.
@@ -81,9 +84,9 @@ const FONT_FAMILIES = [
 // pick, applies) Arial rather than a blank option.
 const DEFAULT_FONT_VALUE = 'Arial, sans-serif'
 
-// F3: sentinel for the trailing disabled "More fonts…" affordance. Selecting it
-// is a no-op (the <option> is disabled) — it is a "coming soon" signpost, not a
-// font value and not a picker dialog.
+// F3 / v0.2.7 #4b: sentinel for the "More fonts…" option. Selecting it opens the
+// on-demand Google Fonts picker (no longer a disabled stub); the value is reset so
+// it never reaches setFontFamily.
 const MORE_FONTS_VALUE = '__more_fonts__'
 
 const LINE_HEIGHTS = [
@@ -396,6 +399,45 @@ export function Toolbar({
     ro.observe(el)
     return () => ro.disconnect()
   }, [overflowed])
+
+  // v0.2.7 #4b: the workspace's PICKED Google fonts. Fetched on mount so they
+  // appear in the font dropdown (and self-host via the (app) layout's
+  // GoogleFontsStyle). The "More fonts…" option opens the on-demand picker.
+  const [googleFonts, setGoogleFonts] = useState<string[]>([])
+  const [fontPickerOpen, setFontPickerOpen] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/settings/fonts')
+      .then((r) => (r.ok ? r.json() : { fonts: [] }))
+      .then((d: { fonts?: unknown }) => {
+        if (!cancelled && Array.isArray(d.fonts)) {
+          setGoogleFonts(d.fonts.filter((f): f is string => typeof f === 'string'))
+        }
+      })
+      .catch(() => {
+        // best-effort — picked fonts just won't appear in the dropdown.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Apply a picked Google font: persist it workspace-wide (so it self-hosts + shows
+  // in the dropdown across reloads), add it locally for immediate use, and set it on
+  // the current selection. Injecting the @font-face for the picked family also
+  // happens immediately via the local list below so the applied text renders at once.
+  const handlePickFont = (family: string) => {
+    setFontPickerOpen(false)
+    setGoogleFonts((prev) => (prev.includes(family) ? prev : [...prev, family]))
+    editor.chain().focus().setFontFamily(googleFontStack(family)).run()
+    void fetch('/api/settings/fonts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ family }),
+    }).catch(() => {
+      // best-effort — the font still applies + renders this session via the local list.
+    })
+  }
 
   // v0.1.5 toolbar: the secondary actions that move into the `⋯` menu when
   // overflowed. Each row re-surfaces an EXISTING handler (no new feature logic)
@@ -716,9 +758,13 @@ export function Toolbar({
             // is a real CSS value applied via setFontFamily.
             value={s.fontFamily ?? DEFAULT_FONT_VALUE}
             onChange={(e) => {
-              // The disabled "More fonts…" option cannot be selected, but guard
-              // it anyway so the sentinel never reaches setFontFamily.
-              if (e.target.value === MORE_FONTS_VALUE) return
+              // v0.2.7 #4b: "More fonts…" now opens the on-demand Google Fonts
+              // picker instead of being a disabled stub. Reset the select back to
+              // the current value so the sentinel never sticks / reaches setFontFamily.
+              if (e.target.value === MORE_FONTS_VALUE) {
+                setFontPickerOpen(true)
+                return
+              }
               editor.chain().focus().setFontFamily(e.target.value).run()
             }}
             className="parchment-toolbar-select"
@@ -728,10 +774,23 @@ export function Toolbar({
                 {f.label}
               </option>
             ))}
-            {/* F3: disabled "coming soon" affordance — no picker dialog. */}
-            <option value={MORE_FONTS_VALUE} disabled>
-              More fonts…
-            </option>
+            {/* v0.2.7 #4b: the workspace's picked Google fonts, self-hosted. The
+                option value is the same stack setFontFamily applies, so re-selecting
+                one round-trips. */}
+            {googleFonts.length > 0 && (
+              <optgroup label="Google Fonts">
+                {googleFonts.map((family) => {
+                  const stack = googleFontStack(family)
+                  return (
+                    <option key={family} value={stack} style={{ fontFamily: stack }}>
+                      {family}
+                    </option>
+                  )
+                })}
+              </optgroup>
+            )}
+            {/* v0.2.7 #4b: opens the on-demand Google Fonts search picker. */}
+            <option value={MORE_FONTS_VALUE}>More fonts…</option>
           </select>
         </label>
 
@@ -1386,6 +1445,16 @@ export function Toolbar({
           }))}
         />
       </div>
+
+      {/* v0.2.7 #4b: self-host the picked fonts immediately (before the layout
+          re-renders its own GoogleFontsStyle) so a just-applied font renders at
+          once. Mirrors the workspace-wide injection. */}
+      <GoogleFontsStyle families={googleFonts} />
+
+      {/* v0.2.7 #4b: on-demand Google Fonts search picker (opened from "More fonts…"). */}
+      {fontPickerOpen && (
+        <FontPicker onPick={handlePickFont} onClose={() => setFontPickerOpen(false)} />
+      )}
     </div>
   )
 }

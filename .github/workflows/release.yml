@@ -73,17 +73,55 @@ jobs:
   # I8: container security scan. Runs AFTER publish so the pushed image is
   # available to pull. Fails the workflow on HIGH or CRITICAL CVE findings.
   # Results are uploaded to the GitHub Security tab as SARIF even on failure.
+  #
+  # v0.2.5: scan a CONCRETE linux/amd64 DIGEST, not the multi-arch tag. The publish
+  # step attaches buildx SBOM + provenance attestations (provenance:true/sbom:true),
+  # so the tag's manifest LIST carries two extra `unknown/unknown` in-toto
+  # attestation manifests alongside linux/amd64 + linux/arm64. trivy-action@master,
+  # resolving the tag in the runner's registry context, scanned/choked on an
+  # attestation manifest and exited 1 even though BOTH real platform images are
+  # clean (verified: `trivy image <amd64-digest>` and `<arm64-digest>` both report
+  # 0 HIGH/CRITICAL with --ignore-unfixed). Resolving the amd64 platform digest up
+  # front and scanning THAT makes the gate deterministic and attestation-proof.
   scan:
     needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: read           # pull the image + inspect the manifest list
       security-events: write   # required to upload SARIF to GitHub Security tab
     steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the linux/amd64 platform digest
+        id: digest
+        run: |
+          set -euo pipefail
+          REF="ghcr.io/jonathanmcohen/parchment:${{ github.ref_name }}"
+          # imagetools is part of buildx (preinstalled on ubuntu-latest). Pull the
+          # per-platform manifest digest for linux/amd64 from the manifest list.
+          AMD64_DIGEST="$(docker buildx imagetools inspect "$REF" --format '{{json .}}' \
+            | jq -r '.manifest.manifests[]
+                     | select(.platform.os=="linux" and .platform.architecture=="amd64")
+                     | .digest' | head -n1)"
+          if [ -z "$AMD64_DIGEST" ] || [ "$AMD64_DIGEST" = "null" ]; then
+            echo "::error::could not resolve a linux/amd64 digest for $REF" >&2
+            docker buildx imagetools inspect "$REF" || true
+            exit 1
+          fi
+          echo "ref=ghcr.io/jonathanmcohen/parchment@${AMD64_DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Scanning ghcr.io/jonathanmcohen/parchment@${AMD64_DIGEST}"
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ghcr.io/jonathanmcohen/parchment:${{ github.ref_name }}
+          # Concrete amd64 digest → no attestation manifests in the scan target.
+          image-ref: ${{ steps.digest.outputs.ref }}
           format: sarif
           output: trivy-results.sarif
           severity: HIGH,CRITICAL

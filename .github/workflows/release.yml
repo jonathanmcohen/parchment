@@ -71,18 +71,27 @@ jobs:
           cache-to: type=gha,mode=max
 
   # I8: container security scan. Runs AFTER publish so the pushed image is
-  # available to pull. Fails the workflow on HIGH or CRITICAL CVE findings.
-  # Results are uploaded to the GitHub Security tab as SARIF even on failure.
+  # available to pull. Fails the workflow ONLY on FIXED HIGH/CRITICAL CVEs.
+  # All-severity results are uploaded to the GitHub Security tab as SARIF.
   #
-  # v0.2.5: scan a CONCRETE linux/amd64 DIGEST, not the multi-arch tag. The publish
-  # step attaches buildx SBOM + provenance attestations (provenance:true/sbom:true),
-  # so the tag's manifest LIST carries two extra `unknown/unknown` in-toto
-  # attestation manifests alongside linux/amd64 + linux/arm64. trivy-action@master,
-  # resolving the tag in the runner's registry context, scanned/choked on an
-  # attestation manifest and exited 1 even though BOTH real platform images are
-  # clean (verified: `trivy image <amd64-digest>` and `<arm64-digest>` both report
-  # 0 HIGH/CRITICAL with --ignore-unfixed). Resolving the amd64 platform digest up
-  # front and scanning THAT makes the gate deterministic and attestation-proof.
+  # Two reliability fixes, learned the hard way (v0.2.0–v0.2.5 all red here):
+  #
+  # 1. Scan a CONCRETE linux/amd64 DIGEST, not the multi-arch tag. The publish step
+  #    attaches buildx SBOM + provenance attestations (provenance:true/sbom:true),
+  #    so the tag's manifest LIST carries two extra `unknown/unknown` in-toto
+  #    manifests; resolving the amd64 platform digest and scanning THAT avoids any
+  #    attestation-manifest resolution ambiguity.
+  #
+  # 2. DECOUPLE the SARIF upload from the pass/fail GATE. aquasecurity/trivy-action
+  #    in `format: sarif` mode builds the report with ALL severities and its
+  #    `exit-code: 1` then fires on ANY severity — IGNORING the `severity:
+  #    HIGH,CRITICAL` input. So a mere MEDIUM/LOW finding (this image has 3 MEDIUMs)
+  #    failed the release even though there are ZERO HIGH/CRITICAL. The fix: the
+  #    trivy-action step only WRITES the SARIF (exit-code 0, never fails); a
+  #    separate `trivy` table run with `--severity HIGH,CRITICAL --ignore-unfixed
+  #    --exit-code 1` is the actual gate. Verified locally on the published amd64
+  #    digest: the gate run is exit 0 (0 HIGH/CRITICAL), while the all-severity
+  #    sarif run is exit 1 (the MEDIUMs) — hence the split.
   scan:
     needs: publish
     runs-on: ubuntu-latest
@@ -117,23 +126,45 @@ jobs:
           echo "ref=ghcr.io/jonathanmcohen/parchment@${AMD64_DIGEST}" >> "$GITHUB_OUTPUT"
           echo "Scanning ghcr.io/jonathanmcohen/parchment@${AMD64_DIGEST}"
 
-      - name: Run Trivy vulnerability scanner
+      # SARIF for the Security tab — informational only, NEVER fails the job
+      # (exit-code 0). This is the all-severity report.
+      - name: Trivy — build SARIF report (all severities, non-blocking)
         uses: aquasecurity/trivy-action@master
         with:
-          # Concrete amd64 digest → no attestation manifests in the scan target.
           image-ref: ${{ steps.digest.outputs.ref }}
           format: sarif
           output: trivy-results.sarif
-          severity: HIGH,CRITICAL
-          # The remaining HIGH/CRITICAL findings are debian-12 base-image OS CVEs
-          # with no upstream patch (fix_deferred / will_not_fix / affected), so a
-          # fixed-only gate is what we can actually act on. Unfixed OS CVEs are
-          # still uploaded to the Security tab below for visibility.
           ignore-unfixed: true
-          exit-code: '1'          # fail the job on FIXED HIGH/CRITICAL findings
+          exit-code: '0'          # informational; the gate is the next step
 
       - name: Upload Trivy scan results to GitHub Security tab
-        if: always()              # upload even if the scan step above failed
+        if: always()              # upload even if a later step fails
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
+
+      # The actual GATE: run the Trivy CLI directly (NOT the action wrapper, which
+      # in sarif mode ignores the severity filter for its exit code). Table format,
+      # --severity HIGH,CRITICAL, --ignore-unfixed, --exit-code 1 → exits non-zero
+      # ONLY on a FIXED HIGH/CRITICAL. Pinned Trivy version to match the action's,
+      # with the DB cached across the two scans via the shared cache dir. Verified
+      # locally on the published amd64 digest: exit 0 (0 HIGH/CRITICAL; 3 MEDIUMs
+      # are below the gate threshold and correctly do NOT fail it).
+      - name: Trivy — fail on FIXED HIGH/CRITICAL (the gate)
+        env:
+          GATE_REF: ${{ steps.digest.outputs.ref }}
+          REG_USER: ${{ github.actor }}
+          REG_PASS: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e TRIVY_USERNAME="$REG_USER" \
+            -e TRIVY_PASSWORD="$REG_PASS" \
+            -v "${{ github.workspace }}/.cache/trivy:/root/.cache/" \
+            aquasec/trivy:0.72.0 image \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --scanners vuln \
+            --format table \
+            --exit-code 1 \
+            "$GATE_REF"

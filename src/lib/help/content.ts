@@ -46,6 +46,12 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.3',
+    notes: [
+      'Security: updated undici to a patched release (CVE-2026-12151), clearing the last actionable container-image vulnerability.',
+    ],
+  },
+  {
     version: '0.2.2',
     notes: [
       'The “page not found” screen now follows your system light/dark preference instead of always showing a light page.',

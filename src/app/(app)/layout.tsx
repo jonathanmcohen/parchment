@@ -13,6 +13,7 @@ import { TopbarUserCluster } from '@/components/shell/TopbarUserCluster'
 import { GlobalShortcuts } from '@/components/shortcuts/GlobalShortcuts'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
+import { refreshReleaseNotesDoc } from '@/lib/docs/seed-guide'
 import { getWorkspaceTheme } from '@/lib/docs/settings-repo'
 import { themeCssVars } from '@/lib/editor/theme'
 import { getShortcutOverrides } from '@/lib/help/keymap-repo'
@@ -47,6 +48,14 @@ const nav = [
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Gate the whole app group: unauthenticated visitors are sent to /login.
   const user = await requireUser()
+
+  // #4: edit-safe refresh of the owner's "Release notes" guide doc after an app
+  // update. The guide is seeded for the owner, so only the owner needs the check.
+  // refreshReleaseNotesDoc is a cheap settings read that early-returns when the
+  // stored version already matches APP_VERSION, and is fully best-effort (its own
+  // try/catch) so it can never block rendering the app shell. Not awaited on the
+  // hot path for non-owners.
+  if (user.role === 'owner') void refreshReleaseNotesDoc(user.id)
 
   // K5: localized shell strings (nav labels, skip link, brand). The active
   // locale comes from the NEXT_LOCALE cookie via next-intl's request config.

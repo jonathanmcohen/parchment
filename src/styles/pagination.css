@@ -186,8 +186,10 @@
 
 .parchment-page[data-paged] {
   /* The container is just the gutter field + positioning context; its own paper
-     look is dropped because the .parchment-live-sheet elements carry it. */
-  background: var(--editor-gutter) !important;
+     look is dropped because the .parchment-live-sheet elements carry it.
+     v0.2.2: page-scoped --page-gutter (a dark page darkens its own trough) with
+     the chrome --editor-gutter as the fallback for light/sepia/custom pages. */
+  background: var(--page-gutter, var(--editor-gutter)) !important;
   box-shadow: none !important;
   border-color: transparent !important;
 }

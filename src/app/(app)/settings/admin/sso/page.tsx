@@ -1,5 +1,6 @@
 import { OidcConfigForm, type OidcFormValues } from '@/components/settings/OidcConfigForm'
 import { requireAdmin } from '@/lib/auth/guard'
+import { oidcPostLogoutRedirectUri, oidcRedirectUri } from '@/lib/auth/oidc-client'
 import { getOidcConfigForDisplay } from '@/lib/auth/oidc-config'
 import { SECRET_MASK } from '@/lib/crypto/secret-box'
 
@@ -29,7 +30,13 @@ export default async function SsoSettingsPage() {
       </p>
 
       <div className="mt-8">
-        <OidcConfigForm initial={initial} />
+        {/* #3/#9: surface the IdP-registration URLs (server-computed from
+            PARCHMENT_PUBLIC_URL) so the operator copies the exact values. */}
+        <OidcConfigForm
+          initial={initial}
+          callbackUrl={oidcRedirectUri()}
+          postLogoutUrl={oidcPostLogoutRedirectUri()}
+        />
       </div>
     </section>
   )

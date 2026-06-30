@@ -368,7 +368,10 @@ export function PageCanvas({
         paddingBottom: margins.bottom,
         paddingLeft: margins.left,
         position: 'relative',
-        ...(paged ? { background: 'var(--editor-gutter)' } : {}),
+        // Paged mode trough: page-scoped gutter (dark pages darken their own
+        // trough via DARK_PAGE_VARS' --page-gutter), falling back to the chrome
+        // gutter for light/sepia/custom pages and the normal scheme.
+        ...(paged ? { background: 'var(--page-gutter, var(--editor-gutter))' } : {}),
       }}
       className="parchment-page mx-auto"
       data-page-layout={pageLayoutMode}

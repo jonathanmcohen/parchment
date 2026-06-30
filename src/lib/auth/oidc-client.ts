@@ -14,6 +14,14 @@ export function oidcRedirectUri(): string {
   return `${env.publicUrl}/api/auth/sso/callback`
 }
 
+// #9: the RP-initiated-logout landing. Sent to the IdP as `post_logout_redirect_uri`
+// on the end_session redirect, and surfaced in the SSO config UI so the operator can
+// register it at the IdP (many providers require an exact-match allow-list). Sourced
+// from PARCHMENT_PUBLIC_URL for the same anti-spoof reason as oidcRedirectUri().
+export function oidcPostLogoutRedirectUri(): string {
+  return `${env.publicUrl}/login`
+}
+
 // Only the loopback stub IdP (http on 127.0.0.1/localhost, used by the integration
 // tests) is allowed to run over insecure HTTP. A real https issuer never enables it,
 // so production TLS verification is never weakened.
@@ -68,6 +76,28 @@ export async function buildStart(
   })
 
   return { state, nonce, codeVerifier, authorizationUrl: url.href }
+}
+
+// #9: RP-initiated single-logout. Given a discovered configuration, returns the
+// IdP end_session URL to redirect the browser to on logout — with
+// post_logout_redirect_uri = <publicUrl>/login (and id_token_hint when available) —
+// but ONLY when the IdP advertises an end_session_endpoint. When it does not, returns
+// null so the caller keeps the existing local-only logout (this is the opt-in/safe
+// gate the brief requires). buildEndSessionUrl throws without the endpoint, hence the
+// explicit metadata check first.
+export function buildEndSessionRedirect(
+  configuration: client.Configuration,
+  idToken?: string,
+): string | null {
+  const meta = configuration.serverMetadata()
+  if (!meta.end_session_endpoint) return null
+
+  const params: Record<string, string> = {
+    post_logout_redirect_uri: oidcPostLogoutRedirectUri(),
+  }
+  if (idToken) params.id_token_hint = idToken
+
+  return client.buildEndSessionUrl(configuration, params).href
 }
 
 export type OidcClaims = {

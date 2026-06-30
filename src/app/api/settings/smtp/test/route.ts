@@ -11,8 +11,9 @@ type TlsValue = (typeof TLS_VALUES)[number]
  * Builds a one-shot transporter from the submitted fields (does NOT save to DB).
  * Admin-only. Validates before sending. Never logs the password.
  *
- * Body: { host, port, user?, password?, from, tls, to? }
+ * Body: { host, port, user?, password?, fromAddress, tls, to? }
  *   password === SECRET_MASK → reads stored password from DB
+ *   fromAddress — the envelope From; matches the key the SMTP form/save use.
  * Returns: { ok: true } | { ok: false, error: string }
  */
 export async function POST(req: NextRequest | Request): Promise<NextResponse> {
@@ -32,8 +33,10 @@ export async function POST(req: NextRequest | Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'invalid JSON body' }, { status: 400 })
   }
 
-  // Validate required fields
-  const { host, port, user: smtpUser, password, from, tls, to } = body
+  // Validate required fields. The From key is `fromAddress` — the SAME key the
+  // SMTP form and the save endpoint use. (Previously this read `from`, so every
+  // test send falsely failed validation with "from is required".)
+  const { host, port, user: smtpUser, password, fromAddress, tls, to } = body
 
   if (!host || typeof host !== 'string' || host.trim() === '') {
     return NextResponse.json({ error: 'host is required' }, { status: 400 })
@@ -45,8 +48,11 @@ export async function POST(req: NextRequest | Request): Promise<NextResponse> {
   if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
     return NextResponse.json({ error: 'port must be between 1 and 65535' }, { status: 400 })
   }
-  if (!from || typeof from !== 'string' || !from.includes('@')) {
-    return NextResponse.json({ error: 'from is required and must contain @' }, { status: 400 })
+  if (!fromAddress || typeof fromAddress !== 'string' || !fromAddress.includes('@')) {
+    return NextResponse.json(
+      { error: 'fromAddress is required and must contain @' },
+      { status: 400 },
+    )
   }
   if (!tls || !TLS_VALUES.includes(tls as TlsValue)) {
     return NextResponse.json(
@@ -88,7 +94,7 @@ export async function POST(req: NextRequest | Request): Promise<NextResponse> {
 
   try {
     await transporter.sendMail({
-      from: String(from),
+      from: String(fromAddress),
       to: destination,
       subject: 'Parchment SMTP test',
       text: 'This is a test email from Parchment to verify your SMTP configuration is working correctly.',

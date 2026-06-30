@@ -1132,6 +1132,19 @@ body {
   white-space: nowrap;
 }
 
+/* ── v0.2.2 #5: continuous mode is a clean, pageless flow ────────────────────
+   The A1 pagination only added discrete sheets to PAGED mode. In CONTINUOUS
+   mode the editor still emitted the auto page-boundary overlays (the dashed
+   "Page N" divider + running header/footer) and the legacy page-break line, so
+   a multi-page doc showed page indicators with text flowing straight through
+   them. Suppress every auto page marker when the canvas is in continuous mode;
+   paged mode keeps its real sheet gaps. The manual, user-inserted
+   .parchment-page-break-node is intentional and is NOT gated here. */
+[data-page-layout="continuous"] .parchment-page-boundary,
+[data-page-layout="continuous"] .parchment-page-break {
+  display: none;
+}
+
 /* Section-break node — inline in the doc */
 .parchment-section-break-node {
   display: block;

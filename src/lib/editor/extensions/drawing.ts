@@ -10,6 +10,7 @@
 
 import { Node } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
+import { sanitizeDrawingScene } from '@/lib/editor/excalidraw-scene'
 
 // ── Module augmentation ────────────────────────────────────────────────────
 
@@ -110,7 +111,11 @@ export const DrawingExtension = Node.create({
           // biome-ignore lint/complexity/useOptionalChain: explicit null check needed — nodeAt returns null (not undefined) and the optional chain would change the falsy guard to include undefined
           if (!target || target.type.name !== 'drawing') return false
           if (dispatch) {
-            tr.setNodeMarkup(pos, undefined, { ...target.attrs, scene, svg })
+            // #8: defense in depth — strip runtime-only appState (collaborators Map
+            // etc.) here too, so EVERY persist path produces a reload-safe scene
+            // regardless of the caller (not only DrawingModal).
+            const safeScene = sanitizeDrawingScene(scene)
+            tr.setNodeMarkup(pos, undefined, { ...target.attrs, scene: safeScene, svg })
             dispatch(tr)
           }
           return true

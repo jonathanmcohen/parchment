@@ -112,6 +112,13 @@ export const DARK_PAGE_VARS: Readonly<Record<string, string>> = {
   '--page-surface-muted': '#2a2c30',
   '--page-border': '#3c4043',
   '--code-bg': '#1b1c1f',
+  // v0.2.2: the paged-editor inter-sheet gutter is page-scoped (--page-gutter),
+  // falling back to the chrome --editor-gutter for light/sepia/custom pages. A
+  // DARK page must darken its own trough too — otherwise a dark sheet floats on
+  // the light chrome gutter when the UI scheme is light (a light band framing a
+  // dark page). Slightly darker than the #1e1f22 sheet so sheets read as floating
+  // above the trough, mirroring the white-sheet-on-#f1f3f4 relationship in light.
+  '--page-gutter': '#161719',
 }
 
 /** The dark document-page canvas colour (the sheet itself). */

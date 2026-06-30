@@ -4678,9 +4678,9 @@ body {
   z-index: 10000;
   display: flex;
   flex-direction: column;
-  /* Overlay CHROME — tokenized so it flips in dark mode. The paged.js page
-     sheets inside .parchment-print-pages keep their own white paper styling
-     (from EXPORT_STYLESHEET); only this surrounding chrome is themed. */
+  /* Overlay CHROME — tokenized so it flips in dark mode. The page sheets inside
+     .parchment-print-sheets keep their own white-paper styling (pinned light
+     below); only this surrounding chrome is themed. */
   background: var(--surface);
   color: var(--foreground);
   overflow: hidden;
@@ -4742,27 +4742,9 @@ body {
   background: var(--surface-hover);
 }
 
-/* Hidden source container — paged.js reads the rendered HTML from here,
-   but it is never visible to the user. */
-.parchment-print-source {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  visibility: hidden;
-}
-
-/* Scrollable paginated content area produced by paged.js. */
-.parchment-print-pages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+/* v0.2.7 #5: removed the dead .parchment-print-source / .parchment-print-pages
+   layout rules — leftovers from the removed paged.js path; neither element is
+   rendered (PrintView renders .parchment-print-sheets). */
 
 /* ── v0.1.10 #10: force printed content to a fixed light (white-paper) palette ──
  *
@@ -4779,13 +4761,11 @@ body {
  * color nor any var(--page-*)/chrome/code token can resolve to a dark-theme
  * value. Independent of OS scheme, app theme, and the selectable dark page.
  *
- * Covers BOTH print DOMs: the legacy source/pages containers AND the v0.1.10 #13
- * content-split sheets (.parchment-print-sheets / .parchment-paged-sheet), whose
- * pagination.css uses var(--foreground)/var(--surface)/var(--muted)/--editor-
- * gutter — all pinned light here so a dark-mode user's PDF stays black-on-white.
+ * Applies to the v0.1.10 #13 content-split sheets (.parchment-print-sheets /
+ * .parchment-paged-sheet), whose pagination.css uses var(--foreground)/
+ * var(--surface)/var(--muted)/--editor-gutter — all pinned light here so a
+ * dark-mode user's PDF stays black-on-white.
  */
-.parchment-print-source,
-.parchment-print-pages,
 .parchment-print-sheets,
 .parchment-paged-sheet {
   color: #1a1a1a;
@@ -4826,34 +4806,9 @@ body {
     display: none;
     visibility: hidden;
   }
-
-  /* #10 (v0.1.9): print the SOURCE xor the PAGES based on paged.js status.
-     ready  → paged.js produced .pagedjs_page boxes → print those, hide source.
-     else   → paged.js failed/loading → native print the source (paged.js pages
-              are empty here; printing them gave a blank PDF). */
-  body > .parchment-print-overlay[data-print-status="ready"] .parchment-print-source {
-    display: none;
-    visibility: hidden;
-  }
-  body > .parchment-print-overlay[data-print-status="ready"] .parchment-print-pages {
-    display: block;
-    padding: 0;
-    overflow: visible;
-    flex: none;
-  }
-  body > .parchment-print-overlay:not([data-print-status="ready"]) .parchment-print-source {
-    display: block;
-    visibility: visible;
-    position: static;
-    left: auto;
-    top: auto;
-    width: auto;
-    height: auto;
-    overflow: visible;
-  }
-  body > .parchment-print-overlay:not([data-print-status="ready"]) .parchment-print-pages {
-    display: none;
-  }
+  /* v0.2.7 #5: removed the dead .parchment-print-source / .parchment-print-pages /
+     [data-print-status] rules — leftovers from the removed paged.js path that are
+     never rendered now (PrintView prints .parchment-print-sheets directly). */
 }
 
 /* ── K2: HC accent text (placed last so it stays MORE specific AND later) ─────

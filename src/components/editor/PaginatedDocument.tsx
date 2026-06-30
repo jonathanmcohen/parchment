@@ -244,7 +244,11 @@ export function PaginatedDocument({
       <div
         ref={measureRef}
         aria-hidden="true"
-        className="parchment-paged-measure"
+        // v0.2.7 #5: `.parchment-prose` so the pagination MEASURE pass uses the
+        // same editor typography (var(--font-body)/11pt/1.15, via PrintView's
+        // print-scoped stylesheet) that the printed sheets use — keeping measure
+        // and render identical, so the preview matches the printout AND the editor.
+        className="parchment-paged-measure parchment-prose"
         style={{ width: defaultContentBox.widthPx }}
       >
         {measureBody}
@@ -310,7 +314,10 @@ export function PaginatedDocument({
                 </button>
               </div>
             )}
-            <div className="parchment-paged-content">{pageBodies[i]}</div>
+            {/* v0.2.7 #5: `.parchment-prose` so printed text inherits the editor's
+                font/size/leading (PrintView injects the print-scoped prose rules +
+                the resolved font vars), making line/page breaks match the editor. */}
+            <div className="parchment-paged-content parchment-prose">{pageBodies[i]}</div>
           </div>
         )
       })}

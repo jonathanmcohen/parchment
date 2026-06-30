@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  EDITOR_CHROME_STACK_PX,
-  sidePanelStyle,
-} from '@/components/editor/side-panel-style'
+import { EDITOR_CHROME_STACK_PX, sidePanelStyle } from '@/components/editor/side-panel-style'
 
 // v0.2.7 #6: the editor right-rail panels (Version history / Comments) must be a
 // sticky side panel on desktop so they are reachable from ANY scroll position on a

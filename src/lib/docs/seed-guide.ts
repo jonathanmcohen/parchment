@@ -1,3 +1,5 @@
+import { sweepOrphanReleaseNotesFiles } from '@/lib/disk/mirror'
+import { sanitizeSegment } from '@/lib/disk/paths'
 import { createFolder, findFolderByName } from '@/lib/docs/folders-repo'
 import {
   createDocument,
@@ -141,17 +143,34 @@ export async function refreshReleaseNotesDoc(ownerId: string): Promise<void> {
       // markdown projection + disk mirror itself. The old doc is then removed
       // (trash → permanent; deleteDocumentPermanently only acts on a trashed doc)
       // and its orphan Yjs snapshot cleaned up (collab_state has no FK cascade).
-      await createDocument(ownerId, {
+      const created = await createDocument(ownerId, {
         title: releaseNotesTitle(APP_VERSION),
         folderId,
         content: currentReleaseNotesContent(),
       })
+      // v0.2.9 #3 — WATCHER RACE ORDER: the old doc's `.md` is removed by
+      // trashDocument (removeDocFromDisk) BEFORE the row is hard-deleted, so the
+      // reverse-sync watcher can never re-import the stale file into a still-present
+      // doc between the two operations — a removed file resolves to no doc (echo),
+      // and the watcher's `unlink` handler never deletes docs. The NEW file
+      // (`Release notes — v<APP_VERSION>.md`) has a distinct version-suffixed name,
+      // so it never collides with the old one during the overlap window.
       await trashDocument(ownerId, summary.id)
       await deleteDocumentPermanently(ownerId, summary.id)
       try {
         await deleteCollabState(summary.id)
       } catch {
         // ignore — orphan-snapshot cleanup is best-effort; the version still bumps.
+      }
+
+      // v0.2.9 #3 — sweep any STALE orphan `Release notes — v*.md` files left in the
+      // guide folder by prior recreates (prod carried an orphan
+      // `Release notes — v0.1.0.md` from June). Keep only the file the just-created
+      // live doc owns. Best-effort — a sweep failure must never block boot/login.
+      try {
+        await sweepStaleReleaseNotesFiles(ownerId, folderId, created.id)
+      } catch {
+        // best-effort — never blocks the version bump below.
       }
     }
     // Whether we recreated or deferred to a user edit, record the current version so
@@ -160,4 +179,35 @@ export async function refreshReleaseNotesDoc(ownerId: string): Promise<void> {
   } catch {
     // Best-effort — a refresh failure must never block boot/login.
   }
+}
+
+/**
+ * v0.2.9 #3: remove stale orphan `Release notes — v*.md` files from the guide
+ * folder on disk, keeping only the file owned by the just-recreated live doc
+ * (`keepDocId`). The guide folder is a root-level folder, so its disk directory is
+ * `sanitizeSegment(GUIDE_FOLDER_NAME)`; a live release-notes doc's filename is
+ * `${sanitizeSegment(title)}.md` (matching what syncDocToDisk writes). We compute
+ * the keep-set from every live `Release notes — v*` doc still in the folder (there
+ * is normally exactly one — the new doc), so a concurrent edge never deletes a live
+ * file. Best-effort — the caller guards it; this never throws on its own.
+ */
+async function sweepStaleReleaseNotesFiles(
+  ownerId: string,
+  folderId: string,
+  keepDocId: string,
+): Promise<void> {
+  // Guide folder is root-level → its disk dir is the sanitized folder name.
+  const guideDirRel = sanitizeSegment(GUIDE_FOLDER_NAME)
+  const inFolder = await listDocumentsInFolder(ownerId, folderId)
+  const keep = new Set<string>()
+  for (const d of inFolder) {
+    if (!d.title.startsWith('Release notes — v')) continue
+    // Keep every live release-notes doc's filename (normally just the new doc's),
+    // so a concurrent state can never make the sweep delete a live file.
+    keep.add(`${sanitizeSegment(d.title)}.md`)
+  }
+  // `keepDocId` is guaranteed present in the keep-set via its title above; the
+  // param documents intent and guards a hypothetical listing lag.
+  void keepDocId
+  await sweepOrphanReleaseNotesFiles(guideDirRel, keep)
 }

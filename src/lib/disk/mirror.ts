@@ -4,7 +4,7 @@
 // IMPORTANT: mirror.ts queries the db directly (no import of repo.ts) to avoid
 // a circular dependency. repo.ts → mirror.ts is a one-way dependency.
 
-import { mkdir, rm, rmdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rm, rmdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { and, eq, isNotNull, isNull, ne } from 'drizzle-orm'
 import { db, schema } from '@/db'
@@ -121,6 +121,51 @@ export async function syncDocToDisk(docId: string): Promise<string | null> {
     // Any error is best-effort — never propagate
     return null
   }
+}
+
+/**
+ * v0.2.9 #3: sweep stale orphan `Release notes — v*.md` files from a guide
+ * directory. The release-notes refresh recreates the doc under a FRESH id each
+ * version; if an OLD file was ever left behind (e.g. prod's orphan
+ * `Release notes — v0.1.0.md` from before removeDocFromDisk covered the recreate),
+ * it lingers with no live doc. This removes any `Release notes — v*.md` in
+ * `guideDirRel` whose basename is NOT in `keepBasenames` (the live docs' filenames).
+ *
+ * Deliberately narrow: it ONLY matches the managed `Release notes — v<...>.md`
+ * naming so it can never delete a user doc, and never touches other guide docs.
+ * Conflict siblings (`… .conflict-<ms>.md`) are also swept when orphaned, since
+ * they belong to a since-removed release-notes file. Best-effort: returns the list
+ * of removed POSIX relpaths (for logging/verification); NEVER throws.
+ */
+export async function sweepOrphanReleaseNotesFiles(
+  guideDirRel: string,
+  keepBasenames: ReadonlySet<string>,
+): Promise<string[]> {
+  const removed: string[] = []
+  try {
+    const dirAbs = absPath(guideDirRel)
+    let entries: string[]
+    try {
+      entries = await readdir(dirAbs)
+    } catch {
+      return removed // dir missing/unreadable → nothing to sweep.
+    }
+    // Match `Release notes — v<anything>.md` and its `.conflict-<ms>.md` siblings.
+    const RELEASE_NOTES_FILE_RE = /^Release notes — v.+?\.md$/
+    for (const name of entries) {
+      if (!RELEASE_NOTES_FILE_RE.test(name)) continue
+      if (keepBasenames.has(name)) continue
+      try {
+        await rm(join(dirAbs, name), { force: true })
+        removed.push(`${guideDirRel}/${name}`)
+      } catch {
+        // best-effort — a failed unlink must not abort the sweep or throw.
+      }
+    }
+  } catch {
+    // best-effort — never propagate.
+  }
+  return removed
 }
 
 /**

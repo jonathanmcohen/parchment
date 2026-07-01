@@ -107,6 +107,7 @@ export function UserCluster({
           pageBg: data.pageBg ?? DEFAULT_THEME.pageBg,
           highContrast: data.highContrast ?? DEFAULT_THEME.highContrast,
           dyslexicFont: data.dyslexicFont ?? DEFAULT_THEME.dyslexicFont,
+          defaultBodyFont: data.defaultBodyFont ?? DEFAULT_THEME.defaultBodyFont,
         })
       })
       .catch(() => {

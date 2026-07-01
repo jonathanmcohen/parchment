@@ -160,12 +160,18 @@ function useFocusTrap(
 // The backdrop is a presentation layer; Esc is handled by useFocusTrap on the
 // document. The only interactive surface is click-outside-to-close on the outer
 // div — keyboard users are served by the focus trap + Esc inside the dialog.
+//
+// v0.2.8 #2: route through the SHARED dialog scrim (.parchment-dialog-overlay =
+// position:fixed;inset:0 centered layer, z-index above the app). Before this, the
+// help dialogs used a bespoke .parchment-help-backdrop class that had NO CSS, so
+// the "dialog" was a plain in-flow block rendered inside the sidebar footer (where
+// HelpMenu is mounted) — it grew the sidebar instead of floating over the content.
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: Esc is handled by useFocusTrap on the document; click-outside closes
     // biome-ignore lint/a11y/noStaticElementInteractions: presentation backdrop — inner dialog carries all a11y roles
     <div
-      className="parchment-help-backdrop"
+      className="parchment-dialog-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -209,14 +215,14 @@ function ShortcutsDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Keyboard shortcuts"
-        className="parchment-help-dialog"
+        className="parchment-dialog parchment-help-dialog"
       >
-        <div className="parchment-help-dialog-header">
-          <h2 className="parchment-help-dialog-title">Keyboard shortcuts</h2>
+        <div className="parchment-dialog-header">
+          <h2 className="parchment-dialog-title">Keyboard shortcuts</h2>
           <button
             type="button"
             aria-label="Close shortcuts"
-            className="parchment-help-close"
+            className="parchment-dialog-close"
             onClick={onClose}
           >
             ✕
@@ -268,16 +274,16 @@ function WhatsNewDialog({
         role="dialog"
         aria-modal="true"
         aria-label="What's new"
-        className="parchment-help-dialog"
+        className="parchment-dialog parchment-help-dialog"
       >
-        <div className="parchment-help-dialog-header">
-          <h2 className="parchment-help-dialog-title">
+        <div className="parchment-dialog-header">
+          <h2 className="parchment-dialog-title">
             {"What's new"} <span className="parchment-help-version">v{RELEASE_NOTES.version}</span>
           </h2>
           <button
             type="button"
             aria-label="Close what's new"
-            className="parchment-help-close"
+            className="parchment-dialog-close"
             onClick={onClose}
           >
             ✕
@@ -332,14 +338,14 @@ function TourModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Welcome tour, step ${step + 1} of ${total}`}
-        className="parchment-help-dialog parchment-tour-dialog"
+        className="parchment-dialog parchment-help-dialog parchment-tour-dialog"
       >
-        <div className="parchment-help-dialog-header">
-          <h2 className="parchment-help-dialog-title">{current?.title}</h2>
+        <div className="parchment-dialog-header">
+          <h2 className="parchment-dialog-title">{current?.title}</h2>
           <button
             type="button"
             aria-label="Close tour"
-            className="parchment-help-close"
+            className="parchment-dialog-close"
             onClick={handleDone}
           >
             ✕

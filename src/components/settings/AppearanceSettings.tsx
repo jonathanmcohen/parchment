@@ -5,8 +5,10 @@ import { useEffect, useId, useState } from 'react'
 import { applyThemeToDom } from '@/lib/editor/apply-theme-dom'
 import {
   ACCENT_SWATCHES,
+  DEFAULT_BODY_FONT_PAIR,
   DEFAULT_THEME,
   FONT_PAIRS,
+  findFontPair,
   PAGE_BG_PRESETS,
   resolvePageBg,
   type WorkspaceTheme,
@@ -30,9 +32,13 @@ export function AppearanceSettings() {
   const [error, setError] = useState<string | null>(null)
   const [customAccent, setCustomAccent] = useState('')
   const [customPageBg, setCustomPageBg] = useState('')
+  // v0.2.8 #1: the workspace's self-hosted Google fonts, offered as choices for the
+  // default editor font alongside the built-in pairs.
+  const [googleFonts, setGoogleFonts] = useState<string[]>([])
 
   const schemeGroupId = useId()
   const pageBgGroupId = useId()
+  const defaultFontId = useId()
 
   useEffect(() => {
     let active = true
@@ -48,6 +54,8 @@ export function AppearanceSettings() {
           // K2: legacy-compat — themes stored before K2 omit these booleans.
           highContrast: data.highContrast ?? DEFAULT_THEME.highContrast,
           dyslexicFont: data.dyslexicFont ?? DEFAULT_THEME.dyslexicFont,
+          // v0.2.8 #1: legacy-compat — themes stored before this omit the field.
+          defaultBodyFont: data.defaultBodyFont ?? DEFAULT_THEME.defaultBodyFont,
         })
         // Pre-fill custom inputs if the stored value is not a preset.
         const isPresetAccent = ACCENT_SWATCHES.includes(data.accent)
@@ -57,6 +65,24 @@ export function AppearanceSettings() {
       })
       .catch(() => {
         /* keep defaults on failure */
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // v0.2.8 #1: load the workspace's added Google fonts so they can be chosen as the
+  // default editor font. Independent of the theme fetch; failure is non-fatal (the
+  // dropdown just shows the built-in fonts).
+  useEffect(() => {
+    let active = true
+    fetch('/api/settings/fonts')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('failed'))))
+      .then((data: { fonts?: string[] }) => {
+        if (active && Array.isArray(data.fonts)) setGoogleFonts(data.fonts)
+      })
+      .catch(() => {
+        /* built-in fonts only on failure */
       })
     return () => {
       active = false
@@ -284,6 +310,50 @@ export function AppearanceSettings() {
             )
           })}
         </div>
+      </fieldset>
+
+      {/* ── v0.2.8 #1: Default editor font ── */}
+      <fieldset className="mt-6 border-0 p-0">
+        <legend className="font-medium text-sm">Default editor font</legend>
+        <p className="mt-1 text-[var(--muted)] text-xs">
+          The body font every document (and new documents) starts with. Add more fonts from the
+          editor toolbar’s font menu (Google Fonts, self-hosted on your server).
+        </p>
+        <select
+          id={defaultFontId}
+          // a11y: the <legend> labels the fieldset group, but axe's select-name
+          // rule requires the control itself to carry an accessible name.
+          aria-label="Default editor font"
+          value={theme.defaultBodyFont}
+          disabled={saving}
+          onChange={(e) => save({ ...theme, defaultBodyFont: e.target.value })}
+          className="mt-2 w-full max-w-sm rounded-md border border-[var(--border)] bg-[var(--paper)] px-3 py-2 text-sm"
+        >
+          <option value={DEFAULT_BODY_FONT_PAIR}>
+            {`Font pair default (${findFontPair(theme.fontPair).name})`}
+          </option>
+          {googleFonts.length > 0 && (
+            <optgroup label="Your fonts">
+              {googleFonts.map((family) => (
+                <option key={family} value={family}>
+                  {family}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+        {/* Live preview of the chosen default body font. */}
+        <p
+          className="mt-2 text-sm text-[var(--foreground)]"
+          style={{
+            fontFamily:
+              theme.defaultBodyFont === DEFAULT_BODY_FONT_PAIR
+                ? findFontPair(theme.fontPair).body
+                : `"${theme.defaultBodyFont}", sans-serif`,
+          }}
+        >
+          The quick brown fox jumps over the lazy dog.
+        </p>
       </fieldset>
 
       {/* ── K2: Accessibility ── */}

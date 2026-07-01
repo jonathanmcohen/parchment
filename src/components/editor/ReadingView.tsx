@@ -18,6 +18,7 @@ import {
   readingClassNames,
   readingPrefsKey,
 } from '@/lib/editor/reading'
+import { annotateDocWithShiki } from '@/lib/export/html'
 
 type Props = {
   content: unknown
@@ -75,6 +76,44 @@ function saveBookmark(docId: string, scrollTop: number): void {
 export function ReadingView({ content, docId, customCss = '', onClose }: Props) {
   const [prefs, setPrefs] = useState<ReadingPrefs>(() => loadPrefs())
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // v0.2.8 #3: syntax-highlight code blocks in Reading mode (same as the editor /
+  // print). Annotate the snapshot with Shiki tokens (LIGHT github-light — reads on
+  // the white/sepia reading sheet) on mount; until it resolves we render the raw
+  // doc (plaintext code) then swap in the highlighted version. The annotated doc
+  // carries escaped + hex-validated `__exportHtml` attrs that render-pm only honours
+  // under `exportHighlight: true`, so the XSS gate stays shut for untrusted docs.
+  const [renderContent, setRenderContent] = useState<unknown>(content)
+  // Gate `exportHighlight` (which lets render-pm emit code-block HTML) to ONLY the
+  // annotated snapshot. annotateDocWithShiki strips any pre-existing/forged
+  // __exportHtml and re-adds it only for blocks it itself highlighted, so enabling
+  // export mode on the raw stored doc (first paint) could honour a forged attr —
+  // keep it off until the safe, annotated doc is in state.
+  const [highlighted, setHighlighted] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    setRenderContent(content)
+    setHighlighted(false)
+    void annotateDocWithShiki(content).then((annotated) => {
+      if (!cancelled) {
+        setRenderContent(annotated)
+        setHighlighted(true)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [content])
+
+  // v0.2.8 #3: KaTeX renders math into markup that needs katex.min.css to lay out
+  // (super/subscripts, fractions). The editor lazy-loads it in the math NodeView;
+  // Reading mode renders math server-style via render-pm, so load the stylesheet
+  // here too. Lazy import (never in the server bundle); best-effort.
+  useEffect(() => {
+    void import('katex/dist/katex.min.css').catch(() => {
+      // ignore — math still renders, just without KaTeX's fine layout CSS
+    })
+  }, [])
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   // Keep a stable ref to the latest onClose so the keydown handler never stales.
   const onCloseRef = useRef(onClose)
@@ -241,7 +280,15 @@ export function ReadingView({ content, docId, customCss = '', onClose }: Props) 
         onScroll={handleScroll}
       >
         <CustomCssStyle css={customCss} />
-        {renderReadOnlyDoc(content)}
+        {/* v0.2.8 #3: wrap the rendered doc in .parchment-prose so the editor's
+            block styles (code blocks, tables, task lists, math, blockquotes, …)
+            actually apply in Reading mode. Without this wrapper the read-only
+            fragment sat bare in .parchment-reading and every block was unstyled —
+            the reported "Reading mode doesn't apply formatting" bug. exportHighlight
+            renders the Shiki-annotated code blocks with colour. */}
+        <div className="parchment-prose">
+          {renderReadOnlyDoc(renderContent, highlighted ? { exportHighlight: true } : undefined)}
+        </div>
       </div>
     </div>
   )

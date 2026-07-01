@@ -114,6 +114,7 @@ describe('applyThemeToDom — full dark/high-contrast/custom-accent scenario', (
       pageBg: '#fefefe',
       highContrast: true,
       dyslexicFont: false,
+      defaultBodyFont: DEFAULT_THEME.defaultBodyFont,
     }
 
     applyThemeToDom(theme)

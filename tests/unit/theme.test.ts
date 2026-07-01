@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   ACCENT_SWATCHES,
   DARK_PAGE_VARS,
+  DEFAULT_BODY_FONT_PAIR,
   DEFAULT_THEME,
   FONT_PAIRS,
+  findFontPair,
   isDarkPage,
   PAGE_BG_PRESETS,
   parseTheme,
@@ -150,6 +152,7 @@ describe('themeCssVars', () => {
       pageBg: 'white',
       highContrast: false,
       dyslexicFont: false,
+      defaultBodyFont: DEFAULT_BODY_FONT_PAIR,
     }
     const vars = themeCssVars(theme)
     const serif = FONT_PAIRS.find((p) => p.key === 'serif')
@@ -166,6 +169,7 @@ describe('themeCssVars', () => {
       pageBg: 'white',
       highContrast: false,
       dyslexicFont: false,
+      defaultBodyFont: DEFAULT_BODY_FONT_PAIR,
     }
     const vars = themeCssVars(theme)
     // The bare --accent powers links, selections and color-mix surfaces; it must
@@ -183,6 +187,7 @@ describe('themeCssVars', () => {
       pageBg: 'white',
       highContrast: false,
       dyslexicFont: false,
+      defaultBodyFont: DEFAULT_BODY_FONT_PAIR,
     })
     const first = FONT_PAIRS[0]
     expect(vars['--font-heading']).toBe(first?.heading)
@@ -198,6 +203,7 @@ describe('themeCssVars', () => {
       pageBg: 'white',
       highContrast: false,
       dyslexicFont: false,
+      defaultBodyFont: DEFAULT_BODY_FONT_PAIR,
     })
     expect(vars['--page-bg']).toBe('#ffffff')
   })
@@ -210,6 +216,7 @@ describe('themeCssVars', () => {
       pageBg: 'sepia',
       highContrast: false,
       dyslexicFont: false,
+      defaultBodyFont: DEFAULT_BODY_FONT_PAIR,
     })
     expect(vars['--page-bg']).toBe('#f5efe0')
   })
@@ -222,6 +229,7 @@ describe('themeCssVars', () => {
       pageBg: '#ffe4c4',
       highContrast: false,
       dyslexicFont: false,
+      defaultBodyFont: DEFAULT_BODY_FONT_PAIR,
     })
     expect(vars['--page-bg']).toBe('#ffe4c4')
   })
@@ -234,6 +242,7 @@ describe('themeCssVars', () => {
     pageBg,
     highContrast: false,
     dyslexicFont: false,
+    defaultBodyFont: DEFAULT_BODY_FONT_PAIR,
   })
 
   it("emits the dark page canvas + ink + code-bg for pageBg 'dark'", () => {
@@ -303,6 +312,53 @@ describe('FONT_PAIRS', () => {
 
   it('exposes exactly the four S4 pairs (system, serif, mono, classic)', () => {
     expect(FONT_PAIRS.map((p) => p.key)).toEqual(['system', 'serif', 'mono', 'classic'])
+  })
+})
+
+// ── v0.2.8 #1: default editor body font ───────────────────────────────────────
+describe('defaultBodyFont (v0.2.8 #1)', () => {
+  it('DEFAULT_THEME follows the font pair (sentinel)', () => {
+    expect(DEFAULT_THEME.defaultBodyFont).toBe(DEFAULT_BODY_FONT_PAIR)
+  })
+
+  it('parseTheme keeps a valid allow-listed Google font as the default', () => {
+    const t = parseTheme({ accent: '#000000', fontPair: 'system', defaultBodyFont: 'Inter' })
+    expect(t.defaultBodyFont).toBe('Inter')
+  })
+
+  it('parseTheme rejects a non-allow-listed / tampered default font → sentinel', () => {
+    for (const bad of ['Comic Sans MS', 'evil"; }', 42, null, '']) {
+      const t = parseTheme({ accent: '#000000', fontPair: 'system', defaultBodyFont: bad })
+      expect(t.defaultBodyFont).toBe(DEFAULT_BODY_FONT_PAIR)
+    }
+  })
+
+  it('legacy theme without defaultBodyFont → sentinel (compat)', () => {
+    const t = parseTheme({ accent: '#6d28d9', fontPair: 'serif' })
+    expect(t.defaultBodyFont).toBe(DEFAULT_BODY_FONT_PAIR)
+  })
+
+  it('themeCssVars: the sentinel resolves --font-body to the pair body (Arial for system)', () => {
+    const vars = themeCssVars({ ...DEFAULT_THEME, defaultBodyFont: DEFAULT_BODY_FONT_PAIR })
+    expect(vars['--font-body']).toBe(findFontPair('system').body)
+    expect(vars['--font-body']?.startsWith('Arial')).toBe(true)
+  })
+
+  it('themeCssVars: a chosen Google font drives --font-body via its stack', () => {
+    const vars = themeCssVars({ ...DEFAULT_THEME, defaultBodyFont: 'Inter' })
+    expect(vars['--font-body']).toBe('"Inter", sans-serif')
+  })
+
+  it('themeCssVars: the Google-font default overrides even a non-system pair body', () => {
+    // With the serif pair, the pair body would be a serif stack; the chosen Google
+    // font must win so the DEFAULT-font selection is authoritative.
+    const vars = themeCssVars({ ...DEFAULT_THEME, fontPair: 'serif', defaultBodyFont: 'Inter' })
+    expect(vars['--font-body']).toBe('"Inter", sans-serif')
+  })
+
+  it('themeCssVars: dyslexic mode still overrides the chosen default font', () => {
+    const vars = themeCssVars({ ...DEFAULT_THEME, defaultBodyFont: 'Inter', dyslexicFont: true })
+    expect(vars['--font-body']).toContain('OpenDyslexic')
   })
 })
 

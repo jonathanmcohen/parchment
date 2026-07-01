@@ -1,3 +1,4 @@
+import katex from 'katex'
 import { Fragment, type ReactNode } from 'react'
 import { formatBibliography, formatInText } from '@/lib/citations/format'
 import type { CiteStyle, CslEntry } from '@/lib/citations/types'
@@ -25,6 +26,50 @@ type PMNode = {
 
 function str(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
+}
+
+// v0.2.8 #3: render a mathInline / mathBlock node with KaTeX so Reading mode /
+// share / print / epub show real formulas (matching the editor), not the raw
+// LaTeX source dropped through the default case. KaTeX's own output is a fixed set
+// of spans with escaped text + inline classes (no <script>, no event handlers) —
+// this is the ONE place render-pm emits dangerouslySetInnerHTML for non-export
+// content, and it is safe because the HTML is produced by KaTeX from the LaTeX
+// STRING (we never pass through user HTML). throwOnError:false → a malformed
+// formula renders a KaTeX error node instead of crashing SSR.
+function renderMath(latex: string, displayMode: boolean, key: number): ReactNode {
+  let markup: string
+  try {
+    markup = katex.renderToString(latex, { displayMode, throwOnError: false, output: 'html' })
+  } catch {
+    // Defensive: even with throwOnError:false a truly degenerate input could throw;
+    // fall back to the escaped source text (React escapes it) rather than nothing.
+    return displayMode ? (
+      <div key={key} className="parchment-math-block parchment-math-empty">
+        {latex}
+      </div>
+    ) : (
+      <span key={key} className="parchment-math-inline parchment-math-empty">
+        {latex}
+      </span>
+    )
+  }
+  return displayMode ? (
+    <div key={key} className="parchment-math-block">
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: KaTeX-built markup from a LaTeX string (escaped text + fixed KaTeX classes), never user HTML */}
+      <span dangerouslySetInnerHTML={{ __html: markup }} />
+    </div>
+  ) : (
+    <span key={key} className="parchment-math-inline">
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: KaTeX-built markup from a LaTeX string (escaped text + fixed KaTeX classes), never user HTML */}
+      <span dangerouslySetInnerHTML={{ __html: markup }} />
+    </span>
+  )
+}
+
+/** A positive integer attr (colspan / rowspan) or undefined when absent/1. */
+function spanAttr(value: unknown): number | undefined {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isInteger(n) && n > 1 ? n : undefined
 }
 
 // Wrap a text string in its marks (innermost-first). Only a safe, fixed set of
@@ -328,9 +373,41 @@ function renderNode(node: PMNode, key: number): ReactNode {
         </p>
       )
     }
+    // v0.2.8 #3: tables — render real <table>/<tr>/<th>/<td> structure so the
+    // .parchment-prose table styles apply in Reading mode (before this they fell
+    // through to a bare Fragment and lost all structure). Cell attrs colspan /
+    // rowspan / colwidth are threaded through.
+    case 'table':
+      return (
+        <table key={key}>
+          <tbody>{children}</tbody>
+        </table>
+      )
+    case 'tableRow':
+      return <tr key={key}>{children}</tr>
+    case 'tableHeader':
+    case 'tableCell': {
+      const Tag = node.type === 'tableHeader' ? 'th' : 'td'
+      const colspan = spanAttr(node.attrs?.colspan)
+      const rowspan = spanAttr(node.attrs?.rowspan)
+      return (
+        <Tag key={key} colSpan={colspan} rowSpan={rowspan}>
+          {children}
+        </Tag>
+      )
+    }
+    // v0.2.8 #3: math — render with KaTeX (matches the editor) instead of dropping
+    // the LaTeX source through the default case.
+    case 'mathInline':
+      return renderMath(str(node.attrs?.latex) ?? '', false, key)
+    case 'mathBlock':
+      return renderMath(str(node.attrs?.latex) ?? '', true, key)
+    // v0.2.8 #3: a section break is a page-layout boundary → a rule in flowed views.
+    case 'sectionBreak':
+      return <hr key={key} className="parchment-section-break-node" />
     default:
-      // Unknown block (table, section break, toc, etc.) — render its children so
-      // text content is never silently dropped; wrap in a Fragment.
+      // Unknown block (toc, etc.) — render its children so text content is never
+      // silently dropped; wrap in a Fragment.
       return children.length > 0 ? <Fragment key={key}>{children}</Fragment> : null
   }
 }
@@ -509,9 +586,32 @@ function renderNodeWithCites(
     // Notes are author-only; returning null here ensures they never leak.
     case 'speakerNote':
       return null
+    // v0.2.8 #3: tables can contain citations in their cells, so thread the
+    // cite-aware child renderer through the table structure (rather than delegating
+    // to the cite-UNAWARE renderNode, which would drop citation atoms inside cells).
+    case 'table':
+      return (
+        <table key={key}>
+          <tbody>{children}</tbody>
+        </table>
+      )
+    case 'tableRow':
+      return <tr key={key}>{children}</tr>
+    case 'tableHeader':
+    case 'tableCell': {
+      const Tag = node.type === 'tableHeader' ? 'th' : 'td'
+      const colspan = spanAttr(node.attrs?.colspan)
+      const rowspan = spanAttr(node.attrs?.rowspan)
+      return (
+        <Tag key={key} colSpan={colspan} rowSpan={rowspan}>
+          {children}
+        </Tag>
+      )
+    }
     default:
       // Delegate to the cite-unaware renderer for specialised block types
-      // (drawing, mermaid, plantuml, etc.) that cannot contain citation nodes.
+      // (drawing, mermaid, plantuml, math, section breaks, …) that cannot contain
+      // citation nodes.
       return renderNode(node, key)
   }
 }

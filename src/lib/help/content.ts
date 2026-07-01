@@ -46,6 +46,15 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.8',
+    notes: [
+      'You can now choose the default editor font for the whole workspace — including any font you added from the Google Fonts picker. Set it under Settings → Appearance and every document (and new documents) picks it up.',
+      'The Help menu’s “Keyboard shortcuts” and “What’s new” now open as a proper pop-out dialog you can dismiss (click outside, the ✕, or Esc) instead of expanding inside the sidebar.',
+      'Reading mode now renders formatting faithfully: code blocks are syntax-highlighted and tables, math, callouts, and other blocks match how they look in the editor.',
+      'Release notes reliably refresh after an update, even for a document you had already opened before upgrading — the in-place “Release notes” guide is regenerated from the current changelog and the new content actually appears when you open it.',
+    ],
+  },
+  {
     version: '0.2.7',
     notes: [
       'Paged layout no longer nudges the left sidebar as you scroll a long, multi-page document — the horizontal scroll for wide pages is isolated to the page area, so the sidebar and toolbar stay put and there is a single scrollbar.',

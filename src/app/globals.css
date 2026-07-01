@@ -1977,6 +1977,128 @@ body {
   color: var(--foreground);
 }
 
+/* ── Help menu dialogs (v0.2.8 #2) ─────────────────────────────────────────────
+ *  "Keyboard shortcuts" / "What's new" / the welcome tour now open as pop-out
+ *  dialogs over the content via the shared .parchment-dialog(-overlay) shell
+ *  above. These add only the help-specific INNER layout: a scrollable body (so a
+ *  long shortcut/changelog list never grows the dialog past the viewport), the
+ *  cheat-sheet table, the release-notes list, and the tour footer/nav. */
+.parchment-help-dialog {
+  /* Slightly wider than the default 480px form dialog — cheat-sheet + release
+     notes read better with room; still clamped to the viewport. */
+  width: min(560px, 96vw);
+}
+
+.parchment-help-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3); /* 12px */
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.parchment-help-version {
+  margin-inline-start: var(--space-2); /* 8px */
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.parchment-shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.parchment-shortcuts-table tr:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.parchment-shortcut-keys {
+  padding: var(--space-2) var(--space-3); /* 8px 12px */
+  text-align: start;
+  white-space: nowrap;
+  width: 1%;
+  vertical-align: top;
+}
+
+.parchment-shortcut-keys kbd {
+  display: inline-block;
+  background: var(--surface-muted, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font: 500 0.8125rem / 1.2 var(--font-mono, monospace);
+  color: var(--foreground);
+  white-space: nowrap;
+}
+
+.parchment-shortcut-label {
+  padding: var(--space-2) var(--space-3); /* 8px 12px */
+  color: var(--foreground);
+}
+
+.parchment-release-list {
+  list-style: disc;
+  margin: 0;
+  padding-inline-start: var(--space-5); /* 20px */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2); /* 8px */
+}
+
+.parchment-release-item {
+  line-height: 1.55;
+  color: var(--foreground);
+}
+
+.parchment-tour-body {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+
+.parchment-tour-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3); /* 12px */
+}
+
+.parchment-tour-counter {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.parchment-tour-nav {
+  display: flex;
+  gap: var(--space-2); /* 8px */
+}
+
+.parchment-tour-btn {
+  padding: var(--space-2) var(--space-4); /* 8px 16px */
+  border: 1px solid var(--border-chrome);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground);
+  font: 500 0.875rem / 1 var(--font-ui);
+  cursor: pointer;
+}
+
+.parchment-tour-btn:hover {
+  background: var(--surface-hover);
+}
+
+.parchment-tour-btn--primary {
+  background: var(--primary);
+  color: var(--primary-contrast, #fff);
+  border-color: var(--primary);
+}
+
+.parchment-tour-btn--primary:hover {
+  background: var(--primary-hover, var(--primary));
+}
+
 .parchment-dialog-tabs {
   display: flex;
   gap: var(--space-1); /* S4-4: 4px */

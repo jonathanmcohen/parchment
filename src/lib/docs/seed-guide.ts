@@ -2,10 +2,11 @@ import { createFolder, findFolderByName } from '@/lib/docs/folders-repo'
 import {
   createDocument,
   deleteCollabState,
+  deleteDocumentPermanently,
   getDocument,
   listDocuments,
   listDocumentsInFolder,
-  saveDocument,
+  trashDocument,
 } from '@/lib/docs/repo'
 import { GUIDE_DOCS, GUIDE_FOLDER_NAME, releaseNotesTitle } from '@/lib/docs/seed-guide-content'
 import {
@@ -13,7 +14,6 @@ import {
   isUneditedManagedReleaseNotes,
 } from '@/lib/docs/seed-guide-refresh'
 import { getSetting, setSetting } from '@/lib/docs/settings-repo'
-import { serializeMarkdown } from '@/lib/markdown/serialize'
 import { APP_VERSION } from '@/lib/version'
 
 // L6: first-run "Parchment Guide" seed. Runs once after owner creation so a fresh
@@ -83,10 +83,27 @@ export async function seedGuideWorkspace(ownerId: string): Promise<void> {
  * update. NO-OP unless the stored seed/refresh version differs from APP_VERSION.
  * When it differs we locate the doc and:
  *   • if its content is still an unedited managed snapshot (matches the changelog
- *     rendering of some shipped version) → regenerate it from the current changelog
- *     and bump the stored version;
- *   • if the user EDITED it → leave the content untouched, but still bump the stored
+ *     rendering of some shipped version) → RECREATE it (a fresh doc with the current
+ *     changelog body, in the same guide folder) and bump the stored version;
+ *   • if the user EDITED it → leave the doc untouched, but still bump the stored
  *     version so we stop re-checking every boot (the edit wins permanently).
+ *
+ * v0.2.8 #4 — WHY RECREATE (a fresh doc id) instead of saving in place:
+ *   The v0.2.7 attempt rewrote documents.content + title in place and cleared the
+ *   server-side Yjs snapshot (collab_state). It demonstrably did NOT make the new
+ *   body appear in the editor, because the editor's first-open seeding (D4) reads
+ *   documents.content ONLY when there is no shadowing Yjs state — and there are TWO
+ *   shadows the server cannot clear for an already-opened doc:
+ *     1. collab_state — even after deleting the row, the collab server re-persists
+ *        its in-memory snapshot (it holds the doc while any client is connected),
+ *        re-creating the row over the delete;
+ *     2. browser IndexedDB (`parchment-doc-<id>`) — a per-doc-id local Yjs copy the
+ *        editor loads on open; the server has no way to reach or clear it, and the
+ *        G11 "IDB had content" guard then refuses to seed documents.content.
+ *   A fresh doc id has NEITHER shadow: no collab_state row exists for it and no
+ *   browser has an IndexedDB store keyed by it. So the editor seeds the new doc
+ *   cleanly from documents.content and the fresh changelog actually renders. This
+ *   is verified LIVE (open-in-editor screenshot) — see scratchpad/v028-report.md.
  *
  * Best-effort: every step is guarded so a failure can never block app boot/login.
  * Never clobbers user edits.
@@ -117,31 +134,27 @@ export async function refreshReleaseNotesDoc(ownerId: string): Promise<void> {
     }
 
     if (isUneditedManagedReleaseNotes(doc.content)) {
-      // Unedited managed snapshot → regenerate from the current changelog.
-      const content = currentReleaseNotesContent()
-      const markdown = serializeMarkdown(content)
-      await saveDocument(summary.id, {
-        contentJson: content,
-        markdown,
+      // Unedited managed snapshot → RECREATE from the current changelog under a
+      // fresh doc id (see the WHY-RECREATE note above). Create the new doc FIRST so
+      // a failure before the delete leaves the (still-valid, if stale) old doc in
+      // place rather than removing the only copy. createDocument derives the
+      // markdown projection + disk mirror itself. The old doc is then removed
+      // (trash → permanent; deleteDocumentPermanently only acts on a trashed doc)
+      // and its orphan Yjs snapshot cleaned up (collab_state has no FK cascade).
+      await createDocument(ownerId, {
         title: releaseNotesTitle(APP_VERSION),
+        folderId,
+        content: currentReleaseNotesContent(),
       })
-      // v0.2.7 #2: rewriting documents.content is INVISIBLE in the editor once a
-      // Yjs collab snapshot exists (the snapshot shadows documents.content via the
-      // D4 first-open seeding gate) — which is why, before this fix, the guide only
-      // refreshed on a brand-new instance. Drop the snapshot so the NEXT open
-      // re-seeds from the freshly-written content. SAFE here: we are strictly on the
-      // unedited-managed branch (no user edits to lose), and the guide doc is not
-      // open at owner page-load (when this runs), so the collab server holds no
-      // in-memory snapshot to re-persist over the delete. Best-effort: a failure to
-      // clear the snapshot must not break the refresh (the DB/disk write already
-      // landed), so it is wrapped — never throws out of refreshReleaseNotesDoc.
+      await trashDocument(ownerId, summary.id)
+      await deleteDocumentPermanently(ownerId, summary.id)
       try {
         await deleteCollabState(summary.id)
       } catch {
-        // ignore — snapshot reset is best-effort; the version is still bumped below.
+        // ignore — orphan-snapshot cleanup is best-effort; the version still bumps.
       }
     }
-    // Whether we refreshed or deferred to a user edit, record the current version so
+    // Whether we recreated or deferred to a user edit, record the current version so
     // the expensive scan/compare runs at most once per app version.
     await setSetting(ownerId, RELEASE_NOTES_VERSION_KEY, APP_VERSION)
   } catch {

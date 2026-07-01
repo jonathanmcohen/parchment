@@ -19,6 +19,7 @@ const CUSTOM_THEME: WorkspaceTheme = {
   pageBg: 'sepia',
   highContrast: true,
   dyslexicFont: true,
+  defaultBodyFont: DEFAULT_THEME.defaultBodyFont,
 }
 
 describe('F1 — applyColorScheme', () => {

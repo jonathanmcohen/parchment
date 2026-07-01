@@ -5,6 +5,18 @@
 //
 // I1: extended with colorScheme (light | dark | system) + pageBg (#hex or keyword).
 // K2: extended with highContrast (WCAG-AAA palette) + dyslexicFont (OpenDyslexic).
+// v0.2.8 #1: extended with defaultBodyFont — a workspace-wide DEFAULT editor body
+// font, chosen from the built-in pairs OR a self-hosted Google font.
+
+import { isAllowedGoogleFont } from '@/lib/fonts/google-catalog'
+import { googleFontStack } from '@/lib/fonts/google-fonts'
+
+/**
+ * v0.2.8 #1: sentinel for {@link WorkspaceTheme.defaultBodyFont} meaning "follow
+ * the selected font pair's body" (the historical behaviour — Arial for the default
+ * `system` pair). Any other value is a self-hosted Google font family name.
+ */
+export const DEFAULT_BODY_FONT_PAIR = 'pair'
 
 /** A workspace theme: an accent color (#hex) + a key into {@link FONT_PAIRS}. */
 export interface WorkspaceTheme {
@@ -27,6 +39,17 @@ export interface WorkspaceTheme {
    * typeface (globals.css @font-face), falling back to a system dyslexia-ish stack.
    */
   dyslexicFont: boolean
+  /**
+   * v0.2.8 #1: the workspace DEFAULT editor body font. Drives `--font-body` (which
+   * the editor prose inherits when a run carries no explicit font-family mark), so
+   * every document — including new ones — defaults to this font. Either the
+   * {@link DEFAULT_BODY_FONT_PAIR} sentinel ("follow the font pair's body", the
+   * default) or a self-hosted Google font family the workspace has added via the
+   * fonts picker (validated against the catalogue by {@link parseTheme}). This
+   * resolves the "let me pick the default document font" ask without shipping a
+   * specific licensed face: the user sets any font they added as the default.
+   */
+  defaultBodyFont: string
 }
 
 /** A selectable heading/body font pairing. */
@@ -140,16 +163,22 @@ export const DEFAULT_THEME: WorkspaceTheme = {
   // K2: accessibility toggles default off so existing/new workspaces are unchanged.
   highContrast: false,
   dyslexicFont: false,
+  // v0.2.8 #1: default to the font pair's body (Arial for `system`) — the exact
+  // historical behaviour, so nothing changes until the user picks a font.
+  defaultBodyFont: DEFAULT_BODY_FONT_PAIR,
 }
 
 const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
 
 /** Look up a font pair by key (defaults to the first pair). */
-function findPair(key: string): FontPair {
+export function findFontPair(key: string): FontPair {
   // FONT_PAIRS is non-empty so the fallback is always defined.
   const fallback = FONT_PAIRS[0] as FontPair
   return FONT_PAIRS.find((p) => p.key === key) ?? fallback
 }
+
+/** Back-compat alias — the internal name used elsewhere in this module. */
+const findPair = findFontPair
 
 /**
  * Validate/normalize a raw value to a {@link WorkspaceTheme}. The accent must be
@@ -194,7 +223,26 @@ export function parseTheme(raw: unknown): WorkspaceTheme {
   const highContrast = obj.highContrast === true
   const dyslexicFont = obj.dyslexicFont === true
 
-  return { accent, fontPair, colorScheme, pageBg, highContrast, dyslexicFont }
+  // v0.2.8 #1: defaultBodyFont — the sentinel (follow the pair) OR a family name
+  // that is STILL in the Google-fonts allow-list (validate on read so a font later
+  // removed from the catalogue, or a tampered value, can never inject an arbitrary
+  // font-family string into --font-body). Anything else → the sentinel.
+  const defaultBodyFont =
+    typeof obj.defaultBodyFont === 'string' &&
+    obj.defaultBodyFont !== DEFAULT_BODY_FONT_PAIR &&
+    isAllowedGoogleFont(obj.defaultBodyFont)
+      ? obj.defaultBodyFont
+      : DEFAULT_BODY_FONT_PAIR
+
+  return {
+    accent,
+    fontPair,
+    colorScheme,
+    pageBg,
+    highContrast,
+    dyslexicFont,
+    defaultBodyFont,
+  }
 }
 
 /** Resolve a pageBg value to the CSS color it represents. */
@@ -230,6 +278,15 @@ export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
   // element follows the dark sheet. White/sepia/custom-hex pages emit nothing
   // here, so their per-scheme tokens.css defaults apply UNCHANGED.
   const darkPageVars = isDarkPage(theme.pageBg) ? DARK_PAGE_VARS : {}
+  // v0.2.8 #1: the DEFAULT editor body font. Dyslexic mode wins (K2). Otherwise a
+  // chosen self-hosted Google font (validated by parseTheme, so it is in the
+  // allow-list AND its @font-face is injected app-wide by GoogleFontsStyle) drives
+  // --font-body; the sentinel falls back to the pair's body (historical Arial).
+  const bodyFont = theme.dyslexicFont
+    ? DYSLEXIC_FONT_STACK
+    : theme.defaultBodyFont !== DEFAULT_BODY_FONT_PAIR && isAllowedGoogleFont(theme.defaultBodyFont)
+      ? googleFontStack(theme.defaultBodyFont)
+      : pair.body
   return {
     // S1-1: both accent tokens track the per-workspace picker and drive
     // IN-DOCUMENT accent ONLY — never chrome. Chrome (primary buttons, active
@@ -242,7 +299,9 @@ export function themeCssVars(theme: WorkspaceTheme): Record<string, string> {
     '--accent': theme.accent,
     '--accent-contrast': theme.accent,
     '--font-heading': theme.dyslexicFont ? DYSLEXIC_FONT_STACK : pair.heading,
-    '--font-body': theme.dyslexicFont ? DYSLEXIC_FONT_STACK : pair.body,
+    // v0.2.8 #1: driven by defaultBodyFont (see bodyFont above) — falls back to the
+    // pair's body, so the default `system`/`pair`-sentinel theme still emits Arial.
+    '--font-body': bodyFont,
     // I1: page/paper background, overrides --paper on the doc canvas.
     '--page-bg': resolvePageBg(theme.pageBg),
     // #8 (v0.1.9): dark-page palette (spread last so it wins). Empty object for

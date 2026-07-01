@@ -321,6 +321,9 @@ export function AppearanceSettings() {
         </p>
         <select
           id={defaultFontId}
+          // a11y: the <legend> labels the fieldset group, but axe's select-name
+          // rule requires the control itself to carry an accessible name.
+          aria-label="Default editor font"
           value={theme.defaultBodyFont}
           disabled={saving}
           onChange={(e) => save({ ...theme, defaultBodyFont: e.target.value })}

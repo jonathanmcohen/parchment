@@ -46,6 +46,17 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.7',
+    notes: [
+      'Paged layout no longer nudges the left sidebar as you scroll a long, multi-page document — the horizontal scroll for wide pages is isolated to the page area, so the sidebar and toolbar stay put and there is a single scrollbar.',
+      'Release notes now refresh on existing installs after an update (not only on a brand-new instance): the in-place “Release notes” guide is regenerated from the current changelog, even when you had opened it before.',
+      'Changing the workspace colour scheme (Light / Dark / System) now applies immediately across the app, including already-open editor tabs, without a reload.',
+      'Version history (and the comments panel) now stay pinned to the top-right as a sticky side panel, so you can open them from anywhere in a long document without scrolling back up.',
+      'Print / Save-as-PDF now matches the on-screen editor: printed pages use the editor’s font and spacing, so line breaks and page breaks line up with what you see while editing.',
+      'New fonts picker: search the Google Fonts catalogue and add a font on demand. Chosen fonts are fetched once and self-hosted by your own Parchment server — the browser never loads anything from Google, preserving the “never phones home for a font” guarantee.',
+    ],
+  },
+  {
     version: '0.2.6',
     notes: [
       'Build/CI: the container image security scan now passes reliably. The scan’s report step builds an all-severity SBOM/CVE report for the Security tab, while the pass/fail gate runs separately and fails only on fixed High/Critical findings — previously a mere Medium-severity finding could fail the release even with zero High/Critical. No application change.',

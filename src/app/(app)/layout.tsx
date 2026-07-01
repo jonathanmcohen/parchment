@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import type { CSSProperties } from 'react'
 import { CommandPaletteMount } from '@/components/CommandPaletteMount'
+import { GoogleFontsStyle } from '@/components/editor/GoogleFontsStyle'
 import { HelpMenu } from '@/components/help/HelpMenu'
 import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher'
 import { AppShell } from '@/components/shell/AppShell'
@@ -14,7 +15,7 @@ import { GlobalShortcuts } from '@/components/shortcuts/GlobalShortcuts'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
 import { refreshReleaseNotesDoc } from '@/lib/docs/seed-guide'
-import { getWorkspaceTheme } from '@/lib/docs/settings-repo'
+import { getGoogleFonts, getWorkspaceTheme } from '@/lib/docs/settings-repo'
 import { themeCssVars } from '@/lib/editor/theme'
 import { getShortcutOverrides } from '@/lib/help/keymap-repo'
 import { isMaintenanceMode } from '@/lib/maintenance'
@@ -75,6 +76,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // I2: the owner's persisted shortcut overrides, merged with DEFAULT_BINDINGS by
   // the GlobalShortcuts dispatcher (key routing) and the HelpMenu (cheat sheet).
   const shortcutOverrides = await getShortcutOverrides(user.id)
+
+  // v0.2.7 #4b: the workspace's picked Google fonts. Injected app-wide as @font-face
+  // blocks (self-hosted via the local proxy) so any doc using one renders across
+  // reloads. Read for the owner; fonts are workspace-scoped.
+  const googleFonts = await getGoogleFonts(user.id)
 
   const maintenanceActive = await isMaintenanceMode()
 
@@ -137,6 +143,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       <GlobalShortcuts overrides={shortcutOverrides} />
       <CommandPaletteMount />
+      {/* v0.2.7 #4b: self-hosted @font-face for the workspace's picked Google fonts. */}
+      <GoogleFontsStyle families={googleFonts} />
       {/* K3: skip-to-content — first focusable element, visually hidden until
           focused, jumps keyboard users past the sidebar nav to <main>. */}
       <a href="#main-content" className="parchment-skip-link">

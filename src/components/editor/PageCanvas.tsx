@@ -358,6 +358,19 @@ export function PageCanvas({
     }
   }, [paged, editor, heightPx, margins.top, margins.bottom])
 
+  // v0.2.7 #1: the paged sheets are painted ABSOLUTELY, so the last sheet's rect
+  // can extend BELOW the flowed content (a page is a full sheet even if its content
+  // is short). That absolute overflow extended the document's SCROLL height beyond
+  // this container's FLOW height — and therefore beyond the app-shell (the sticky
+  // sidebar's containing block). The sidebar then got "left behind" by exactly that
+  // overflow at the very bottom of a long paged doc (the reported "sidebar shifts up
+  // on scroll"). Fix: give the container a min flow-height that reaches the last
+  // sheet's bottom, so the shell/scroll heights match and the sticky sidebar covers
+  // the whole scroll. (top/height are in the content-box coordinate space; padding
+  // is added on top via the inline padding, matching the sheets' `top:0` origin.)
+  const pagedContentMinHeight =
+    paged && pageBoxes.length > 0 ? Math.max(...pageBoxes.map((b) => b.top + b.height)) : undefined
+
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div
@@ -368,6 +381,8 @@ export function PageCanvas({
         paddingBottom: margins.bottom,
         paddingLeft: margins.left,
         position: 'relative',
+        // v0.2.7 #1: extend the flow height to the last sheet's bottom (see above).
+        ...(pagedContentMinHeight !== undefined ? { minHeight: pagedContentMinHeight } : {}),
         // Paged mode trough: page-scoped gutter (dark pages darken their own
         // trough via DARK_PAGE_VARS' --page-gutter), falling back to the chrome
         // gutter for light/sepia/custom pages and the normal scheme.

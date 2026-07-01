@@ -3,6 +3,7 @@
 import type { Editor } from '@tiptap/core'
 import type { ReactElement } from 'react'
 import { useCallback, useEffect, useState } from 'react'
+import { EditorSidePanel } from '@/components/editor/EditorSidePanel'
 import type { DiffLine, UnifiedHunkLine } from '@/lib/docs/version-diff'
 import { diffMarkdown, parseUnifiedHunks, unifiedPatch } from '@/lib/docs/version-diff'
 import type { Version, VersionSummary } from '@/lib/docs/versions-shared'
@@ -264,20 +265,10 @@ export function VersionHistory({ docId, editor }: Props) {
   // ── Render ────────────────────────────────────────────────────────────
 
   return (
-    <aside
-      aria-label="Version history"
-      style={{
-        width: 300,
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        borderLeft: '1px solid var(--border, #e5e7eb)',
-        background: 'var(--surface, #fff)',
-        overflowY: 'auto',
-        padding: '8px 0',
-        maxHeight: '100vh',
-      }}
-    >
+    // v0.2.7 #6: sticky right-rail panel (EditorSidePanel) so it is reachable from
+    // any scroll position on a long doc — previously a non-sticky aside that
+    // scrolled off-screen.
+    <EditorSidePanel ariaLabel="Version history" width={300}>
       {/* Header */}
       <div
         style={{
@@ -716,7 +707,7 @@ export function VersionHistory({ docId, editor }: Props) {
           )}
         </section>
       )}
-    </aside>
+    </EditorSidePanel>
   )
 }
 

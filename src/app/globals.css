@@ -954,18 +954,48 @@ body {
   padding-bottom: 24px;
 }
 
-/* #12/#14 — horizontal reach for wide pages only. The 816px page sits beside the
- * 220px outline rail + 256px sidebar inside the 2rem-padded shell, fitting around
- * ~1360px of viewport. Below that — including when high browser zoom shrinks the
- * CSS viewport width — the page can exceed the gutter, so re-enable horizontal
- * scrolling on the gutter alone to keep the right edge reachable. This is the only
- * regime where the gutter becomes a scroll container; at the wide desktop widths
- * where the double-scrollbar / detached-chrome bugs are reported, the rule above
- * keeps it `overflow: visible`. The mobile path (≤768px) is handled by --page-scale,
- * so this gate stops at 769px. */
+/* #12/#14 + v0.2.7 #1 — horizontal reach for wide pages only.
+ *
+ * The 816px page sits beside the 220px outline rail + 256px sidebar inside the
+ * 2rem-padded shell, fitting around ~1360px of viewport. Below that — including
+ * when high browser zoom shrinks the CSS viewport width — the page can exceed the
+ * available width, so horizontal scrolling is needed to keep the right edge
+ * reachable.
+ *
+ * v0.2.7 #1 BUG + FIX: previously this `overflow-x:auto` lived on
+ * `.parchment-canvas-gutter` itself. The gutter is the WINDOW-scroll/layout-
+ * viewport-defining column AND the nearest scroll ancestor of the sticky chrome +
+ * sticky sidebar. Putting overflow-x on it (a) coerced overflow-y visible→auto
+ * (the documented hazard above), and (b) the resulting HORIZONTAL scrollbar
+ * consumed bottom gutter space → shortened the layout viewport → the
+ * `height:100vh` sticky sidebar re-measured and visibly SHIFTED UP as you scrolled
+ * a long paged doc to the bottom.
+ *
+ * Fix: isolate the horizontal scroll to the INNER content host
+ * (`.parchment-canvas-scaled-host`) and keep the gutter `overflow:visible` at every
+ * width. The inner host is `height:auto` (it grows to the page's height), so even
+ * though overflow-x:auto coerces its overflow-y to auto, scrollHeight===clientHeight
+ * and NO nested vertical scrollbar appears (avoiding the #12/#14 double-scroll). A
+ * horizontal scrollbar there consumes the inner host's own box height, NOT the
+ * layout viewport — so the `100vh` sidebar never re-measures and stays put.
+ * `scrollbar-gutter:stable` reserves the scrollbar track so toggling it can't nudge
+ * geometry. The mobile path (≤768px) shrinks the page via --page-scale and never
+ * needs horizontal scroll, so this gate stops at 769px. */
 @media (min-width: 769px) and (max-width: 1360px) {
-  .parchment-canvas-gutter {
+  .parchment-canvas-scaled-host {
+    /* overflow-x:auto gives the horizontal reach; overflow-y:CLIP (NOT visible)
+       is the crucial detail. In paged mode the .parchment-page paints absolutely-
+       positioned .parchment-live-sheet backgrounds that extend a few hundred px
+       BELOW the flowed content; if overflow-y were `visible` it would COERCE to
+       `auto` (the documented hazard) and that absolute overflow would grow a nested
+       VERTICAL scrollbar inside the host — reintroducing the #12/#14 double-scroll.
+       `clip` is EXEMPT from the overflow-axis coercion (only `visible` coerces), so
+       overflow-y stays `clip`: the host scrolls horizontally only, the WINDOW stays
+       the sole vertical scroller (sticky chrome + sidebar anchored), and the
+       clipped region is just empty decorative sheet-background below the last line —
+       no real content is cut. */
     overflow-x: auto;
+    overflow-y: clip;
   }
 }
 
@@ -2020,6 +2050,52 @@ body {
   outline: 2px solid var(--primary);
   outline-offset: 1px;
   border-color: transparent;
+}
+
+/* ── v0.2.7 #4b: Google Fonts picker ─────────────────────────────────────── */
+.parchment-font-picker-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.parchment-font-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.parchment-font-picker-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.parchment-font-picker-list li:last-child .parchment-font-picker-item {
+  border-bottom: 0;
+}
+
+.parchment-font-picker-item:hover,
+.parchment-font-picker-item:focus-visible {
+  background: var(--surface-hover);
+}
+
+.parchment-font-picker-empty {
+  padding: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .parchment-dialog-select {
@@ -4283,6 +4359,16 @@ body {
     overflow: visible;
   }
 
+  /* v0.2.7 #6: the editor right-rail panels (Version history / Comments) are
+     position:sticky on desktop (EditorSidePanel inline style) so they are
+     reachable from any scroll position. On a narrow viewport a pinned 280–300px
+     panel would cover the document, so de-sticky them here: back to in-flow with
+     no viewport-height cap. */
+  .parchment-side-panel {
+    position: static;
+    max-height: none;
+  }
+
   /* Apply the visual scale to the page element; transform-origin top left
      anchors the scale at the top-left corner so the shrunken page stays
      flush with the left edge of the reading area (top center would push
@@ -4668,9 +4754,9 @@ body {
   z-index: 10000;
   display: flex;
   flex-direction: column;
-  /* Overlay CHROME — tokenized so it flips in dark mode. The paged.js page
-     sheets inside .parchment-print-pages keep their own white paper styling
-     (from EXPORT_STYLESHEET); only this surrounding chrome is themed. */
+  /* Overlay CHROME — tokenized so it flips in dark mode. The page sheets inside
+     .parchment-print-sheets keep their own white-paper styling (pinned light
+     below); only this surrounding chrome is themed. */
   background: var(--surface);
   color: var(--foreground);
   overflow: hidden;
@@ -4732,27 +4818,9 @@ body {
   background: var(--surface-hover);
 }
 
-/* Hidden source container — paged.js reads the rendered HTML from here,
-   but it is never visible to the user. */
-.parchment-print-source {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  visibility: hidden;
-}
-
-/* Scrollable paginated content area produced by paged.js. */
-.parchment-print-pages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+/* v0.2.7 #5: removed the dead .parchment-print-source / .parchment-print-pages
+   layout rules — leftovers from the removed paged.js path; neither element is
+   rendered (PrintView renders .parchment-print-sheets). */
 
 /* ── v0.1.10 #10: force printed content to a fixed light (white-paper) palette ──
  *
@@ -4769,13 +4837,11 @@ body {
  * color nor any var(--page-*)/chrome/code token can resolve to a dark-theme
  * value. Independent of OS scheme, app theme, and the selectable dark page.
  *
- * Covers BOTH print DOMs: the legacy source/pages containers AND the v0.1.10 #13
- * content-split sheets (.parchment-print-sheets / .parchment-paged-sheet), whose
- * pagination.css uses var(--foreground)/var(--surface)/var(--muted)/--editor-
- * gutter — all pinned light here so a dark-mode user's PDF stays black-on-white.
+ * Applies to the v0.1.10 #13 content-split sheets (.parchment-print-sheets /
+ * .parchment-paged-sheet), whose pagination.css uses var(--foreground)/
+ * var(--surface)/var(--muted)/--editor-gutter — all pinned light here so a
+ * dark-mode user's PDF stays black-on-white.
  */
-.parchment-print-source,
-.parchment-print-pages,
 .parchment-print-sheets,
 .parchment-paged-sheet {
   color: #1a1a1a;
@@ -4816,34 +4882,9 @@ body {
     display: none;
     visibility: hidden;
   }
-
-  /* #10 (v0.1.9): print the SOURCE xor the PAGES based on paged.js status.
-     ready  → paged.js produced .pagedjs_page boxes → print those, hide source.
-     else   → paged.js failed/loading → native print the source (paged.js pages
-              are empty here; printing them gave a blank PDF). */
-  body > .parchment-print-overlay[data-print-status="ready"] .parchment-print-source {
-    display: none;
-    visibility: hidden;
-  }
-  body > .parchment-print-overlay[data-print-status="ready"] .parchment-print-pages {
-    display: block;
-    padding: 0;
-    overflow: visible;
-    flex: none;
-  }
-  body > .parchment-print-overlay:not([data-print-status="ready"]) .parchment-print-source {
-    display: block;
-    visibility: visible;
-    position: static;
-    left: auto;
-    top: auto;
-    width: auto;
-    height: auto;
-    overflow: visible;
-  }
-  body > .parchment-print-overlay:not([data-print-status="ready"]) .parchment-print-pages {
-    display: none;
-  }
+  /* v0.2.7 #5: removed the dead .parchment-print-source / .parchment-print-pages /
+     [data-print-status] rules — leftovers from the removed paged.js path that are
+     never rendered now (PrintView prints .parchment-print-sheets directly). */
 }
 
 /* ── K2: HC accent text (placed last so it stays MORE specific AND later) ─────

@@ -21,6 +21,7 @@ import type { PageOrientations } from '@/lib/editor/pagination'
 import type { WatermarkConfig } from '@/lib/editor/watermark'
 import { annotateDocWithShiki, EXPORT_STYLESHEET } from '@/lib/export/html'
 import { pageCss } from '@/lib/export/page-css'
+import { PRINT_TYPOGRAPHY_CSS, printOverlayFontVars } from '@/lib/export/print-typography'
 
 type Props = {
   content: unknown
@@ -52,6 +53,25 @@ export function PrintView({
   // Until the first paginate measurement lands the page count is unknown; the
   // print button stays enabled (the sheets render correct content immediately).
   const [pageCount, setPageCount] = useState(0)
+
+  // v0.2.7 #5: the print overlay portals to document.body, OUTSIDE the (app)
+  // wrapper whose inline themeCssVars define --font-body/--font-heading. Read the
+  // RESOLVED fonts off the live editor's .parchment-prose (falling back to the app
+  // wrapper) and re-emit them as vars on the overlay so the printed prose uses the
+  // workspace font — matching the editor instead of EXPORT_STYLESHEET's serif.
+  const [fontVars, setFontVars] = useState<Record<string, string>>({})
+  useEffect(() => {
+    const src =
+      document.querySelector('.parchment-prose') ?? document.querySelector('[data-color-scheme]')
+    if (!src) return
+    const cs = getComputedStyle(src)
+    setFontVars(
+      printOverlayFontVars({
+        fontBody: cs.getPropertyValue('--font-body'),
+        fontHeading: cs.getPropertyValue('--font-heading'),
+      }),
+    )
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -138,7 +158,10 @@ export function PrintView({
   // size matches the document-default orientation; mixed per-page orientation
   // still shows correctly in the on-screen preview, but native print uses one
   // @page size for every page (a browser limitation we accept rather than fake).
-  const printStyles = `${EXPORT_STYLESHEET}\n${pageCss(pageSetup, { marginless: true })}`
+  // v0.2.7 #5: append the print-scoped prose typography AFTER EXPORT_STYLESHEET so
+  // it wins (source order + higher specificity) and the printed text matches the
+  // editor — without touching EXPORT_STYLESHEET (still shared by HTML/EPUB export).
+  const printStyles = `${EXPORT_STYLESHEET}\n${PRINT_TYPOGRAPHY_CSS}\n${pageCss(pageSetup, { marginless: true })}`
 
   const overlay = (
     <div
@@ -146,6 +169,7 @@ export function PrintView({
       role="dialog"
       aria-modal="true"
       aria-label="Print / PDF"
+      style={fontVars}
     >
       {/* ── Control bar (hidden during actual print via @media print) ── */}
       <div className="parchment-print-bar">

@@ -12,6 +12,7 @@ import {
 } from '@/lib/docs/workspace-config'
 import { DEFAULT_STYLES, type NamedStyle, parseStyles } from '@/lib/editor/styles'
 import { DEFAULT_THEME, parseTheme, type WorkspaceTheme } from '@/lib/editor/theme'
+import { isAllowedGoogleFont } from '@/lib/fonts/google-catalog'
 
 // E11: generic owner key-value settings store.
 
@@ -82,6 +83,50 @@ export async function setTrashRetentionDays(ownerId: string, days: number): Prom
 export async function getWorkspaceTheme(ownerId: string): Promise<WorkspaceTheme> {
   const raw = await getSetting<unknown>(ownerId, WORKSPACE_THEME_KEY, DEFAULT_THEME)
   return parseTheme(raw)
+}
+
+// v0.2.7 #4b: the owner's PICKED Google fonts (family names from the bundled
+// catalogue). Drives (a) the toolbar font dropdown additions and (b) the @font-face
+// blocks injected into the editor so any doc using a picked font renders across
+// reloads. Stored as a string[] under this key; ALWAYS re-validated against the
+// allow-list on read AND write (the SSRF allow-list is the single source of truth —
+// a stored non-catalogue value can never sneak a font reference through).
+export const GOOGLE_FONTS_KEY = 'googleFonts'
+
+/** Read the owner's picked Google fonts (allow-list-filtered, de-duped). */
+export async function getGoogleFonts(ownerId: string): Promise<string[]> {
+  const raw = await getSetting<unknown>(ownerId, GOOGLE_FONTS_KEY, [])
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const f of raw) {
+    if (typeof f === 'string' && isAllowedGoogleFont(f) && !seen.has(f)) {
+      seen.add(f)
+      out.push(f)
+    }
+  }
+  return out
+}
+
+/**
+ * Add a Google font to the owner's picked list (idempotent, allow-list-gated).
+ * Returns the updated list. A non-catalogue family is rejected (returns the list
+ * unchanged) — the route maps that to a 400.
+ */
+export async function addGoogleFont(ownerId: string, family: string): Promise<string[]> {
+  const current = await getGoogleFonts(ownerId)
+  if (!isAllowedGoogleFont(family) || current.includes(family)) return current
+  const next = [...current, family]
+  await setSetting(ownerId, GOOGLE_FONTS_KEY, next)
+  return next
+}
+
+/** Remove a Google font from the owner's picked list. Returns the updated list. */
+export async function removeGoogleFont(ownerId: string, family: string): Promise<string[]> {
+  const current = await getGoogleFonts(ownerId)
+  const next = current.filter((f) => f !== family)
+  if (next.length !== current.length) await setSetting(ownerId, GOOGLE_FONTS_KEY, next)
+  return next
 }
 
 /** Persist the owner's workspace theme (normalized via parseTheme). */

@@ -46,6 +46,14 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.9',
+    notes: [
+      'The “Release notes” guide document now reliably refreshes after an update — including on an instance you had already opened it on before upgrading. The refresh survives the disk-sync round trips that previously left it stuck on an older version.',
+      'Fixed heading anchor comments accumulating in documents that are mirrored to disk: repeated “id” markers no longer pile up inside headings on each disk-to-app sync, and any documents that already collected them heal themselves on the next sync.',
+      'Stale “Release notes” files left behind in the Parchment Guide folder on disk are now cleaned up automatically when the guide is regenerated.',
+    ],
+  },
+  {
     version: '0.2.8',
     notes: [
       'You can now choose the default editor font for the whole workspace — including any font you added from the Google Fonts picker. Set it under Settings → Appearance and every document (and new documents) picks it up.',

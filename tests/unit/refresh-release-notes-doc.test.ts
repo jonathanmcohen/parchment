@@ -25,6 +25,7 @@ const {
   trashDocument,
   deleteDocumentPermanently,
   deleteCollabState,
+  sweepOrphanReleaseNotesFiles,
 } = vi.hoisted(() => ({
   getSetting: vi.fn<() => Promise<unknown>>(),
   setSetting: vi.fn<() => Promise<void>>(),
@@ -41,6 +42,8 @@ const {
   trashDocument: vi.fn<(ownerId: string, id: string) => Promise<void>>(),
   deleteDocumentPermanently: vi.fn<(ownerId: string, id: string) => Promise<boolean>>(),
   deleteCollabState: vi.fn<(id: string) => Promise<number>>(),
+  sweepOrphanReleaseNotesFiles:
+    vi.fn<(guideDirRel: string, keep: ReadonlySet<string>) => Promise<string[]>>(),
 }))
 
 vi.mock('@/lib/docs/settings-repo', () => ({ getSetting, setSetting }))
@@ -55,7 +58,14 @@ vi.mock('@/lib/docs/repo', () => ({
   saveDocument: vi.fn(),
   listDocuments: vi.fn(),
 }))
-vi.mock('@/lib/markdown/serialize', () => ({ serializeMarkdown: () => '# Release notes' }))
+// v0.2.9 #3: stub the disk sweep so the orchestration test stays db/fs-free while
+// still asserting the recreate branch invokes it with the guide dir + keep-set.
+vi.mock('@/lib/disk/mirror', () => ({ sweepOrphanReleaseNotesFiles }))
+
+// v0.2.9 #1: edit-detection now compares NORMALIZED MARKDOWN PROJECTIONS, so the
+// REAL serializer must run (it is pure — no db / DOM — and safe here). A stub that
+// returns a constant would make every doc serialize identically and defeat the
+// unedited-vs-edited distinction this test asserts. So we do NOT mock serialize.
 
 import { refreshReleaseNotesDoc } from '@/lib/docs/seed-guide'
 import { currentReleaseNotesContent } from '@/lib/docs/seed-guide-refresh'
@@ -65,6 +75,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   createDocument.mockResolvedValue({ id: 'new-doc' })
   deleteDocumentPermanently.mockResolvedValue(true)
+  sweepOrphanReleaseNotesFiles.mockResolvedValue([])
 })
 
 describe('refreshReleaseNotesDoc', () => {
@@ -104,6 +115,14 @@ describe('refreshReleaseNotesDoc', () => {
     // Its orphan Yjs snapshot is cleaned up too (no FK cascade on collab_state).
     expect(deleteCollabState).toHaveBeenCalledWith('doc1')
 
+    // v0.2.9 #3: after recreate, the guide folder is swept for stale orphan
+    // `Release notes — v*.md` files (prod carried `Release notes — v0.1.0.md`),
+    // targeting the guide dir and keeping the live release-notes filename(s).
+    expect(sweepOrphanReleaseNotesFiles).toHaveBeenCalledTimes(1)
+    const sweepCall = sweepOrphanReleaseNotesFiles.mock.calls[0]
+    expect(sweepCall?.[0]).toBe('Parchment Guide')
+    expect(sweepCall?.[1]).toBeInstanceOf(Set)
+
     // Stored version bumped to current.
     expect(setSetting).toHaveBeenCalledWith('owner1', 'releaseNotesGuideVersion', APP_VERSION)
   })
@@ -126,6 +145,8 @@ describe('refreshReleaseNotesDoc', () => {
     expect(trashDocument).not.toHaveBeenCalled()
     expect(deleteDocumentPermanently).not.toHaveBeenCalled()
     expect(deleteCollabState).not.toHaveBeenCalled()
+    // v0.2.9 #3: the sweep only runs in the recreate branch — never for an edit.
+    expect(sweepOrphanReleaseNotesFiles).not.toHaveBeenCalled()
     expect(setSetting).toHaveBeenCalledWith('owner1', 'releaseNotesGuideVersion', APP_VERSION)
   })
 

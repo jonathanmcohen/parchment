@@ -71,6 +71,32 @@ function textNode(s: string, marks: Mark[]): PMNode | null {
   return { type: 'text', text: s, ...(marks.length ? { marks } : {}) }
 }
 
+/**
+ * v0.2.9 #2: after removing id-comment tokens from a heading's inline stream, a
+ * trailing whitespace-only text node (e.g. the space before ` <!-- id:… -->`) or a
+ * trailing space on the last text node can survive. Left in place it re-serialises
+ * to `# Title ` (trailing space), which is a distinct-but-equivalent markdown and
+ * breaks byte-idempotency. Trim the trailing whitespace off the last text node and
+ * drop any node that becomes empty, so `# Title <!-- id:t -->` → text "Title".
+ * ONLY the trailing edge is trimmed (interior spacing between inline nodes stays).
+ */
+function trimTrailingWhitespaceTextNodes(nodes: PMNode[]): PMNode[] {
+  const out = [...nodes]
+  while (out.length > 0) {
+    const last = out[out.length - 1]
+    if (last?.type !== 'text' || typeof last.text !== 'string') break
+    const trimmed = last.text.replace(/\s+$/, '')
+    if (trimmed === last.text) break // no trailing whitespace → done
+    if (trimmed.length === 0) {
+      out.pop() // node was all whitespace → drop it and keep trimming.
+      continue
+    }
+    out[out.length - 1] = { ...last, text: trimmed }
+    break
+  }
+  return out
+}
+
 // F6: `[[Label]]` wiki-link recognition. A non-greedy capture of any chars
 // except `[` and `]` between double brackets so `[[A]] x [[B]]` yields two
 // distinct links and a stray `]]` cannot over-match.
@@ -117,12 +143,25 @@ const INLINE_MATH_RE = /(?<![\d$])\$([^$\s][^$]*?[^$\s]|[^$\s])\$(?![\d$])/g
 const CITE_RE = /\[@([\w:./-]+)(?:,\s*([^\]]+))?\]/g
 
 /**
- * G8a: heading id sentinel. serialize.ts appends ` <!-- id:<slug> -->` to
- * heading lines that carry a non-empty HeadingId `id` attr so the id survives
+ * G8a / v0.2.9 #2: heading id sentinel. serialize.ts appends ` <!-- id:<slug> -->`
+ * to heading lines that carry a non-empty HeadingId `id` attr so the id survives
  * the disk-mirror cycle. We strip it from the rendered text and restore `attrs.id`.
- * The sentinel is on the raw heading text token, not the inline token stream.
+ *
+ * v0.2.9 #2 — STRIP EVERY OCCURRENCE, not just one trailing comment. `marked`
+ * tokenises each `<!-- id:… -->` as a SEPARATE inline `html` token (verified), so a
+ * heading that somehow accumulated several id comments (the prod snowball bug) would
+ * previously keep all-but-one in its visible text, the editor re-slugged from that
+ * polluted text, serialize re-appended another comment, and the comments compounded
+ * across disk↔DB round trips. This module now removes ALL id-comment tokens from the
+ * heading's inline stream and derives attrs.id from the FIRST (canonical) one, so the
+ * stored heading text is clean and serialize(parse(x)) is idempotent from pass one.
+ *
+ * `HEADING_ID_GLOBAL_RE` matches an id comment ANYWHERE in a string (global,
+ * whitespace-tolerant); `HEADING_ID_TOKEN_RE` matches an inline `html` token whose
+ * entire text is a single id comment (anchored). Both are the same shape.
  */
-const HEADING_ID_RE = /\s+<!--\s*id:([\w-]+)\s*-->\s*$/
+const HEADING_ID_GLOBAL_RE = /<!--\s*id:([\w-]+)\s*-->/g
+const HEADING_ID_TOKEN_RE = /^<!--\s*id:([\w-]+)\s*-->$/
 
 /**
  * G8b: CONSERVATIVE inline cross-reference recognition.
@@ -548,29 +587,40 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
   for (const t of tokens ?? []) {
     switch (t.type) {
       case 'heading': {
-        // G8a: restore heading `id` attr from the serialize.ts sentinel
-        // `<!-- id:<slug> -->`. We check the raw heading text before marked
-        // strips HTML comments, extract the id, then re-inline the remainder
-        // (which has the sentinel stripped) so the rendered label is clean.
+        // G8a / v0.2.9 #2: restore heading `id` from serialize.ts's sentinel
+        // `<!-- id:<slug> -->` AND strip EVERY id comment from the heading text.
+        //
+        // `marked` emits each `<!-- … -->` as a separate inline `html` token, so
+        // stripping only a trailing text-token match (the old behaviour) left the
+        // comments in the visible heading text — the root of the prod snowball.
+        // Here we: (1) take the id from the FIRST id comment anywhere in the raw
+        // heading text (the canonical slug — never a nested/polluted one), and
+        // (2) drop/clean id comments from the inline token stream so the stored
+        // heading text carries zero comment residue.
         const rawText = t.text ?? ''
-        const idMatch = HEADING_ID_RE.exec(rawText)
-        const headingId = idMatch ? (idMatch[1] ?? '') : ''
-        // Strip the sentinel from the raw token text so inline() doesn't emit
-        // the HTML comment as visible text. We mutate a local copy — marked
-        // token objects are plain JS objects so this is safe inside the switch.
-        const cleanTokens = idMatch
-          ? (() => {
-              // Walk t.tokens and strip the sentinel from any trailing text node.
-              return (t.tokens ?? []).map((tok) => {
-                if (tok.type === 'text' && tok.text) {
-                  const stripped = tok.text.replace(HEADING_ID_RE, '')
-                  return stripped !== tok.text ? { ...tok, text: stripped } : tok
-                }
-                return tok
-              })
-            })()
-          : (t.tokens ?? [])
-        const headingContent = inline(cleanTokens, [])
+        HEADING_ID_GLOBAL_RE.lastIndex = 0
+        const firstId = HEADING_ID_GLOBAL_RE.exec(rawText)
+        const headingId = firstId ? (firstId[1] ?? '') : ''
+        // Rebuild the token stream without any id-comment html tokens, and with
+        // id comments scrubbed from text tokens (defensive — covers a comment
+        // marked chose to keep inside a text run). marked tokens are plain JS
+        // objects; we map to shallow copies, never mutating in place.
+        const cleanTokens = (t.tokens ?? [])
+          .filter(
+            (tok) => !(tok.type === 'html' && HEADING_ID_TOKEN_RE.test((tok.text ?? '').trim())),
+          )
+          .map((tok) => {
+            if (tok.type === 'text' && tok.text) {
+              // Reset lastIndex — HEADING_ID_GLOBAL_RE is a shared /g regex; a stray
+              // lastIndex would make .replace start mid-string. .replace() itself
+              // resets it, but be explicit for the guard read below.
+              HEADING_ID_GLOBAL_RE.lastIndex = 0
+              const stripped = tok.text.replace(HEADING_ID_GLOBAL_RE, '')
+              return stripped !== tok.text ? { ...tok, text: stripped } : tok
+            }
+            return tok
+          })
+        const headingContent = trimTrailingWhitespaceTextNodes(inline(cleanTokens, []))
         out.push({
           type: 'heading',
           attrs: {

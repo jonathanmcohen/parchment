@@ -60,7 +60,20 @@ export default async function globalSetup(): Promise<void> {
           sameSite: 'Lax',
         },
       ],
-      origins: [],
+      // v0.2.8: pre-set the "welcome tour seen" flag so the first-run tour does NOT
+      // auto-open in the authed e2e session. The tour is a genuine full-viewport
+      // modal (HelpMenu #2 routes it through .parchment-dialog-overlay, a fixed
+      // z-index:1000 scrim that correctly intercepts pointer events); if it auto-
+      // showed, its backdrop would block the button clicks these admin-flow specs
+      // perform (Users invite, S3 Save, restore picker). Seeding the localStorage
+      // key here matches a returning user and keeps these tests focused on their
+      // own flows. baseURL is http://localhost:3000 (playwright.config.ts).
+      origins: [
+        {
+          origin: 'http://localhost:3000',
+          localStorage: [{ name: 'parchment:tour-seen', value: 'true' }],
+        },
+      ],
     }),
   )
 }

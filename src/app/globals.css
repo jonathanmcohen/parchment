@@ -983,8 +983,19 @@ body {
  * needs horizontal scroll, so this gate stops at 769px. */
 @media (min-width: 769px) and (max-width: 1360px) {
   .parchment-canvas-scaled-host {
+    /* overflow-x:auto gives the horizontal reach; overflow-y:CLIP (NOT visible)
+       is the crucial detail. In paged mode the .parchment-page paints absolutely-
+       positioned .parchment-live-sheet backgrounds that extend a few hundred px
+       BELOW the flowed content; if overflow-y were `visible` it would COERCE to
+       `auto` (the documented hazard) and that absolute overflow would grow a nested
+       VERTICAL scrollbar inside the host — reintroducing the #12/#14 double-scroll.
+       `clip` is EXEMPT from the overflow-axis coercion (only `visible` coerces), so
+       overflow-y stays `clip`: the host scrolls horizontally only, the WINDOW stays
+       the sole vertical scroller (sticky chrome + sidebar anchored), and the
+       clipped region is just empty decorative sheet-background below the last line —
+       no real content is cut. */
     overflow-x: auto;
-    scrollbar-gutter: stable;
+    overflow-y: clip;
   }
 }
 

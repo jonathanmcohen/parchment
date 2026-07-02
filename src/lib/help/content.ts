@@ -27,6 +27,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: '⌘\\', label: 'Clear formatting' },
   { keys: 'Tab', label: 'Indent list item' },
   { keys: '⇧Tab', label: 'Outdent list item' },
+  { keys: '⌘⇧V', label: 'Paste without formatting' },
 ]
 
 // ── Release notes ─────────────────────────────────────────────────────────────

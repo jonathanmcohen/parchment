@@ -11,20 +11,53 @@ export type Shortcut = {
   label: string
 }
 
+// v0.2.10: synced to every shortcut VERIFIED working in this Tiptap setup
+// (tests/unit/shortcut-keymap.test.ts is the executable proof). Notable: strike
+// is ⌘⇧S here (not the Docs-style ⌘⇧X), and ⌘⇧H opens Find & replace (the
+// highlight extension's identical default is shadowed by it).
 export const SHORTCUTS: Shortcut[] = [
+  // ── App ──
   { keys: '⌘K', label: 'Open command palette' },
   { keys: '⌘P', label: 'Fuzzy file finder' },
+  { keys: '⌘/', label: 'Keyboard shortcuts (in the editor; ⌘⇧/ anywhere)' },
+  { keys: 'F5', label: 'Enter / exit presenter mode' },
+  { keys: '⌘S', label: 'Note (autosaves continuously)' },
+  // ── Editing (v0.2.10) ──
+  { keys: '⌘↩', label: 'Insert page break' },
+  { keys: '⌘⇧K', label: 'Insert or edit link' },
+  { keys: '⌘⌥M', label: 'New comment on selection' },
+  { keys: '⌘⇧↑', label: 'Move block up' },
+  { keys: '⌘⇧↓', label: 'Move block down' },
+  { keys: '⌘D', label: 'Duplicate block' },
+  // ── Find ──
+  { keys: '⌘F', label: 'Find' },
+  { keys: '⌘⇧H', label: 'Find & replace' },
+  // ── Text style ──
   { keys: '⌘B', label: 'Bold' },
   { keys: '⌘I', label: 'Italic' },
   { keys: '⌘U', label: 'Underline' },
-  { keys: '⌘S', label: 'Note (autosaves continuously)' },
-  { keys: 'F5', label: 'Enter / exit presenter mode' },
+  { keys: '⌘⇧S', label: 'Strikethrough' },
+  { keys: '⌘E', label: 'Inline code' },
+  { keys: '⌘,', label: 'Subscript' },
+  { keys: '⌘.', label: 'Superscript' },
+  { keys: '⌘\\', label: 'Clear formatting' },
+  // ── Blocks ──
+  { keys: '⌘⌥0', label: 'Normal text (paragraph)' },
+  { keys: '⌘⌥1–6', label: 'Heading 1–6' },
+  { keys: '⌘⇧7', label: 'Numbered list' },
+  { keys: '⌘⇧8', label: 'Bulleted list' },
+  { keys: '⌘⇧9', label: 'Checklist' },
+  { keys: '⌘⌥C', label: 'Code block' },
+  { keys: '⌘⇧B', label: 'Blockquote' },
+  // ── Alignment ──
+  { keys: '⌘⇧L / E / R / J', label: 'Align left / center / right / justify' },
+  // ── History ──
+  { keys: '⌘Z', label: 'Undo' },
+  { keys: '⌘⇧Z', label: 'Redo' },
+  // ── Insert triggers ──
   { keys: '/', label: 'Open slash-command menu (at line start)' },
   { keys: '[[', label: 'Insert wiki link' },
   { keys: '@', label: 'Insert citation / @-mention' },
-  { keys: '⌘Z', label: 'Undo' },
-  { keys: '⌘⇧Z', label: 'Redo' },
-  { keys: '⌘\\', label: 'Clear formatting' },
   { keys: 'Tab', label: 'Indent list item' },
   { keys: '⇧Tab', label: 'Outdent list item' },
 ]

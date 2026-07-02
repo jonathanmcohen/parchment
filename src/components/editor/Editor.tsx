@@ -51,6 +51,7 @@ import { WordCountDialog } from '@/components/editor/WordCountDialog'
 import { WritingGoalDialog } from '@/components/editor/WritingGoalDialog'
 import { UserCluster } from '@/components/shell/UserCluster'
 import {
+  dispatchShortcut,
   registerShortcutAction,
   SHORTCUT_EVENT,
   type ShortcutEventDetail,
@@ -66,6 +67,7 @@ import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { GrammarCheckExtension } from '@/lib/editor/extensions/grammar-check'
 import { PaginationLive } from '@/lib/editor/extensions/pagination-live'
+import { makeShortcutKeymap } from '@/lib/editor/extensions/shortcut-keymap'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import { WikiSuggestionExtension } from '@/lib/editor/extensions/wiki-suggestion'
 import { classifySwipe, isMobileWidth, pageFitScale } from '@/lib/editor/page-fit'
@@ -618,6 +620,14 @@ export function Editor({
   // sidebar's mount the way a one-shot DOM event could. 0 = no request yet.
   const [openComposerSignal, setOpenComposerSignal] = useState(0)
 
+  // v0.2.10 shortcuts: Mod-Alt-M — open the comments sidebar AND bump the
+  // composer-open intent (the same state updates the F3 handleAddComment path
+  // performs). Declared BEFORE useEditor so the keymap extension can capture it.
+  const openCommentComposer = useCallback(() => {
+    setCommentsSidebarOpen(true)
+    setOpenComposerSignal((n) => n + 1)
+  }, [])
+
   // D3: version history panel toggle
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
 
@@ -967,6 +977,18 @@ export function Editor({
         : []),
       // B9: configured with onOpen so Cmd-F / Cmd-Shift-H open the React panel.
       FindReplaceExtension.configure({ onOpen: openFind }),
+      // v0.2.10: user-friendly shortcuts — Mod-Enter page break, Mod-Shift-K
+      // link, Mod-Alt-M comment, Mod-Shift-↑/↓ move block, Mod-D duplicate,
+      // Mod-Alt-0 normal text, Mod-/ shortcuts cheat sheet. High-priority so
+      // Mod-Enter beats StarterKit's hardBreak binding; Shift-Enter untouched.
+      makeShortcutKeymap({
+        onInsertLink: openLinkPopover,
+        onAddComment: openCommentComposer,
+        // Reuses the I2 dispatcher: HelpMenu (mounted in the app layout,
+        // including the editor route) handles `shortcuts-help` and opens the
+        // same pop-out dialog the app-wide Mod-Shift-/ chord opens.
+        onShowShortcuts: () => dispatchShortcut('shortcuts-help'),
+      }),
       // B12: slash menu — onOpenImage delegates to the existing image dialog.
       // G4: onEditMath opens the LaTeX popover for a freshly-inserted math node.
       // G8b: onOpenCrossRefPicker opens the cross-reference picker.

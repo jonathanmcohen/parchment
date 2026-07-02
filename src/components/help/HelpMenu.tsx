@@ -184,9 +184,41 @@ function Backdrop({ onClose, children }: { onClose: () => void; children: React.
 // ── Shortcuts dialog ──────────────────────────────────────────────────────────
 
 // Reference rows that are NOT part of the remappable keymap (editor-context
-// triggers and Tiptap list/save keys) but belong on the cheat sheet so it stays
-// a complete reference. Display strings only; not customizable.
+// triggers and Tiptap-owned keys) but belong on the cheat sheet so it stays a
+// complete reference. Display strings only; not customizable.
+//
+// v0.2.10: synced to every editor shortcut VERIFIED working in this setup
+// (tests/unit/shortcut-keymap.test.ts is the executable proof) — the new
+// ShortcutKeymap bindings plus the StarterKit defaults users don't know about.
+// Strike is ⌘⇧S here (not Docs-style ⌘⇧X); ⌘⇧H is Find & replace.
 const STATIC_REFERENCE: { keys: string; label: string }[] = [
+  // ── Editing (v0.2.10 ShortcutKeymap) ──
+  { keys: '⌘↩', label: 'Insert page break' },
+  { keys: '⌘⇧K', label: 'Insert or edit link' },
+  { keys: '⌘⌥M', label: 'New comment on selection' },
+  { keys: '⌘⇧↑', label: 'Move block up' },
+  { keys: '⌘⇧↓', label: 'Move block down' },
+  { keys: '⌘D', label: 'Duplicate block' },
+  { keys: '⌘/', label: 'Keyboard shortcuts (in the editor)' },
+  // ── Find ──
+  { keys: '⌘F', label: 'Find' },
+  { keys: '⌘⇧H', label: 'Find & replace' },
+  // ── Text style ──
+  { keys: '⌘⇧S', label: 'Strikethrough' },
+  { keys: '⌘E', label: 'Inline code' },
+  { keys: '⌘,', label: 'Subscript' },
+  { keys: '⌘.', label: 'Superscript' },
+  // ── Blocks ──
+  { keys: '⌘⌥0', label: 'Normal text (paragraph)' },
+  { keys: '⌘⌥1–6', label: 'Heading 1–6' },
+  { keys: '⌘⇧7', label: 'Numbered list' },
+  { keys: '⌘⇧8', label: 'Bulleted list' },
+  { keys: '⌘⇧9', label: 'Checklist' },
+  { keys: '⌘⌥C', label: 'Code block' },
+  { keys: '⌘⇧B', label: 'Blockquote' },
+  // ── Alignment ──
+  { keys: '⌘⇧L / E / R / J', label: 'Align left / center / right / justify' },
+  // ── Save & insert triggers ──
   { keys: '⌘S', label: 'Note (autosaves continuously)' },
   { keys: '/', label: 'Open slash-command menu (at line start)' },
   { keys: '[[', label: 'Insert wiki link' },

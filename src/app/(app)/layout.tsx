@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react'
 import { CommandPaletteMount } from '@/components/CommandPaletteMount'
 import { GoogleFontsStyle } from '@/components/editor/GoogleFontsStyle'
 import { HelpMenu } from '@/components/help/HelpMenu'
+import { WhatsNewToast } from '@/components/help/WhatsNewToast'
 import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher'
 import { AppShell } from '@/components/shell/AppShell'
 import { Avatar } from '@/components/shell/Avatar'
@@ -19,6 +20,7 @@ import { getGoogleFonts, getWorkspaceTheme } from '@/lib/docs/settings-repo'
 import { themeCssVars } from '@/lib/editor/theme'
 import { getShortcutOverrides } from '@/lib/help/keymap-repo'
 import { isMaintenanceMode } from '@/lib/maintenance'
+import { APP_VERSION } from '@/lib/version'
 
 // S2-2 polish (v0.1.9): the sidebar footer is a cohesive cluster of nav-row-
 // height controls separated by a hairline from the nav above. Controls share:
@@ -143,6 +145,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       <GlobalShortcuts overrides={shortcutOverrides} />
       <CommandPaletteMount />
+      {/* v0.2.10: post-upgrade "What's new" toast (client island). Renders only on
+          authenticated (app) pages, inside the [data-color-scheme] wrapper so it
+          themes correctly. Self-gates via localStorage (parchment:whatsnew-seen);
+          shows once per version after an upgrade, seeds silently on first visit. */}
+      <WhatsNewToast version={APP_VERSION} />
       {/* v0.2.7 #4b: self-hosted @font-face for the workspace's picked Google fonts. */}
       <GoogleFontsStyle families={googleFonts} />
       {/* K3: skip-to-content — first focusable element, visually hidden until

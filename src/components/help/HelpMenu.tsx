@@ -13,11 +13,13 @@
 //   - Tab/Shift-Tab cycle is trapped within each dialog
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   registerShortcutAction,
   SHORTCUT_EVENT,
   type ShortcutEventDetail,
 } from '@/components/shortcuts/GlobalShortcuts'
+import { getThemedPortalRoot } from '@/components/ui/themed-portal'
 import { RELEASE_NOTES, TOUR_STEPS } from '@/lib/help/content'
 import {
   type Binding,
@@ -166,8 +168,16 @@ function useFocusTrap(
 // help dialogs used a bespoke .parchment-help-backdrop class that had NO CSS, so
 // the "dialog" was a plain in-flow block rendered inside the sidebar footer (where
 // HelpMenu is mounted) — it grew the sidebar instead of floating over the content.
+// v0.2.10: the overlay PORTALS to the body-level themed overlay root. Rendered
+// in place it sits inside the sidebar <aside>, whose `position: sticky` makes it
+// a stacking context at z-auto — so on the editor route the z-index:1000 overlay
+// painted BELOW the canvas (`.parchment-page-content` is z-index:1) and the
+// dialog appeared "behind the page". A direct body child has no such sibling
+// stacking context (the v0.1.9 themed-portal lesson); getThemedPortalRoot also
+// re-copies the data-color-scheme/high-contrast/font attrs so dark tokens
+// resolve. Falls back to in-place render when there is no DOM (SSR safety).
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
-  return (
+  const overlay = (
     // biome-ignore lint/a11y/useKeyWithClickEvents: Esc is handled by useFocusTrap on the document; click-outside closes
     // biome-ignore lint/a11y/noStaticElementInteractions: presentation backdrop — inner dialog carries all a11y roles
     <div
@@ -179,14 +189,48 @@ function Backdrop({ onClose, children }: { onClose: () => void; children: React.
       {children}
     </div>
   )
+  const root = getThemedPortalRoot()
+  return root ? createPortal(overlay, root) : overlay
 }
 
 // ── Shortcuts dialog ──────────────────────────────────────────────────────────
 
 // Reference rows that are NOT part of the remappable keymap (editor-context
-// triggers and Tiptap list/save keys) but belong on the cheat sheet so it stays
-// a complete reference. Display strings only; not customizable.
+// triggers and Tiptap-owned keys) but belong on the cheat sheet so it stays a
+// complete reference. Display strings only; not customizable.
+//
+// v0.2.10: synced to every editor shortcut VERIFIED working in this setup
+// (tests/unit/shortcut-keymap.test.ts is the executable proof) — the new
+// ShortcutKeymap bindings plus the StarterKit defaults users don't know about.
+// Strike is ⌘⇧S here (not Docs-style ⌘⇧X); ⌘⇧H is Find & replace.
 const STATIC_REFERENCE: { keys: string; label: string }[] = [
+  // ── Editing (v0.2.10 ShortcutKeymap) ──
+  { keys: '⌘↩', label: 'Insert page break' },
+  { keys: '⌘⇧K', label: 'Insert or edit link' },
+  { keys: '⌘⌥M', label: 'New comment on selection' },
+  { keys: '⌘⇧↑', label: 'Move block up' },
+  { keys: '⌘⇧↓', label: 'Move block down' },
+  { keys: '⌘D', label: 'Duplicate block' },
+  { keys: '⌘/', label: 'Keyboard shortcuts (in the editor)' },
+  // ── Find ──
+  { keys: '⌘F', label: 'Find' },
+  { keys: '⌘⇧H', label: 'Find & replace' },
+  // ── Text style ──
+  { keys: '⌘⇧S', label: 'Strikethrough' },
+  { keys: '⌘E', label: 'Inline code' },
+  { keys: '⌘,', label: 'Subscript' },
+  { keys: '⌘.', label: 'Superscript' },
+  // ── Blocks ──
+  { keys: '⌘⌥0', label: 'Normal text (paragraph)' },
+  { keys: '⌘⌥1–6', label: 'Heading 1–6' },
+  { keys: '⌘⇧7', label: 'Numbered list' },
+  { keys: '⌘⇧8', label: 'Bulleted list' },
+  { keys: '⌘⇧9', label: 'Checklist' },
+  { keys: '⌘⌥C', label: 'Code block' },
+  { keys: '⌘⇧B', label: 'Blockquote' },
+  // ── Alignment ──
+  { keys: '⌘⇧L / E / R / J', label: 'Align left / center / right / justify' },
+  // ── Save & insert triggers ──
   { keys: '⌘S', label: 'Note (autosaves continuously)' },
   { keys: '/', label: 'Open slash-command menu (at line start)' },
   { keys: '[[', label: 'Insert wiki link' },

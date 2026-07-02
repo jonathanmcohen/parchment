@@ -22,6 +22,7 @@ import { SpeakerNoteExtension } from '@/lib/editor/extensions/speaker-note'
 import { Suggesting } from '@/lib/editor/extensions/suggesting'
 import { tableExtensions } from '@/lib/editor/extensions/table'
 import { TocExtension } from '@/lib/editor/extensions/toc'
+import { SmartTypography } from '@/lib/editor/extensions/typography'
 import { WikiLink } from '@/lib/editor/extensions/wiki-link'
 import { inlineExtensions } from '@/lib/editor/inline-extensions'
 
@@ -154,4 +155,12 @@ export const baseExtensions = [
   // No DOM/React imported at module load; getSchema(baseExtensions) builds in
   // the Next.js server runtime. Serializes as parchment:speakernote fence.
   SpeakerNoteExtension,
+  // v0.2.10: smart typography — curly quotes, en/em dashes, ellipsis, common
+  // fractions, arrows, (c)/(r)/(tm). Added AFTER StarterKit so its input rules
+  // register after the block-level HorizontalRule rule: a line-start `---` is
+  // therefore claimed as a divider before the en-dash rule can touch it.
+  // Automatically excluded from code blocks / inline code / math by @tiptap/core's
+  // input-rule plugin (it applies no rule inside a `code` node/mark). No DOM at
+  // module load; getSchema(baseExtensions) builds in the server runtime.
+  SmartTypography,
 ]

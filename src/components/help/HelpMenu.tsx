@@ -13,11 +13,13 @@
 //   - Tab/Shift-Tab cycle is trapped within each dialog
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   registerShortcutAction,
   SHORTCUT_EVENT,
   type ShortcutEventDetail,
 } from '@/components/shortcuts/GlobalShortcuts'
+import { getThemedPortalRoot } from '@/components/ui/themed-portal'
 import { RELEASE_NOTES, TOUR_STEPS } from '@/lib/help/content'
 import {
   type Binding,
@@ -166,8 +168,16 @@ function useFocusTrap(
 // help dialogs used a bespoke .parchment-help-backdrop class that had NO CSS, so
 // the "dialog" was a plain in-flow block rendered inside the sidebar footer (where
 // HelpMenu is mounted) — it grew the sidebar instead of floating over the content.
+// v0.2.10: the overlay PORTALS to the body-level themed overlay root. Rendered
+// in place it sits inside the sidebar <aside>, whose `position: sticky` makes it
+// a stacking context at z-auto — so on the editor route the z-index:1000 overlay
+// painted BELOW the canvas (`.parchment-page-content` is z-index:1) and the
+// dialog appeared "behind the page". A direct body child has no such sibling
+// stacking context (the v0.1.9 themed-portal lesson); getThemedPortalRoot also
+// re-copies the data-color-scheme/high-contrast/font attrs so dark tokens
+// resolve. Falls back to in-place render when there is no DOM (SSR safety).
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
-  return (
+  const overlay = (
     // biome-ignore lint/a11y/useKeyWithClickEvents: Esc is handled by useFocusTrap on the document; click-outside closes
     // biome-ignore lint/a11y/noStaticElementInteractions: presentation backdrop — inner dialog carries all a11y roles
     <div
@@ -179,6 +189,8 @@ function Backdrop({ onClose, children }: { onClose: () => void; children: React.
       {children}
     </div>
   )
+  const root = getThemedPortalRoot()
+  return root ? createPortal(overlay, root) : overlay
 }
 
 // ── Shortcuts dialog ──────────────────────────────────────────────────────────

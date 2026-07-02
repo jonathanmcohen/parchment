@@ -257,7 +257,9 @@ function ShortcutsDialog({
 
 // ── What's new dialog ─────────────────────────────────────────────────────────
 
-function WhatsNewDialog({
+// Exported so the v0.2.10 post-upgrade toast (WhatsNewToast) can open the SAME
+// dialog — one source of truth for the release-notes pop-out, no duplication.
+export function WhatsNewDialog({
   onClose,
   restoreRef,
 }: {

@@ -1930,6 +1930,107 @@ body {
   z-index: 1000;
 }
 
+/* v0.2.10: post-upgrade "What's new" toast.
+ *
+ * A small, non-blocking notice anchored bottom-left, above the sidebar footer
+ * cluster. CRITICAL (v0.2.8 e2e lesson): this must NOT be a full-viewport layer —
+ * there is no inset:0 scrim, so it can never intercept clicks elsewhere. The card
+ * is the ONLY thing that catches pointer events (pointer-events:auto on the fixed
+ * card itself). z-index sits below the modal dialog scrim (1000) but above the app
+ * chrome. Themed via the chrome tokens (--surface / --foreground / --border-chrome
+ * / --shadow-dropdown) so light / dark / system all resolve on the (app) wrapper. */
+.parchment-whatsnew-toast {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 900;
+  /* Only the card is interactive — no viewport-spanning catcher. */
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 6px 6px 6px 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  border: 1px solid var(--border-chrome);
+  border-radius: 10px;
+  box-shadow: var(--shadow-dropdown);
+  font-size: 0.8125rem;
+  animation: parchment-whatsnew-in 160ms ease-out;
+}
+
+@keyframes parchment-whatsnew-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parchment-whatsnew-toast {
+    animation: none;
+  }
+}
+
+/* The message is a full-height button (click / Enter / Space open the dialog). */
+.parchment-whatsnew-toast-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: inherit;
+  text-align: start;
+  background: transparent;
+  cursor: pointer;
+}
+
+.parchment-whatsnew-toast-open:hover {
+  background: var(--surface-hover);
+}
+
+.parchment-whatsnew-toast-icon {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--primary);
+  flex: 0 0 auto;
+}
+
+.parchment-whatsnew-toast-text {
+  line-height: 1.3;
+}
+
+.parchment-whatsnew-toast-version {
+  font-weight: 600;
+}
+
+.parchment-whatsnew-toast-dismiss {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.parchment-whatsnew-toast-dismiss:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+
 .parchment-dialog {
   background: var(--surface);
   border: 1px solid var(--border-chrome);

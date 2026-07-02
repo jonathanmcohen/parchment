@@ -15,6 +15,13 @@ describe('SHORTCUTS', () => {
       expect(s.label.length).toBeGreaterThan(0)
     }
   })
+
+  // v0.2.10 — paste without formatting (Mod+Shift+V) is documented in the cheat sheet.
+  it('documents the paste-without-formatting shortcut', () => {
+    const row = SHORTCUTS.find((s) => /paste without formatting/i.test(s.label))
+    expect(row).toBeDefined()
+    expect(row?.keys).toMatch(/⇧V/)
+  })
 })
 
 describe('TOUR_STEPS', () => {

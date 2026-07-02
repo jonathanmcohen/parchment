@@ -23,7 +23,7 @@
 
 import { Extension, InputRule, textInputRule } from '@tiptap/core'
 
-// Unicode targets (kept as escapes so the source stays ASCII-clean).
+// Unicode targets, named so each rule below reads as intent rather than a bare glyph.
 const EN_DASH = '–' // –
 const EM_DASH = '—' // —
 const LDQUO = '“' // “
@@ -96,10 +96,12 @@ function buildRules(): InputRule[] {
     textInputRule({ find: /\(c\)$/, replace: COPY }),
     textInputRule({ find: /\(r\)$/, replace: REG }),
     textInputRule({ find: /\(tm\)$/, replace: TM }),
-    // Common fractions — trailing space is the trigger; the space is preserved.
-    textInputRule({ find: /(?:^|\s)(1\/2)\s$/, replace: `${HALF} ` }),
-    textInputRule({ find: /(?:^|\s)(1\/4)\s$/, replace: `${QUARTER} ` }),
-    textInputRule({ find: /(?:^|\s)(3\/4)\s$/, replace: `${THREEQ} ` }),
+    // Common fractions — trailing space is the trigger. The replacement is the
+    // bare fraction char: textInputRule re-appends whatever followed the capture
+    // group (the trigger space itself), so including a space here would double it.
+    textInputRule({ find: /(?:^|\s)(1\/2)\s$/, replace: HALF }),
+    textInputRule({ find: /(?:^|\s)(1\/4)\s$/, replace: QUARTER }),
+    textInputRule({ find: /(?:^|\s)(3\/4)\s$/, replace: THREEQ }),
   ]
 }
 

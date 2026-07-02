@@ -120,14 +120,13 @@ describe('smart typography — fires while typing', () => {
     expect(docText(editor)).toContain('…') // …
   })
 
-  it('1/2, 1/4, 3/4 become ½ ¼ ¾', () => {
-    typeText(editor, '1/2 ')
-    typeText(editor, '1/4 ')
-    typeText(editor, '3/4 ')
+  it('1/2, 1/4, 3/4 become ½ ¼ ¾ (single trigger space preserved, never doubled)', () => {
+    typeText(editor, '1/2 1/4 3/4 done')
     const t = docText(editor)
-    expect(t).toContain('½') // ½
-    expect(t).toContain('¼') // ¼
-    expect(t).toContain('¾') // ¾
+    // The trigger space after each fraction survives exactly once: textInputRule
+    // re-appends the matched trailing space itself, so a replacement carrying its
+    // own space would yield "½  ¼" — the double-space regression live-verify caught.
+    expect(t).toBe('½ ¼ ¾ done')
   })
 
   it('-> and <- become → and ←', () => {

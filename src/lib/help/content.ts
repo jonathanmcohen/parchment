@@ -80,6 +80,20 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.10',
+    notes: [
+      'New keyboard shortcuts: ⌘/Ctrl+Enter inserts a page break, ⌘⇧K links, ⌘⌥M comments, ⌘⇧↑/↓ moves a block, ⌘D duplicates it, and ⌘/ opens the shortcut reference — which now lists every shortcut that actually works.',
+      'Smart typography as you type: proper quotes, en/em dashes, ellipses, fractions, and arrows — never inside code — plus markdown triggers for fenced code with a language, dividers, checklists, and strikethrough.',
+      'Pasting from Word, Google Docs, or a web page now produces clean content: real headings, lists, tables, and links instead of styled soup. ⌘⇧V pastes plain text.',
+      'Tables got Docs-grade controls: hover a table for add-row/column strips, grip handles with an insert/delete/header menu, and draggable column resizing.',
+      'Images are now first-class: click to select, drag corner handles to resize, align left/center/right, and add captions and alt text from a floating toolbar. Images also render properly in Reading mode, shares, and exports.',
+      'Parchment now works offline: the app installs as a PWA, previously opened documents load and stay editable without a connection, and your edits sync automatically when you are back online.',
+      'A real mobile experience: a slide-in sidebar, a compact touch toolbar with a “More tools” sheet, viewport-fitting menus, and documents that reflow to your phone’s width.',
+      'After an update, a small toast lets you know what changed — once, and only after upgrades, never on a fresh install.',
+      'One-time maintenance sweep heals any documents that accumulated duplicated heading-id markers on disk from before v0.2.9, and cleans stale release-notes files from the guide folder.',
+    ],
+  },
+  {
     version: '0.2.9',
     notes: [
       'The “Release notes” guide document now reliably refreshes after an update — including on an instance you had already opened it on before upgrading. The refresh survives the disk-sync round trips that previously left it stuck on an older version.',

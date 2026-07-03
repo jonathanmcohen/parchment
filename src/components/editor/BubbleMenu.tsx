@@ -1,6 +1,7 @@
 'use client'
 
 import type { Editor } from '@tiptap/core'
+import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { useEditorState } from '@tiptap/react'
 import { BubbleMenu as TiptapBubbleMenu } from '@tiptap/react/menus'
 import { AiMenu } from '@/components/editor/AiMenu'
@@ -25,7 +26,20 @@ export function BubbleMenu({ editor, aiEnabled = false }: Props) {
   })
 
   return (
-    <TiptapBubbleMenu editor={editor} className="parchment-bubble-menu">
+    <TiptapBubbleMenu
+      editor={editor}
+      className="parchment-bubble-menu"
+      // v0.2.10: only show for a non-empty TEXT selection. Without this, the
+      // default shouldShow also fires for a NodeSelection (it is "non-empty"),
+      // so selecting an image raised BOTH this text bubble and the ImageBubble
+      // (B/I/U on an image is meaningless — the ImageBubble owns that state).
+      shouldShow={({ editor, state }) => {
+        if (!editor.isEditable) return false
+        const sel = state.selection
+        if (sel instanceof NodeSelection) return false
+        return sel instanceof TextSelection && !sel.empty
+      }}
+    >
       <button
         type="button"
         aria-label="Bold"

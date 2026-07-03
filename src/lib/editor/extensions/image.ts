@@ -9,12 +9,17 @@ import { crossRefNumberingKey } from '@/lib/editor/extensions/cross-ref-numberin
 
 export type ImagePosition = 'inline' | 'wrap-left' | 'wrap-right' | 'break' | 'behind'
 
+// v0.2.10: horizontal alignment, orthogonal to `position` (flow/wrap). The
+// selection bubble exposes these three; block images default to `center`.
+export type ImageAlign = 'left' | 'center' | 'right'
+
 export interface ImageAttrs {
   src?: string
   alt?: string
   width?: number | null
   height?: number | null
   position?: ImagePosition
+  align?: ImageAlign
   lockAspect?: boolean
   caption?: string
   refId?: string
@@ -40,6 +45,23 @@ export function assertImageAttrs(attrs: {
   return { ok: true }
 }
 
+/**
+ * Returns the position + node of the image the current selection targets — i.e.
+ * a NodeSelection whose node is an image — or null. Used by every attr command
+ * so they operate on exactly the selected figure and no-op (return false) when
+ * no image is selected. Kept pure/exported for unit testing.
+ */
+export function selectedImage(state: {
+  selection: { node?: ProseMirrorNode; from: number }
+}): { pos: number; node: ProseMirrorNode } | null {
+  const sel = state.selection as { node?: ProseMirrorNode; from: number }
+  const node = sel.node
+  if (node && node.type.name === 'image') {
+    return { pos: sel.from, node }
+  }
+  return null
+}
+
 // ── Custom commands type augmentation ─────────────────────────────────────
 
 declare module '@tiptap/core' {
@@ -50,6 +72,17 @@ declare module '@tiptap/core' {
        * or src is missing — enforces the axe WCAG2 A/AA alt-text gate.
        */
       insertImage: (attrs: ImageAttrs) => ReturnType
+      /** Set horizontal alignment on the selected image (single transaction). */
+      setImageAlign: (align: ImageAlign) => ReturnType
+      /**
+       * Set alt text on the selected image. Rejected (returns false) when the
+       * new alt is empty/whitespace — the a11y gate requires non-empty alt.
+       */
+      setImageAlt: (alt: string) => ReturnType
+      /** Set (or clear) the optional caption on the selected image. */
+      setImageCaption: (caption: string) => ReturnType
+      /** Set width (px) on the selected image; height is cleared so it stays auto. */
+      setImageWidth: (width: number) => ReturnType
     }
   }
 }
@@ -71,6 +104,16 @@ function buildImageNodeView(
   wrapper.classList.add('parchment-image-wrapper')
   const pos = node.attrs.position as ImagePosition | null
   if (pos) wrapper.dataset.imagePosition = pos
+  // v0.2.10: horizontal alignment mirrored to the wrapper for the CSS margins.
+  wrapper.dataset.imageAlign = (node.attrs.align as ImageAlign | undefined) ?? 'center'
+  // v0.2.10: read-only gating. The chrome (handles/crop) is ALWAYS built, but
+  // behavior checks the LIVE `_editor.isEditable` at event time and visibility
+  // is CSS-gated on `.ProseMirror[contenteditable="false"]`. Never capture the
+  // editable state at construction: the mode dropdown flips Editing↔Viewing at
+  // runtime WITHOUT rebuilding NodeViews (verified live — a construction-time
+  // flag left the image click-selectable with visible handles in Viewing mode,
+  // and would symmetrically leave a read-only-mounted doc without handles
+  // after switching back to Editing).
   // G8b-fix: set data-ref-id on the NodeView DOM from the start so
   // parchment:goto-ref can find this figure by [data-ref-id="..."].
   const initialRefId = node.attrs.refId as string | undefined
@@ -82,6 +125,37 @@ function buildImageNodeView(
   if (node.attrs.width) img.style.width = `${node.attrs.width as number}px`
   if (node.attrs.height) img.style.height = `${node.attrs.height as number}px`
   img.dataset.position = pos ?? 'inline'
+
+  // v0.2.10: the image box is the positioning context for the resize handles
+  // and crop button, so they pin to the IMAGE corners — not the wrapper corners
+  // (the caption line under the image would otherwise stretch the hit-area and
+  // float the south handles below the caption).
+  const imgBox = document.createElement('span')
+  imgBox.className = 'parchment-image-box'
+  imgBox.appendChild(img)
+
+  // v0.2.10: click-to-select. ProseMirror's native leaf-click NodeSelection is
+  // unreliable through this NodeView's DOM (verified live: a center click landed
+  // a TextSelection in the adjacent paragraph), so select explicitly on
+  // mousedown: focus the view and set a NodeSelection at this node. preventDefault
+  // stops the browser starting a text selection (native image drag still works —
+  // dragstart is independent of mousedown's default). Resize handles manage
+  // their own mousedown (guarded out), and read-only editors keep the default
+  // browser behavior (no selection chrome to show).
+  wrapper.addEventListener('mousedown', (e) => {
+    if (!_editor.isEditable) return
+    if ((e.target as HTMLElement).closest('.parchment-image-handle')) return
+    if ((e.target as HTMLElement).closest('.parchment-image-crop-btn')) return
+    e.preventDefault()
+    if (typeof getPos !== 'function') return
+    const p = getPos()
+    if (p === undefined) return
+    _editor.view.focus()
+    _editor.commands.command(({ tr, dispatch }) => {
+      if (dispatch) dispatch(tr.setSelection(NodeSelection.create(tr.doc, p)))
+      return true
+    })
+  })
 
   // G8a: caption element shown below the image as "Figure N: <caption>".
   const captionEl = document.createElement('span')
@@ -105,7 +179,7 @@ function buildImageNodeView(
   }
   paintCaption()
 
-  // ── Resize handles ──────────────────────────────────────────────────────
+  // ── Resize handles (visible in editable mode only — CSS-gated) ──────────
   const handles = ['nw', 'ne', 'sw', 'se'] as const
   for (const corner of handles) {
     const handle = document.createElement('span')
@@ -117,7 +191,9 @@ function buildImageNodeView(
     let startY = 0
     let startW = 0
     let startH = 0
-    const lockAspect = node.attrs.lockAspect as boolean
+    // v0.2.10: read lockAspect at drag START from currentNode (not the
+    // construction-time node — the attr may have changed since mount).
+    let lockAspect = true
 
     const onMouseMove = (e: MouseEvent) => {
       e.preventDefault()
@@ -142,7 +218,9 @@ function buildImageNodeView(
       e.preventDefault()
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup', onMouseUp)
-      // Commit to ProseMirror
+      // Commit to ProseMirror. v0.2.10: spread currentNode.attrs (NOT the
+      // construction-time node.attrs) so a resize never reverts align /
+      // caption / alt edits made after this NodeView mounted.
       const newW = Number.parseInt(img.style.width, 10) || null
       const newH = Number.parseInt(img.style.height, 10) || null
       if (typeof getPos === 'function') {
@@ -150,7 +228,7 @@ function buildImageNodeView(
         if (pos2 !== undefined) {
           _editor.commands.command(({ tr }) => {
             tr.setNodeMarkup(pos2, undefined, {
-              ...node.attrs,
+              ...currentNode.attrs,
               width: newW,
               height: newH,
             })
@@ -161,21 +239,32 @@ function buildImageNodeView(
     }
 
     handle.addEventListener('mousedown', (e) => {
+      // Live editable check — handles are CSS-hidden in read-only, but guard
+      // the behavior too (defense in depth against stray synthetic events).
+      if (!_editor.isEditable) return
       e.preventDefault()
+      e.stopPropagation()
       startX = e.clientX
       startY = e.clientY
-      startW = img.naturalWidth || img.offsetWidth || (node.attrs.width as number | null) || 200
-      startH = img.naturalHeight || img.offsetHeight || (node.attrs.height as number | null) || 150
-      if (node.attrs.width) startW = node.attrs.width as number
-      if (node.attrs.height) startH = node.attrs.height as number
+      lockAspect = currentNode.attrs.lockAspect !== false
+      // v0.2.10: start from the RENDERED size (offsetWidth) rather than the
+      // natural bitmap size — for a large photo naturalWidth would make the
+      // first drag jump. A stored width attr still wins (it IS the layout
+      // width the user last committed).
+      startW =
+        img.offsetWidth || img.naturalWidth || (currentNode.attrs.width as number | null) || 200
+      startH =
+        img.offsetHeight || img.naturalHeight || (currentNode.attrs.height as number | null) || 150
+      if (currentNode.attrs.width) startW = currentNode.attrs.width as number
+      if (currentNode.attrs.height) startH = currentNode.attrs.height as number
       document.addEventListener('mousemove', onMouseMove)
       document.addEventListener('mouseup', onMouseUp)
     })
 
-    wrapper.appendChild(handle)
+    imgBox.appendChild(handle)
   }
 
-  // ── Overlay crop button (visible when selected) ─────────────────────────
+  // ── Overlay crop button (visible when selected; CSS-hidden read-only) ───
   const cropBtn = document.createElement('button')
   cropBtn.type = 'button'
   cropBtn.className = 'parchment-image-crop-btn'
@@ -189,6 +278,7 @@ function buildImageNodeView(
   cropBtn.addEventListener('click', (e) => {
     e.preventDefault()
     e.stopPropagation()
+    if (!_editor.isEditable) return
     if (typeof getPos === 'function') {
       const p = getPos()
       if (p !== undefined) {
@@ -200,9 +290,9 @@ function buildImageNodeView(
     }
     _editor.view.dom.dispatchEvent(new CustomEvent('parchment:crop-image', { bubbles: true }))
   })
-  wrapper.appendChild(cropBtn)
+  imgBox.appendChild(cropBtn)
 
-  wrapper.appendChild(img)
+  wrapper.appendChild(imgBox)
   wrapper.appendChild(captionEl)
 
   return {
@@ -218,6 +308,9 @@ function buildImageNodeView(
       const newPos = updatedNode.attrs.position as ImagePosition | null
       img.dataset.position = newPos ?? 'inline'
       wrapper.dataset.imagePosition = newPos ?? 'inline'
+      // v0.2.10: keep the alignment mirror in sync so the CSS margins update
+      // live when the bubble sets align.
+      wrapper.dataset.imageAlign = (updatedNode.attrs.align as ImageAlign | undefined) ?? 'center'
       // G8b-fix: keep data-ref-id on the wrapper DOM so parchment:goto-ref can
       // find the node by [data-ref-id="..."] (renderHTML is not used when a
       // NodeView is active — the NodeView owns the DOM).
@@ -241,6 +334,21 @@ function buildImageNodeView(
     },
     deselectNode() {
       wrapper.classList.remove('parchment-image-selected')
+    },
+    // v0.2.10: make ProseMirror IGNORE mouse events inside this NodeView. The
+    // wrapper's mousedown handler above sets the NodeSelection itself; without
+    // stopEvent, PM's own mouseUP handling runs afterwards and resolves the
+    // click coords to a nearby TEXT position, stomping the NodeSelection
+    // (verified live — a real click selected, then immediately deselected).
+    // Drag events are left to PM so native block drag-and-drop keeps working.
+    stopEvent(event) {
+      if (!_editor.isEditable) return false
+      return (
+        event.type === 'mousedown' ||
+        event.type === 'mouseup' ||
+        event.type === 'click' ||
+        event.type === 'dblclick'
+      )
     },
   }
 }
@@ -287,6 +395,18 @@ export const imageExtensions = Image.extend({
         parseHTML: (element) => (element.dataset.position as ImagePosition | undefined) ?? 'inline',
         renderHTML: (attributes) => ({ 'data-position': attributes.position as ImagePosition }),
       },
+      // v0.2.10: horizontal alignment (left|center|right), orthogonal to
+      // `position`. Block images default to center; the bubble toolbar sets it.
+      align: {
+        default: 'center' as ImageAlign,
+        parseHTML: (element) => {
+          const a = element.dataset.align
+          return a === 'left' || a === 'center' || a === 'right' ? a : 'center'
+        },
+        renderHTML: (attributes) => ({
+          'data-align': (attributes.align as ImageAlign) ?? 'center',
+        }),
+      },
       lockAspect: {
         default: true,
         parseHTML: (element) => element.dataset.lockAspect !== 'false',
@@ -322,6 +442,7 @@ export const imageExtensions = Image.extend({
       src: HTMLAttributes.src as string,
       alt: (HTMLAttributes.alt as string | null) ?? '',
       'data-position': HTMLAttributes.position as string,
+      'data-align': (HTMLAttributes.align as string) ?? 'center',
       'data-lock-aspect': String(HTMLAttributes.lockAspect),
     }
     if (style.length > 0) attrs.style = style.join(';')
@@ -350,11 +471,72 @@ export const imageExtensions = Image.extend({
               width: attrs.width ?? null,
               height: attrs.height ?? null,
               position: attrs.position ?? 'inline',
+              align: attrs.align ?? 'center',
               lockAspect: attrs.lockAspect ?? true,
               caption: attrs.caption ?? '',
               refId: attrs.refId ?? '',
             },
           })
+        },
+
+      // v0.2.10: attr commands for the selection bubble. Each is a SINGLE
+      // setNodeMarkup transaction (collab-safe — one Yjs update, one undo step)
+      // and no-ops (returns false) when no image is selected.
+      setImageAlign:
+        (align: ImageAlign) =>
+        ({ state, tr, dispatch }) => {
+          const target = selectedImage(state)
+          if (!target) return false
+          if (dispatch) {
+            tr.setNodeMarkup(target.pos, undefined, { ...target.node.attrs, align })
+            dispatch(tr)
+          }
+          return true
+        },
+
+      setImageAlt:
+        (alt: string) =>
+        ({ state, tr, dispatch }) => {
+          // a11y gate: never allow an empty alt (WCAG2 A/AA — every image needs
+          // alt text). Callers should keep the field required in the UI too.
+          if (!alt.trim()) return false
+          const target = selectedImage(state)
+          if (!target) return false
+          if (dispatch) {
+            tr.setNodeMarkup(target.pos, undefined, { ...target.node.attrs, alt: alt.trim() })
+            dispatch(tr)
+          }
+          return true
+        },
+
+      setImageCaption:
+        (caption: string) =>
+        ({ state, tr, dispatch }) => {
+          const target = selectedImage(state)
+          if (!target) return false
+          if (dispatch) {
+            // caption is optional — empty string clears it.
+            tr.setNodeMarkup(target.pos, undefined, { ...target.node.attrs, caption })
+            dispatch(tr)
+          }
+          return true
+        },
+
+      setImageWidth:
+        (width: number) =>
+        ({ state, tr, dispatch }) => {
+          const target = selectedImage(state)
+          if (!target) return false
+          if (dispatch) {
+            // height cleared → the img keeps its natural aspect (height:auto).
+            tr.setNodeMarkup(target.pos, undefined, {
+              ...target.node.attrs,
+              width,
+              height: null,
+            })
+            dispatch(tr)
+          }
+          return true
         },
     }
   },

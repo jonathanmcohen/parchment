@@ -252,6 +252,10 @@ function serializeBlock(node: PMNode): string {
           caption: String(node.attrs?.caption ?? ''),
           refId: String(node.attrs?.refId ?? ''),
           position: String(node.attrs?.position ?? 'inline'),
+          // v0.2.10: `align` (left|center|right) is orthogonal to `position`
+          // (which drives wrap/inline/break flow). Carried in the fence so
+          // alignment survives the disk-mirror cycle.
+          align: String(node.attrs?.align ?? 'center'),
           width: node.attrs?.width ?? null,
           height: node.attrs?.height ?? null,
           lockAspect: node.attrs?.lockAspect ?? true,

@@ -1673,6 +1673,78 @@ body {
   border-color: transparent;
 }
 
+/* ── v0.2.10: image selection bubble (align / alt / caption / delete) ──────
+ *  Portalled (via Tiptap BubbleMenu) above the selected image. Uses the same
+ *  chrome tokens as the text bubble so it themes for light/dark/system out of
+ *  the overlay root (which carries [data-color-scheme]). */
+.parchment-image-bubble {
+  background: var(--surface);
+  border: 1px solid var(--border-chrome);
+  border-radius: 8px;
+  box-shadow: var(--shadow-dropdown);
+  padding: 4px 6px;
+}
+.parchment-image-bubble-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.parchment-image-bubble-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 0.82rem;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.parchment-image-bubble-btn--text {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.parchment-image-bubble-btn:hover {
+  background: var(--surface-hover);
+}
+.parchment-image-bubble-btn[aria-pressed="true"] {
+  background: var(--primary-surface);
+  color: var(--primary-surface-text);
+}
+.parchment-image-bubble-btn--danger:hover {
+  background: color-mix(in srgb, var(--danger, #d93025) 15%, transparent);
+}
+.parchment-image-bubble-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--border-chrome);
+}
+.parchment-image-bubble-label {
+  font-size: 0.74rem;
+  color: var(--muted);
+  padding-left: 2px;
+  white-space: nowrap;
+}
+.parchment-image-bubble-input {
+  min-width: 180px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 0.82rem;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--border-chrome);
+  border-radius: 4px;
+}
+.parchment-image-bubble-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+
 /* ── Highlight mark (B2) ─────────────────────────────────────────────── */
 
 .parchment-prose mark {
@@ -1847,8 +1919,11 @@ body {
   margin: 0.5em 0;
 }
 
-.parchment-prose img[data-position="inline"],
-.parchment-prose .parchment-image-wrapper[data-image-position="inline"] {
+/* v0.2.10: raw <img data-position="inline"> (renderHTML output outside the
+ * NodeView) keeps the legacy inline flow; the NodeView WRAPPER for position
+ * "inline" is now a block so the `align` margins apply (the schema image node
+ * is block-level — inline:false — so a block box matches the document model). */
+.parchment-prose img[data-position="inline"] {
   display: inline;
   vertical-align: middle;
 }
@@ -1859,6 +1934,15 @@ body {
   display: inline-block;
   line-height: 0;
   user-select: none;
+}
+
+/* v0.2.10: positioning context for the resize handles + crop button so they
+ * pin to the image corners (the caption line would otherwise stretch the box
+ * and drop the south handles below the caption). */
+.parchment-image-box {
+  position: relative;
+  display: block;
+  line-height: 0;
 }
 
 .parchment-image-wrapper img {
@@ -1909,6 +1993,114 @@ body {
 .parchment-image-selected img {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* v0.2.10: read-only editors (Viewing mode flips contenteditable at runtime
+ * WITHOUT rebuilding NodeViews) never show resize/crop chrome or the ring. */
+.ProseMirror[contenteditable="false"] .parchment-image-handle,
+.ProseMirror[contenteditable="false"] .parchment-image-crop-btn {
+  display: none;
+}
+.ProseMirror[contenteditable="false"] .parchment-image-selected img {
+  outline: none;
+}
+
+/* ── v0.2.10: horizontal alignment (editor NodeView wrapper) ──────────────
+ *  `align` is orthogonal to `position`. For the common inline/block case the
+ *  wrapper is a block whose margins center/left/right it. `position` wrap modes
+ *  (float) win over align for advanced layouts, so we only apply align margins
+ *  when the wrapper is NOT floated (inline/break positions). */
+.parchment-image-wrapper[data-image-position="inline"],
+.parchment-image-wrapper[data-image-position="break"] {
+  display: block;
+}
+.parchment-image-wrapper[data-image-align="center"]:not([data-image-position="wrap-left"]):not(
+  [data-image-position="wrap-right"]
+) {
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+}
+.parchment-image-wrapper[data-image-align="left"]:not([data-image-position="wrap-left"]):not(
+  [data-image-position="wrap-right"]
+) {
+  margin-left: 0;
+  margin-right: auto;
+  width: fit-content;
+}
+.parchment-image-wrapper[data-image-align="right"]:not([data-image-position="wrap-left"]):not(
+  [data-image-position="wrap-right"]
+) {
+  margin-left: auto;
+  margin-right: 0;
+  width: fit-content;
+}
+
+/* Editable caption line under the image (NodeView `.parchment-image-caption`).
+ * width:0 + min-width:100% keeps a long caption from stretching the
+ * fit-content wrapper past the image — the caption wraps at the image width
+ * (Docs behavior) instead of widening the figure. */
+.parchment-image-caption {
+  display: block;
+  width: 0;
+  min-width: 100%;
+  margin-top: 0.35em;
+  font-size: 0.82em;
+  line-height: 1.35;
+  color: var(--muted);
+  text-align: center;
+  font-style: italic;
+}
+/* On a themed page (light/sepia/custom/dark) the caption follows page ink. */
+.parchment-page .parchment-image-caption,
+.parchment-prose .parchment-image-caption {
+  color: var(--page-ink-muted, var(--muted));
+}
+
+/* Dark-page: the chrome --primary can be low-contrast on a dark sheet. Use the
+ * page link/info accent for the ring + handles so selection stays visible. */
+[data-page-bg="dark"] .parchment-image-selected img {
+  outline-color: var(--info);
+}
+[data-page-bg="dark"] .parchment-image-handle {
+  background: var(--info);
+}
+
+/* ── v0.2.10: read-only <figure> (Reading / share / print / epub / export) ──
+ *  render-pm emits <figure.parchment-prose-figure data-align><img><figcaption>.
+ *  Alignment is by figure margins; caption is subtle italic page-ink. */
+.parchment-prose-figure {
+  margin: 0.75em 0;
+  max-width: 100%;
+}
+.parchment-prose-figure[data-align="center"] {
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+}
+.parchment-prose-figure[data-align="left"] {
+  margin-right: auto;
+  width: fit-content;
+}
+.parchment-prose-figure[data-align="right"] {
+  margin-left: auto;
+  width: fit-content;
+}
+.parchment-prose-figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.parchment-prose-figure figcaption {
+  /* Same width containment as the editor caption: wrap at the image width. */
+  width: 0;
+  min-width: 100%;
+  margin-top: 0.35em;
+  font-size: 0.82em;
+  line-height: 1.35;
+  color: var(--page-ink-muted, var(--muted));
+  text-align: center;
+  font-style: italic;
 }
 
 /* ── Image dialog (B5) ────────────────────────────────────────────────── */

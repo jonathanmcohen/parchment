@@ -24,6 +24,7 @@ import { EmbedDialog } from '@/components/editor/EmbedDialog'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { GithubEmbedDialog } from '@/components/editor/GithubEmbedDialog'
 import { GrammarPanel } from '@/components/editor/GrammarPanel'
+import { ImageBubble } from '@/components/editor/ImageBubble'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { MathPopover } from '@/components/editor/MathPopover'
@@ -1797,6 +1798,9 @@ export function Editor({
 
         {/* Selection bubble menu (B2 + G13: AI actions) */}
         {editor && <BubbleMenu editor={editor} aiEnabled={aiEnabled} />}
+
+        {/* v0.2.10: image selection toolbar (align / alt / caption / delete) */}
+        {editor && <ImageBubble editor={editor} />}
 
         {/* S3-6: the standalone OfflineIndicator sibling is folded into the
             status bar's connection dot below (one bar, no separate pill). */}

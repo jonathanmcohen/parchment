@@ -140,4 +140,110 @@ describe('insertImage command', () => {
     const img = findNode(doc, 'image')
     expect(img?.attrs?.lockAspect).toBe(false)
   })
+
+  it('inserts with align=center by default', () => {
+    editor.commands.insertImage({ src: 'https://example.com/img.png', alt: 'test' })
+    const doc = editor.getJSON() as DocJson
+    const img = findNode(doc, 'image')
+    expect(img?.attrs?.align).toBe('center')
+  })
+})
+
+// ── Bubble-toolbar attr commands (v0.2.10) ──────────────────────────────────
+
+describe('image attr commands (align / alt / caption / width)', () => {
+  let editor: Editor
+
+  /** Insert one image and leave it selected via a NodeSelection at its pos. */
+  function insertAndSelectImage(): void {
+    editor.commands.insertImage({ src: 'https://example.com/i.png', alt: 'orig alt' })
+    // Find the image position and select the node.
+    let imgPos = -1
+    editor.state.doc.descendants((n, pos) => {
+      if (n.type.name === 'image') {
+        imgPos = pos
+        return false
+      }
+      return true
+    })
+    expect(imgPos).toBeGreaterThanOrEqual(0)
+    editor.commands.setNodeSelection(imgPos)
+  }
+
+  beforeEach(() => {
+    editor = new Editor({ extensions: baseExtensions, content: '<p>hi</p>' })
+  })
+  afterEach(() => {
+    editor.destroy()
+  })
+
+  it('setImageAlign updates the align attr of the selected image', () => {
+    insertAndSelectImage()
+    const ok = editor.commands.setImageAlign('right')
+    expect(ok).toBe(true)
+    const img = findNode(editor.getJSON() as DocJson, 'image')
+    expect(img?.attrs?.align).toBe('right')
+  })
+
+  it('setImageAlign returns false when no image is selected', () => {
+    // selection sits in the paragraph, not on an image
+    editor.commands.setTextSelection(1)
+    expect(editor.commands.setImageAlign('left')).toBe(false)
+  })
+
+  it('setImageAlt updates the alt attr of the selected image', () => {
+    insertAndSelectImage()
+    const ok = editor.commands.setImageAlt('new descriptive alt')
+    expect(ok).toBe(true)
+    const img = findNode(editor.getJSON() as DocJson, 'image')
+    expect(img?.attrs?.alt).toBe('new descriptive alt')
+  })
+
+  it('setImageAlt rejects an empty/whitespace alt (a11y gate preserved)', () => {
+    insertAndSelectImage()
+    expect(editor.commands.setImageAlt('   ')).toBe(false)
+    const img = findNode(editor.getJSON() as DocJson, 'image')
+    // alt unchanged — still the original non-empty value
+    expect(img?.attrs?.alt).toBe('orig alt')
+  })
+
+  it('setImageCaption updates the caption attr (empty allowed — caption is optional)', () => {
+    insertAndSelectImage()
+    expect(editor.commands.setImageCaption('A nice caption')).toBe(true)
+    let img = findNode(editor.getJSON() as DocJson, 'image')
+    expect(img?.attrs?.caption).toBe('A nice caption')
+    // clearing the caption is allowed
+    expect(editor.commands.setImageCaption('')).toBe(true)
+    img = findNode(editor.getJSON() as DocJson, 'image')
+    expect(img?.attrs?.caption).toBe('')
+  })
+
+  it('setImageWidth updates the width attr and clears height (auto)', () => {
+    insertAndSelectImage()
+    expect(editor.commands.setImageWidth(300)).toBe(true)
+    const img = findNode(editor.getJSON() as DocJson, 'image')
+    expect(img?.attrs?.width).toBe(300)
+    expect(img?.attrs?.height).toBeNull()
+  })
+
+  it('each attr command emits exactly one step and preserves sibling attrs (collab-safe)', () => {
+    insertAndSelectImage()
+    // Set a width first so we can prove setImageAlign leaves it untouched.
+    editor.commands.setImageWidth(250)
+    let steps = 0
+    const onTr = () => {
+      steps += 1
+    }
+    editor.on('transaction', onTr)
+    editor.commands.setImageAlign('left')
+    editor.off('transaction', onTr)
+    // Exactly one transaction dispatched by the command.
+    expect(steps).toBe(1)
+    const img = findNode(editor.getJSON() as DocJson, 'image')
+    // align changed, but src/alt/width from prior state are intact (targeted markup).
+    expect(img?.attrs?.align).toBe('left')
+    expect(img?.attrs?.width).toBe(250)
+    expect(img?.attrs?.src).toBe('https://example.com/i.png')
+    expect(img?.attrs?.alt).toBe('orig alt')
+  })
 })

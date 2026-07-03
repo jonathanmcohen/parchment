@@ -107,3 +107,63 @@ describe('render-pm — math (KaTeX)', () => {
     expect(() => html(docOf({ type: 'mathBlock', attrs: { latex: '\\frac{' } }))).not.toThrow()
   })
 })
+
+// v0.2.10 — images render as a real <figure>/<img>/<figcaption> in read-only
+// surfaces (Reading mode / share / print / epub / HTML export), carrying
+// width / alignment / alt / caption. URL is still strictly gated (http(s) or
+// app-relative only) — the public viewer must never load data:/javascript: srcs.
+describe('render-pm — images', () => {
+  const img = (attrs: Record<string, unknown>) => ({ type: 'image', attrs })
+
+  it('renders a real <img> with src + alt (not a placeholder link)', () => {
+    const out = html(docOf(img({ src: 'https://cdn.example.com/a.png', alt: 'A photo' })))
+    expect(out).toContain('<img')
+    expect(out).toContain('src="https://cdn.example.com/a.png"')
+    expect(out).toContain('alt="A photo"')
+    // no longer the old bracketed-link fallback
+    expect(out).not.toContain('[A photo]')
+  })
+
+  it('carries width as an inline style', () => {
+    const out = html(docOf(img({ src: '/assets/d/p.png', alt: 'x', width: 320 })))
+    expect(out).toMatch(/width:\s*320px/)
+  })
+
+  it('reflects alignment via a data-align attribute', () => {
+    const out = html(docOf(img({ src: '/assets/d/p.png', alt: 'x', align: 'right' })))
+    expect(out).toContain('data-align="right"')
+  })
+
+  it('renders a caption in a <figcaption>', () => {
+    const out = html(docOf(img({ src: '/assets/d/p.png', alt: 'x', caption: 'The office cat' })))
+    expect(out).toContain('<figcaption')
+    expect(out).toContain('The office cat')
+  })
+
+  it('omits the figcaption entirely when there is no caption', () => {
+    const out = html(docOf(img({ src: '/assets/d/p.png', alt: 'x' })))
+    expect(out).not.toContain('<figcaption')
+  })
+
+  it('rejects a data: URL src (XSS-safe public viewer)', () => {
+    const out = html(docOf(img({ src: 'data:text/html,<script>alert(1)</script>', alt: 'evil' })))
+    expect(out).not.toContain('<img')
+    expect(out).not.toContain('data:text/html')
+  })
+
+  it('rejects a javascript: URL src', () => {
+    const out = html(docOf(img({ src: 'javascript:alert(1)', alt: 'evil' })))
+    expect(out).not.toContain('<img')
+    expect(out).not.toContain('javascript:')
+  })
+
+  it('escapes a malicious caption (text, never raw HTML)', () => {
+    const out = html(
+      docOf(img({ src: '/a.png', alt: 'x', caption: '<img src=x onerror=alert(1)>' })),
+    )
+    // The caption is rendered as escaped text inside figcaption, so the literal
+    // onerror payload must NOT appear as a live attribute-bearing tag.
+    expect(out).not.toContain('onerror=alert(1)>')
+    expect(out).toContain('&lt;img')
+  })
+})

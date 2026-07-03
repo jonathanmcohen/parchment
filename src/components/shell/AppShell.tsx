@@ -1,6 +1,7 @@
 'use client'
 
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { useModalOverlay } from '@/components/shell/use-modal-overlay'
 
 // S2-6: responsive chrome shell.
 //
@@ -13,8 +14,13 @@ import { type ReactNode, useEffect, useState } from 'react'
 //   • <main>           — the routed page content.
 //
 // No new feature logic — pure layout/visibility behavior on existing chrome.
-// The narrow drawer is the S2-6 slice; the editor-chrome reflow remainder is
-// logged PARTIAL in scope.md (it leans on S3-3's `⋯` overflow, not yet built).
+//
+// v0.2.10 mobile pass: the open narrow drawer is now a proper modal overlay —
+// aria-modal dialog, Tab focus-trap, body-scroll lock, focus-in / restore-to-
+// hamburger, Esc/scrim close — via the shared useModalOverlay hook (also used by
+// the toolbar `⋯` bottom sheet). The hamburger is `display:none` at ≥768px, so the
+// drawer can only be opened at mobile widths; the modal semantics never engage on
+// desktop (where the sidebar is a static rail).
 //
 // The actual media-query rules live in globals.css (`.parchment-app-shell`,
 // `.parchment-sidebar`, `.parchment-menu-toggle`, `.parchment-scrim`) so the
@@ -32,15 +38,34 @@ export function AppShell({
   children: ReactNode
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const drawerRef = useRef<HTMLElement>(null)
+  const toggleRef = useRef<HTMLButtonElement>(null)
 
-  // Close the drawer on Escape (narrow-viewport overlay is modal-ish).
+  const closeDrawer = () => setDrawerOpen(false)
+
+  // Modal-overlay behaviour for the OPEN drawer: focus-trap, body-scroll lock,
+  // focus-in-on-open, restore-to-hamburger + Esc-to-close on unmount/close. The
+  // hamburger is the return-focus target.
+  useModalOverlay({
+    open: drawerOpen,
+    panelRef: drawerRef,
+    onClose: closeDrawer,
+    returnFocusRef: toggleRef,
+  })
+
+  // Belt-and-suspenders: if the viewport is resized up to desktop while the drawer
+  // is open (hamburger becomes display:none), close it so no orphaned modal state
+  // lingers behind a now-static rail.
   useEffect(() => {
-    if (!drawerOpen) return
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setDrawerOpen(false)
+    if (!drawerOpen || typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
     }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    const mql = window.matchMedia('(min-width: 768px)')
+    const onChange = () => {
+      if (mql.matches) setDrawerOpen(false)
+    }
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
   }, [drawerOpen])
 
   return (
@@ -49,8 +74,15 @@ export function AppShell({
       data-drawer-open={drawerOpen || undefined}
     >
       <aside
+        ref={drawerRef}
         // K5/RTL: border-e (inline-end) so the divider flips under dir="rtl".
         className="parchment-sidebar flex w-64 shrink-0 flex-col gap-1 border-[var(--border)] border-e bg-[var(--surface)] p-4"
+        // v0.2.10: when open as the mobile drawer, expose modal-dialog semantics.
+        // Only applied while open — at ≥768px the drawer never opens, so the rail
+        // keeps its plain landmark role.
+        {...(drawerOpen
+          ? { role: 'dialog', 'aria-modal': true, 'aria-label': menuLabels.openNav }
+          : {})}
       >
         {sidebar}
       </aside>
@@ -67,9 +99,11 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="parchment-topbar flex h-12 shrink-0 items-center justify-between gap-2 px-4">
           <button
+            ref={toggleRef}
             type="button"
             aria-label={drawerOpen ? menuLabels.closeNav : menuLabels.openNav}
             aria-expanded={drawerOpen}
+            aria-haspopup="dialog"
             className="parchment-menu-toggle items-center justify-center rounded-full text-[var(--foreground)] hover:bg-[var(--surface-hover)]"
             onClick={() => setDrawerOpen((v) => !v)}
           >

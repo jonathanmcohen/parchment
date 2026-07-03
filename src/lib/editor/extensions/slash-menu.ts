@@ -2,7 +2,10 @@ import { Extension } from '@tiptap/core'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import type { SlashMenuRef } from '@/components/editor/SlashMenu'
-import { getSuggestionContainer } from '@/lib/editor/extensions/suggestion-container'
+import {
+  clampSuggestionPosition,
+  getSuggestionContainer,
+} from '@/lib/editor/extensions/suggestion-container'
 import { filterSlashItems, type SlashItem } from '@/lib/editor/slash-items'
 
 // ── Extension options ──────────────────────────────────────────────────────
@@ -477,7 +480,9 @@ export const SlashMenuExtension = Extension.create<SlashMenuOptions>({
                 editor: props.editor,
               })
 
-              unmountFn = props.mount(component.element)
+              unmountFn = props.mount(component.element, {
+                onPosition: clampSuggestionPosition(component.element),
+              })
             },
 
             onUpdate(props) {

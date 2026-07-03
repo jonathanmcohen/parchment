@@ -2384,6 +2384,104 @@ body.resize-cursor .parchment-prose table .column-resize-handle {
   color: var(--foreground);
 }
 
+/* ── v0.2.10 mobile pass: toolbar `⋯` bottom sheet ─────────────────────────────
+ *  The phone-shaped surface the editor toolbar's `⋯` opens (BottomSheet.tsx). It
+ *  is portalled to the themed #parchment-overlay-root, so it resolves the active
+ *  scheme's tokens at body level and paints above the sticky chrome + editor
+ *  NodeViews. It is only ever mounted by the ≤768px toolbar branch, so these
+ *  (un-media-gated) rules never affect desktop. The panel borrows the shared
+ *  `.px-menu` shell for surface/rows but overrides its absolute positioning to a
+ *  bottom-anchored full-width sheet. */
+.parchment-bottom-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10001; /* above suggestion menus (9999) + the reading overlay is 10000 */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.parchment-bottom-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgb(0 0 0 / 0.45);
+  cursor: pointer;
+  animation: parchment-sheet-fade 160ms ease-out;
+}
+.parchment-bottom-sheet {
+  /* Override the shared .px-menu base (position:absolute; min-width:240px;
+     max-height:70vh; radius:8px on all corners) into a bottom sheet. */
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 80vh;
+  margin: 0;
+  border-inline: none;
+  border-bottom: none;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  padding: 8px 0 0;
+  /* Item 5: respect the iOS home-indicator inset so the last row + its padding sit
+     above the home indicator. Falls back to 12px where the env() is unsupported. */
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 24px rgb(0 0 0 / 0.28);
+  animation: parchment-sheet-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.parchment-bottom-sheet-grip {
+  width: 36px;
+  height: 4px;
+  margin: 4px auto 8px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.parchment-bottom-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 4px 16px;
+  border-bottom: 1px solid var(--border-chrome);
+}
+.parchment-bottom-sheet-title {
+  font: 500 15px / 1.4 var(--font-ui);
+  color: var(--foreground);
+}
+.parchment-bottom-sheet-body {
+  overflow-y: auto;
+  padding: 4px 0;
+  -webkit-overflow-scrolling: touch;
+}
+/* Item 4: ≥44px tap targets for every sheet row (WCAG 2.5.5 / 2.5.8). */
+.parchment-bottom-sheet-item {
+  min-height: 48px;
+}
+@keyframes parchment-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes parchment-sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .parchment-bottom-sheet,
+  .parchment-bottom-sheet-scrim {
+    animation: none;
+  }
+}
+
 /* ── Help menu dialogs (v0.2.8 #2) ─────────────────────────────────────────────
  *  "Keyboard shortcuts" / "What's new" / the welcome tour now open as pop-out
  *  dialogs over the content via the shared .parchment-dialog(-overlay) shell
@@ -4881,78 +4979,218 @@ body.resize-cursor .parchment-prose table .column-resize-handle {
 /* Page-fit: visual scale wrapper — compensates height so no empty gap appears.
    The JS hook sets --page-scale and --page-natural-height on this element. */
 @media (max-width: 768px) {
-  .parchment-canvas-scaled-host {
+  /* v0.2.10 mobile pass (item 1/3): the document outline rail is desktop chrome
+     that steals ~half the width on a phone (squeezing the page into a cramped
+     column). Hide it on mobile so the reflowed page uses the full viewport width.
+     The outline is still reachable on desktop; on mobile the heading structure is
+     visible inline in the document itself. */
+  .parchment-outline {
+    display: none;
+  }
+
+  /* v0.2.10 mobile pass: the host height compensation is ONLY for PAGED mode, which
+     transform-scales the page (below). Continuous mode reflows the page to viewport
+     width with NO transform, so its host must keep auto height — otherwise the
+     `--page-natural-height` (unset → 0px) calc would collapse the host. Gate the
+     calc on the paged page being present. */
+  .parchment-canvas-scaled-host:has(.parchment-page[data-page-layout="paged"]) {
     /* Collapse the visual height to match the scaled page height so scroll
        content does not have a gap below the shrunken page. */
     height: calc(var(--page-natural-height, 0px) * var(--page-scale, 1));
     overflow: visible;
   }
 
-  /* v0.2.7 #6: the editor right-rail panels (Version history / Comments) are
-     position:sticky on desktop (EditorSidePanel inline style) so they are
-     reachable from any scroll position. On a narrow viewport a pinned 280–300px
-     panel would cover the document, so de-sticky them here: back to in-flow with
-     no viewport-height cap. */
+  /* v0.2.10 mobile pass (item 4): the editor right-rail panels (Comments /
+     Version history / Suggestions / Grammar / Backlinks) are position:sticky
+     280–300px side panels on desktop, geometry set via EditorSidePanel's INLINE
+     style (sidePanelStyle: width / position / top / maxHeight / borderLeft / …).
+     On a phone a pinned side panel would cover the document, so turn each into a
+     FULL-HEIGHT bottom sheet: fixed to the viewport, full-width, its own scroll,
+     above the chrome. Slides up from the bottom; respects the iOS home-indicator
+     inset. `!important` is REQUIRED here because a media query cannot otherwise
+     override the component's inline style (inline wins on specificity) — this is
+     the one sanctioned use: a responsive override of a JS-computed inline geometry,
+     scoped to ≤768px so desktop is unaffected. */
   .parchment-side-panel {
-    position: static;
-    max-height: none;
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    z-index: 60 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    /* Leave the title bar (56px) visible above the sheet so the doc name + close
+       affordances stay reachable; the sheet owns the rest of the viewport. */
+    height: calc(100dvh - 56px) !important;
+    max-height: calc(100dvh - 56px) !important;
+    margin: 0 !important;
+    border: none !important;
+    border-top: 1px solid var(--border-chrome) !important;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    background: var(--surface);
+    box-shadow: 0 -4px 24px rgb(0 0 0 / 0.28);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    animation: parchment-sheet-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
-  /* Apply the visual scale to the page element; transform-origin top left
-     anchors the scale at the top-left corner so the shrunken page stays
-     flush with the left edge of the reading area (top center would push
-     the page off-screen to the right on narrow viewports). */
-  .parchment-canvas-scaled-host .parchment-page:not(.parchment-live-sheet) {
+  /* PAGED mode: apply the visual scale to the page element; transform-origin top
+     left anchors the scale at the top-left corner so the shrunken page stays flush
+     with the left edge of the reading area. Scoped to paged mode — continuous mode
+     reflows instead (below). */
+  .parchment-canvas-scaled-host
+  .parchment-page[data-page-layout="paged"]:not(.parchment-live-sheet) {
     transform: scale(var(--page-scale, 1));
     transform-origin: top left;
   }
 
-  /* ── Touch toolbar ── */
+  /* v0.2.10 mobile pass (item 3): CONTINUOUS mode reflows the page to the viewport
+     width so text stays readable at its natural font size (no transform-scale to an
+     illegible ~46%, and no transform → the body-portalled suggestion/bubble menus
+     keep correct caret coordinates). The fixed 816px inline width is overridden to
+     fluid full-width; margins tighten to a comfortable phone padding so the text
+     column isn't cramped. `!important` overrides PageCanvas's inline `width:816px`
+     (inline beats the class), scoped to ≤768px + continuous so desktop + paged are
+     untouched. min-height:auto lets the sheet size to its content. */
+  .parchment-page[data-page-layout="continuous"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    /* Tighter margins than the 96px desktop page inset — a phone can't spare 1in
+       each side. Keeps ~16px breathing room; the inline padding from pageSetup is
+       overridden so the text column reflows near-full-width. */
+    padding: 16px !important;
+    box-sizing: border-box;
+  }
 
-  /* Make the toolbar horizontally scrollable with 44px touch targets.
-     L1/L7: stickiness now lives on the .parchment-toolbar-bleed wrapper at
-     top:88px (title 56 + menu 32) for every viewport — title (top:0) and menu
-     (top:56px) keep their heights at <768px, so the 136px stack math holds on
-     mobile too. The inner row only owns the touch scroll behavior here. */
-  .parchment-toolbar {
-    overflow-x: auto;
+  /* ── v0.2.10 mobile pass (item 2): compact toolbar ──
+     The mobile toolbar is a SEPARATE render branch (Toolbar.tsx `isMobile`):
+     `.parchment-toolbar--mobile` is a compact essentials row + a `⋯` that opens
+     the bottom sheet. Unlike the pre-v0.2.10 approach it does NOT scroll — the
+     essentials are chosen to fit ~360px. Stickiness still lives on the
+     `.parchment-toolbar-bleed` wrapper at top:88px, so the 136px chrome stack math
+     holds on mobile too. */
+  .parchment-toolbar--mobile {
+    overflow-x: hidden;
     flex-wrap: nowrap;
-    /* Momentum scrolling on iOS */
-    -webkit-overflow-scrolling: touch;
-    /* Hide scrollbar visually (still scrollable) */
-    scrollbar-width: none;
+    gap: 0;
+    /* The controls FILL the row (flex:1 on the buttons) so the essentials fit
+       exactly with no horizontal scroll. */
+    justify-content: flex-start;
+    padding: 0 2px;
   }
 
-  /* Hide the webkit scrollbar track in the toolbar */
-  .parchment-toolbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Increase all toolbar buttons to WCAG 2.5.5 / 2.5.8 minimum 44×44px */
-  .parchment-toolbar-btn {
+  /* Item 2/4: the icon buttons shrink to share the row width evenly (flex:1 1 0;
+     min-width:0) so all essentials fit ≤390px with NO scroll, while keeping a 44px
+     tap HEIGHT (WCAG 2.5.8: 24×24 min is exceeded; height is the thumb-reach axis).
+     Scoped to the mobile toolbar so desktop's 32px icon box is untouched. */
+  .parchment-toolbar--mobile .parchment-toolbar-btn {
     min-height: 44px;
-    min-width: 44px;
+    min-width: 0;
+    flex: 1 1 0;
+    padding: 0;
+  }
+  /* The `⋯` chip keeps a comfortable fixed width and sits at the trailing edge. */
+  .parchment-toolbar--mobile .parchment-toolbar-overflow {
+    flex: 0 0 auto;
+    min-width: 40px;
+    margin-inline-start: 2px;
+  }
+  /* The Styles dropdown: cap its width and hide the visible "Styles" prefix text so
+     the select shows just the (truncated) block name — keeps the row compact. The
+     select stays fully functional + keeps its aria-label for the accessible name. */
+  .parchment-toolbar--mobile .parchment-menu-wrap,
+  .parchment-toolbar--mobile > .parchment-toolbar-label {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .parchment-toolbar--mobile .parchment-toolbar-label {
+    max-width: 84px;
+    gap: 0;
+    /* Collapse the visible label text node (e.g. "Styles") to nothing; the select's
+       aria-label carries the accessible name. */
+    font-size: 0;
+  }
+  .parchment-toolbar--mobile .parchment-toolbar-select {
+    max-width: 84px;
+    min-width: 0;
+    font-size: 13px;
+    padding: 0 4px;
+  }
+}
+
+/* ── v0.2.10 mobile pass (items 3 & 4): touch menus + safe areas ────────────────
+ *  All ≤768px. Keeps the desktop experience byte-for-byte above the breakpoint. */
+@media (max-width: 768px) {
+  /* Item 4: the suggestion popups (slash / wiki / cite / cairn) and the shared
+     menu-bar / overflow dropdown are portalled to #parchment-overlay-root and
+     positioned by Floating UI / measured rects. On a narrow viewport an unclamped
+     panel can exceed the screen, so clamp every floating surface to the viewport
+     width (minus an 8px gutter each side) and let its own list scroll. They are
+     already collision-aware (Floating UI / the Menu rect math), so this only bounds
+     the width — placement is unchanged. */
+  .parchment-slash-menu,
+  .parchment-wiki-menu,
+  .parchment-cite-menu,
+  .parchment-ai-menu,
+  .parchment-bubble-menu,
+  .parchment-image-bubble,
+  .px-menu.parchment-menu-dropdown-fixed {
+    max-width: calc(100vw - 16px);
   }
 
-  /* Increase toolbar selects/inputs to be large enough to tap reliably */
-  .parchment-toolbar-select {
-    height: 44px;
-    font-size: 1rem;
+  /* The suggestion menus have their own inner scroll list; cap the popup height so
+     a long result set never runs off-screen on a short phone viewport. */
+  .parchment-slash-menu,
+  .parchment-wiki-menu,
+  .parchment-cite-menu {
+    max-height: 50vh;
+    overflow-y: auto;
   }
 
-  .parchment-color-input {
-    width: 44px;
-    height: 44px;
+  /* Item 4: ≥44px tap targets for the dropdown/suggestion rows so they're reliably
+     tappable (the desktop 36px row is fine with a mouse, tight for a thumb). */
+  .px-menu-item,
+  .parchment-slash-item,
+  .parchment-wiki-menu-item,
+  .parchment-cite-menu-item {
+    min-height: 44px;
   }
 
-  .parchment-size-input {
-    height: 44px;
-    font-size: 1rem;
+  /* The text + image bubble menus can wrap their controls if the selection sits
+     near a narrow edge, rather than overflow horizontally. */
+  .parchment-bubble-menu,
+  .parchment-image-bubble {
+    flex-wrap: wrap;
   }
 
-  .parchment-unit-btn {
-    height: 44px;
-    padding: 0 10px;
+  /* Item 5: the sticky bottom status bar respects the iOS home-indicator inset so
+     its content isn't hidden behind the home indicator. */
+  .parchment-status-bar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ── v0.2.10 mobile pass (item 1): file-manager touch reachability ──────────────
+ *  The file rows' action cluster (rename / star / tags / ⋯) is hidden until hover
+ *  on desktop (Google-Drive parity). A touch device has no hover, so the actions
+ *  would be UNREACHABLE. On any coarse (touch) pointer, reveal them. Uses
+ *  `pointer: coarse` rather than a width query so it targets touch specifically and
+ *  a narrow desktop window keeps the clean hover-reveal. */
+@media (hover: none), (pointer: coarse) {
+  .parchment-row-actions {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Item 1: the details view is an HTML <table> with fixed-width columns that can
+     exceed a 380px viewport. Let the table scroll horizontally INSIDE its own box
+     so the page body never grows a horizontal scrollbar. The table is wrapped by
+     `.parchment-details-scroll` (FileManager details view). */
+  .parchment-details-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

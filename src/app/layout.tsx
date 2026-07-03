@@ -26,6 +26,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   // G12: pinch-zoom is intentionally NOT disabled — maximumScale and
   // userScalable are omitted to preserve accessibility zooming.
+  // v0.2.10 mobile pass (item 5): viewport-fit=cover so the page extends under the
+  // iOS notch / home indicator and env(safe-area-inset-*) resolves to real values.
+  // The mobile bottom sheet, side-panel sheets, and status bar pad by those insets.
+  viewportFit: 'cover',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

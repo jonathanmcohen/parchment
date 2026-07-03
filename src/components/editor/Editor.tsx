@@ -782,8 +782,19 @@ export function Editor({
       const pageHeight = contentEl ? contentEl.offsetHeight : pageEl ? pageEl.offsetHeight : 1056
 
       const isMobile = isMobileWidth(availableWidth)
-      if (!isMobile) {
-        // Desktop: clear any mobile overrides — byte-for-byte unchanged above 768px.
+
+      // v0.2.10 mobile pass: CONTINUOUS mode reflows the page to the viewport width
+      // on mobile (CSS: .parchment-page width → 100%) so text stays readable at its
+      // natural font size — NOT transform-scaled down to an illegible ~46%. Reflow
+      // also avoids the transform:scale coordinate mismatch that mis-placed the
+      // body-portalled suggestion menus. So for continuous+mobile we clear the scale
+      // vars (no transform, host height auto) exactly like desktop. PAGED mode still
+      // scales (its pagination depends on the fixed 816px sheet width).
+      const isPaged = pageEl?.getAttribute('data-page-layout') === 'paged'
+      if (!isMobile || !isPaged) {
+        // Desktop (any mode) OR mobile+continuous: clear mobile scale overrides.
+        // Desktop stays byte-for-byte unchanged above 768px; mobile+continuous
+        // reflows via CSS width with no transform.
         host.style.removeProperty('--page-scale')
         host.style.removeProperty('--page-natural-height')
         host.style.height = ''

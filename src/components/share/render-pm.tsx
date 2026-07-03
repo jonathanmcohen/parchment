@@ -359,18 +359,33 @@ function renderNode(node: PMNode, key: number): ReactNode {
       return <br key={key} />
     case 'image': {
       const src = str(node.attrs?.src)
-      // Only allow http(s) or app-relative image sources; never data:/javascript:
-      // URLs. Rendered as a labelled link rather than an inline <img> — keeps the
-      // public read-only viewer dependency-light and avoids loading arbitrary
-      // remote image bytes into the unauthenticated page.
+      // SECURITY: only allow http(s) or app-relative image sources; never
+      // data:/javascript: URLs (this renderer feeds the UNAUTHENTICATED public
+      // share page as well as exports). A rejected src renders nothing.
       if (!src || !/^(https?:|\/)/i.test(src)) return null
-      const alt = str(node.attrs?.alt) ?? 'image'
+      const alt = str(node.attrs?.alt) ?? ''
+      // v0.2.10: render a real <figure>/<img>/<figcaption> so Reading mode,
+      // print, epub and the HTML export carry the picture with its width,
+      // alignment and caption — matching the editor (before this, images were a
+      // bracketed placeholder link and never displayed). All values are React
+      // props/children → escaped as text, never raw HTML, so the caption/alt
+      // cannot inject markup. width is an inline style; alignment is expressed
+      // via a data-align attribute the .parchment-prose figure CSS reads.
+      const widthAttr = node.attrs?.width
+      const width = typeof widthAttr === 'number' && widthAttr > 0 ? widthAttr : null
+      const align =
+        node.attrs?.align === 'left' || node.attrs?.align === 'right'
+          ? (node.attrs.align as string)
+          : 'center'
+      const caption = str(node.attrs?.caption)
+      const imgStyle: Record<string, string | number> = { maxWidth: '100%', height: 'auto' }
+      if (width) imgStyle.width = width
       return (
-        <p key={key}>
-          <a href={src} rel="nofollow noopener noreferrer" target="_blank">
-            {`[${alt}]`}
-          </a>
-        </p>
+        <figure key={key} className="parchment-prose-figure" data-align={align}>
+          {/* biome-ignore lint/performance/noImgElement: owner-authored content image; next/image cannot optimize arbitrary/app-relative srcs in this static read-only renderer (same treatment as the drawing/drawio SVG paths above) */}
+          <img src={src} alt={alt} style={imgStyle} />
+          {caption ? <figcaption>{caption}</figcaption> : null}
+        </figure>
       )
     }
     // v0.2.8 #3: tables — render real <table>/<tr>/<th>/<td> structure so the

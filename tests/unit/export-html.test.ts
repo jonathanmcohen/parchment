@@ -106,6 +106,34 @@ describe('docToStandaloneHtml', () => {
     expect(html).toContain('Hello, export world!')
   })
 
+  // v0.2.10: image figures carry width/alignment/caption/alt into the export,
+  // and the standalone stylesheet knows how to render them.
+  it('image exports as <figure> with data-align, width style, alt and figcaption', async () => {
+    const imageDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'image',
+          attrs: {
+            src: '/assets/d/pic.png',
+            alt: 'A test picture',
+            caption: 'The caption line',
+            align: 'right',
+            width: 240,
+          },
+        },
+      ],
+    }
+    const html = await docToStandaloneHtml(imageDoc, 'Image Doc')
+    expect(html).toContain('data-align="right"')
+    expect(html).toMatch(/width:\s*240px/)
+    expect(html).toContain('alt="A test picture"')
+    expect(html).toContain('<figcaption>The caption line</figcaption>')
+    // The inline stylesheet carries the figure alignment + caption rules.
+    expect(html).toContain('figure.parchment-prose-figure[data-align="right"]')
+    expect(html).toContain('figure.parchment-prose-figure figcaption')
+  })
+
   it('plantuml node is rendered as <pre> source — no external URL', async () => {
     // Simulate NEXT_PUBLIC_PLANTUML_SERVER_URL being set by checking that the
     // output never contains an http(s):// src attribute regardless.

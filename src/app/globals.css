@@ -1781,14 +1781,16 @@ body {
   background: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
-/* Column resize handle injected by the resizable Table extension */
+/* Column resize handle injected by the resizable Table extension. Uses the
+   chrome accent (--primary) so it reads on light AND the dark page (--accent is
+   a warmer page tint that can wash out); a hairline base + a bolder hover. */
 .parchment-prose table .column-resize-handle {
   position: absolute;
   right: -2px;
   top: 0;
   bottom: 0;
   width: 4px;
-  background: var(--accent);
+  background: var(--primary);
   cursor: col-resize;
   opacity: 0;
   transition: opacity 0.15s;
@@ -1798,6 +1800,12 @@ body {
 .parchment-prose table .column-resize-handle:hover,
 .parchment-prose table th:hover .column-resize-handle,
 .parchment-prose table td:hover .column-resize-handle {
+  opacity: 1;
+}
+
+/* While a resize drag is in progress ProseMirror adds `.resize-cursor` to body;
+   keep the active column's handle fully visible for the duration. */
+body.resize-cursor .parchment-prose table .column-resize-handle {
   opacity: 1;
 }
 
@@ -1814,6 +1822,112 @@ body {
   border: none;
   padding: 0;
   margin: 0;
+}
+
+/* ── v0.2.10 table UX: hover affordances (grips + "+" strips + row/col menu) ──
+   TableControlsOverlay.tsx renders an absolutely-positioned layer inside the
+   editor canvas gutter. Chrome tokens (grips/strips) sit ON the page sheet, so
+   they use the CHROME accent (--primary) for the pick highlight but read the
+   page surface tokens (--page-surface-muted / --page-border) for the resting
+   fill — the same page-token discipline the F2b table header uses, so they stay
+   legible on light, sepia AND the dark page (data-page-bg=dark flips
+   --page-* to a light-on-dark set). */
+
+/* The overlay layer fades its chrome in only when the table is active (cursor
+   inside it or hovered); it never intercepts document clicks itself. */
+.parchment-table-overlay {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.parchment-table-overlay[data-active="true"] {
+  opacity: 1;
+}
+
+/* Row/column grip handles (left/top edges). A subtle rail that brightens to the
+   accent on hover; click selects the row/col + opens its menu. */
+.parchment-table-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--page-border);
+  border-radius: 4px;
+  background: var(--page-surface-muted);
+  color: var(--page-ink-muted);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+.parchment-table-grip::before {
+  /* A small "grip dots" affordance drawn with a repeating dot pattern. */
+  content: "";
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow:
+    0 -4px 0 currentColor,
+    0 4px 0 currentColor;
+}
+.parchment-table-grip--col::before {
+  /* horizontal dots for the top (column) grip */
+  box-shadow:
+    -4px 0 0 currentColor,
+    4px 0 0 currentColor;
+}
+.parchment-table-grip:hover,
+.parchment-table-grip:focus-visible {
+  background: color-mix(in srgb, var(--primary) 22%, var(--page-surface-muted));
+  border-color: var(--primary);
+  color: var(--primary);
+  outline: none;
+}
+
+/* "+" strips on the right (add column) and bottom (add row) edges. */
+.parchment-table-addstrip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--page-border);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--page-surface-muted) 60%, transparent);
+  color: var(--page-ink-muted);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.parchment-table-addstrip:hover,
+.parchment-table-addstrip:focus-visible {
+  background: color-mix(in srgb, var(--primary) 18%, var(--page-surface-muted));
+  border-color: var(--primary);
+  border-style: solid;
+  color: var(--primary);
+  outline: none;
+}
+.parchment-table-addstrip-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* The portalled row/column menu reuses the shared .px-menu shell; it inherits
+   the chrome tokens from the overlay root (which carries [data-color-scheme]).
+   A minimum width keeps the labels ("Insert column right") on one line. */
+.parchment-table-menu {
+  min-width: 200px;
+}
+
+/* Selected-cell highlight while a grip is active — reinforce the ProseMirror
+   .selectedCell so a whole-row/col selection reads clearly in every scheme. The
+   base rule (above) already outlines .selectedCell; here we ensure the fill is
+   visible on the dark page too (page-scoped mix, not the chrome --primary alone
+   which can wash out on a dark sheet). */
+[data-page-bg="dark"] .parchment-prose table .selectedCell {
+  background: color-mix(in srgb, var(--primary) 26%, transparent);
 }
 
 /* ── Images (B5) ─────────────────────────────────────────────────────── */

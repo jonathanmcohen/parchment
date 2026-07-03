@@ -42,6 +42,7 @@ import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
 import { ShareDialog } from '@/components/editor/ShareDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
+import { TableControlsOverlay } from '@/components/editor/TableControlsOverlay'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { useConnectionState } from '@/components/editor/useConnectionState'
 import { useSaveStatus } from '@/components/editor/useSaveStatus'
@@ -1768,6 +1769,12 @@ export function Editor({
                 onReadersChange={setReaders}
               />
             )}
+
+            {/* v0.2.10 table UX: hover affordances (row/col grips, + strips) and
+              the themed row/column menu over the active table. Positions itself
+              against the canvas gutter (position:relative). Renders null when the
+              editor is not editable, so Reading/Share stay affordance-free. */}
+            {editor && <TableControlsOverlay editor={editor} containerRef={canvasWrapRef} />}
           </div>
 
           {/* D1: comments sidebar (right rail) */}

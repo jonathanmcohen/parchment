@@ -3,7 +3,10 @@ import { PluginKey } from '@tiptap/pm/state'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import type { WikiDoc, WikiSuggestionMenuRef } from '@/components/editor/WikiSuggestionMenu'
-import { getSuggestionContainer } from '@/lib/editor/extensions/suggestion-container'
+import {
+  clampSuggestionPosition,
+  getSuggestionContainer,
+} from '@/lib/editor/extensions/suggestion-container'
 
 // Distinct plugin key — @tiptap/suggestion defaults to a single shared key, so
 // without this the `[[` suggestion plugin collides with the slash-menu `/`
@@ -83,7 +86,9 @@ export const WikiSuggestionExtension = Extension.create({
                 editor: props.editor,
               })
 
-              unmountFn = props.mount(component.element)
+              unmountFn = props.mount(component.element, {
+                onPosition: clampSuggestionPosition(component.element),
+              })
             },
 
             onUpdate(props) {

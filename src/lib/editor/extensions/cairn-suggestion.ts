@@ -3,7 +3,10 @@ import { PluginKey } from '@tiptap/pm/state'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion from '@tiptap/suggestion'
 import type { CairnPage, CairnSuggestionMenuRef } from '@/components/editor/CairnSuggestionMenu'
-import { getSuggestionContainer } from '@/lib/editor/extensions/suggestion-container'
+import {
+  clampSuggestionPosition,
+  getSuggestionContainer,
+} from '@/lib/editor/extensions/suggestion-container'
 
 // DISTINCT plugin key — @tiptap/suggestion defaults to a single shared key, so
 // without a unique key here the `[[cairn://` suggestion plugin would collide
@@ -86,7 +89,9 @@ export const CairnSuggestionExtension = Extension.create({
                 editor: props.editor,
               })
 
-              unmountFn = props.mount(component.element)
+              unmountFn = props.mount(component.element, {
+                onPosition: clampSuggestionPosition(component.element),
+              })
             },
 
             onUpdate(props) {

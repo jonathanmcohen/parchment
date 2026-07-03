@@ -5,6 +5,7 @@ import { useEditorState } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import { FontPicker } from '@/components/editor/FontPicker'
 import { GoogleFontsStyle } from '@/components/editor/GoogleFontsStyle'
+import { BottomSheet } from '@/components/editor/menus/BottomSheet'
 import { Menu, type MenuItemConfig } from '@/components/editor/menus/Menu'
 import { StylesMenu } from '@/components/editor/StylesMenu'
 import { TableControls } from '@/components/editor/TableControls'
@@ -12,6 +13,7 @@ import { VoiceButton } from '@/components/editor/VoiceButton'
 import { TOP_LANGUAGES } from '@/lib/editor/shiki/languages'
 import { partitionControls } from '@/lib/editor/toolbar-overflow'
 import { stepFontSize } from '@/lib/editor/toolbar-size'
+import { useIsMobile } from '@/lib/editor/use-is-mobile'
 import { googleFontStack } from '@/lib/fonts/google-fonts'
 
 // S3-3: px reserved for the `⋯` trigger (a 32px icon button + 2px flex gap)
@@ -405,6 +407,19 @@ export function Toolbar({
   // GoogleFontsStyle). The "More fonts…" option opens the on-demand picker.
   const [googleFonts, setGoogleFonts] = useState<string[]>([])
   const [fontPickerOpen, setFontPickerOpen] = useState(false)
+
+  // v0.2.10 mobile pass: at ≤768px the toolbar collapses to a COMPACT essentials
+  // row (undo/redo · Styles · B/I/U · lists · link · image · comment) plus a `⋯`
+  // that opens a bottom sheet holding the rest. matchMedia (not a layout
+  // ResizeObserver) gates the branch — it tracks the viewport and never feeds back
+  // on layout, so it can't reintroduce the G12 measure loop. The desktop toolbar
+  // (>768px) is rendered byte-for-byte unchanged (separate branch below).
+  const isMobile = useIsMobile()
+  const [sheetOpen, setSheetOpen] = useState(false)
+  // Close the sheet if the viewport grows back to desktop while it's open.
+  useEffect(() => {
+    if (!isMobile) setSheetOpen(false)
+  }, [isMobile])
   useEffect(() => {
     let cancelled = false
     fetch('/api/settings/fonts')
@@ -523,6 +538,305 @@ export function Toolbar({
     { label: 'Reading mode', icon: 'menu_book', onSelect: onToggleReading },
     { label: 'Presenter mode', icon: 'slideshow', onSelect: onTogglePresenter },
   ]
+
+  // v0.2.10 mobile pass: the `⋯` bottom-sheet rows for the compact mobile toolbar.
+  // The mobile essentials row shows fewer controls than the desktop primary block
+  // (no font/size/colour selects — they don't fit a 380px row), so the sheet must
+  // re-surface those non-essentials too. It = the desktop overflow set PLUS the
+  // primary-but-non-essential ACTION controls (strike, alignment, highlight, font
+  // size ±). Every row re-uses an EXISTING handler — no new feature logic. Colour
+  // swatches / font-family + line/letter selects aren't menu-row-shaped and stay a
+  // documented gap on phones (reachable by rotating to ≥769px, where the full
+  // desktop toolbar returns). Rows appear once (sheet XOR essentials row).
+  const mobileSheetItems: MenuItemConfig[] = [
+    { kind: 'submenu', label: 'Format', items: [] },
+    {
+      label: 'Strikethrough',
+      icon: 'format_strikethrough',
+      onSelect: () => editor.chain().focus().toggleStrike().run(),
+    },
+    {
+      label: 'Highlight',
+      icon: 'format_ink_highlighter',
+      onSelect: () => editor.chain().focus().toggleHighlight().run(),
+    },
+    {
+      label: 'Inline code',
+      icon: 'code',
+      onSelect: () => editor.chain().focus().toggleCode().run(),
+    },
+    {
+      label: 'Subscript',
+      icon: 'subscript',
+      onSelect: () => editor.chain().focus().toggleSubscript().run(),
+    },
+    {
+      label: 'Superscript',
+      icon: 'superscript',
+      onSelect: () => editor.chain().focus().toggleSuperscript().run(),
+    },
+    { kind: 'separator' },
+    { kind: 'submenu', label: 'Align', items: [] },
+    {
+      label: 'Align left',
+      icon: 'format_align_left',
+      onSelect: () => editor.chain().focus().setTextAlign('left').run(),
+    },
+    {
+      label: 'Align center',
+      icon: 'format_align_center',
+      onSelect: () => editor.chain().focus().setTextAlign('center').run(),
+    },
+    {
+      label: 'Align right',
+      icon: 'format_align_right',
+      onSelect: () => editor.chain().focus().setTextAlign('right').run(),
+    },
+    {
+      label: 'Justify',
+      icon: 'format_align_justify',
+      onSelect: () => editor.chain().focus().setTextAlign('justify').run(),
+    },
+    { kind: 'separator' },
+    { kind: 'submenu', label: 'Font size', items: [] },
+    {
+      label: 'Increase font size',
+      icon: 'add',
+      onSelect: () => applySize(stepFontSize(sizeValue, 1), sizeUnit),
+    },
+    {
+      label: 'Decrease font size',
+      icon: 'remove',
+      onSelect: () => applySize(stepFontSize(sizeValue, -1), sizeUnit),
+    },
+    { kind: 'separator' },
+    { kind: 'submenu', label: 'Insert', items: [] },
+    {
+      label: 'Task list',
+      icon: 'checklist',
+      onSelect: () => editor.chain().focus().toggleTaskList().run(),
+    },
+    {
+      label: 'Insert table',
+      icon: 'table',
+      onSelect: () =>
+        editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    },
+    {
+      label: 'Insert table of contents',
+      icon: 'toc',
+      onSelect: () => editor.chain().focus().insertToc().run(),
+    },
+    {
+      label: 'Insert footnote',
+      icon: 'note_add',
+      onSelect: () => editor.chain().focus().insertFootnote().run(),
+    },
+    {
+      label: 'Insert page break',
+      icon: 'insert_page_break',
+      onSelect: () => editor.chain().focus().insertPageBreak().run(),
+    },
+    {
+      label: 'Insert section break',
+      icon: 'newspaper',
+      onSelect: () => editor.chain().focus().insertSectionBreak().run(),
+    },
+    { kind: 'separator' },
+    { kind: 'submenu', label: 'Document', items: [] },
+    { label: 'Toggle comments', icon: 'comment', onSelect: onToggleComments },
+    { label: 'Version history', icon: 'history', onSelect: onToggleVersionHistory },
+    { label: 'Backlinks', icon: 'call_received', onSelect: onToggleBacklinks },
+    {
+      label: 'Suggesting mode',
+      icon: 'edit_note',
+      onSelect: () => {
+        editor.chain().focus().toggleSuggesting().run()
+        onToggleSuggestions()
+      },
+    },
+    { label: 'Save as template', icon: 'bookmark_add', onSelect: onSaveAsTemplate },
+    { label: 'Share', icon: 'share', onSelect: onOpenShare },
+    { kind: 'separator' },
+    { kind: 'submenu', label: 'View & export', items: [] },
+    { label: 'Print', icon: 'print', onSelect: onExportPdf },
+    { label: 'Reading mode', icon: 'menu_book', onSelect: onToggleReading },
+    { label: 'Presenter mode', icon: 'slideshow', onSelect: onTogglePresenter },
+    { label: 'Page setup', icon: 'settings_overscan', onSelect: onOpenPageSetup },
+    { label: 'Watermark', icon: 'branding_watermark', onSelect: onOpenWatermark },
+    { label: 'Custom CSS', icon: 'css', onSelect: onOpenCustomCss },
+  ]
+
+  // v0.2.10 mobile pass: the COMPACT essentials row (≤768px). It renders the same
+  // handlers the desktop toolbar uses, just a curated subset; everything else lives
+  // in the `⋯` bottom sheet. Kept as its own branch so the desktop toolbar JSX is
+  // untouched (desktop pixel-identity guarantee). The row does not scroll: the
+  // controls are chosen to fit ~360px.
+  if (isMobile) {
+    return (
+      <div className="parchment-toolbar-bleed parchment-toolbar-bleed--mobile">
+        <div
+          ref={toolbarRef}
+          className="parchment-toolbar parchment-toolbar--mobile"
+          role="toolbar"
+          aria-label="Formatting"
+        >
+          <button
+            type="button"
+            aria-label="Undo"
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={() => editor.chain().focus().undo().run()}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              undo
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label="Redo"
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={() => editor.chain().focus().redo().run()}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              redo
+            </span>
+          </button>
+
+          <StylesMenu
+            editor={editor}
+            activeBlockType={activeBlockType}
+            onBlockTypeChange={handleBlockTypeChange}
+          />
+
+          <button
+            type="button"
+            aria-label="Bold"
+            aria-pressed={s.bold}
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={() => editor.chain().focus().toggleBold().run()}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              format_bold
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label="Italic"
+            aria-pressed={s.italic}
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              format_italic
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label="Underline"
+            aria-pressed={s.underline}
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              format_underlined
+            </span>
+          </button>
+
+          <button
+            type="button"
+            aria-label="Bullet list"
+            aria-pressed={s.bulletList}
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              format_list_bulleted
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label="Numbered list"
+            aria-pressed={s.orderedList}
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              format_list_numbered
+            </span>
+          </button>
+
+          <button
+            type="button"
+            aria-label="Link"
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={onOpenLink}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              add_link
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label="Insert image"
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={() => onInsertImage()}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              image
+            </span>
+          </button>
+          <button
+            type="button"
+            aria-label="Add comment"
+            className="parchment-toolbar-btn"
+            onMouseDown={keepSelection}
+            onClick={onAddComment}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              add_comment
+            </span>
+          </button>
+
+          {/* `⋯` opens the bottom sheet with everything else. Pinned to the row's
+              trailing edge; reuses the overflow chip look. */}
+          <button
+            type="button"
+            aria-label="More tools"
+            aria-haspopup="dialog"
+            aria-expanded={sheetOpen}
+            className="parchment-toolbar-btn parchment-toolbar-overflow parchment-toolbar-overflow-btn"
+            onMouseDown={keepSelection}
+            onClick={() => setSheetOpen(true)}
+          >
+            <span aria-hidden className="material-symbols-rounded text-[20px]">
+              more_horiz
+            </span>
+          </button>
+        </div>
+
+        <BottomSheet
+          open={sheetOpen}
+          title="More tools"
+          items={mobileSheetItems}
+          onClose={() => setSheetOpen(false)}
+        />
+
+        <GoogleFontsStyle families={googleFonts} />
+        {fontPickerOpen && (
+          <FontPicker onPick={handlePickFont} onClose={() => setFontPickerOpen(false)} />
+        )}
+      </div>
+    )
+  }
 
   return (
     // L1: .parchment-toolbar-bleed is the full-bleed bg/border/sticky box; the

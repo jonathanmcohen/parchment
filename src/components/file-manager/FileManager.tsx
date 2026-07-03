@@ -1070,7 +1070,7 @@ function DocActions({
     // (`group-focus-within/row`) — matching Google Drive. The parent row
     // applies `group/row`. focus-within keeps the keyboard path fully reachable
     // (Tab into the row reveals the controls); `transition-opacity` softens it.
-    <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+    <div className="parchment-row-actions flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
       {/* Tag button + popover */}
       <div className="relative">
         <Tooltip label={`Edit tags for ${doc.title}`}>
@@ -1774,144 +1774,152 @@ function DocList({
 
   // details
   return (
-    <table className="w-full text-sm border-collapse">
-      <thead>
-        <tr className="border-b border-[var(--border)] text-[var(--muted)] text-xs">
-          <th scope="col" className="text-left py-2 pr-2 w-6">
-            <input
-              type="checkbox"
-              checked={allDisplayedSelected}
-              aria-label="Select all documents"
-              onChange={() => onSelectAll(orderedIds)}
-              className="rounded"
-            />
-          </th>
-          <th
-            scope="col"
-            aria-sort={thAriaSort('name')}
-            className="text-left py-2 pr-3 font-medium"
-          >
-            <button
-              type="button"
-              onClick={() => handleHeaderClick('name')}
-              className="group hover:text-[var(--foreground)]"
-            >
-              Name <SortArrow active={sortKey === 'name'} />
-            </button>
-          </th>
-          <th
-            scope="col"
-            aria-sort={thAriaSort('modified')}
-            className="text-left py-2 pr-3 font-medium"
-          >
-            <button
-              type="button"
-              onClick={() => handleHeaderClick('modified')}
-              className="group hover:text-[var(--foreground)]"
-            >
-              Modified <SortArrow active={sortKey === 'modified'} />
-            </button>
-          </th>
-          <th
-            scope="col"
-            aria-sort={thAriaSort('created')}
-            className="text-left py-2 pr-3 font-medium"
-          >
-            <button
-              type="button"
-              onClick={() => handleHeaderClick('created')}
-              className="group hover:text-[var(--foreground)]"
-            >
-              Created <SortArrow active={sortKey === 'created'} />
-            </button>
-          </th>
-          <th
-            scope="col"
-            aria-sort={thAriaSort('size')}
-            className="text-left py-2 pr-3 font-medium"
-          >
-            <button
-              type="button"
-              onClick={() => handleHeaderClick('size')}
-              className="group hover:text-[var(--foreground)]"
-            >
-              Size <SortArrow active={sortKey === 'size'} />
-            </button>
-          </th>
-          <th scope="col" className="text-left py-2 font-medium">
-            Actions
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {docs.map((doc) => (
-          <tr
-            key={doc.id}
-            // S5-5: row-body gestures on the details row too (single / double /
-            // ⌘ / shift); the checkbox + link keep their own handlers.
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest('a,button,input')) return
-              onRowSelect(doc.id, { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey }, orderedIds)
-            }}
-            onDoubleClick={(e) => {
-              if ((e.target as HTMLElement).closest('button,input')) return
-              onOpen(doc.id)
-            }}
-            className={[
-              'group/row border-b border-[var(--border)]',
-              // LT6-1: active details row = --primary-surface pill (AA light + dark).
-              selected.has(doc.id)
-                ? 'bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
-                : 'hover:bg-[var(--surface-hover)]',
-            ].join(' ')}
-          >
-            <td className="py-2 pr-2">
+    // v0.2.10 mobile pass (item 1): wrap the fixed-column details table so it
+    // scrolls horizontally inside its own box on narrow viewports rather than
+    // forcing a horizontal scrollbar on the page body.
+    <div className="parchment-details-scroll">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="border-b border-[var(--border)] text-[var(--muted)] text-xs">
+            <th scope="col" className="text-left py-2 pr-2 w-6">
               <input
                 type="checkbox"
-                checked={selected.has(doc.id)}
-                aria-label={`Select ${doc.title}`}
-                onClick={(e) => onToggle(doc.id, e.shiftKey, orderedIds)}
-                onChange={() => {
-                  // handled by onClick to capture shiftKey
-                }}
+                checked={allDisplayedSelected}
+                aria-label="Select all documents"
+                onChange={() => onSelectAll(orderedIds)}
                 className="rounded"
               />
-            </td>
-            <td className="py-2 pr-3">
-              <a
-                href={`/d/${doc.id}`}
-                className="flex items-center gap-2 font-medium hover:text-[var(--primary)] truncate max-w-xs"
+            </th>
+            <th
+              scope="col"
+              aria-sort={thAriaSort('name')}
+              className="text-left py-2 pr-3 font-medium"
+            >
+              <button
+                type="button"
+                onClick={() => handleHeaderClick('name')}
+                className="group hover:text-[var(--foreground)]"
               >
-                <DocGlyph />
-                <span className="truncate">{doc.title}</span>
-              </a>
-            </td>
-            {/* LT6-5: fixed-width (w-24 / 96px) left-aligned date columns so the
-                Modified/Created columns don't jitter as dates vary in length. */}
-            <td className="w-24 py-2 pr-3 text-left text-[var(--muted)] text-xs whitespace-nowrap">
-              <time dateTime={doc.updatedAt}>{fmt.format(new Date(doc.updatedAt))}</time>
-            </td>
-            <td className="w-24 py-2 pr-3 text-left text-[var(--muted)] text-xs whitespace-nowrap">
-              <time dateTime={doc.createdAt}>{fmt.format(new Date(doc.createdAt))}</time>
-            </td>
-            <td className="py-2 pr-3 text-[var(--muted)] text-xs" aria-label={`${doc.size} chars`}>
-              {formatSize(doc.size)}
-            </td>
-            <td className="py-2">
-              <DocActions
-                doc={doc}
-                view={view}
-                onRefresh={onRefresh}
-                allTags={allTags}
-                onTagsChanged={onTagsChanged}
-                navigateTo={navigateTo}
-                onSetView={onSetView}
-              />
-            </td>
+                Name <SortArrow active={sortKey === 'name'} />
+              </button>
+            </th>
+            <th
+              scope="col"
+              aria-sort={thAriaSort('modified')}
+              className="text-left py-2 pr-3 font-medium"
+            >
+              <button
+                type="button"
+                onClick={() => handleHeaderClick('modified')}
+                className="group hover:text-[var(--foreground)]"
+              >
+                Modified <SortArrow active={sortKey === 'modified'} />
+              </button>
+            </th>
+            <th
+              scope="col"
+              aria-sort={thAriaSort('created')}
+              className="text-left py-2 pr-3 font-medium"
+            >
+              <button
+                type="button"
+                onClick={() => handleHeaderClick('created')}
+                className="group hover:text-[var(--foreground)]"
+              >
+                Created <SortArrow active={sortKey === 'created'} />
+              </button>
+            </th>
+            <th
+              scope="col"
+              aria-sort={thAriaSort('size')}
+              className="text-left py-2 pr-3 font-medium"
+            >
+              <button
+                type="button"
+                onClick={() => handleHeaderClick('size')}
+                className="group hover:text-[var(--foreground)]"
+              >
+                Size <SortArrow active={sortKey === 'size'} />
+              </button>
+            </th>
+            <th scope="col" className="text-left py-2 font-medium">
+              Actions
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {docs.map((doc) => (
+            <tr
+              key={doc.id}
+              // S5-5: row-body gestures on the details row too (single / double /
+              // ⌘ / shift); the checkbox + link keep their own handlers.
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('a,button,input')) return
+                onRowSelect(doc.id, { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey }, orderedIds)
+              }}
+              onDoubleClick={(e) => {
+                if ((e.target as HTMLElement).closest('button,input')) return
+                onOpen(doc.id)
+              }}
+              className={[
+                'group/row border-b border-[var(--border)]',
+                // LT6-1: active details row = --primary-surface pill (AA light + dark).
+                selected.has(doc.id)
+                  ? 'bg-[var(--primary-surface)] text-[var(--primary-surface-text)]'
+                  : 'hover:bg-[var(--surface-hover)]',
+              ].join(' ')}
+            >
+              <td className="py-2 pr-2">
+                <input
+                  type="checkbox"
+                  checked={selected.has(doc.id)}
+                  aria-label={`Select ${doc.title}`}
+                  onClick={(e) => onToggle(doc.id, e.shiftKey, orderedIds)}
+                  onChange={() => {
+                    // handled by onClick to capture shiftKey
+                  }}
+                  className="rounded"
+                />
+              </td>
+              <td className="py-2 pr-3">
+                <a
+                  href={`/d/${doc.id}`}
+                  className="flex items-center gap-2 font-medium hover:text-[var(--primary)] truncate max-w-xs"
+                >
+                  <DocGlyph />
+                  <span className="truncate">{doc.title}</span>
+                </a>
+              </td>
+              {/* LT6-5: fixed-width (w-24 / 96px) left-aligned date columns so the
+                Modified/Created columns don't jitter as dates vary in length. */}
+              <td className="w-24 py-2 pr-3 text-left text-[var(--muted)] text-xs whitespace-nowrap">
+                <time dateTime={doc.updatedAt}>{fmt.format(new Date(doc.updatedAt))}</time>
+              </td>
+              <td className="w-24 py-2 pr-3 text-left text-[var(--muted)] text-xs whitespace-nowrap">
+                <time dateTime={doc.createdAt}>{fmt.format(new Date(doc.createdAt))}</time>
+              </td>
+              <td
+                className="py-2 pr-3 text-[var(--muted)] text-xs"
+                aria-label={`${doc.size} chars`}
+              >
+                {formatSize(doc.size)}
+              </td>
+              <td className="py-2">
+                <DocActions
+                  doc={doc}
+                  view={view}
+                  onRefresh={onRefresh}
+                  allTags={allTags}
+                  onTagsChanged={onTagsChanged}
+                  navigateTo={navigateTo}
+                  onSetView={onSetView}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -2002,7 +2010,7 @@ function AllViewDocRow({
       {/* S5-4 Drive parity: action controls hidden until row hover
           (`group-hover/row`) or keyboard focus within the row
           (`group-focus-within/row`), so they stay reachable via Tab. */}
-      <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+      <div className="parchment-row-actions flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
         <div className="relative shrink-0">
           <Tooltip label={`Edit tags for ${doc.title}`}>
             <button

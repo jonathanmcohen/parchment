@@ -18,7 +18,10 @@ import { citeLabel } from '@/lib/citations/format'
 import type { CslEntry } from '@/lib/citations/types'
 import { parseCslEntries } from '@/lib/citations/types'
 import { citationResolveKey } from '@/lib/editor/extensions/citation'
-import { getSuggestionContainer } from '@/lib/editor/extensions/suggestion-container'
+import {
+  clampSuggestionPosition,
+  getSuggestionContainer,
+} from '@/lib/editor/extensions/suggestion-container'
 
 // DISTINCT key — critical (F6 lesson).
 const citeSuggestionPluginKey = new PluginKey('citeSuggestion')
@@ -98,7 +101,9 @@ export const CiteSuggestionExtension = Extension.create({
                 editor: props.editor,
               })
 
-              unmountFn = props.mount(component.element)
+              unmountFn = props.mount(component.element, {
+                onPosition: clampSuggestionPosition(component.element),
+              })
             },
 
             onUpdate(props) {

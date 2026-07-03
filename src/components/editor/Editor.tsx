@@ -474,6 +474,40 @@ export function Editor({
     }
   }, [provider])
 
+  // v0.2.10 offline-sync: reconnect the collab provider when the browser comes
+  // back online, so edits made while offline flush to the server.
+  //
+  // Why this is needed: the offline fallback (goOffline) calls p.disconnect() to
+  // stop the reconnect loop — a reconnect that overlapped the initial force-seed
+  // of a *never-collaborated* doc could merge the local seed with server state and
+  // duplicate content. But disconnect() is permanent (shouldConnect=false), so
+  // WITHOUT this, an offline edit (durably held in the ydoc + IndexedDB) would
+  // never reach the server after the network returns. Reconnecting here closes
+  // that gap: by the time the 'online' event fires the doc is long past its
+  // one-shot seed (seededRef is set), so provider.connect() just re-runs the
+  // normal Yjs sync — which CRDT-merges local + server state idempotently (the
+  // seeding comments above confirm this merge is safe). Guarded to browser-only
+  // (window events) per the navigator.onLine trap; a no-op when already connected.
+  useEffect(() => {
+    if (!provider) return
+    const reconnect = () => {
+      try {
+        const ws = (
+          provider as unknown as {
+            configuration?: { websocketProvider?: { wsconnected?: boolean } }
+          }
+        ).configuration?.websocketProvider
+        // Only (re)connect when the socket is not already up — connect() is
+        // otherwise a cheap no-op, but this avoids churn on spurious events.
+        if (!ws?.wsconnected) provider.connect()
+      } catch {
+        // Provider may be mid-teardown — ignore; nothing to reconnect.
+      }
+    }
+    window.addEventListener('online', reconnect)
+    return () => window.removeEventListener('online', reconnect)
+  }, [provider])
+
   // G11: Destroy the IDB persistence on unmount to close the IndexedDB connection
   // and release the store. The ydoc itself is garbage-collected by React; idb
   // listens for doc.on('destroy') internally but we also call destroy() explicitly

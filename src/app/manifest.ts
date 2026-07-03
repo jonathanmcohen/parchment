@@ -5,8 +5,11 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Parchment',
     short_name: 'Parchment',
     description: 'Parchment — your documents, on your disk.',
-    start_url: '/',
+    // Launch straight into the file list (the app home). '/' only redirects here.
+    start_url: '/files',
     display: 'standalone',
+    // Match the fixed chrome tokens in src/styles/tokens.css (--background /
+    // --primary); these drive the OS splash + status-bar tint when installed.
     background_color: '#FFFFFF',
     theme_color: '#1A73E8',
     icons: [

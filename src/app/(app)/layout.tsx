@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react'
 import { CommandPaletteMount } from '@/components/CommandPaletteMount'
 import { GoogleFontsStyle } from '@/components/editor/GoogleFontsStyle'
 import { HelpMenu } from '@/components/help/HelpMenu'
+import { WhatsNewToast } from '@/components/help/WhatsNewToast'
 import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher'
 import { AppShell } from '@/components/shell/AppShell'
 import { Avatar } from '@/components/shell/Avatar'
@@ -14,11 +15,13 @@ import { TopbarUserCluster } from '@/components/shell/TopbarUserCluster'
 import { GlobalShortcuts } from '@/components/shortcuts/GlobalShortcuts'
 import { requireUser } from '@/lib/auth/guard'
 import { SignOutButton } from '@/lib/auth/sign-out-button'
+import { runDiskRepairSweepOnce } from '@/lib/disk/repair-heading-ids'
 import { refreshReleaseNotesDoc } from '@/lib/docs/seed-guide'
 import { getGoogleFonts, getWorkspaceTheme } from '@/lib/docs/settings-repo'
 import { themeCssVars } from '@/lib/editor/theme'
 import { getShortcutOverrides } from '@/lib/help/keymap-repo'
 import { isMaintenanceMode } from '@/lib/maintenance'
+import { APP_VERSION } from '@/lib/version'
 
 // S2-2 polish (v0.1.9): the sidebar footer is a cohesive cluster of nav-row-
 // height controls separated by a hairline from the nav above. Controls share:
@@ -57,6 +60,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // try/catch) so it can never block rendering the app shell. Not awaited on the
   // hot path for non-owners.
   if (user.role === 'owner') void refreshReleaseNotesDoc(user.id)
+
+  // v0.2.10: one-shot heading-id disk-repair sweep. Until v0.2.9, heading-id sentinel
+  // comments snowballed in mirrored markdown (parse stripped only ONE `<!-- id:x -->`,
+  // leftovers polluted the text, slugs re-derived from the pollution, each round trip
+  // added a layer). v0.2.9 fixed parse/serialize so a polluted doc self-heals on its
+  // NEXT sync — but docs that never sync again stay polluted on disk, and their DB
+  // heading text may still carry literal comment garbage from old-code imports. This
+  // sweep heals everything once. It is gated by an instance-wide settings marker
+  // (runs at most once per instance; a cheap settings read then early-returns on every
+  // later boot), fully best-effort (its own try/catch never blocks rendering), and
+  // fire-and-forget (not awaited on the hot path). Wired here — the same owner-role
+  // boot-maintenance hook that owns refreshReleaseNotesDoc — because it is the
+  // established once-per-owner boot spot that runs in the Next server (nodejs) runtime
+  // where the graph-free parse/serialize this sweep consumes both load. The rewrite
+  // advances disk_synced_hash before writing so the collab process's reverse-sync
+  // watcher classifies it as an 'echo' (no re-import loop).
+  if (user.role === 'owner') void runDiskRepairSweepOnce()
 
   // K5: localized shell strings (nav labels, skip link, brand). The active
   // locale comes from the NEXT_LOCALE cookie via next-intl's request config.
@@ -143,6 +163,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       <GlobalShortcuts overrides={shortcutOverrides} />
       <CommandPaletteMount />
+      {/* v0.2.10: post-upgrade "What's new" toast (client island). Renders only on
+          authenticated (app) pages, inside the [data-color-scheme] wrapper so it
+          themes correctly. Self-gates via localStorage (parchment:whatsnew-seen);
+          shows once per version after an upgrade, seeds silently on first visit. */}
+      <WhatsNewToast version={APP_VERSION} />
       {/* v0.2.7 #4b: self-hosted @font-face for the workspace's picked Google fonts. */}
       <GoogleFontsStyle families={googleFonts} />
       {/* K3: skip-to-content — first focusable element, visually hidden until

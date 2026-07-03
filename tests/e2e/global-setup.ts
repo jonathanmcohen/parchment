@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { Client } from 'pg'
+import { APP_VERSION } from '../../src/lib/version'
 
 // Seeds an owner + a valid session directly in the e2e DB and writes a Playwright
 // storageState carrying the session cookie, so protected (app) routes (gated by
@@ -71,7 +72,16 @@ export default async function globalSetup(): Promise<void> {
       origins: [
         {
           origin: 'http://localhost:3000',
-          localStorage: [{ name: 'parchment:tour-seen', value: 'true' }],
+          localStorage: [
+            { name: 'parchment:tour-seen', value: 'true' },
+            // v0.2.10: seed the "What's new" toast as already-acknowledged for the
+            // CURRENT version so the post-upgrade toast never renders in the authed
+            // e2e session. Same rationale as the tour flag above — a returning user
+            // at the current version. Even though the toast is pointer-events-
+            // contained (can't intercept clicks), seeding it keeps the a11y snapshot
+            // and admin-flow specs free of an unrelated floating element.
+            { name: 'parchment:whatsnew-seen', value: APP_VERSION },
+          ],
         },
       ],
     }),

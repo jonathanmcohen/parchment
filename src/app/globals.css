@@ -1673,6 +1673,78 @@ body {
   border-color: transparent;
 }
 
+/* ── v0.2.10: image selection bubble (align / alt / caption / delete) ──────
+ *  Portalled (via Tiptap BubbleMenu) above the selected image. Uses the same
+ *  chrome tokens as the text bubble so it themes for light/dark/system out of
+ *  the overlay root (which carries [data-color-scheme]). */
+.parchment-image-bubble {
+  background: var(--surface);
+  border: 1px solid var(--border-chrome);
+  border-radius: 8px;
+  box-shadow: var(--shadow-dropdown);
+  padding: 4px 6px;
+}
+.parchment-image-bubble-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.parchment-image-bubble-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 0.82rem;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.parchment-image-bubble-btn--text {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.parchment-image-bubble-btn:hover {
+  background: var(--surface-hover);
+}
+.parchment-image-bubble-btn[aria-pressed="true"] {
+  background: var(--primary-surface);
+  color: var(--primary-surface-text);
+}
+.parchment-image-bubble-btn--danger:hover {
+  background: color-mix(in srgb, var(--danger, #d93025) 15%, transparent);
+}
+.parchment-image-bubble-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--border-chrome);
+}
+.parchment-image-bubble-label {
+  font-size: 0.74rem;
+  color: var(--muted);
+  padding-left: 2px;
+  white-space: nowrap;
+}
+.parchment-image-bubble-input {
+  min-width: 180px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 0.82rem;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--border-chrome);
+  border-radius: 4px;
+}
+.parchment-image-bubble-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+
 /* ── Highlight mark (B2) ─────────────────────────────────────────────── */
 
 .parchment-prose mark {
@@ -1781,14 +1853,16 @@ body {
   background: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
-/* Column resize handle injected by the resizable Table extension */
+/* Column resize handle injected by the resizable Table extension. Uses the
+   chrome accent (--primary) so it reads on light AND the dark page (--accent is
+   a warmer page tint that can wash out); a hairline base + a bolder hover. */
 .parchment-prose table .column-resize-handle {
   position: absolute;
   right: -2px;
   top: 0;
   bottom: 0;
   width: 4px;
-  background: var(--accent);
+  background: var(--primary);
   cursor: col-resize;
   opacity: 0;
   transition: opacity 0.15s;
@@ -1798,6 +1872,12 @@ body {
 .parchment-prose table .column-resize-handle:hover,
 .parchment-prose table th:hover .column-resize-handle,
 .parchment-prose table td:hover .column-resize-handle {
+  opacity: 1;
+}
+
+/* While a resize drag is in progress ProseMirror adds `.resize-cursor` to body;
+   keep the active column's handle fully visible for the duration. */
+body.resize-cursor .parchment-prose table .column-resize-handle {
   opacity: 1;
 }
 
@@ -1814,6 +1894,112 @@ body {
   border: none;
   padding: 0;
   margin: 0;
+}
+
+/* ── v0.2.10 table UX: hover affordances (grips + "+" strips + row/col menu) ──
+   TableControlsOverlay.tsx renders an absolutely-positioned layer inside the
+   editor canvas gutter. Chrome tokens (grips/strips) sit ON the page sheet, so
+   they use the CHROME accent (--primary) for the pick highlight but read the
+   page surface tokens (--page-surface-muted / --page-border) for the resting
+   fill — the same page-token discipline the F2b table header uses, so they stay
+   legible on light, sepia AND the dark page (data-page-bg=dark flips
+   --page-* to a light-on-dark set). */
+
+/* The overlay layer fades its chrome in only when the table is active (cursor
+   inside it or hovered); it never intercepts document clicks itself. */
+.parchment-table-overlay {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.parchment-table-overlay[data-active="true"] {
+  opacity: 1;
+}
+
+/* Row/column grip handles (left/top edges). A subtle rail that brightens to the
+   accent on hover; click selects the row/col + opens its menu. */
+.parchment-table-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--page-border);
+  border-radius: 4px;
+  background: var(--page-surface-muted);
+  color: var(--page-ink-muted);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+.parchment-table-grip::before {
+  /* A small "grip dots" affordance drawn with a repeating dot pattern. */
+  content: "";
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow:
+    0 -4px 0 currentColor,
+    0 4px 0 currentColor;
+}
+.parchment-table-grip--col::before {
+  /* horizontal dots for the top (column) grip */
+  box-shadow:
+    -4px 0 0 currentColor,
+    4px 0 0 currentColor;
+}
+.parchment-table-grip:hover,
+.parchment-table-grip:focus-visible {
+  background: color-mix(in srgb, var(--primary) 22%, var(--page-surface-muted));
+  border-color: var(--primary);
+  color: var(--primary);
+  outline: none;
+}
+
+/* "+" strips on the right (add column) and bottom (add row) edges. */
+.parchment-table-addstrip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--page-border);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--page-surface-muted) 60%, transparent);
+  color: var(--page-ink-muted);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.parchment-table-addstrip:hover,
+.parchment-table-addstrip:focus-visible {
+  background: color-mix(in srgb, var(--primary) 18%, var(--page-surface-muted));
+  border-color: var(--primary);
+  border-style: solid;
+  color: var(--primary);
+  outline: none;
+}
+.parchment-table-addstrip-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* The portalled row/column menu reuses the shared .px-menu shell; it inherits
+   the chrome tokens from the overlay root (which carries [data-color-scheme]).
+   A minimum width keeps the labels ("Insert column right") on one line. */
+.parchment-table-menu {
+  min-width: 200px;
+}
+
+/* Selected-cell highlight while a grip is active — reinforce the ProseMirror
+   .selectedCell so a whole-row/col selection reads clearly in every scheme. The
+   base rule (above) already outlines .selectedCell; here we ensure the fill is
+   visible on the dark page too (page-scoped mix, not the chrome --primary alone
+   which can wash out on a dark sheet). */
+[data-page-bg="dark"] .parchment-prose table .selectedCell {
+  background: color-mix(in srgb, var(--primary) 26%, transparent);
 }
 
 /* ── Images (B5) ─────────────────────────────────────────────────────── */
@@ -1847,8 +2033,11 @@ body {
   margin: 0.5em 0;
 }
 
-.parchment-prose img[data-position="inline"],
-.parchment-prose .parchment-image-wrapper[data-image-position="inline"] {
+/* v0.2.10: raw <img data-position="inline"> (renderHTML output outside the
+ * NodeView) keeps the legacy inline flow; the NodeView WRAPPER for position
+ * "inline" is now a block so the `align` margins apply (the schema image node
+ * is block-level — inline:false — so a block box matches the document model). */
+.parchment-prose img[data-position="inline"] {
   display: inline;
   vertical-align: middle;
 }
@@ -1859,6 +2048,15 @@ body {
   display: inline-block;
   line-height: 0;
   user-select: none;
+}
+
+/* v0.2.10: positioning context for the resize handles + crop button so they
+ * pin to the image corners (the caption line would otherwise stretch the box
+ * and drop the south handles below the caption). */
+.parchment-image-box {
+  position: relative;
+  display: block;
+  line-height: 0;
 }
 
 .parchment-image-wrapper img {
@@ -1911,6 +2109,114 @@ body {
   outline-offset: 2px;
 }
 
+/* v0.2.10: read-only editors (Viewing mode flips contenteditable at runtime
+ * WITHOUT rebuilding NodeViews) never show resize/crop chrome or the ring. */
+.ProseMirror[contenteditable="false"] .parchment-image-handle,
+.ProseMirror[contenteditable="false"] .parchment-image-crop-btn {
+  display: none;
+}
+.ProseMirror[contenteditable="false"] .parchment-image-selected img {
+  outline: none;
+}
+
+/* ── v0.2.10: horizontal alignment (editor NodeView wrapper) ──────────────
+ *  `align` is orthogonal to `position`. For the common inline/block case the
+ *  wrapper is a block whose margins center/left/right it. `position` wrap modes
+ *  (float) win over align for advanced layouts, so we only apply align margins
+ *  when the wrapper is NOT floated (inline/break positions). */
+.parchment-image-wrapper[data-image-position="inline"],
+.parchment-image-wrapper[data-image-position="break"] {
+  display: block;
+}
+.parchment-image-wrapper[data-image-align="center"]:not([data-image-position="wrap-left"]):not(
+  [data-image-position="wrap-right"]
+) {
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+}
+.parchment-image-wrapper[data-image-align="left"]:not([data-image-position="wrap-left"]):not(
+  [data-image-position="wrap-right"]
+) {
+  margin-left: 0;
+  margin-right: auto;
+  width: fit-content;
+}
+.parchment-image-wrapper[data-image-align="right"]:not([data-image-position="wrap-left"]):not(
+  [data-image-position="wrap-right"]
+) {
+  margin-left: auto;
+  margin-right: 0;
+  width: fit-content;
+}
+
+/* Editable caption line under the image (NodeView `.parchment-image-caption`).
+ * width:0 + min-width:100% keeps a long caption from stretching the
+ * fit-content wrapper past the image — the caption wraps at the image width
+ * (Docs behavior) instead of widening the figure. */
+.parchment-image-caption {
+  display: block;
+  width: 0;
+  min-width: 100%;
+  margin-top: 0.35em;
+  font-size: 0.82em;
+  line-height: 1.35;
+  color: var(--muted);
+  text-align: center;
+  font-style: italic;
+}
+/* On a themed page (light/sepia/custom/dark) the caption follows page ink. */
+.parchment-page .parchment-image-caption,
+.parchment-prose .parchment-image-caption {
+  color: var(--page-ink-muted, var(--muted));
+}
+
+/* Dark-page: the chrome --primary can be low-contrast on a dark sheet. Use the
+ * page link/info accent for the ring + handles so selection stays visible. */
+[data-page-bg="dark"] .parchment-image-selected img {
+  outline-color: var(--info);
+}
+[data-page-bg="dark"] .parchment-image-handle {
+  background: var(--info);
+}
+
+/* ── v0.2.10: read-only <figure> (Reading / share / print / epub / export) ──
+ *  render-pm emits <figure.parchment-prose-figure data-align><img><figcaption>.
+ *  Alignment is by figure margins; caption is subtle italic page-ink. */
+.parchment-prose-figure {
+  margin: 0.75em 0;
+  max-width: 100%;
+}
+.parchment-prose-figure[data-align="center"] {
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+}
+.parchment-prose-figure[data-align="left"] {
+  margin-right: auto;
+  width: fit-content;
+}
+.parchment-prose-figure[data-align="right"] {
+  margin-left: auto;
+  width: fit-content;
+}
+.parchment-prose-figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.parchment-prose-figure figcaption {
+  /* Same width containment as the editor caption: wrap at the image width. */
+  width: 0;
+  min-width: 100%;
+  margin-top: 0.35em;
+  font-size: 0.82em;
+  line-height: 1.35;
+  color: var(--page-ink-muted, var(--muted));
+  text-align: center;
+  font-style: italic;
+}
+
 /* ── Image dialog (B5) ────────────────────────────────────────────────── */
 
 /* ── S5-11: shared modal dialog shell → Google Material dialog ─────────────────
@@ -1928,6 +2234,107 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 1000;
+}
+
+/* v0.2.10: post-upgrade "What's new" toast.
+ *
+ * A small, non-blocking notice anchored bottom-left, above the sidebar footer
+ * cluster. CRITICAL (v0.2.8 e2e lesson): this must NOT be a full-viewport layer —
+ * there is no inset:0 scrim, so it can never intercept clicks elsewhere. The card
+ * is the ONLY thing that catches pointer events (pointer-events:auto on the fixed
+ * card itself). z-index sits below the modal dialog scrim (1000) but above the app
+ * chrome. Themed via the chrome tokens (--surface / --foreground / --border-chrome
+ * / --shadow-dropdown) so light / dark / system all resolve on the (app) wrapper. */
+.parchment-whatsnew-toast {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 900;
+  /* Only the card is interactive — no viewport-spanning catcher. */
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 6px 6px 6px 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  border: 1px solid var(--border-chrome);
+  border-radius: 10px;
+  box-shadow: var(--shadow-dropdown);
+  font-size: 0.8125rem;
+  animation: parchment-whatsnew-in 160ms ease-out;
+}
+
+@keyframes parchment-whatsnew-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parchment-whatsnew-toast {
+    animation: none;
+  }
+}
+
+/* The message is a full-height button (click / Enter / Space open the dialog). */
+.parchment-whatsnew-toast-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: inherit;
+  text-align: start;
+  background: transparent;
+  cursor: pointer;
+}
+
+.parchment-whatsnew-toast-open:hover {
+  background: var(--surface-hover);
+}
+
+.parchment-whatsnew-toast-icon {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--primary);
+  flex: 0 0 auto;
+}
+
+.parchment-whatsnew-toast-text {
+  line-height: 1.3;
+}
+
+.parchment-whatsnew-toast-version {
+  font-weight: 600;
+}
+
+.parchment-whatsnew-toast-dismiss {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.parchment-whatsnew-toast-dismiss:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
 }
 
 .parchment-dialog {
@@ -1975,6 +2382,104 @@ body {
 .parchment-dialog-close:hover {
   background: var(--surface-hover);
   color: var(--foreground);
+}
+
+/* ── v0.2.10 mobile pass: toolbar `⋯` bottom sheet ─────────────────────────────
+ *  The phone-shaped surface the editor toolbar's `⋯` opens (BottomSheet.tsx). It
+ *  is portalled to the themed #parchment-overlay-root, so it resolves the active
+ *  scheme's tokens at body level and paints above the sticky chrome + editor
+ *  NodeViews. It is only ever mounted by the ≤768px toolbar branch, so these
+ *  (un-media-gated) rules never affect desktop. The panel borrows the shared
+ *  `.px-menu` shell for surface/rows but overrides its absolute positioning to a
+ *  bottom-anchored full-width sheet. */
+.parchment-bottom-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10001; /* above suggestion menus (9999) + the reading overlay is 10000 */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.parchment-bottom-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgb(0 0 0 / 0.45);
+  cursor: pointer;
+  animation: parchment-sheet-fade 160ms ease-out;
+}
+.parchment-bottom-sheet {
+  /* Override the shared .px-menu base (position:absolute; min-width:240px;
+     max-height:70vh; radius:8px on all corners) into a bottom sheet. */
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 80vh;
+  margin: 0;
+  border-inline: none;
+  border-bottom: none;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  padding: 8px 0 0;
+  /* Item 5: respect the iOS home-indicator inset so the last row + its padding sit
+     above the home indicator. Falls back to 12px where the env() is unsupported. */
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 24px rgb(0 0 0 / 0.28);
+  animation: parchment-sheet-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.parchment-bottom-sheet-grip {
+  width: 36px;
+  height: 4px;
+  margin: 4px auto 8px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.parchment-bottom-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 4px 16px;
+  border-bottom: 1px solid var(--border-chrome);
+}
+.parchment-bottom-sheet-title {
+  font: 500 15px / 1.4 var(--font-ui);
+  color: var(--foreground);
+}
+.parchment-bottom-sheet-body {
+  overflow-y: auto;
+  padding: 4px 0;
+  -webkit-overflow-scrolling: touch;
+}
+/* Item 4: ≥44px tap targets for every sheet row (WCAG 2.5.5 / 2.5.8). */
+.parchment-bottom-sheet-item {
+  min-height: 48px;
+}
+@keyframes parchment-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes parchment-sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .parchment-bottom-sheet,
+  .parchment-bottom-sheet-scrim {
+    animation: none;
+  }
 }
 
 /* ── Help menu dialogs (v0.2.8 #2) ─────────────────────────────────────────────
@@ -4406,41 +4911,6 @@ body {
   pointer-events: none;
 }
 
-/* G11: Offline / sync status indicator */
-.parchment-offline-indicator {
-  min-height: 0;
-}
-
-.parchment-offline-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  line-height: 1.5;
-  margin: 4px 0;
-  user-select: none;
-}
-
-.parchment-offline-indicator[data-state="offline"] .parchment-offline-pill {
-  background: color-mix(in srgb, var(--foreground) 8%, transparent);
-  /* --muted (#6b6b63) on this 8%-foreground tint is only 4.22:1 — below the
-     WCAG AA 4.5:1 for this small pill text (axe color-contrast). The offline
-     state is an important status, so use the full foreground for clear
-     contrast in every theme. */
-  color: var(--foreground);
-  border: 1px solid var(--border);
-}
-
-.parchment-offline-indicator[data-state="syncing"] .parchment-offline-pill {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
 /* ── G12: Mobile responsive editor (≤ 768px) ────────────────────────────────
  *
  * ALL rules in this block are scoped to max-width: 768px so the desktop
@@ -4474,78 +4944,218 @@ body {
 /* Page-fit: visual scale wrapper — compensates height so no empty gap appears.
    The JS hook sets --page-scale and --page-natural-height on this element. */
 @media (max-width: 768px) {
-  .parchment-canvas-scaled-host {
+  /* v0.2.10 mobile pass (item 1/3): the document outline rail is desktop chrome
+     that steals ~half the width on a phone (squeezing the page into a cramped
+     column). Hide it on mobile so the reflowed page uses the full viewport width.
+     The outline is still reachable on desktop; on mobile the heading structure is
+     visible inline in the document itself. */
+  .parchment-outline {
+    display: none;
+  }
+
+  /* v0.2.10 mobile pass: the host height compensation is ONLY for PAGED mode, which
+     transform-scales the page (below). Continuous mode reflows the page to viewport
+     width with NO transform, so its host must keep auto height — otherwise the
+     `--page-natural-height` (unset → 0px) calc would collapse the host. Gate the
+     calc on the paged page being present. */
+  .parchment-canvas-scaled-host:has(.parchment-page[data-page-layout="paged"]) {
     /* Collapse the visual height to match the scaled page height so scroll
        content does not have a gap below the shrunken page. */
     height: calc(var(--page-natural-height, 0px) * var(--page-scale, 1));
     overflow: visible;
   }
 
-  /* v0.2.7 #6: the editor right-rail panels (Version history / Comments) are
-     position:sticky on desktop (EditorSidePanel inline style) so they are
-     reachable from any scroll position. On a narrow viewport a pinned 280–300px
-     panel would cover the document, so de-sticky them here: back to in-flow with
-     no viewport-height cap. */
+  /* v0.2.10 mobile pass (item 4): the editor right-rail panels (Comments /
+     Version history / Suggestions / Grammar / Backlinks) are position:sticky
+     280–300px side panels on desktop, geometry set via EditorSidePanel's INLINE
+     style (sidePanelStyle: width / position / top / maxHeight / borderLeft / …).
+     On a phone a pinned side panel would cover the document, so turn each into a
+     FULL-HEIGHT bottom sheet: fixed to the viewport, full-width, its own scroll,
+     above the chrome. Slides up from the bottom; respects the iOS home-indicator
+     inset. `!important` is REQUIRED here because a media query cannot otherwise
+     override the component's inline style (inline wins on specificity) — this is
+     the one sanctioned use: a responsive override of a JS-computed inline geometry,
+     scoped to ≤768px so desktop is unaffected. */
   .parchment-side-panel {
-    position: static;
-    max-height: none;
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    z-index: 60 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    /* Leave the title bar (56px) visible above the sheet so the doc name + close
+       affordances stay reachable; the sheet owns the rest of the viewport. */
+    height: calc(100dvh - 56px) !important;
+    max-height: calc(100dvh - 56px) !important;
+    margin: 0 !important;
+    border: none !important;
+    border-top: 1px solid var(--border-chrome) !important;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    background: var(--surface);
+    box-shadow: 0 -4px 24px rgb(0 0 0 / 0.28);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    animation: parchment-sheet-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
-  /* Apply the visual scale to the page element; transform-origin top left
-     anchors the scale at the top-left corner so the shrunken page stays
-     flush with the left edge of the reading area (top center would push
-     the page off-screen to the right on narrow viewports). */
-  .parchment-canvas-scaled-host .parchment-page:not(.parchment-live-sheet) {
+  /* PAGED mode: apply the visual scale to the page element; transform-origin top
+     left anchors the scale at the top-left corner so the shrunken page stays flush
+     with the left edge of the reading area. Scoped to paged mode — continuous mode
+     reflows instead (below). */
+  .parchment-canvas-scaled-host
+  .parchment-page[data-page-layout="paged"]:not(.parchment-live-sheet) {
     transform: scale(var(--page-scale, 1));
     transform-origin: top left;
   }
 
-  /* ── Touch toolbar ── */
+  /* v0.2.10 mobile pass (item 3): CONTINUOUS mode reflows the page to the viewport
+     width so text stays readable at its natural font size (no transform-scale to an
+     illegible ~46%, and no transform → the body-portalled suggestion/bubble menus
+     keep correct caret coordinates). The fixed 816px inline width is overridden to
+     fluid full-width; margins tighten to a comfortable phone padding so the text
+     column isn't cramped. `!important` overrides PageCanvas's inline `width:816px`
+     (inline beats the class), scoped to ≤768px + continuous so desktop + paged are
+     untouched. min-height:auto lets the sheet size to its content. */
+  .parchment-page[data-page-layout="continuous"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    /* Tighter margins than the 96px desktop page inset — a phone can't spare 1in
+       each side. Keeps ~16px breathing room; the inline padding from pageSetup is
+       overridden so the text column reflows near-full-width. */
+    padding: 16px !important;
+    box-sizing: border-box;
+  }
 
-  /* Make the toolbar horizontally scrollable with 44px touch targets.
-     L1/L7: stickiness now lives on the .parchment-toolbar-bleed wrapper at
-     top:88px (title 56 + menu 32) for every viewport — title (top:0) and menu
-     (top:56px) keep their heights at <768px, so the 136px stack math holds on
-     mobile too. The inner row only owns the touch scroll behavior here. */
-  .parchment-toolbar {
-    overflow-x: auto;
+  /* ── v0.2.10 mobile pass (item 2): compact toolbar ──
+     The mobile toolbar is a SEPARATE render branch (Toolbar.tsx `isMobile`):
+     `.parchment-toolbar--mobile` is a compact essentials row + a `⋯` that opens
+     the bottom sheet. Unlike the pre-v0.2.10 approach it does NOT scroll — the
+     essentials are chosen to fit ~360px. Stickiness still lives on the
+     `.parchment-toolbar-bleed` wrapper at top:88px, so the 136px chrome stack math
+     holds on mobile too. */
+  .parchment-toolbar--mobile {
+    overflow-x: hidden;
     flex-wrap: nowrap;
-    /* Momentum scrolling on iOS */
-    -webkit-overflow-scrolling: touch;
-    /* Hide scrollbar visually (still scrollable) */
-    scrollbar-width: none;
+    gap: 0;
+    /* The controls FILL the row (flex:1 on the buttons) so the essentials fit
+       exactly with no horizontal scroll. */
+    justify-content: flex-start;
+    padding: 0 2px;
   }
 
-  /* Hide the webkit scrollbar track in the toolbar */
-  .parchment-toolbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Increase all toolbar buttons to WCAG 2.5.5 / 2.5.8 minimum 44×44px */
-  .parchment-toolbar-btn {
+  /* Item 2/4: the icon buttons shrink to share the row width evenly (flex:1 1 0;
+     min-width:0) so all essentials fit ≤390px with NO scroll, while keeping a 44px
+     tap HEIGHT (WCAG 2.5.8: 24×24 min is exceeded; height is the thumb-reach axis).
+     Scoped to the mobile toolbar so desktop's 32px icon box is untouched. */
+  .parchment-toolbar--mobile .parchment-toolbar-btn {
     min-height: 44px;
-    min-width: 44px;
+    min-width: 0;
+    flex: 1 1 0;
+    padding: 0;
+  }
+  /* The `⋯` chip keeps a comfortable fixed width and sits at the trailing edge. */
+  .parchment-toolbar--mobile .parchment-toolbar-overflow {
+    flex: 0 0 auto;
+    min-width: 40px;
+    margin-inline-start: 2px;
+  }
+  /* The Styles dropdown: cap its width and hide the visible "Styles" prefix text so
+     the select shows just the (truncated) block name — keeps the row compact. The
+     select stays fully functional + keeps its aria-label for the accessible name. */
+  .parchment-toolbar--mobile .parchment-menu-wrap,
+  .parchment-toolbar--mobile > .parchment-toolbar-label {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .parchment-toolbar--mobile .parchment-toolbar-label {
+    max-width: 84px;
+    gap: 0;
+    /* Collapse the visible label text node (e.g. "Styles") to nothing; the select's
+       aria-label carries the accessible name. */
+    font-size: 0;
+  }
+  .parchment-toolbar--mobile .parchment-toolbar-select {
+    max-width: 84px;
+    min-width: 0;
+    font-size: 13px;
+    padding: 0 4px;
+  }
+}
+
+/* ── v0.2.10 mobile pass (items 3 & 4): touch menus + safe areas ────────────────
+ *  All ≤768px. Keeps the desktop experience byte-for-byte above the breakpoint. */
+@media (max-width: 768px) {
+  /* Item 4: the suggestion popups (slash / wiki / cite / cairn) and the shared
+     menu-bar / overflow dropdown are portalled to #parchment-overlay-root and
+     positioned by Floating UI / measured rects. On a narrow viewport an unclamped
+     panel can exceed the screen, so clamp every floating surface to the viewport
+     width (minus an 8px gutter each side) and let its own list scroll. They are
+     already collision-aware (Floating UI / the Menu rect math), so this only bounds
+     the width — placement is unchanged. */
+  .parchment-slash-menu,
+  .parchment-wiki-menu,
+  .parchment-cite-menu,
+  .parchment-ai-menu,
+  .parchment-bubble-menu,
+  .parchment-image-bubble,
+  .px-menu.parchment-menu-dropdown-fixed {
+    max-width: calc(100vw - 16px);
   }
 
-  /* Increase toolbar selects/inputs to be large enough to tap reliably */
-  .parchment-toolbar-select {
-    height: 44px;
-    font-size: 1rem;
+  /* The suggestion menus have their own inner scroll list; cap the popup height so
+     a long result set never runs off-screen on a short phone viewport. */
+  .parchment-slash-menu,
+  .parchment-wiki-menu,
+  .parchment-cite-menu {
+    max-height: 50vh;
+    overflow-y: auto;
   }
 
-  .parchment-color-input {
-    width: 44px;
-    height: 44px;
+  /* Item 4: ≥44px tap targets for the dropdown/suggestion rows so they're reliably
+     tappable (the desktop 36px row is fine with a mouse, tight for a thumb). */
+  .px-menu-item,
+  .parchment-slash-item,
+  .parchment-wiki-menu-item,
+  .parchment-cite-menu-item {
+    min-height: 44px;
   }
 
-  .parchment-size-input {
-    height: 44px;
-    font-size: 1rem;
+  /* The text + image bubble menus can wrap their controls if the selection sits
+     near a narrow edge, rather than overflow horizontally. */
+  .parchment-bubble-menu,
+  .parchment-image-bubble {
+    flex-wrap: wrap;
   }
 
-  .parchment-unit-btn {
-    height: 44px;
-    padding: 0 10px;
+  /* Item 5: the sticky bottom status bar respects the iOS home-indicator inset so
+     its content isn't hidden behind the home indicator. */
+  .parchment-status-bar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ── v0.2.10 mobile pass (item 1): file-manager touch reachability ──────────────
+ *  The file rows' action cluster (rename / star / tags / ⋯) is hidden until hover
+ *  on desktop (Google-Drive parity). A touch device has no hover, so the actions
+ *  would be UNREACHABLE. On any coarse (touch) pointer, reveal them. Uses
+ *  `pointer: coarse` rather than a width query so it targets touch specifically and
+ *  a narrow desktop window keeps the clean hover-reveal. */
+@media (hover: none), (pointer: coarse) {
+  .parchment-row-actions {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Item 1: the details view is an HTML <table> with fixed-width columns that can
+     exceed a 380px viewport. Let the table scroll horizontally INSIDE its own box
+     so the page body never grows a horizontal scrollbar. The table is wrapped by
+     `.parchment-details-scroll` (FileManager details view). */
+  .parchment-details-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

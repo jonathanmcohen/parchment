@@ -370,6 +370,45 @@ function paragraph(tokens: Tok[] | undefined): PMNode {
 }
 
 /**
+ * v0.2.10: a hand-authored standalone markdown image `![alt](src)` is lexed by
+ * `marked` as a paragraph whose only meaningful token is an `image` token. The
+ * schema image node is BLOCK-level (extension-image default: inline:false), so
+ * we lift such a paragraph to a top-level image block instead of dropping the
+ * image token (the inline path has no image case — the alt text would leak as
+ * plain text and the picture would vanish on reverse-sync).
+ *
+ * Conservative: only fires when, ignoring whitespace-only text tokens, the
+ * paragraph contains EXACTLY one `image` token. A paragraph mixing prose and an
+ * image stays a paragraph (the image stays inline text — an accepted edge, same
+ * as the pre-existing inline handling). Returns null when not a standalone image.
+ */
+function standaloneImageBlock(tokens: Tok[] | undefined): PMNode | null {
+  if (!tokens) return null
+  const meaningful = tokens.filter(
+    (t) => !(t.type === 'text' && (t.raw ?? t.text ?? '').trim() === ''),
+  )
+  if (meaningful.length !== 1) return null
+  const only = meaningful[0]
+  if (only?.type !== 'image') return null
+  const src = only.href ?? ''
+  if (!src) return null
+  return {
+    type: 'image',
+    attrs: {
+      src,
+      alt: only.text ?? '',
+      caption: '',
+      refId: '',
+      position: 'inline',
+      align: 'center',
+      width: null,
+      height: null,
+      lockAspect: true,
+    },
+  }
+}
+
+/**
  * G4: a display-math block is serialized as `$$` on its own line, the LaTeX, and
  * a closing `$$` on its own line. `marked` lexes that as a paragraph whose raw
  * text is exactly that shape. This recognizer matches `$$ … $$` (the inner LaTeX
@@ -496,6 +535,12 @@ function reconstructParchment(kind: string, body: string): PMNode | null {
           caption: typeof data.caption === 'string' ? data.caption : '',
           refId: typeof data.refId === 'string' ? data.refId : '',
           position: typeof data.position === 'string' ? data.position : 'inline',
+          // v0.2.10: default to 'center' when a legacy (pre-align) figure fence
+          // omits it, matching the extension's block-image default.
+          align:
+            data.align === 'left' || data.align === 'center' || data.align === 'right'
+              ? data.align
+              : 'center',
           width: typeof data.width === 'number' ? data.width : null,
           height: typeof data.height === 'number' ? data.height : null,
           lockAspect: typeof data.lockAspect === 'boolean' ? data.lockAspect : true,
@@ -636,6 +681,12 @@ function blocks(tokens: Tok[] | undefined): PMNode[] {
         const mathBlock = displayMathBlock(t.raw ?? t.text ?? '')
         if (mathBlock) {
           out.push(mathBlock)
+          break
+        }
+        // v0.2.10: a standalone `![alt](src)` paragraph → a block image node.
+        const imageBlock = standaloneImageBlock(t.tokens)
+        if (imageBlock) {
+          out.push(imageBlock)
           break
         }
         out.push(paragraph(t.tokens))

@@ -11,22 +11,56 @@ export type Shortcut = {
   label: string
 }
 
+// v0.2.10: synced to every shortcut VERIFIED working in this Tiptap setup
+// (tests/unit/shortcut-keymap.test.ts is the executable proof). Notable: strike
+// is ⌘⇧S here (not the Docs-style ⌘⇧X), and ⌘⇧H opens Find & replace (the
+// highlight extension's identical default is shadowed by it).
 export const SHORTCUTS: Shortcut[] = [
+  // ── App ──
   { keys: '⌘K', label: 'Open command palette' },
   { keys: '⌘P', label: 'Fuzzy file finder' },
+  { keys: '⌘/', label: 'Keyboard shortcuts (in the editor; ⌘⇧/ anywhere)' },
+  { keys: 'F5', label: 'Enter / exit presenter mode' },
+  { keys: '⌘S', label: 'Note (autosaves continuously)' },
+  // ── Editing (v0.2.10) ──
+  { keys: '⌘↩', label: 'Insert page break' },
+  { keys: '⌘⇧K', label: 'Insert or edit link' },
+  { keys: '⌘⌥M', label: 'New comment on selection' },
+  { keys: '⌘⇧↑', label: 'Move block up' },
+  { keys: '⌘⇧↓', label: 'Move block down' },
+  { keys: '⌘D', label: 'Duplicate block' },
+  // ── Find ──
+  { keys: '⌘F', label: 'Find' },
+  { keys: '⌘⇧H', label: 'Find & replace' },
+  // ── Text style ──
   { keys: '⌘B', label: 'Bold' },
   { keys: '⌘I', label: 'Italic' },
   { keys: '⌘U', label: 'Underline' },
-  { keys: '⌘S', label: 'Note (autosaves continuously)' },
-  { keys: 'F5', label: 'Enter / exit presenter mode' },
+  { keys: '⌘⇧S', label: 'Strikethrough' },
+  { keys: '⌘E', label: 'Inline code' },
+  { keys: '⌘,', label: 'Subscript' },
+  { keys: '⌘.', label: 'Superscript' },
+  { keys: '⌘\\', label: 'Clear formatting' },
+  // ── Blocks ──
+  { keys: '⌘⌥0', label: 'Normal text (paragraph)' },
+  { keys: '⌘⌥1–6', label: 'Heading 1–6' },
+  { keys: '⌘⇧7', label: 'Numbered list' },
+  { keys: '⌘⇧8', label: 'Bulleted list' },
+  { keys: '⌘⇧9', label: 'Checklist' },
+  { keys: '⌘⌥C', label: 'Code block' },
+  { keys: '⌘⇧B', label: 'Blockquote' },
+  // ── Alignment ──
+  { keys: '⌘⇧L / E / R / J', label: 'Align left / center / right / justify' },
+  // ── History ──
+  { keys: '⌘Z', label: 'Undo' },
+  { keys: '⌘⇧Z', label: 'Redo' },
+  // ── Insert triggers ──
   { keys: '/', label: 'Open slash-command menu (at line start)' },
   { keys: '[[', label: 'Insert wiki link' },
   { keys: '@', label: 'Insert citation / @-mention' },
-  { keys: '⌘Z', label: 'Undo' },
-  { keys: '⌘⇧Z', label: 'Redo' },
-  { keys: '⌘\\', label: 'Clear formatting' },
   { keys: 'Tab', label: 'Indent list item' },
   { keys: '⇧Tab', label: 'Outdent list item' },
+  { keys: '⌘⇧V', label: 'Paste without formatting' },
 ]
 
 // ── Release notes ─────────────────────────────────────────────────────────────
@@ -45,6 +79,20 @@ export type ChangelogEntry = {
 
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.2.10',
+    notes: [
+      'New keyboard shortcuts: ⌘/Ctrl+Enter inserts a page break, ⌘⇧K links, ⌘⌥M comments, ⌘⇧↑/↓ moves a block, ⌘D duplicates it, and ⌘/ opens the shortcut reference — which now lists every shortcut that actually works.',
+      'Smart typography as you type: proper quotes, en/em dashes, ellipses, fractions, and arrows — never inside code — plus markdown triggers for fenced code with a language, dividers, checklists, and strikethrough.',
+      'Pasting from Word, Google Docs, or a web page now produces clean content: real headings, lists, tables, and links instead of styled soup. ⌘⇧V pastes plain text.',
+      'Tables got Docs-grade controls: hover a table for add-row/column strips, grip handles with an insert/delete/header menu, and draggable column resizing.',
+      'Images are now first-class: click to select, drag corner handles to resize, align left/center/right, and add captions and alt text from a floating toolbar. Images also render properly in Reading mode, shares, and exports.',
+      'Parchment now works offline: the app installs as a PWA, previously opened documents load and stay editable without a connection, and your edits sync automatically when you are back online.',
+      'A real mobile experience: a slide-in sidebar, a compact touch toolbar with a “More tools” sheet, viewport-fitting menus, and documents that reflow to your phone’s width.',
+      'After an update, a small toast lets you know what changed — once, and only after upgrades, never on a fresh install.',
+      'One-time maintenance sweep heals any documents that accumulated duplicated heading-id markers on disk from before v0.2.9, and cleans stale release-notes files from the guide folder.',
+    ],
+  },
   {
     version: '0.2.9',
     notes: [

@@ -196,6 +196,36 @@ img {
   display: block;
 }
 
+/* v0.2.10: image figures — alignment + caption (mirrors .parchment-prose-figure
+ * in the app so the standalone export honors data-align and shows the caption). */
+figure.parchment-prose-figure {
+  margin: 0.75em 0;
+  max-width: 100%;
+}
+figure.parchment-prose-figure[data-align="center"] {
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+}
+figure.parchment-prose-figure[data-align="left"] {
+  margin-right: auto;
+  width: fit-content;
+}
+figure.parchment-prose-figure[data-align="right"] {
+  margin-left: auto;
+  width: fit-content;
+}
+figure.parchment-prose-figure figcaption {
+  width: 0;
+  min-width: 100%;
+  margin-top: 0.35em;
+  font-size: 0.82em;
+  line-height: 1.35;
+  color: #666;
+  text-align: center;
+  font-style: italic;
+}
+
 hr {
   border: none;
   border-top: 1px solid #ccc;

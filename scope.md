@@ -213,3 +213,17 @@
 | **Total** | **105** | **105** | **0** | **0** |
 
 Shared items (one impl, tracked twice): A4≡I5, A5≡I6, B5↔K1, D3↔F5.
+
+## v0.2.10 scope (added 2026-07-03; per-feature PRs #152–#160 into release/v0.2.10)
+
+| ID | Item | Status | Coverage | Failure-modes | Notes |
+|---|---|---|---|---|---|
+| L10 | Keyboard shortcuts (⌘Enter page break, link/comment/move/duplicate/⌘⁄, help-list sync) | DONE | unit+e2e+live 17/17 | end-of-block caret hop fixed | PR #156; local live-stack verified w/ screenshots; Cairn re-verify post-deploy |
+| L11 | Smart typography + input-rule audit | DONE | unit 30 + live 26/26 | code/math exclusion tested; line-start `---` divider precedence | PR #154; custom rules, no new dep |
+| L12 | Post-upgrade What's-new toast (once per version) | DONE | unit 17 + live 23/23 | first-install silent seed; non-blocking; e2e storageState seeded | PR #152 |
+| L13 | One-shot disk-repair sweep (heading-id snowball legacy healing) | DONE | unit 15 + integration 2 + live boot proof | watcher-echo safe; idempotent; per-doc isolation | PR #153; surgical strip, not re-parse |
+| L14 | Paste-from-Word/HTML cleanup + ⌘⇧V plain paste | DONE | unit fixtures + live 32/32 | internal data-pm-slice passthrough; code-block raw | PR #155; deep Word list nesting flattens sanely (documented) |
+| L15 | Table UX (hover strips, grips, row/col menu, resize polish) | DONE | unit 41 + live 23/23 | read-only gating; dark-page tokens | PR #157; colwidth lossless via parchment:table fence (not GFM pipe) |
+| L16 | Image UX (select/resize/align/caption/alt bubble + render-pm figures) | DONE | unit + live incl. exports | fixed pre-existing: click-select + Reading-mode image rendering | PR #158; standalone HTML export doesn't inline app-hosted asset bytes (follow-up) |
+| L17 | Offline PWA (installable, offline shell, sync-on-reconnect, logout purge) | DONE | unit + e2e + live 15/15 | never-cache /api; version-scoped caches; update toast opt-in | PR #160; offline create + /files freshness out of scope (documented); fixed reconnect-never-synced + logout cache leak |
+| L18 | Mobile/responsive editor (drawer, compact toolbar + bottom sheet, reflow) | DONE | unit + e2e + live 60/60 | desktop 1440 regression pass; a11y modal semantics | PR #159; emulator-verified (no physical device); paged mode scales (reflow = future) |

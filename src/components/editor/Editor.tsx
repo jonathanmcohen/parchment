@@ -24,6 +24,7 @@ import { EmbedDialog } from '@/components/editor/EmbedDialog'
 import { FindReplace } from '@/components/editor/FindReplace'
 import { GithubEmbedDialog } from '@/components/editor/GithubEmbedDialog'
 import { GrammarPanel } from '@/components/editor/GrammarPanel'
+import { ImageBubble } from '@/components/editor/ImageBubble'
 import { ImageDialog } from '@/components/editor/ImageDialog'
 import { LinkPopover } from '@/components/editor/LinkPopover'
 import { MathPopover } from '@/components/editor/MathPopover'
@@ -42,6 +43,7 @@ import { SectionBreakDialog } from '@/components/editor/SectionBreakDialog'
 import { ShareDialog } from '@/components/editor/ShareDialog'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { SuggestionsPanel } from '@/components/editor/SuggestionsPanel'
+import { TableControlsOverlay } from '@/components/editor/TableControlsOverlay'
 import { Toolbar } from '@/components/editor/Toolbar'
 import { useConnectionState } from '@/components/editor/useConnectionState'
 import { useSaveStatus } from '@/components/editor/useSaveStatus'
@@ -51,6 +53,7 @@ import { WordCountDialog } from '@/components/editor/WordCountDialog'
 import { WritingGoalDialog } from '@/components/editor/WritingGoalDialog'
 import { UserCluster } from '@/components/shell/UserCluster'
 import {
+  dispatchShortcut,
   registerShortcutAction,
   SHORTCUT_EVENT,
   type ShortcutEventDetail,
@@ -66,6 +69,7 @@ import { CiteSuggestionExtension } from '@/lib/editor/extensions/cite-suggestion
 import { FindReplaceExtension } from '@/lib/editor/extensions/find-replace'
 import { GrammarCheckExtension } from '@/lib/editor/extensions/grammar-check'
 import { PaginationLive } from '@/lib/editor/extensions/pagination-live'
+import { makeShortcutKeymap } from '@/lib/editor/extensions/shortcut-keymap'
 import { SlashMenuExtension } from '@/lib/editor/extensions/slash-menu'
 import { WikiSuggestionExtension } from '@/lib/editor/extensions/wiki-suggestion'
 import { classifySwipe, isMobileWidth, pageFitScale } from '@/lib/editor/page-fit'
@@ -470,6 +474,40 @@ export function Editor({
     }
   }, [provider])
 
+  // v0.2.10 offline-sync: reconnect the collab provider when the browser comes
+  // back online, so edits made while offline flush to the server.
+  //
+  // Why this is needed: the offline fallback (goOffline) calls p.disconnect() to
+  // stop the reconnect loop — a reconnect that overlapped the initial force-seed
+  // of a *never-collaborated* doc could merge the local seed with server state and
+  // duplicate content. But disconnect() is permanent (shouldConnect=false), so
+  // WITHOUT this, an offline edit (durably held in the ydoc + IndexedDB) would
+  // never reach the server after the network returns. Reconnecting here closes
+  // that gap: by the time the 'online' event fires the doc is long past its
+  // one-shot seed (seededRef is set), so provider.connect() just re-runs the
+  // normal Yjs sync — which CRDT-merges local + server state idempotently (the
+  // seeding comments above confirm this merge is safe). Guarded to browser-only
+  // (window events) per the navigator.onLine trap; a no-op when already connected.
+  useEffect(() => {
+    if (!provider) return
+    const reconnect = () => {
+      try {
+        const ws = (
+          provider as unknown as {
+            configuration?: { websocketProvider?: { wsconnected?: boolean } }
+          }
+        ).configuration?.websocketProvider
+        // Only (re)connect when the socket is not already up — connect() is
+        // otherwise a cheap no-op, but this avoids churn on spurious events.
+        if (!ws?.wsconnected) provider.connect()
+      } catch {
+        // Provider may be mid-teardown — ignore; nothing to reconnect.
+      }
+    }
+    window.addEventListener('online', reconnect)
+    return () => window.removeEventListener('online', reconnect)
+  }, [provider])
+
   // G11: Destroy the IDB persistence on unmount to close the IndexedDB connection
   // and release the store. The ydoc itself is garbage-collected by React; idb
   // listens for doc.on('destroy') internally but we also call destroy() explicitly
@@ -617,6 +655,14 @@ export function Editor({
   // runs after the sidebar mounts), so the signal cannot be dropped against the
   // sidebar's mount the way a one-shot DOM event could. 0 = no request yet.
   const [openComposerSignal, setOpenComposerSignal] = useState(0)
+
+  // v0.2.10 shortcuts: Mod-Alt-M — open the comments sidebar AND bump the
+  // composer-open intent (the same state updates the F3 handleAddComment path
+  // performs). Declared BEFORE useEditor so the keymap extension can capture it.
+  const openCommentComposer = useCallback(() => {
+    setCommentsSidebarOpen(true)
+    setOpenComposerSignal((n) => n + 1)
+  }, [])
 
   // D3: version history panel toggle
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
@@ -770,8 +816,19 @@ export function Editor({
       const pageHeight = contentEl ? contentEl.offsetHeight : pageEl ? pageEl.offsetHeight : 1056
 
       const isMobile = isMobileWidth(availableWidth)
-      if (!isMobile) {
-        // Desktop: clear any mobile overrides — byte-for-byte unchanged above 768px.
+
+      // v0.2.10 mobile pass: CONTINUOUS mode reflows the page to the viewport width
+      // on mobile (CSS: .parchment-page width → 100%) so text stays readable at its
+      // natural font size — NOT transform-scaled down to an illegible ~46%. Reflow
+      // also avoids the transform:scale coordinate mismatch that mis-placed the
+      // body-portalled suggestion menus. So for continuous+mobile we clear the scale
+      // vars (no transform, host height auto) exactly like desktop. PAGED mode still
+      // scales (its pagination depends on the fixed 816px sheet width).
+      const isPaged = pageEl?.getAttribute('data-page-layout') === 'paged'
+      if (!isMobile || !isPaged) {
+        // Desktop (any mode) OR mobile+continuous: clear mobile scale overrides.
+        // Desktop stays byte-for-byte unchanged above 768px; mobile+continuous
+        // reflows via CSS width with no transform.
         host.style.removeProperty('--page-scale')
         host.style.removeProperty('--page-natural-height')
         host.style.height = ''
@@ -967,6 +1024,18 @@ export function Editor({
         : []),
       // B9: configured with onOpen so Cmd-F / Cmd-Shift-H open the React panel.
       FindReplaceExtension.configure({ onOpen: openFind }),
+      // v0.2.10: user-friendly shortcuts — Mod-Enter page break, Mod-Shift-K
+      // link, Mod-Alt-M comment, Mod-Shift-↑/↓ move block, Mod-D duplicate,
+      // Mod-Alt-0 normal text, Mod-/ shortcuts cheat sheet. High-priority so
+      // Mod-Enter beats StarterKit's hardBreak binding; Shift-Enter untouched.
+      makeShortcutKeymap({
+        onInsertLink: openLinkPopover,
+        onAddComment: openCommentComposer,
+        // Reuses the I2 dispatcher: HelpMenu (mounted in the app layout,
+        // including the editor route) handles `shortcuts-help` and opens the
+        // same pop-out dialog the app-wide Mod-Shift-/ chord opens.
+        onShowShortcuts: () => dispatchShortcut('shortcuts-help'),
+      }),
       // B12: slash menu — onOpenImage delegates to the existing image dialog.
       // G4: onEditMath opens the LaTeX popover for a freshly-inserted math node.
       // G8b: onOpenCrossRefPicker opens the cross-reference picker.
@@ -1746,6 +1815,12 @@ export function Editor({
                 onReadersChange={setReaders}
               />
             )}
+
+            {/* v0.2.10 table UX: hover affordances (row/col grips, + strips) and
+              the themed row/column menu over the active table. Positions itself
+              against the canvas gutter (position:relative). Renders null when the
+              editor is not editable, so Reading/Share stay affordance-free. */}
+            {editor && <TableControlsOverlay editor={editor} containerRef={canvasWrapRef} />}
           </div>
 
           {/* D1: comments sidebar (right rail) */}
@@ -1775,6 +1850,9 @@ export function Editor({
 
         {/* Selection bubble menu (B2 + G13: AI actions) */}
         {editor && <BubbleMenu editor={editor} aiEnabled={aiEnabled} />}
+
+        {/* v0.2.10: image selection toolbar (align / alt / caption / delete) */}
+        {editor && <ImageBubble editor={editor} />}
 
         {/* S3-6: the standalone OfflineIndicator sibling is folded into the
             status bar's connection dot below (one bar, no separate pill). */}

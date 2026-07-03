@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { applyColorScheme } from '@/components/settings/account-theme-handler'
 import { DEFAULT_THEME, type WorkspaceTheme } from '@/lib/editor/theme'
+import { clearOfflineCaches } from '@/lib/offline/clear-caches'
 import { Avatar } from './Avatar'
 import { useMenuDismiss } from './use-menu-dismiss'
 import { useMenuKeyboard } from './use-menu-keyboard'
@@ -146,12 +147,18 @@ export function UserCluster({
       } catch {
         // network/parse failure → fall through to the local /login redirect
       }
+      // D5: purge the offline shell caches + per-doc Yjs IndexedDB before EITHER
+      // redirect (OIDC end-session or local /login) so a shared machine never
+      // leaks the departing user's cached pages / document content. Best-effort.
+      await clearOfflineCaches()
       if (redirectTo) {
         window.location.assign(redirectTo)
         return
       }
-      router.replace('/login')
-      router.refresh()
+      // HARD navigation (not router.replace): a client transition keeps this authed
+      // page + its link-prefetch alive and re-populates the cache right after we
+      // clear it; a full navigation tears it down so the purge sticks.
+      window.location.assign('/login')
     })
   }
 

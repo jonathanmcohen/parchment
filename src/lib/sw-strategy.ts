@@ -73,6 +73,16 @@ export function swStrategyFor(
     return 'cache-first'
   }
 
+  // 6b. Self-hosted fonts (/fonts/*.woff2) and PWA icons (/icons/*.png) →
+  //     cache-first. These are versioned-by-content in practice (a font/icon
+  //     swap ships a new file), so serving a cached copy is safe and makes the
+  //     app shell paint correctly on the FIRST offline load (fonts are otherwise
+  //     a render-blocking miss). The big material-symbols file is cached lazily
+  //     on first fetch (not precached) to avoid a 5 MB install cost.
+  if (pathname.startsWith('/fonts/') || pathname.startsWith('/icons/')) {
+    return 'cache-first'
+  }
+
   // 7. Navigation requests (full page loads, back/forward) → network-first.
   //    Network-first ensures the user always gets the latest HTML/build on a new
   //    deploy; falls back to cached shell only when offline.
@@ -80,7 +90,43 @@ export function swStrategyFor(
     return 'network-first'
   }
 
-  // 8. All other same-origin GETs (/_next/image, /icons/, manifest, etc.) →
+  // 8. All other same-origin GETs (/_next/image, manifest, etc.) →
   //    stale-while-revalidate: serve from cache instantly, revalidate in background.
   return 'swr'
+}
+
+// ---------------------------------------------------------------------------
+// Version-scoped cache naming.
+//
+// public/sw.js is a STATIC asset (Next does not template it) and the release
+// pipeline is off-limits, so the app version is threaded to the SW through its
+// registration URL (`/sw.js?v=<APP_VERSION>`): the SW reads that `?v=` off
+// self.location and builds a version-scoped cache name from it here. A version
+// bump changes the SW script URL (new SW installs) AND the cache name (a fresh
+// cache; the old one is swept on activate) — so an upgrade can never leave a
+// stale shell pinned. These are the source-of-truth; public/sw.js inlines the
+// same one-liners.
+// ---------------------------------------------------------------------------
+
+const CACHE_PREFIX = 'parchment-shell-'
+
+/**
+ * Build the version-scoped shell cache name. A blank/missing version (local dev,
+ * or a registration URL without `?v=`) falls back to a stable "dev" suffix.
+ */
+export function shellCacheName(version: string | null | undefined): string {
+  const v = (version ?? '').trim()
+  return `${CACHE_PREFIX}${v === '' ? 'dev' : v}`
+}
+
+/**
+ * Activate-time cleanup predicate: is `name` a Parchment shell cache that is NOT
+ * the current one? Only our own caches (parchment-*) are ever considered — a
+ * cache owned by other code (e.g. a future workbox integration) is left alone.
+ * The legacy pre-versioned `parchment-v1` name matches `parchment-` and so is
+ * swept on the first post-upgrade activate.
+ */
+export function isStaleShellCache(name: string, currentName: string): boolean {
+  if (name === currentName) return false
+  return name.startsWith('parchment-')
 }

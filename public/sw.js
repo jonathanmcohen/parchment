@@ -3,64 +3,116 @@
  *
  * Cache strategy (see src/lib/sw-strategy.ts for the canonical classifier):
  *   /_next/static/**   → cache-first   (content-hashed, immutable)
- *   navigate           → network-first (never serve stale HTML)
+ *   /fonts/** /icons/**→ cache-first   (self-hosted, versioned-by-content)
+ *   navigate           → network-first (never serve stale HTML; offline fallback)
  *   /api/**            → network-only  (pass through, never cache)
  *   ws:/wss:           → network-only  (collab WebSocket)
  *   non-GET            → network-only  (mutations)
  *   other same-origin  → stale-while-revalidate
+ *
+ * Versioned caches (see src/lib/sw-strategy.ts shellCacheName/isStaleShellCache):
+ *   The app version is threaded in via the registration URL `/sw.js?v=<APP_VERSION>`.
+ *   We read that `?v=` off self.location and scope the cache name to it, so an
+ *   upgrade lands a fresh cache and the old one is swept on activate — a release
+ *   can never leave a stale shell pinned.
+ *
+ * Update model (D2): the new SW does NOT skipWaiting on install; it waits. The
+ * page's ServiceWorkerRegister surfaces a "refresh to update" toast and, on the
+ * user's click, posts { type: 'SKIP_WAITING' } so we activate then. This avoids
+ * an unsolicited mid-session reload. First install (no controller) activates as
+ * usual — there is nothing to refresh from.
  */
 
-const CACHE_VERSION = 'parchment-v1'
-// Shell URLs to precache on install (minimal set — the dynamic assets get
-// cached lazily on first fetch).
-const _PRECACHE_URLS = ['/', '/offline']
+// Derive the version-scoped cache name from the registration URL's `?v=`.
+// Mirrors shellCacheName() in src/lib/sw-strategy.ts (kept in sync by hand).
+const _SW_VERSION = new URL(self.location.href).searchParams.get('v')
+const CACHE_VERSION = `parchment-shell-${_SW_VERSION && _SW_VERSION.trim() !== '' ? _SW_VERSION.trim() : 'dev'}`
+
+// Shell URLs to precache on install. '/' is the app shell (required for offline).
+// '/offline' is the graceful never-visited-doc fallback page. Core self-hosted
+// fonts + PWA icons make the shell paint correctly on the first offline load.
+// The 5 MB material-symbols font is intentionally NOT precached (cached lazily,
+// cache-first, on first fetch).
+const PRECACHE_URLS = [
+  '/',
+  '/offline',
+  '/fonts/roboto-400.woff2',
+  '/fonts/roboto-500.woff2',
+  '/fonts/roboto-700.woff2',
+  '/fonts/roboto-mono-400.woff2',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+]
 
 // ---------------------------------------------------------------------------
-// Install — precache shell + skipWaiting so the new SW activates immediately.
-//
-// cache.addAll() is atomic: if any URL fails (e.g. /offline returns 404 on
-// first deploy because the route doesn't exist yet), the ENTIRE batch is
-// rolled back — including the app shell '/'. That would leave nothing precached
-// and the app unable to load offline even after visiting once.
-//
-// Fix: cache '/' and '/offline' in separate calls. The app shell '/' is
-// always cached (required for offline support). '/offline' is best-effort —
-// a 404 on first deploy is silently ignored and it will be cached lazily on
-// first navigation, or on the next SW install once the route exists.
-//
-// skipWaiting() is chained last in the waitUntil promise (not in .finally())
-// so event.waitUntil properly holds the install event open until skipWaiting
-// resolves, which is the spec-correct pattern.
+// Install — precache the shell. Each URL is added independently (NOT via a single
+// atomic cache.addAll) so one 404 (e.g. /offline missing on an old deploy, or a
+// renamed font) can never roll back the critical '/' precache. '/' is added first
+// and its failure propagates (the app must have a shell); all others are
+// best-effort. We do NOT skipWaiting here — see the update model above.
 // ---------------------------------------------------------------------------
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches
-      .open(CACHE_VERSION)
-      .then((cache) =>
-        // Cache the app shell unconditionally — this is the critical precache.
-        cache.add('/').then(() =>
-          // Cache /offline separately; 404 on first deploy is expected and safe.
-          cache.add('/offline').catch(() => {
-            // /offline route may not exist yet — ignore so '/' is still cached.
+    caches.open(CACHE_VERSION).then(async (cache) => {
+      // Critical: the app shell must be cached or offline support is pointless.
+      await cache.add('/')
+      // Everything else is best-effort — a single miss must not fail the install.
+      await Promise.all(
+        PRECACHE_URLS.filter((u) => u !== '/').map((url) =>
+          cache.add(url).catch(() => {
+            // Missing/renamed asset — ignore; it caches lazily on first fetch.
           }),
         ),
       )
-      .then(() => self.skipWaiting()),
+    }),
   )
 })
 
 // ---------------------------------------------------------------------------
-// Activate — delete stale caches, claim existing clients immediately.
+// Activate — delete stale Parchment caches, claim existing clients immediately.
+// Only our own (parchment-*) caches other than the current one are removed;
+// caches owned by other code are left untouched. Mirrors isStaleShellCache().
 // ---------------------------------------------------------------------------
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key))),
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE_VERSION && key.startsWith('parchment-'))
+            .map((key) => caches.delete(key)),
+        ),
       )
       .then(() => self.clients.claim()),
   )
+})
+
+// ---------------------------------------------------------------------------
+// Message handler:
+//   SKIP_WAITING  — the page tells a waiting SW to take over now (user clicked
+//                   "refresh to update"). skipWaiting() promotes this worker; the
+//                   page's single 'controllerchange' listener then reloads once.
+//   CLEAR_CACHES  — logout purge. Delete every parchment-* cache from the SW
+//                   context so it completes even after the logging-out page has
+//                   navigated away (mopping up any authed shell entry a last-
+//                   moment link-prefetch re-added). Only our own caches; the HTTP
+//                   cache and other-origin caches are untouched.
+// ---------------------------------------------------------------------------
+self.addEventListener('message', (event) => {
+  const data = event.data
+  if (!data) return
+  if (data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  } else if (data.type === 'CLEAR_CACHES') {
+    event.waitUntil(
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(keys.filter((k) => k.startsWith('parchment-')).map((k) => caches.delete(k))),
+        ),
+    )
+  }
 })
 
 // ---------------------------------------------------------------------------
@@ -89,6 +141,7 @@ function swStrategyFor(url, method, mode, origin) {
     return 'network-only'
 
   if (pathname.startsWith('/_next/static/')) return 'cache-first'
+  if (pathname.startsWith('/fonts/') || pathname.startsWith('/icons/')) return 'cache-first'
 
   if (mode === 'navigate') return 'network-first'
 
@@ -128,7 +181,7 @@ self.addEventListener('fetch', (event) => {
 
 /**
  * Cache-first: serve from cache immediately; fetch + cache on miss.
- * Used for immutable /_next/static/ assets.
+ * Used for immutable /_next/static/ assets and self-hosted fonts/icons.
  */
 async function cacheFirst(request) {
   const cached = await caches.match(request)
@@ -165,12 +218,19 @@ async function networkFirst(request) {
     }
     return response
   } catch {
-    // Offline — serve cached version if available.
+    // Offline — serve the cached version of THIS page if we have it. A doc that
+    // was opened online is cached under its own URL here (and its body then
+    // hydrates from IndexedDB via the editor's y-indexeddb path), so a reload of
+    // an already-visited doc works offline. (Flow 4a.)
     const cached = await caches.match(request)
     if (cached) return cached
-    // Last resort: serve the offline fallback page.
+    // A never-visited page (flow 4c): show the dedicated, graceful /offline page
+    // rather than the raw file-list shell or a browser error page. Fall further
+    // back to the app shell '/', then a minimal inline notice.
     const offline = await caches.match('/offline')
     if (offline) return offline
+    const shell = await caches.match('/')
+    if (shell) return shell
     return new Response(
       '<!doctype html><html><head><title>Offline</title></head><body><h1>You are offline</h1><p>Parchment will resume when your connection returns.</p></body></html>',
       { status: 503, headers: { 'Content-Type': 'text/html' } },

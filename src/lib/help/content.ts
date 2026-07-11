@@ -80,6 +80,13 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.11',
+    notes: [
+      'Fixed single sign-on: the OIDC token exchange behind a reverse proxy sent the internal redirect_uri, so every SSO login ended with “did not complete”. Sign-in via your identity provider now works.',
+      'SSO failures now log a one-line diagnostic server-side (error class and provider reason only — never tokens), so the next issue is debuggable from the container logs.',
+    ],
+  },
+  {
     version: '0.2.10',
     notes: [
       'New keyboard shortcuts: ⌘/Ctrl+Enter inserts a page break, ⌘⇧K links, ⌘⌥M comments, ⌘⇧↑/↓ moves a block, ⌘D duplicates it, and ⌘/ opens the shortcut reference — which now lists every shortcut that actually works.',

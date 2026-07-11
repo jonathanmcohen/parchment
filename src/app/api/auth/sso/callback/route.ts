@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { logAuditRequest } from '@/lib/audit'
 import { resolveOidcUser } from '@/lib/auth/oidc-account'
-import { discoverOidc, exchangeCallback } from '@/lib/auth/oidc-client'
+import { discoverOidc, exchangeCallback, oidcRedirectUri } from '@/lib/auth/oidc-client'
 import { getOidcConfig, isOidcEnabled } from '@/lib/auth/oidc-config'
 import { consumeOidcFlow } from '@/lib/auth/oidc-flow-repo'
 import { createSession } from '@/lib/auth/session'
@@ -62,18 +62,29 @@ export async function GET(req: NextRequest) {
   let claims: Awaited<ReturnType<typeof exchangeCallback>>
   try {
     const configuration = await discoverOidc(config)
-    // openid-client requires a plain URL instance; req.nextUrl is a NextURL proxy,
-    // so pass a fresh URL built from the full request URL (carries ?state&code).
+    // openid-client derives the token request's redirect_uri from currentUrl, and the
+    // IdP requires it to byte-match the registered value. Behind the TLS-terminating
+    // proxy req.url carries the INTERNAL origin (http://0.0.0.0:3000), so it must be
+    // rebuilt on the PUBLIC callback URL (same anti-spoof rule as /start) with the
+    // incoming ?code&state&iss query preserved.
     claims = await exchangeCallback({
       configuration,
-      currentUrl: new URL(req.url),
+      currentUrl: new URL(`${oidcRedirectUri()}${req.nextUrl.search}`),
       expectedState: state,
       expectedNonce: flow.nonce,
       codeVerifier: flow.codeVerifier,
     })
-  } catch {
-    // Signature/iss/aud/exp/nonce/PKCE/state failure — generic reject, nothing leaked.
-    // Deliberately swallow the error (no logging) so no token/claim/secret can surface.
+  } catch (err) {
+    // Signature/iss/aud/exp/nonce/PKCE/state failure — generic reject toward the
+    // browser (nothing leaked in the response), but log the error CLASS + message
+    // server-side so operators can diagnose (e.g. the IdP's invalid_grant reason).
+    // openid-client messages never embed tokens; claims/secrets are never logged.
+    const detail =
+      err && typeof err === 'object' && 'error_description' in err
+        ? ` (${String((err as { error_description: unknown }).error_description)})`
+        : ''
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : 'unknown error'
+    console.error(`[sso] callback token exchange failed: ${msg}${detail}`)
     return fail(req, 'invalid')
   }
 

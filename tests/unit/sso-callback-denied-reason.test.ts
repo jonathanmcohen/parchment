@@ -27,7 +27,11 @@ const {
 }))
 
 vi.mock('@/lib/auth/oidc-config', () => ({ isOidcEnabled, getOidcConfig }))
-vi.mock('@/lib/auth/oidc-client', () => ({ discoverOidc, exchangeCallback }))
+vi.mock('@/lib/auth/oidc-client', () => ({
+  discoverOidc,
+  exchangeCallback,
+  oidcRedirectUri: () => 'http://localhost:3000/api/auth/sso/callback',
+}))
 vi.mock('@/lib/auth/oidc-flow-repo', () => ({ consumeOidcFlow }))
 vi.mock('@/lib/auth/oidc-account', () => ({ resolveOidcUser }))
 vi.mock('@/lib/auth/session', () => ({ createSession }))

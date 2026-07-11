@@ -89,8 +89,13 @@ for (const file of files) {
     }
   }
   if (short.endsWith('release.yml')) {
-    if (!content.includes('platforms: linux/amd64,linux/arm64')) {
-      fail(short, 0, 'release.yml missing multi-arch platforms line')
+    // Multi-arch guarantee: either the combined single-build line, or (v0.2.12
+    // sharded publish) BOTH platforms present as matrix entries.
+    const combined = content.includes('platforms: linux/amd64,linux/arm64')
+    const sharded =
+      content.includes('platform: linux/amd64') && content.includes('platform: linux/arm64')
+    if (!combined && !sharded) {
+      fail(short, 0, 'release.yml missing multi-arch platforms (combined line or matrix entries)')
     }
     if (!/packages:\s*write/.test(content)) {
       fail(short, 0, 'release.yml missing "packages: write" permission')

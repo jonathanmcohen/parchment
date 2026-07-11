@@ -17,19 +17,93 @@ jobs:
   gate:
     uses: ./.github/workflows/ci.yml
 
+  # v0.2.12: SHARDED multi-arch publish. The old single job built arm64 under QEMU
+  # emulation (~20 min wall). Now each arch builds NATIVELY in parallel — amd64 on
+  # ubuntu-latest, arm64 on GitHub's free-for-public-repos arm runner — pushed
+  # by-digest (no tags), and a tiny merge job stitches the digests into the tagged
+  # multi-arch manifest list. Wall time ≈ the slower single arch + ~1 min.
   publish:
     needs: gate
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
 
-      # Multi-arch (amd64 + arm64) builds run on the GitHub-hosted runner via QEMU
-      # emulation + buildx — the user's stated preference (not local builds).
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      # Native per-arch builds — no QEMU anywhere.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sanitize platform for artifact/cache keys
+        id: plat
+        run: echo "slug=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          # CF2: stamp the image with the commit it was built from. version.ts
+          # BUILD_SHA reads process.env.GIT_SHA → shown on the /whats-new About page.
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          # Push an untagged per-arch image by digest; the merge job creates the
+          # tagged manifest list from the two digests.
+          outputs: type=image,name=ghcr.io/jonathanmcohen/parchment,push-by-digest=true,name-canonical=true,push=true
+          provenance: true
+          sbom: true
+          # Per-arch cache scope — the two builds must not clobber each other's cache.
+          cache-from: type=gha,scope=build-${{ steps.plat.outputs.slug }}
+          cache-to: type=gha,mode=max,scope=build-${{ steps.plat.outputs.slug }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ steps.plat.outputs.slug }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Stitch the per-arch digests into the tagged multi-arch manifest list
+  # (ghcr.io/jonathanmcohen/parchment:vX.Y.Z + :latest).
+  merge:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -52,23 +126,15 @@ jobs:
             type=ref,event=tag
             type=raw,value=latest
 
-      - name: Build and push multi-arch image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          # CF2: stamp the image with the commit it was built from. version.ts
-          # BUILD_SHA reads process.env.GIT_SHA → shown on the /whats-new About page.
-          build-args: |
-            GIT_SHA=${{ github.sha }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          provenance: true
-          sbom: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create and push the multi-arch manifest list
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/jonathanmcohen/parchment@sha256:%s ' *)
+
+      - name: Inspect the pushed manifest
+        run: docker buildx imagetools inspect "ghcr.io/jonathanmcohen/parchment:${{ steps.meta.outputs.version }}"
 
   # I8: container security scan. Runs AFTER publish so the pushed image is
   # available to pull. Fails the workflow ONLY on FIXED HIGH/CRITICAL CVEs.
@@ -93,7 +159,9 @@ jobs:
   #    digest: the gate run is exit 0 (0 HIGH/CRITICAL), while the all-severity
   #    sarif run is exit 1 (the MEDIUMs) — hence the split.
   scan:
-    needs: publish
+    # The tagged manifest list only exists after the merge job stitches the
+    # per-arch digests — scanning must wait for it, not for the arch builds.
+    needs: merge
     runs-on: ubuntu-latest
     permissions:
       contents: read

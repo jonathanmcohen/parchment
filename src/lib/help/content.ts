@@ -80,6 +80,13 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.12',
+    notes: [
+      "Images are now stored in the database alongside your documents. Previously they lived only on the server's disk, so restoring from a backup gave you documents with broken images. A restore now brings everything back together.",
+      'Storage usage is calculated from the database rather than by scanning files, so it stays accurate after a restore and is faster to check.',
+    ],
+  },
+  {
     version: '0.2.11',
     notes: [
       'Fixed single sign-on: the OIDC token exchange behind a reverse proxy sent the internal redirect_uri, so every SSO login ended with “did not complete”. Sign-in via your identity provider now works.',

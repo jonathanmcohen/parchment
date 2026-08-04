@@ -55,7 +55,10 @@ export function relPathIfManaged(absFilePath: string): string | null {
   if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null
 
   const segments = rel.split(sep)
-  // Reject dotfiles/dot-dirs and `.assets` anywhere in the chain.
+  // Reject dotfiles/dot-dirs and `.assets` anywhere in the chain. The
+  // endsWith('.assets') arm also covers the v0.2.12 `<DocName>.assets/` folders
+  // the mirror writes beside each .md: asset sync is one-directional (DB to disk),
+  // so an image on disk must NEVER be mistaken for an edited document.
   if (segments.some((s) => s.startsWith('.') || s === '.assets' || s.endsWith('.assets'))) {
     return null
   }

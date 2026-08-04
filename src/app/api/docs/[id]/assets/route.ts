@@ -3,10 +3,11 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { db, schema } from '@/db'
 import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { authorizeDocRoute } from '@/lib/authz/doc-access'
+import { isS3Configured } from '@/lib/backup/s3'
 import { listDocuments } from '@/lib/docs/repo'
-import { env } from '@/lib/env'
-import { checkQuota, getUsedAssetBytes } from '@/lib/quota'
+import { checkQuota } from '@/lib/quota'
 import { safeAssetName } from '@/lib/uploads/asset-path'
+import { getUsedAssetBytesFromDb, upsertAsset } from '@/lib/uploads/assets-repo'
 import { putAsset } from '@/lib/uploads/store'
 import { ALLOWED_UPLOAD_TYPES, classifyUpload } from '@/lib/uploads/validate'
 
@@ -68,8 +69,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (userRow && userRow.quotaMb > 0) {
     const docs = await listDocuments(user.id)
     const docIds = docs.map((d) => d.id)
-    const assetsRoot = `${env.filesRoot}/.assets`
-    const usedBytes = await getUsedAssetBytes(docIds, assetsRoot)
+    // v0.2.12: read usage from the assets table rather than globbing `.assets`.
+    // Cheaper, and correct after a database restore.
+    const usedBytes = await getUsedAssetBytesFromDb(docIds)
     if (!checkQuota({ quotaMb: userRow.quotaMb, usedBytes, fileBytes: bytes.byteLength })) {
       return NextResponse.json(
         { error: 'quota_exceeded', usedMb: usedBytes / (1024 * 1024), quotaMb: userRow.quotaMb },
@@ -79,6 +81,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   }
 
   const name = safeAssetName(file.name, result.ext)
+
+  // v0.2.12: the assets row is the source of truth; putAsset only places bytes.
+  // Row first so a failed byte write cannot leave an unrecorded file behind.
+  // `storeInDb` is false when BACKUP_S3_* is configured - bytes live in S3 then,
+  // and the row carries metadata only.
+  await upsertAsset({
+    docId: id,
+    filename: name,
+    mime: result.contentType,
+    bytes,
+    storeInDb: !isS3Configured(),
+  })
   await putAsset({ id }, name, bytes, result.contentType)
 
   return NextResponse.json(

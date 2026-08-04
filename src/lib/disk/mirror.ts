@@ -10,6 +10,7 @@ import { and, eq, isNotNull, isNull, ne } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { folderPath } from '@/lib/docs/folder-tree'
 import { listFolders } from '@/lib/docs/folders-repo'
+import { removeAssetsDir, syncAssetsToDisk, toDiskMarkdown } from './assets-mirror'
 import { sha256 } from './hash'
 import { disambiguate, docRelPath } from './paths'
 
@@ -71,6 +72,13 @@ export async function syncDocToDisk(docId: string): Promise<string | null> {
     const abs = absPath(relPath)
     const markdown = doc.markdown ?? ''
 
+    // v0.2.15: the DISK copy points at `<DocName>.assets/<file>`, not at the
+    // `/api/docs/<id>/assets/...` route the database stores, so the mirrored
+    // directory is usable outside the app. Everything downstream - the hash
+    // baseline, the file write - must use this form consistently. See
+    // assets-mirror.ts for why the rewrite has to run in both directions.
+    const diskMarkdown = toDiskMarkdown(markdown, docId, relPath)
+
     // Update disk_path + sync baseline in the DB BEFORE writing the file.
     //
     // The reverse-sync watcher (F2) resolves a doc by disk_path and classifies
@@ -84,14 +92,23 @@ export async function syncDocToDisk(docId: string): Promise<string | null> {
     // first means the watcher never observes a new file against a stale baseline:
     // worst case it reads the new baseline before the file lands and self-corrects
     // as an echo on the next settled event.
+    //
+    // v0.2.15: the baseline hashes the DISK form. Hashing the database form
+    // against a file that legitimately differs from it would make the watcher
+    // read every mirrored document as externally modified, forever.
     await db
       .update(schema.documents)
-      .set({ diskPath: relPath, diskSyncedHash: sha256(markdown) })
+      .set({ diskPath: relPath, diskSyncedHash: sha256(diskMarkdown) })
       .where(eq(schema.documents.id, docId))
 
     // Write the file
     await mkdir(dirname(abs), { recursive: true })
-    await writeFile(abs, markdown, 'utf8')
+    await writeFile(abs, diskMarkdown, 'utf8')
+
+    // v0.2.15: write the asset bytes beside it. Best-effort by contract - a
+    // mirror failure must never fail a document save - so this cannot throw and
+    // its return value is deliberately unused here.
+    await syncAssetsToDisk(docId, relPath)
 
     // Remove old file if path changed
     const oldRelPath = doc.diskPath
@@ -102,6 +119,10 @@ export async function syncDocToDisk(docId: string): Promise<string | null> {
       } catch {
         // best-effort
       }
+      // The assets directory is named after the .md, so a rename or move leaves
+      // the old `<OldName>.assets/` orphaned next to nothing. syncAssetsToDisk
+      // above has already written the new one.
+      await removeAssetsDir(oldRelPath)
       // Prune empty ancestor dirs up to (not including) filesRoot
       const root = filesRoot()
       let dir = dirname(oldAbs)
@@ -189,6 +210,10 @@ export async function removeDocFromDisk(docId: string): Promise<void> {
     } catch {
       // best-effort
     }
+
+    // v0.2.15: the doc's assets go with it. The `assets` rows are already gone
+    // via ON DELETE CASCADE; this clears the mirrored bytes.
+    await removeAssetsDir(doc.diskPath)
 
     // Prune empty ancestor dirs
     let dir = dirname(oldAbs)

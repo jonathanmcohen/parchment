@@ -26,3 +26,6 @@ parchment-data/
 # os / editor
 .DS_Store
 *.log
+
+# behavioural migrate test staging dir
+.migrate-test-broken/

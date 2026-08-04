@@ -80,6 +80,15 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.15',
+    notes: [
+      'Images and attachments are now written beside their document on disk, in a folder named after it, and the exported Markdown links to them by relative path. A mirrored folder can be opened outside Parchment with its pictures intact.',
+      'Fixed a database migration bug: every restart re-ran every migration because the record of what had already been applied was never created. Harmless so far, but it would have become a real problem for any future migration that changes data rather than structure.',
+      'Container images are now scanned for security advisories before they are published rather than after, and both processor architectures are scanned instead of only one. A failing scan now means nothing is published at all.',
+      'Updated Next.js to 16.3.0.',
+    ],
+  },
+  {
     version: '0.2.14',
     notes: [
       'Security: updated Next.js and one bundled library to patched releases, closing an authentication-bypass and two server-side request forgery advisories. No change to how Parchment behaves.',

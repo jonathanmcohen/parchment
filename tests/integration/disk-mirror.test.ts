@@ -191,3 +191,98 @@ describe('F1 — disk mirror write side', () => {
     expect(content).toBe('# Restore me')
   })
 })
+
+// v0.2.15: the mirror half of DB-backed assets. Proves the bytes actually land
+// beside the .md and that the markdown written to disk points at them.
+//
+// NOTE: this file is NOT run by CI (`vitest run --exclude '**/integration/**'`).
+// It was executed by hand against a real container for the v0.2.15 PR. See the
+// open item about the integration suite never gating a release.
+describe('v0.2.15 - assets mirrored beside the .md', () => {
+  const PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  )
+  const ASSET = 'c67d1549-f511-4a57-b214-bf5e0844dc71.png'
+
+  async function addAsset(docId: string, filename = ASSET): Promise<void> {
+    const { upsertAsset } = await import('@/lib/uploads/assets-repo')
+    await upsertAsset({
+      docId,
+      filename,
+      mime: 'image/png',
+      bytes: new Uint8Array(PNG),
+      storeInDb: true,
+    })
+  }
+
+  it('writes the asset bytes into <DocName>.assets/ and rewrites the link', async () => {
+    const { createDocument, saveDocument } = await import('@/lib/docs/repo')
+    const { id } = await createDocument(ownerId, { title: 'With Image' })
+    await addAsset(id)
+    await saveDocument(id, {
+      contentJson: {},
+      markdown: `![shot](/api/docs/${id}/assets/${ASSET})`,
+      title: 'With Image',
+    })
+
+    // The bytes are on disk, beside the .md, byte-identical to the DB copy.
+    const assetPath = join(filesDir, 'With Image.assets', ASSET)
+    expect(await fileExists(assetPath)).toBe(true)
+    expect(await readFile(assetPath)).toEqual(PNG)
+
+    // ...and the mirrored markdown points at the relative path, not the api route.
+    const md = await readFile(join(filesDir, 'With Image.md'), 'utf8')
+    expect(md).toBe(`![shot](With%20Image.assets/${ASSET})`)
+    expect(md).not.toContain('/api/docs/')
+  })
+
+  it('moves the assets directory when the document is renamed', async () => {
+    const { createDocument, saveDocument, renameDocument } = await import('@/lib/docs/repo')
+    const { id } = await createDocument(ownerId, { title: 'Before Rename' })
+    await addAsset(id)
+    await saveDocument(id, {
+      contentJson: {},
+      markdown: `![](/api/docs/${id}/assets/${ASSET})`,
+      title: 'Before Rename',
+    })
+    expect(await fileExists(join(filesDir, 'Before Rename.assets', ASSET))).toBe(true)
+
+    await renameDocument(ownerId, id, 'After Rename')
+
+    expect(await fileExists(join(filesDir, 'After Rename.assets', ASSET))).toBe(true)
+    expect(await fileExists(join(filesDir, 'Before Rename.assets', ASSET))).toBe(false)
+    // The rewritten link must follow the new directory name too.
+    const md = await readFile(join(filesDir, 'After Rename.md'), 'utf8')
+    expect(md).toBe(`![](After%20Rename.assets/${ASSET})`)
+  })
+
+  it('removes the assets directory when the document is trashed', async () => {
+    const { createDocument, saveDocument, trashDocument } = await import('@/lib/docs/repo')
+    const { id } = await createDocument(ownerId, { title: 'Doomed' })
+    await addAsset(id)
+    await saveDocument(id, {
+      contentJson: {},
+      markdown: `![](/api/docs/${id}/assets/${ASSET})`,
+      title: 'Doomed',
+    })
+    expect(await fileExists(join(filesDir, 'Doomed.assets', ASSET))).toBe(true)
+
+    await trashDocument(ownerId, id)
+    expect(await fileExists(join(filesDir, 'Doomed.assets', ASSET))).toBe(false)
+  })
+
+  it('prunes a file the database no longer lists', async () => {
+    const { createDocument, saveDocument } = await import('@/lib/docs/repo')
+    const { deleteAsset } = await import('@/lib/uploads/assets-repo')
+    const { id } = await createDocument(ownerId, { title: 'Pruned' })
+    await addAsset(id)
+    await saveDocument(id, { contentJson: {}, markdown: 'x', title: 'Pruned' })
+    expect(await fileExists(join(filesDir, 'Pruned.assets', ASSET))).toBe(true)
+
+    // The database is the authority: drop the row, re-save, the file goes.
+    await deleteAsset(id, ASSET)
+    await saveDocument(id, { contentJson: {}, markdown: 'y', title: 'Pruned' })
+    expect(await fileExists(join(filesDir, 'Pruned.assets', ASSET))).toBe(false)
+  })
+})

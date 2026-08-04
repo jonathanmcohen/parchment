@@ -80,6 +80,12 @@ export type ChangelogEntry = {
 /** Newest-first changelog. Used by the Parchment Guide “Release notes” doc. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.13',
+    notes: [
+      'Security: updated three bundled libraries (postcss, sharp, undici) to patched releases. No change to how Parchment behaves.',
+    ],
+  },
+  {
     version: '0.2.12',
     notes: [
       "Images are now stored in the database alongside your documents. Previously they lived only on the server's disk, so restoring from a backup gave you documents with broken images. A restore now brings everything back together.",

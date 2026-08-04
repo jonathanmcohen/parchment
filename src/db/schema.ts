@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   vector,
 } from 'drizzle-orm/pg-core'
@@ -564,6 +565,35 @@ export const appConfig = pgTable('app_config', {
   value: text('value').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// ─── Assets (v0.2.12) ────────────────────────────────────────────────────────
+// Source of truth for document asset bytes and metadata. Previously assets were
+// disk-only under `${filesRoot}/.assets/<docId>/`, so a database restore returned
+// documents with broken images. The copy written beside the .md on disk is a
+// one-directional MIRROR of this table — the mirror never writes back here.
+//
+// `bytes` is null when BACKUP_S3_* is configured and the bytes live in S3; the row
+// is still written so metadata, quota, and the mirror have one source.
+export const assets = pgTable(
+  'assets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    filename: text('filename').notNull(),
+    mime: text('mime').notNull(),
+    byteSize: integer('byte_size').notNull(),
+    sha256: text('sha256').notNull(),
+    bytes: bytea('bytes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('assets_doc_filename_uniq').on(t.docId, t.filename),
+    index('assets_doc_idx').on(t.docId),
+    index('assets_sha_idx').on(t.sha256),
+  ],
+)
 
 // Hint for the migration generator: ensure extensions exist.
 export const _extensions = sql`create extension if not exists vector;`

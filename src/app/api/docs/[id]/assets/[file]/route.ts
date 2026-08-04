@@ -3,6 +3,7 @@ import { apiAuthFailure, authenticateRequest } from '@/lib/auth/guard'
 import { getDocAccess } from '@/lib/authz/doc-access'
 import { resolveShareGrant } from '@/lib/docs/share-grant'
 import { isUuidName } from '@/lib/uploads/asset-path'
+import { getAssetBytes } from '@/lib/uploads/assets-repo'
 import { getAsset } from '@/lib/uploads/store'
 
 // J1-5: serve a doc asset to any AUTHORIZED viewer — owner, a shared-grant user, OR
@@ -70,7 +71,9 @@ export async function GET(
   const access = await getDocAccess({ user, shareGrant }, id)
   if (!access.canView) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
-  const bytes = await getAsset({ id }, file)
+  // v0.2.12: the database is the source of truth. Disk is the fallback for assets
+  // uploaded before this release, which have no row yet.
+  const bytes = (await getAssetBytes(id, file)) ?? (await getAsset({ id }, file))
   if (!bytes) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   const ext = file.split('.').at(-1)?.toLowerCase() ?? ''

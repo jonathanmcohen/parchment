@@ -14,19 +14,19 @@ DB_NAME="${DB_NAME:-${POSTGRES_DB:-parchment}}"
 # Export PGPASSWORD so pg client tools don't prompt interactively.
 export PGPASSWORD="$DB_PASS"
 
-# ── 1. Wait for Postgres ───────────────────────────────────────────────────────
+# -- 1. Wait for Postgres -------------------------------------------------------
 echo "[parchment] waiting for postgres at $DB_HOST:$DB_PORT as $DB_USER ..."
 until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" >/dev/null 2>&1; do sleep 2; done
 echo "[parchment] postgres ready"
 
-# ── 2. Ensure DB exists ────────────────────────────────────────────────────────
+# -- 2. Ensure DB exists --------------------------------------------------------
 # createdb is a no-op if the DB was already created by the pgvector image
 # (POSTGRES_DB). Keep the || true guard.
 createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME" 2>/dev/null || true
 
-# ── 3. Schema-presence check (psql) ───────────────────────────────────────────
+# -- 3. Schema-presence check (psql) -------------------------------------------
 # Check if the migrations table exists to decide whether to run or skip.
-# Use $DB_USER and $DB_NAME — never hardcode.
+# Use $DB_USER and $DB_NAME - never hardcode.
 MIGRATED=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc \
   "SELECT to_regclass('public.migrations');" 2>/dev/null || echo "")
 
@@ -36,9 +36,9 @@ else
   echo "[parchment] fresh database; running all migrations ..."
 fi
 
-# ── 4. Apply pending migrations ────────────────────────────────────────────────
+# -- 4. Apply pending migrations ------------------------------------------------
 # Iterate over /app/src/db/migrations/*.sql in order.
-# Each psql call uses $DB_USER/$DB_NAME — never hardcoded.
+# Each psql call uses $DB_USER/$DB_NAME - never hardcoded.
 for SQL_FILE in $(ls /app/src/db/migrations/*.sql 2>/dev/null | sort); do
   MIGRATION_NAME=$(basename "$SQL_FILE" .sql)
   ALREADY_RAN=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc \

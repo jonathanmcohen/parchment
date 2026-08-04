@@ -88,6 +88,22 @@ jobs:
           node-version: 24
       - run: node scripts/verify-carry-forward-closed.mjs
 
+  migrate-bookkeeping:
+    # v0.2.15: behavioural test for rootfs/etc/parchment/migrate.sh.
+    #
+    # Its own job rather than a vitest integration test, because migrate.sh needs
+    # psql/createdb/pg_isready on the machine that RUNS it, and the `unit` job
+    # above excludes tests/integration entirely — so a test placed there would
+    # never gate a release. This runs in containers and needs only docker.
+    #
+    # Guards the bug found on production 2026-08-04: nothing ever created the
+    # `migrations` table, so every container boot replayed all 28 migrations.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify migration bookkeeping
+        run: ./scripts/verify-migrate-bookkeeping.sh
+
   compose-lint:
     # C6: Validate docker-compose.yml and docker-compose.dev.yml parse cleanly.
     # Required env vars with :? are supplied so the validation does not abort.

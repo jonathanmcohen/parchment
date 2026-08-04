@@ -6,6 +6,22 @@ name: Release
 #
 # The release branch (release/v0.1.0) is NEVER deleted here — the user wants old
 # release branches kept. There is no branch-cleanup step anywhere in this file.
+#
+# Ordering history, because it has changed twice and the difference matters:
+#
+#   through v0.2.12   gate → publish → merge → scan
+#                     A finding arrived AFTER :latest already pointed at the new
+#                     image. v0.2.12 shipped a vulnerable :latest exactly so.
+#
+#   v0.2.13/v0.2.14   gate → publish → scan → merge
+#                     A finding blocked the TAGS, but publish had already pushed
+#                     untagged per-arch digests, so a failed scan left orphans in
+#                     the registry.
+#
+#   v0.2.15 (now)     gate → [build → scan → push] per arch → merge
+#                     Nothing reaches the registry until the scan passes. The
+#                     scan also runs per-arch instead of once on amd64, so the
+#                     arm64 image is covered for the first time.
 on:
   push:
     tags:
@@ -22,6 +38,10 @@ jobs:
   # ubuntu-latest, arm64 on GitHub's free-for-public-repos arm runner — pushed
   # by-digest (no tags), and a tiny merge job stitches the digests into the tagged
   # multi-arch manifest list. Wall time ≈ the slower single arch + ~1 min.
+  #
+  # v0.2.15: each leg now BUILDS TO A LOCAL TAR, SCANS IT, and pushes only if the
+  # scan passes. The push is a second build-push-action against the same gha cache
+  # scope, so it is a cache hit rather than a rebuild.
   publish:
     needs: gate
     strategy:
@@ -36,6 +56,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write   # required to upload SARIF to GitHub Security tab
     steps:
       - uses: actions/checkout@v4
 
@@ -54,8 +75,12 @@ jobs:
         id: plat
         run: echo "slug=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push by digest
-        id: build
+      # ── Build LOCALLY first. Nothing is pushed here. ─────────────────────────
+      # A tar (type=docker,dest=…) rather than `load: true` so Trivy can read it
+      # with `--input` and needs no access to the docker daemon socket.
+      # provenance/sbom are omitted deliberately: attestations are a push-time
+      # concern and the docker exporter cannot carry them.
+      - name: Build image to a local tar (no push)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -65,14 +90,76 @@ jobs:
           # BUILD_SHA reads process.env.GIT_SHA → shown on the /whats-new About page.
           build-args: |
             GIT_SHA=${{ github.sha }}
-          # Push an untagged per-arch image by digest; the merge job creates the
-          # tagged manifest list from the two digests.
+          outputs: type=docker,dest=/tmp/image-${{ steps.plat.outputs.slug }}.tar
+          # Per-arch cache scope — the two builds must not clobber each other's
+          # cache. Written here; the push step below reads it back.
+          cache-from: type=gha,scope=build-${{ steps.plat.outputs.slug }}
+          cache-to: type=gha,mode=max,scope=build-${{ steps.plat.outputs.slug }}
+
+      # SARIF for the Security tab — informational only, NEVER fails the job
+      # (exit-code 0). This is the all-severity report.
+      - name: Trivy — build SARIF report (all severities, non-blocking)
+        uses: aquasecurity/trivy-action@master
+        with:
+          input: /tmp/image-${{ steps.plat.outputs.slug }}.tar
+          format: sarif
+          output: trivy-results-${{ steps.plat.outputs.slug }}.sarif
+          ignore-unfixed: true
+          exit-code: '0'          # informational; the gate is the next step
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: always()              # upload even if a later step fails
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results-${{ steps.plat.outputs.slug }}.sarif
+          # Distinct category per arch, otherwise the second leg overwrites the
+          # first one's results instead of adding to them.
+          category: trivy-${{ steps.plat.outputs.slug }}
+
+      # The actual GATE: run the Trivy CLI directly (NOT the action wrapper, which
+      # in sarif mode ignores the severity filter for its exit code — it builds an
+      # ALL-severity report and then lets `exit-code: 1` fire on any severity at
+      # all, so a mere MEDIUM failed the release. That cost v0.2.0 through v0.2.5,
+      # every one of which was red here for no real reason). Table format,
+      # --severity HIGH,CRITICAL, --ignore-unfixed, --exit-code 1 → exits non-zero
+      # ONLY on a FIXED HIGH/CRITICAL.
+      #
+      # v0.2.15: scans the LOCAL TAR, before anything is pushed. A failure here
+      # means the registry never sees this build at all — not even an orphan
+      # digest, which is what v0.2.13 left behind.
+      - name: Trivy — fail on FIXED HIGH/CRITICAL (the gate)
+        env:
+          TAR: /tmp/image-${{ steps.plat.outputs.slug }}.tar
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${{ github.workspace }}/.cache/trivy:/root/.cache/" \
+            -v "$TAR:/image.tar:ro" \
+            aquasec/trivy:0.72.0 image \
+            --input /image.tar \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --scanners vuln \
+            --format table \
+            --exit-code 1
+
+      # ── Only now does anything reach the registry. ───────────────────────────
+      # Same context, same build-args, same cache scope → a cache hit, not a
+      # rebuild. Pushed by digest and untagged; the merge job builds the tagged
+      # manifest list from the two digests.
+      - name: Push by digest (scan passed)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
           outputs: type=image,name=ghcr.io/jonathanmcohen/parchment,push-by-digest=true,name-canonical=true,push=true
           provenance: true
           sbom: true
-          # Per-arch cache scope — the two builds must not clobber each other's cache.
           cache-from: type=gha,scope=build-${{ steps.plat.outputs.slug }}
-          cache-to: type=gha,mode=max,scope=build-${{ steps.plat.outputs.slug }}
 
       - name: Export digest
         run: |
@@ -91,11 +178,11 @@ jobs:
   # Stitch the per-arch digests into the tagged multi-arch manifest list
   # (ghcr.io/jonathanmcohen/parchment:vX.Y.Z + :latest).
   merge:
-    # v0.2.13: waits for scan. publish pushes UNTAGGED per-arch digests, so until
-    # this job runs nothing is reachable as :vX.Y.Z or :latest. Gating merge on
-    # scan means a failing scan leaves only orphan digests in the registry rather
-    # than a vulnerable :latest — which is exactly what happened on v0.2.12.
-    needs: scan
+    # v0.2.15: back to needing `publish` directly, because the scan now lives
+    # INSIDE publish and runs before its push. If either leg's scan fails, that
+    # leg never pushes, fail-fast cancels the other, and merge never runs — so no
+    # tags and no orphan digests.
+    needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -139,110 +226,3 @@ jobs:
 
       - name: Inspect the pushed manifest
         run: docker buildx imagetools inspect "ghcr.io/jonathanmcohen/parchment:${{ steps.meta.outputs.version }}"
-
-  # I8: container security scan. Runs after publish and BEFORE merge, so a finding
-  # blocks the tags from ever being created. Fails ONLY on FIXED HIGH/CRITICAL CVEs.
-  # All-severity results are uploaded to the GitHub Security tab as SARIF.
-  #
-  # Two reliability fixes, learned the hard way (v0.2.0–v0.2.5 all red here):
-  #
-  # 1. Scan a CONCRETE linux/amd64 DIGEST, not the multi-arch tag. Since v0.2.13
-  #    the digest comes straight from the publish matrix artifact, because no tag
-  #    exists yet at scan time. This also sidesteps the original problem: the tag's
-  #    manifest LIST carries two extra `unknown/unknown` in-toto attestation
-  #    manifests (provenance:true/sbom:true), which confused tag-based resolution.
-  #
-  # 2. DECOUPLE the SARIF upload from the pass/fail GATE. aquasecurity/trivy-action
-  #    in `format: sarif` mode builds the report with ALL severities and its
-  #    `exit-code: 1` then fires on ANY severity — IGNORING the `severity:
-  #    HIGH,CRITICAL` input. So a mere MEDIUM/LOW finding (this image has 3 MEDIUMs)
-  #    failed the release even though there are ZERO HIGH/CRITICAL. The fix: the
-  #    trivy-action step only WRITES the SARIF (exit-code 0, never fails); a
-  #    separate `trivy` table run with `--severity HIGH,CRITICAL --ignore-unfixed
-  #    --exit-code 1` is the actual gate. Verified locally on the published amd64
-  #    digest: the gate run is exit 0 (0 HIGH/CRITICAL), while the all-severity
-  #    sarif run is exit 1 (the MEDIUMs) — hence the split.
-  scan:
-    # v0.2.13: runs BEFORE merge, directly against the untagged amd64 digest that
-    # publish pushed. Previously this waited on merge, which meant the tags — and
-    # :latest — already existed by the time a finding was reported. v0.2.12 shipped
-    # a vulnerable :latest that way.
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read           # pull the image + inspect the manifest list
-      security-events: write   # required to upload SARIF to GitHub Security tab
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # The amd64 digest comes straight from the publish matrix artifact. No tag
-      # exists yet at this point, so there is nothing to resolve a manifest list
-      # from — and that is the whole point of scanning here.
-      - name: Download the amd64 digest
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          name: digests-linux-amd64
-
-      - name: Resolve the linux/amd64 platform digest
-        id: digest
-        run: |
-          set -euo pipefail
-          # publish exported the digest as an empty file named after its hex.
-          AMD64_HEX="$(find /tmp/digests -maxdepth 1 -type f -printf '%f\n' | head -n1)"
-          if [ -z "$AMD64_HEX" ]; then
-            echo "::error::no digest file in the digests-linux-amd64 artifact" >&2
-            ls -la /tmp/digests || true
-            exit 1
-          fi
-          echo "ref=ghcr.io/jonathanmcohen/parchment@sha256:${AMD64_HEX}" >> "$GITHUB_OUTPUT"
-          echo "Scanning ghcr.io/jonathanmcohen/parchment@sha256:${AMD64_HEX}"
-
-      # SARIF for the Security tab — informational only, NEVER fails the job
-      # (exit-code 0). This is the all-severity report.
-      - name: Trivy — build SARIF report (all severities, non-blocking)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ steps.digest.outputs.ref }}
-          format: sarif
-          output: trivy-results.sarif
-          ignore-unfixed: true
-          exit-code: '0'          # informational; the gate is the next step
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        if: always()              # upload even if a later step fails
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
-
-      # The actual GATE: run the Trivy CLI directly (NOT the action wrapper, which
-      # in sarif mode ignores the severity filter for its exit code). Table format,
-      # --severity HIGH,CRITICAL, --ignore-unfixed, --exit-code 1 → exits non-zero
-      # ONLY on a FIXED HIGH/CRITICAL. Pinned Trivy version to match the action's,
-      # with the DB cached across the two scans via the shared cache dir. Verified
-      # locally on the published amd64 digest: exit 0 (0 HIGH/CRITICAL; 3 MEDIUMs
-      # are below the gate threshold and correctly do NOT fail it).
-      - name: Trivy — fail on FIXED HIGH/CRITICAL (the gate)
-        env:
-          GATE_REF: ${{ steps.digest.outputs.ref }}
-          REG_USER: ${{ github.actor }}
-          REG_PASS: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          docker run --rm \
-            -e TRIVY_USERNAME="$REG_USER" \
-            -e TRIVY_PASSWORD="$REG_PASS" \
-            -v "${{ github.workspace }}/.cache/trivy:/root/.cache/" \
-            aquasec/trivy:0.72.0 image \
-            --severity HIGH,CRITICAL \
-            --ignore-unfixed \
-            --scanners vuln \
-            --format table \
-            --exit-code 1 \
-            "$GATE_REF"

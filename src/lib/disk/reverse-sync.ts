@@ -11,6 +11,7 @@ import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, schema } from '@/db'
 import { markdownToJson } from '@/lib/markdown/parse'
+import { toDbMarkdown, toDiskMarkdown } from './assets-mirror'
 import { sha256 } from './hash'
 import { type ChangeClass, classifyChange } from './sync-decision'
 
@@ -135,7 +136,12 @@ export async function handleExternalChange(absFilePath: string): Promise<ChangeC
 
     const content = await readFile(absFilePath, 'utf8')
     const fileHash = sha256(content)
-    const dbHash = sha256(doc.markdown ?? '')
+    // v0.2.15: the file on disk carries RELATIVE asset links (`<Doc>.assets/x.png`)
+    // while documents.markdown carries the `/api/docs/<id>/assets/...` form. Both
+    // sides of this comparison must therefore be expressed in the DISK form, or
+    // any document containing an image would hash as different on every event and
+    // be misclassified as an external edit forever.
+    const dbHash = sha256(toDiskMarkdown(doc.markdown ?? '', doc.id, relPath))
     const cls = classifyChange(fileHash, dbHash, doc.diskSyncedHash)
 
     if (cls === 'echo') return 'echo'
@@ -158,7 +164,13 @@ export async function handleExternalChange(absFilePath: string): Promise<ChangeC
       // state decides echo / apply / conflict — never an unconditional overwrite.
       // markdownToJson is a hand-rolled marked-token walk (no editor graph / no
       // @tiptap/html) precisely so it loads + runs in the Next server runtime.
-      const json = markdownToJson(content)
+      // v0.2.15: normalise the relative asset links back to the `/api/...` form
+      // BEFORE parsing or storing. Storing the relative form would break every
+      // image in the app, which resolves them against the document route, not the
+      // filesystem. Bytes still move one way only - this rewrites URL text and
+      // never reads an image off disk or writes to the `assets` table.
+      const dbContent = toDbMarkdown(content, doc.id, relPath)
+      const json = markdownToJson(dbContent)
       const baselineGuard =
         doc.diskSyncedHash == null
           ? isNull(schema.documents.diskSyncedHash)
@@ -167,7 +179,10 @@ export async function handleExternalChange(absFilePath: string): Promise<ChangeC
         .update(schema.documents)
         .set({
           content: json,
-          markdown: content,
+          // The DB form, with `/api/...` asset links restored. diskSyncedHash
+          // stays the hash of what is ON DISK, which is the relative form - the
+          // two columns intentionally describe different texts.
+          markdown: dbContent,
           diskSyncedHash: fileHash,
           updatedAt: new Date(),
         })

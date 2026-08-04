@@ -16,10 +16,7 @@ import { describe, expect, it } from 'vitest'
 // test next door in tests/integration/migrate-script.test.ts never gates a
 // release. Until that changes, these guards are what stops the regression.
 
-const script = readFileSync(
-  path.resolve('rootfs/etc/parchment/migrate.sh'),
-  'utf8',
-)
+const script = readFileSync(path.resolve('rootfs/etc/parchment/migrate.sh'), 'utf8')
 
 // Strip comments so prose about a construct cannot satisfy an assertion about it.
 const code = script

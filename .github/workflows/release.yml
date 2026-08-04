@@ -91,7 +91,11 @@ jobs:
   # Stitch the per-arch digests into the tagged multi-arch manifest list
   # (ghcr.io/jonathanmcohen/parchment:vX.Y.Z + :latest).
   merge:
-    needs: publish
+    # v0.2.13: waits for scan. publish pushes UNTAGGED per-arch digests, so until
+    # this job runs nothing is reachable as :vX.Y.Z or :latest. Gating merge on
+    # scan means a failing scan leaves only orphan digests in the registry rather
+    # than a vulnerable :latest — which is exactly what happened on v0.2.12.
+    needs: scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -136,17 +140,17 @@ jobs:
       - name: Inspect the pushed manifest
         run: docker buildx imagetools inspect "ghcr.io/jonathanmcohen/parchment:${{ steps.meta.outputs.version }}"
 
-  # I8: container security scan. Runs AFTER publish so the pushed image is
-  # available to pull. Fails the workflow ONLY on FIXED HIGH/CRITICAL CVEs.
+  # I8: container security scan. Runs after publish and BEFORE merge, so a finding
+  # blocks the tags from ever being created. Fails ONLY on FIXED HIGH/CRITICAL CVEs.
   # All-severity results are uploaded to the GitHub Security tab as SARIF.
   #
   # Two reliability fixes, learned the hard way (v0.2.0–v0.2.5 all red here):
   #
-  # 1. Scan a CONCRETE linux/amd64 DIGEST, not the multi-arch tag. The publish step
-  #    attaches buildx SBOM + provenance attestations (provenance:true/sbom:true),
-  #    so the tag's manifest LIST carries two extra `unknown/unknown` in-toto
-  #    manifests; resolving the amd64 platform digest and scanning THAT avoids any
-  #    attestation-manifest resolution ambiguity.
+  # 1. Scan a CONCRETE linux/amd64 DIGEST, not the multi-arch tag. Since v0.2.13
+  #    the digest comes straight from the publish matrix artifact, because no tag
+  #    exists yet at scan time. This also sidesteps the original problem: the tag's
+  #    manifest LIST carries two extra `unknown/unknown` in-toto attestation
+  #    manifests (provenance:true/sbom:true), which confused tag-based resolution.
   #
   # 2. DECOUPLE the SARIF upload from the pass/fail GATE. aquasecurity/trivy-action
   #    in `format: sarif` mode builds the report with ALL severities and its
@@ -159,9 +163,11 @@ jobs:
   #    digest: the gate run is exit 0 (0 HIGH/CRITICAL), while the all-severity
   #    sarif run is exit 1 (the MEDIUMs) — hence the split.
   scan:
-    # The tagged manifest list only exists after the merge job stitches the
-    # per-arch digests — scanning must wait for it, not for the arch builds.
-    needs: merge
+    # v0.2.13: runs BEFORE merge, directly against the untagged amd64 digest that
+    # publish pushed. Previously this waited on merge, which meant the tags — and
+    # :latest — already existed by the time a finding was reported. v0.2.12 shipped
+    # a vulnerable :latest that way.
+    needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -175,24 +181,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # The amd64 digest comes straight from the publish matrix artifact. No tag
+      # exists yet at this point, so there is nothing to resolve a manifest list
+      # from — and that is the whole point of scanning here.
+      - name: Download the amd64 digest
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          name: digests-linux-amd64
+
       - name: Resolve the linux/amd64 platform digest
         id: digest
         run: |
           set -euo pipefail
-          REF="ghcr.io/jonathanmcohen/parchment:${{ github.ref_name }}"
-          # imagetools is part of buildx (preinstalled on ubuntu-latest). Pull the
-          # per-platform manifest digest for linux/amd64 from the manifest list.
-          AMD64_DIGEST="$(docker buildx imagetools inspect "$REF" --format '{{json .}}' \
-            | jq -r '.manifest.manifests[]
-                     | select(.platform.os=="linux" and .platform.architecture=="amd64")
-                     | .digest' | head -n1)"
-          if [ -z "$AMD64_DIGEST" ] || [ "$AMD64_DIGEST" = "null" ]; then
-            echo "::error::could not resolve a linux/amd64 digest for $REF" >&2
-            docker buildx imagetools inspect "$REF" || true
+          # publish exported the digest as an empty file named after its hex.
+          AMD64_HEX="$(find /tmp/digests -maxdepth 1 -type f -printf '%f\n' | head -n1)"
+          if [ -z "$AMD64_HEX" ]; then
+            echo "::error::no digest file in the digests-linux-amd64 artifact" >&2
+            ls -la /tmp/digests || true
             exit 1
           fi
-          echo "ref=ghcr.io/jonathanmcohen/parchment@${AMD64_DIGEST}" >> "$GITHUB_OUTPUT"
-          echo "Scanning ghcr.io/jonathanmcohen/parchment@${AMD64_DIGEST}"
+          echo "ref=ghcr.io/jonathanmcohen/parchment@sha256:${AMD64_HEX}" >> "$GITHUB_OUTPUT"
+          echo "Scanning ghcr.io/jonathanmcohen/parchment@sha256:${AMD64_HEX}"
 
       # SARIF for the Security tab — informational only, NEVER fails the job
       # (exit-code 0). This is the all-severity report.

@@ -133,7 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm \
-            -v "${{ github.workspace }}/.cache/trivy:/root/.cache/" \
+            -v "${{ runner.temp }}/trivy-cache:/root/.cache/" \
             -v "$TAR:/image.tar:ro" \
             aquasec/trivy:0.72.0 image \
             --input /image.tar \

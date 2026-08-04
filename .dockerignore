@@ -10,3 +10,6 @@ parchment-data
 .DS_Store
 Dockerfile
 docker-compose.yml
+
+# never send caches as build context (see release.yml trivy note)
+.cache

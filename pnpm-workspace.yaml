@@ -3,9 +3,15 @@
 # and the tree already pulls 4.18.x on one path; this kills the lingering 4.17.21.
 overrides:
   lodash-es@<4.18.0: '^4.18.0'
-  # CVE-2026-12151: undici < 6.27.0 has a DoS (unbounded memory growth). It is a
-  # transitive dep (Next.js runtime fetch); force the patched 6.27.x everywhere.
-  undici@<6.27.0: '^6.27.0'
+  # CVE-2026-13697: undici < 7.29.0. Supersedes the earlier <6.27.0 pin for
+  # CVE-2026-12151 - the tree has since moved to 7.x, so that rule no longer
+  # matched anything. Nothing in the tree wants 6.x.
+  undici@<7.29.0: '^7.29.0'
+  # CVE-2026-45623 + GHSA-r28c-9q8g-f849: postcss. Vendored by next@16.2.9, so a
+  # direct bump cannot reach it. 8.5.18 covers both advisories.
+  postcss@<8.5.18: '^8.5.18'
+  # GHSA-f88m-g3jw-g9cj: sharp < 0.35.0, also vendored by next@16.2.9.
+  sharp@<0.35.0: '^0.35.0'
 allowBuilds:
   '@parcel/watcher': false
   '@swc/core': false

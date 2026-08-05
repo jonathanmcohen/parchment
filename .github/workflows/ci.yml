@@ -57,7 +57,37 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Exclude Testcontainers integration tests — the unit gate is hermetic.
+      # They are NOT unrun: the `integration` job below covers them.
       - run: pnpm exec vitest run --exclude '**/integration/**'
+
+  integration:
+    # 53 files, 371 test cases. Until 2026-08-04 NO workflow ran a single one of
+    # them: `unit` excludes tests/integration and nothing else invoked vitest, so
+    # they were written and maintained while gating nothing.
+    #
+    # What that cost, found the moment this job was written: migration.test.ts
+    # asserts the exact table list, and `assets` (shipped in v0.2.12) had never
+    # been added to it. Two releases went out with a red test nobody could see.
+    #
+    # It runs on every push and PR rather than only on release branches. A job
+    # that skips on feature branches would be the more frugal choice, but a
+    # skipped job also propagates transitively to anything that needs it, which
+    # has cost this project three retags before. ~45s of Testcontainers is worth
+    # less than that failure mode.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Testcontainers needs a docker daemon; ubuntu-latest ships one. The suite
+      # spins real Postgres (pgvector) containers, so it is the only coverage
+      # that exercises the disk mirror, reverse sync, and asset reconciliation
+      # against an actual database.
+      - run: pnpm exec vitest run tests/integration/
 
   build:
     runs-on: ubuntu-latest

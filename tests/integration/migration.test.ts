@@ -51,6 +51,11 @@ describe('A1 — migration + schema', () => {
     expect(rows.map((r) => r.tablename)).toEqual([
       // Phase 0 §1b — instance encrypted config (migration 0020).
       'app_config',
+      // v0.2.12 - DB-backed assets (migration 0028). This entry was MISSING for
+      // two releases: the table shipped, this assertion was never updated, and
+      // nothing caught it because CI did not run tests/integration at all.
+      // Adding the `integration` job in this same change is what surfaced it.
+      'assets',
       'audit_log',
       'cairn_links',
       'collab_state',
